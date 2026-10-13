@@ -35,7 +35,12 @@ These rules apply to all AI-assisted work unless a human maintainer explicitly g
 ## Project Scope Protection
 
 - Respect the project's documented source-of-truth files and team decisions.
-- Cross-user/cross-device capsule delivery, accounts, cloud sync, Firebase, recipient delivery, and similar functionality remain stretch work unless the team explicitly changes that decision.
+- Current working MVP is Option B: basic accounts and direct capsule send/receive for self or another registered user, text/photo, time/location/current AND locks, and persistent access after unlock. Do not treat direct delivery as stretch based on obsolete bootstrap wording.
+- Read `docs/README.md`, the linked source specifications and latest Notion review addenda before project-specific work. Repository snapshots are working drafts, not unanimous approval.
+- Firebase, backend/media provider and billing, Room/local persistence and unresolved product choices are not finalized. Do not silently select services or implement unresolved choices.
+- Preserve original contents/comments and keep joint discussions open until every requested participant has responded. Do not fabricate LGTM or mark a document Complete merely because a draft was written.
+- Notifications and alarm/geofence callbacks are non-authoritative hints; persisted conditions/state and online server confirmation govern initial unlock. Missed notifications must not prevent recovery on app open.
+- Voice, public feed/comments/reactions, advanced social features, external link/QR sharing, self-destruct, new-receipt FCM/periodic sync and GPS anti-spoofing are outside the working MVP. No exact-second notification promise.
 - For meaningful feature work, follow the team's expected flow:
   Requirement → Acceptance Criteria → Design → GitHub Issue → Implementation → PR → Review → Test → Merge.
 - Do not implement work owned by another role merely because it is unfinished; placeholders are acceptable when repository initialization requires them.
