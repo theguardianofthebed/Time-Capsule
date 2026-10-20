@@ -35,7 +35,6 @@ These rules apply to all AI-assisted work unless a human maintainer explicitly g
 ## Project Scope Protection
 
 - Respect the project's documented source-of-truth files and team decisions.
-- Cross-user/cross-device capsule delivery, accounts, cloud sync, Firebase, recipient delivery, and similar functionality remain stretch work unless the team explicitly changes that decision.
 - For meaningful feature work, follow the team's expected flow:
   Requirement → Acceptance Criteria → Design → GitHub Issue → Implementation → PR → Review → Test → Merge.
 - Do not implement work owned by another role merely because it is unfinished; placeholders are acceptable when repository initialization requires them.
