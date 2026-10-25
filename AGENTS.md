@@ -35,6 +35,22 @@ These rules apply to all AI-assisted work unless a human maintainer explicitly g
 ## Project Scope Protection
 
 - Respect the project's documented source-of-truth files and team decisions.
+- The current MVP follows Option B and includes:
+  - Basic user accounts.
+  - Capsule creation.
+  - Sending capsules to oneself or another registered user.
+  - Capsule receipt.
+  - Text and photo content.
+  - Time-based locks, location-based locks, and combined time + location locks.
+  - AND semantics for combined locks: both conditions must be satisfied before initial unlock.
+  - Locked / Unlocked state handling.
+  - Continued access to capsules after unlock.
+  - Android notification support.
+- Stored unlock conditions and state are the source of truth for unlock decisions. Notification scheduling is a separate mechanism, not the unlock source.
+- Re-evaluate persisted conditions when the app is reopened. A missed background notification must not leave an expired time-locked capsule permanently locked; combined locks must still satisfy both conditions.
+- Option B cross-user delivery requires a backend/cloud persistence structure, but the specific architecture has not been finalized. Do not treat general cloud sync as an additional confirmed MVP requirement.
+- Room is only a candidate for local persistence. Room, Firebase, a specific backend, or a specific cloud database must not be described as selected without an explicit team decision.
+- Keep the following outside the MVP unless the team explicitly changes the scope: voice messages, public feeds, comments / reactions, advanced friend / social systems, external sharing links, QR-based capsule sharing, and self-destructing capsules.
 - For meaningful feature work, follow the team's expected flow:
   Requirement → Acceptance Criteria → Design → GitHub Issue → Implementation → PR → Review → Test → Merge.
 - Do not implement work owned by another role merely because it is unfinished; placeholders are acceptable when repository initialization requires them.
