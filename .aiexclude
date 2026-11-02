@@ -1,0 +1,31 @@
+# Context exclusions for Gemini in Android Studio. Merge existing protections.
+# This does not replace .gitignore or remove secrets from Git history.
+local.properties
+secrets.properties
+keystore.properties
+signing.properties
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.key
+*.pem
+.env
+.env.*
+**/service-account*.json
+**/*service-account*.json
+**/*serviceAccount*.json
+**/*firebase-adminsdk*.json
+
+# Keep each member's real MCP settings outside the repository.
+mcp.json
+mcp.local.json
+
+# Team policy: keep project-specific Firebase configuration local.
+# This is not a claim that every value in this client file is a secret.
+google-services.json
+
+# Local test accounts, private media, and unredacted session exports.
+private/
+test-credentials/
+agent-session-private/

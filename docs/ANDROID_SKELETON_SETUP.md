@@ -1,53 +1,85 @@
-# TimeCapsule — Android Studio skeleton setup
+# TimeCapsule — open and verify the existing Android project
 
-**Status**: scaffold proposal, Oct 21, 2026. Kotlin + Compose + Navigation Compose are recommendations, **not yet confirmed team decisions**.
+**Updated:** 3 November 2026, Asia/Seoul (KST)  
+**Inspected source:** `main` commit `c7bb071cdda302f7562a549d5029e026b4c92a10`  
+**Verification status:** Source and configuration inspected. Gradle Sync, Android build, unit tests, lint, emulator, and device checks were **NOT RUN** for this documentation update.
 
-## 1. Existing repository
+This repository already contains the Android project. Open the existing checkout rather than generating another Empty Activity project or copying an overlay over it. The original October bootstrap instructions are superseded by this guide; their implementation history remains in Git.
 
-GitHub: `theguardianofthebed/Time-Capsule`. Existing `main` includes `.gitignore`, `AGENTS.md`, `CONTRIBUTING.md`, README and support folders but no Android app. Do not replace those root files. Do not commit to `main` directly.
+## 1. Understand the current scaffold
 
-**Conflict to fix in a reviewed change**: existing repository `AGENTS.md` inaccurately calls direct A→B account delivery a stretch; the Oct 14 confirmed project baseline includes it in MVP. This overlay does not modify that document.
+The checked-in entry activity and screens use Compose with Navigation Compose. They provide a provisional UI/navigation preview, with authentication and sending explicitly unavailable. The approved Atlas revision 38 contract specifies native Android Views and the Firebase service family.
 
-## 2. Create the Android Studio template (on your Windows PC)
+These are separate facts: the scaffold describes what is currently checked in, while the contract describes the approved target. Before further UI implementation, complete a separate reviewed reconciliation task. This documentation change does not migrate screens, add dependencies, or approve Compose as the target. Read [REPOSITORY_STATUS.md](agent-tools/REPOSITORY_STATUS.md), [CURRENT_CONTRACT.md](agent-tools/CURRENT_CONTRACT.md), and [DESIGN.md](../DESIGN.md) together.
 
-1. Clone the **Time-Capsule** repository locally and create a task branch from `main`, following `CONTRIBUTING.md`. Use the real issue number when Geonwoo creates the issue.
-2. Android Studio → New Project → **Phone and Tablet → Empty Activity** (Jetpack Compose).
-3. Recommended temporary settings: **Name** `TimeCapsule`, **Package name** `com.example.timecapsule`, **Language** `Kotlin`, **Minimum SDK** API 26. Treat the SDK choice as a proposal pending team review. Let Android Studio generate the Gradle wrapper/dependencies instead of copying an old Gradle configuration from SpikeLab.
-4. Create the project in a **temporary sibling folder**, NOT on top of the nonempty repository; e.g. `C:\dev\TimeCapsuleAndroidBootstrap`.
-5. Close Android Studio while copying files. Copy the Android Studio-generated project files/folders into the **existing cloned repo root**, excluding `.git`, `.idea`, `.gradle`, `build`, `app/build`, `local.properties`, any existing README/.gitignore, and any generated machine-specific secrets. Retain `gradlew`, `gradlew.bat`, `gradle/wrapper`, `gradle/libs.versions.toml`, `settings.gradle.kts`, root/app Gradle scripts and the generated Android manifest/resources.
-6. Copy the **contents** of this overlay's `app/` and `docs/` folders into the matching folders in the cloned repository. Replacing only the generated `MainActivity.kt` is expected; inspect differences before replacing anything else.
-7. Check that `app/src/main/java/com/example/timecapsule/MainActivity.kt` matches the package selected in step 3. If you chose a different package, refactor Kotlin packages and directories consistently.
-8. Add `implementation("androidx.navigation:navigation-compose:2.10.0")` inside `dependencies {}` of `app/build.gradle.kts` (no duplicate entries). This uses the 2026 official Navigation Compose release documented on Android Developers; review version compatibility with the Android Studio-generated AGP/Kotlin configuration.
-9. Open the cloned repository root with Android Studio → **Open**. Let Gradle Sync finish and run on an emulator. All screens are nonfunctional UI previews; they do not authenticate or send capsules.
+## 2. Open the checkout
 
-## 3. Verify locally
+1. Clone or update `theguardianofthebed/Time-Capsule` using your authorized GitHub account. Preserve unrelated local work. For a change, create a task branch from the current `main` following [CONTRIBUTING.md](../CONTRIBUTING.md).
+2. In Android Studio, choose **Open** and select the repository root containing `settings.gradle.kts`, `gradlew`, `gradlew.bat`, and `app/`. The Git root and Gradle root are the same directory.
+3. Use the checked-in wrapper, version catalog, and Gradle scripts. Let Android Studio configure the local SDK path in `local.properties`; keep that file untracked and outside agent context.
+4. Allow Gradle Sync to run on your own machine. Record the actual outcome. If the required SDK or toolchain is missing, resolve that local setup issue or report the exact error; do not silently change dependency versions or the UI framework.
+5. Follow [Agent setup](agent-tools/SETUP.md) to confirm that Android Studio Agent Mode reads the root `AGENTS.md` and relevant shared skill. Configure actual MCP credentials only in your own Android Studio settings directory.
 
-- In project-root terminal on Windows:
-  ```powershell
-  .\gradlew.bat :app:assembleDebug
-  .\gradlew.bat :app:testDebugUnitTest
-  ```
-- Run from Android Studio on a configured emulator, preferably API 33+ for the team's later permissions testing.
-- You should see Welcome → **Explore UI preview** → Received/Sent tabs → Create screen → Back; Account screen → Back.
-- The Send button is disabled. No remote data or protected content can be fetched. Real account login, server time checks, remote ACK, notification/geofence and photo handling are pending feature issues.
-- Share the build instructions with teammates. Review `git status` before committing; `local.properties`, `.idea/`, `build/`, and secrets must never be committed.
+Do not overwrite the root `AGENTS.md`, `CONTRIBUTING.md`, `.gitignore`, Gradle files, or teammates' changes with files from a newly generated project.
 
-## 4. Boundaries / next work
+## 3. Configuration observed in the inspected commit
 
-- No Firebase, Room, FCM or Google Maps dependency is included. Provider selection remains a reviewed team decision.
-- Use separate metadata and protected-content concepts so locked text/photo are not accidentally serialized into a publicly readable metadata document.
-- Android app will evaluate **current** location when required. Server-authoritative time (not device clock) controls initial time eligibility. Once unlocked, do not re-lock.
-- Stable `capsuleId`, backend ACK before SENT, and app-open recipient sync are requirements to implement later, not working code in this scaffold.
-- For the Oct 21–27 milestone: finalize backend and schema approvals, create issue-linked core time-lock slice, then add A→B integrated slice promptly. All 3 members review and test.
+These are recorded repository values, not a new compatibility recommendation or proof that a build passed. Re-read the files if the checkout has changed.
 
-## 5. Suggested issue acceptance criteria
+| Item | Observed value | Source |
+|---|---|---|
+| Application module | `:app` | `settings.gradle.kts` |
+| Namespace and application ID | `com.example.timecapsule` | `app/build.gradle.kts` |
+| Minimum SDK | API 26 | `app/build.gradle.kts` |
+| Compile / target SDK | API 37 / API 37 | `app/build.gradle.kts` |
+| Current scaffold UI | Compose enabled; Navigation Compose dependency present | `app/build.gradle.kts` and `ui/TimeCapsuleApp.kt` |
+| Gradle distribution | 9.6.0, with a checked-in checksum | `gradle/wrapper/gradle-wrapper.properties` |
+| Gradle daemon toolchain | Version 25 | `gradle/gradle-daemon-jvm.properties` |
+| Java source / target compatibility | Version 11 | `app/build.gradle.kts` |
 
-- [ ] Android Studio project committed on a feature/init branch, not directly to main.
-- [ ] `gradlew.bat :app:assembleDebug` works for at least two members locally.
-- [ ] Entry → Home → Create/Profile and back works without crashing.
-- [ ] Received/Sent are explicitly empty (no fake account data).
-- [ ] No fake send success, premature content access, or Firebase/Room dependency.
-- [ ] Unit test for empty/text-only/photo-only draft rule passes.
-- [ ] Existing repository rules/docs are retained and scope conflict is flagged.
+The Gradle daemon version and Java source/target compatibility describe different settings. Preserve both unless a separate reviewed change intentionally updates them.
 
-**Evidence**: This overlay was generated separately from Android Studio and has not been assembled or run on Android. It must pass on-machine Gradle verification before PR approval.
+## 4. Run relevant local checks
+
+From the repository root on Windows PowerShell:
+
+```powershell
+.\gradlew.bat tasks --all
+.\gradlew.bat :app:assembleDebug
+.\gradlew.bat :app:testDebugUnitTest
+```
+
+On macOS/Linux, the inspected `gradlew` is tracked without an executable bit, so use:
+
+```bash
+bash ./gradlew tasks --all
+bash ./gradlew :app:assembleDebug
+bash ./gradlew :app:testDebugUnitTest
+```
+
+Use `:app:lintDebug` or device tests when relevant to the task and available in the actual checkout. The commands above are instructions for future verification, not recorded successes. Record the commit, machine/toolchain, command, result, and relevant error output. Do not change wrapper permissions or versions as an incidental part of a documentation task.
+
+For a local UI check, launch the app on a configured emulator or device. The following are **source-derived expectations to verify**, not test results:
+
+| Preview path | Expected scaffold boundary |
+|---|---|
+| Welcome → Explore UI preview | Enters a navigation preview; does not authenticate an account |
+| Home / Received / Sent | No live backend integration is established by the preview |
+| Home → Create → Back | Shows draft controls; Send remains disabled |
+| Home → Account → Back | Displays a preview account screen rather than a completed account service |
+
+A preview screen, source test file, or successful compile cannot establish server authorization, send acknowledgment, unlock correctness, or application acceptance.
+
+## 5. Continue with approved feature work
+
+The current contract selects Firebase Authentication, Firestore, and Storage; the inspected scaffold has not integrated them. Provider selection and implementation completion must not be confused. Follow the exact current contract for server-confirmed send/unlock, current-condition checks, account-scoped retained content, and recovery.
+
+Supported checks are app-open, foreground resume, detail opening, and explicit Retry. Alarms, registered geofences, boot receivers, periodic polling, background location, and FCM are outside the current production design. Do not restore an old spike or bootstrap suggestion as an approved feature.
+
+Use the shared requirement → Issue → branch → PR workflow for each coherent task. Add the required easy English declaration comments and finer comments for unfamiliar code as it is implemented. Record actual verification and each student's own learning activity. Leave incomplete functionality and unrun checks labeled honestly.
+
+## 6. Why this guide changed
+
+**Before:** the guide instructed teammates to create a new Compose project and copy an overlay, described the repository as having no app, and treated several now-confirmed decisions as pending.  
+**After:** it opens the existing project, records the current scaffold separately from the approved design, and provides honest local verification instructions.  
+**Why:** teammates need instructions that match the checkout without overwriting existing work or mistaking a preview for a completed feature. No application directory was moved. See the full integration rationale in [REPOSITORY_STATUS.md](agent-tools/REPOSITORY_STATUS.md).
