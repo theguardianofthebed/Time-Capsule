@@ -23,6 +23,8 @@ The [documentation index](../README.md) links all guides and student records.
 
 Select Agent Mode and record the actual model used. Check its context panel for `AGENTS.md`. Keep any additional IDE Rules or `GEMINI.md` consistent with the shared rules.
 
+Tell the agent whether this task belongs to **User G**, **User F**, or **User J**. If you omit the owner, it must ask before making changes. Its factual work goes into your ongoing [agent-log.md](../agent-logs/README.md), including delegated work; your weekly coursework log remains separate.
+
 Choose the relevant skill with the IDE's `@` picker when available. If a file is not discovered, attach it explicitly for that session.
 
 | Task | Skill |
@@ -41,6 +43,8 @@ Do not edit code yet.
 Tell me which shared instructions and skills are available.
 Summarize the rules for English comments, unfamiliar code, consistent style,
 refactoring explanations, and PRs.
+Ask whether the task owner is User G, User F, or User J if I have not said so.
+Identify that owner's ongoing agent-log.md and explain what you will record.
 Identify the repository, branch, app module, and any unresolved design conflict.
 Use User F, User G, and User J in shared material. Do not print secrets.
 ```
@@ -62,7 +66,7 @@ Verify your own connection before relying on it. If PR publication fails, preser
 3. Use the matching skill and review the proposed changes. Require clear class/function comments, extra explanation for unfamiliar steps, consistent style, and reusable code.
 4. When refactoring, explain the original problem and how the revised code improves it. Keep that note near the code and include the verification in the PR.
 5. Run checks that match the change, then publish or update its PR. Related fixes stay in that PR.
-6. Update your weekly log. Another teammate reviews the work before a human merges it.
+6. Have the agent finish its factual entry in your ongoing `agent-log.md` and link it in the PR. Use those facts to write your own weekly log. Another teammate reviews the work before a human merges it.
 
 Read [WORKFLOW.md](WORKFLOW.md) for the full process. For a coding task, this prompt is a useful starting point:
 
@@ -72,7 +76,9 @@ Acting student: [User F, User G, or User J].
 Follow AGENTS.md and the relevant contract records.
 Show each diff for my review and explain unfamiliar code.
 Run the relevant checks and record actual results and limits.
-Help update my own weekly log and open or update the GitHub PR.
+Update my ongoing agent-log.md with your actual work, checks, and limits.
+Help me organize my weekly coursework facts without inventing my reflections.
+Open or update the GitHub PR and link the ongoing log entry.
 Return its URL. Leave approval and merge to a human.
 ```
 

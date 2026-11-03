@@ -22,6 +22,17 @@ The Git root is also the Gradle root, with the `:app` module under `app/`. Keep 
 - This file is the team's shared Rules source. Additional IDE Rules must agree with it. Do not weaken these rules or exclusion files to complete a task.
 - Use **User F**, **User G**, and **User J** in shared documentation, templates, comments, and PR descriptions. Use `user-f`, `user-g`, and `user-j` for student directory names. Do not include the members' real names or an identity-mapping table in these materials.
 
+### Identify the owner and keep their agent work log
+
+Every agent task has one explicitly identified human owner: **User G**, **User F**, or **User J**. The owner is the contributor requesting or taking responsibility for the work, not the agent or GitHub account used to publish it.
+
+1. At the start, use the owner explicitly supplied for this task. If none is supplied, ask: **“Who owns this agent task: User G, User F, or User J?”** Wait for that answer before making changes or publishing work; read-only preparation may continue. Do not infer an owner from a name, login, commit author, role, branch, or an older log. Reuse the answer for follow-ups and delegated work in the same task unless the human changes it.
+2. Read the owner's ongoing log and append a task entry in `docs/agent-logs/user-g/agent-log.md`, `docs/agent-logs/user-f/agent-log.md`, or `docs/agent-logs/user-j/agent-log.md`. Use the [agent work log guide](docs/agent-logs/README.md). Record the goal and work in progress when starting; update that entry with the actual outcome before each handoff or completion report.
+3. Record **every kind of agent work**, including implementation, review, investigation, documentation, configuration, issue management, and failed or blocked attempts. Explain what changed or was learned, why it matters, affected files or records, checks actually performed, unresolved work, and real Issue/PR references. Use plain language a teammate can understand without reading a tool transcript. Identify the actual agent environment/model when available; say “not exposed” when it is unavailable.
+4. Delegated agents inherit the same explicit owner. The coordinating agent must collect and record each agent's contribution in that owner's entry; delegation must not lose attribution or create fictional activity for another contributor. Separate concurrent tasks with unique entry IDs and preserve both entries when resolving log conflicts.
+5. Keep existing entries and teammates' logs intact. Add a dated correction rather than rewriting earlier facts. Log updates follow the normal branch/PR workflow; never push to `main` just to save a log. Before opening or updating a PR, check that the factual entry is complete and link it in the PR. After publication, add the actual PR URL to the entry.
+6. The ongoing `agent-log.md` is an agent-written work record. The existing `agent-log-w1.md`–`agent-log-w4.md` files and retrospectives are the student's coursework records. The agent may help organize real facts, but must not invent human review, manual fixes, personal reflections, or claims of understanding.
+
 ## 2. Read the correct project contract
 
 Before a coding task, read [SOURCE_REGISTER.md](docs/agent-tools/SOURCE_REGISTER.md), [CURRENT_CONTRACT.md](docs/agent-tools/CURRENT_CONTRACT.md), the relevant approved FR/NFR, ARC, DD, AC and test records, and [DESIGN.md](DESIGN.md) for UI work. Read the full supplied project Markdown context when establishing a new project context, then consult the relevant current records for each task.
@@ -72,7 +83,7 @@ Follow [WORKFLOW.md](docs/agent-tools/WORKFLOW.md):
 - Test the behavior affected by the change, including relevant denial, error, account-switch, retry, and lifecycle paths. Reuse meaningful existing tests. Do not create tests that merely repeat implementation lines.
 - Record actual commands, environment, results, and untested limits. Use `NOT RUN`, `BLOCKED`, or `FAILED` when appropriate. A documentation-only PR normally needs document checks, not an invented Android test result.
 - Preserve the distinction between E0 research, E1 isolated spikes, E2 application integration, and E3 repeated verification. An Atlas contract or planned test is not an implementation pass.
-- Help the acting student record the actual session in their own `docs/agent-logs/<student>/agent-log-wN.md`. Never write fictional manual fixes, usage, or learning achievements. Retrospectives must reflect that student's own experience.
+- Update the confirmed owner's ongoing `docs/agent-logs/<student>/agent-log.md` with the actual work and verification before handing off. Separately help the student use those facts in their own `agent-log-wN.md`; never write fictional manual fixes, usage, or learning achievements. Retrospectives must reflect that student's own experience.
 
 ## 6. Protect credentials and use tools only for their purpose
 

@@ -10,6 +10,8 @@ Follow this sequence:
 
 Create or identify the Issue before implementation. Use the [task template](.github/ISSUE_TEMPLATE/implementation-task.md) to record the goal, scope, owner, work period, dependencies, relevant requirement/design/test references, and verification plan. Documentation tasks can cite a course or team rule instead of an application requirement.
 
+For agent-assisted work, explicitly identify the task owner as **User G**, **User F**, or **User J**. If missing, the agent must ask which contributor owns the task before making changes. The agent records its actual work in that owner's ongoing [agent-log.md](docs/agent-logs/README.md), including review, investigation, documentation, and blocked attempts. Keep the same owner for delegated agents and follow-ups within that task.
+
 Read the relevant [project sources](docs/agent-tools/SOURCE_REGISTER.md) and existing files before editing. Preserve teammates' work. Agree on any missing product or architecture decision before implementing the affected part. The [repository guide](docs/agent-tools/REPOSITORY_STATUS.md) explains the application structure and the Views/Compose discrepancy.
 
 ## Branches and commits
@@ -53,7 +55,7 @@ Follow [.editorconfig](.editorconfig), [CODING_AND_COMMENTS.md](docs/agent-tools
 
 ## Publish and review
 
-Once the student accepts the local diff, commit the intended files, publish the task branch, and open or update its PR into `main`. Use the [PR template](.github/pull_request_template.md). Explain the problem, resulting behavior, important decisions, checks performed, and remaining work. Include UI evidence when useful and link the student's actual weekly entry.
+Once the student accepts the local diff, commit the intended files, publish the task branch, and open or update its PR into `main`. Use the [PR template](.github/pull_request_template.md). Explain the problem, resulting behavior, important decisions, checks performed, and remaining work. Include UI evidence when useful, identify the confirmed task owner, and link the completed factual entry in their ongoing `agent-log.md`. Add the actual PR URL to that entry after publication. Link a weekly coursework entry separately when the student has written it.
 
 Use `Closes #<issue-number>` only when the PR fully resolves that Issue; otherwise use `Refs #<issue-number>`. Related review fixes stay in the same PR. Read-only investigation needs no empty PR.
 
@@ -67,4 +69,4 @@ Run checks that can reveal problems in the changed behavior. Use the checked-in 
 
 Apply fixes on the same branch, rerun affected checks, and obtain review of the updated diff. Keep the PR in draft when a required decision or check is incomplete. A human merges after review, verification, and conflict resolution. Agents must not self-approve, merge, or enable automatic merging.
 
-Each student records their own work in the weekly log and writes their own retrospective. See [course requirements](docs/agent-tools/COURSE_COMPLIANCE.md) for filenames and deadlines.
+The agent keeps its owner's ongoing work log current; each student records their own experience in the weekly log and writes their own retrospective. The ongoing log does not replace those coursework submissions. See [course requirements](docs/agent-tools/COURSE_COMPLIANCE.md) for filenames and deadlines.
