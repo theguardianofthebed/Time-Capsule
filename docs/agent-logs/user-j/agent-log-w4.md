@@ -1,46 +1,38 @@
 # User J agent log week 4
 
-**Student:** User J  
-**Planned submission date:** 4 December 2026  
-**Status:** Unfilled template
+The planned submission date is **4 December 2026**; follow any later professor announcement. Add one feature/task section for each piece of work. Describe your own contribution and use real prompts, results, and examples. If you did not use an agent this week, say so honestly.
 
-This is an individual record. Write only what actually happened. Duplicate the feature section for each feature or coherent task. If no agent was used this week, state that honestly and describe any relevant manual work. Do not copy another student's experience.
-
-Use [the shared workflow](../../agent-tools/WORKFLOW.md) and [AGENTS.md](../../../AGENTS.md). Remove secrets and personal data from prompts, errors, screenshots, and links before committing.
+Follow [the shared workflow](../../agent-tools/WORKFLOW.md) and [AGENTS.md](../../../AGENTS.md). Remove credentials and private data from any quoted material.
 
 ## Feature or task
 
-- **Name and scope:** [Fill in.]
-- **Date or dates:** [Fill in.]
-- **GitHub Issue and PR:** [Real links, or an honest reason no link exists yet.]
-- **Requirements and design references:** [Actual IDs or paths; explain if not applicable.]
-- **Agent environment:** [Record the actual environment; project code must use Android Studio Agent Mode.]
-- **Model used:** [Exact displayed model name; record any model changes.]
+- **Task and purpose:** [What you worked on and why.]
+- **Session date(s):** [Actual dates.]
+- **Issue and PR:** [Real links, or the publication blocker.]
+- **Requirement/design references:** [Relevant IDs or paths, if applicable.]
+- **Agent environment:** [Actual environment; project coding must use Android Studio Agent Mode.]
+- **Model used:** [Exact displayed model name, including any switch during the task.]
 
 ### Purpose of agent use
 
-[What help did you need, and what did you decide or implement yourself?]
+[What help did you need? What did you decide or do yourself?]
 
 ### Key prompts
 
-[Paste the important prompts, including corrections that changed the result. Mark any redactions.]
+[Include the important prompts and corrections. Mark redacted or paraphrased text.]
 
 ### What the agent changed and verified
 
-- **Changes:** [Files, classes, functions, or documents and their purpose.]
-- **Verification actually performed:** [Command or manual procedure, environment, observed result, and evidence.]
-- **Not verified:** [Remaining checks and reasons. Do not write “passed” without a result.]
+- **Changes:** [Relevant files or behavior.]
+- **Checks and results:** [Actual commands or actions, environment, observed result, and evidence.]
+- **Remaining checks:** [Anything not run, failed, or blocked, and why.]
 
-### Errors and your manual fixes
+### Errors and manual fixes
 
-[Describe the error, its cause if known, and your own correction. Separate an agent's correction from your manual work. If neither occurred, say so only when true.]
+[Describe any error and how it was corrected. Separate the agent's correction from your own manual work. Say that no fix was needed only if that is true.]
 
-### Human review and understanding
+### My review and understanding
 
-- **What I inspected before accepting changes:** [Fill in.]
-- **What I can now explain:** [Data flow, Android mechanism, unfamiliar code, and failure behavior as relevant.]
-- **Review or unresolved feedback:** [Reviewer and evidence, or pending.]
-- **Next action and owner:** [Fill in, or explain why none remains.]
-
-The student completes the personal statements. An agent may organize verified facts but must not invent use, review, test results, or learning.
-
+- **What I reviewed:** [The changes you inspected before accepting them.]
+- **What I can explain:** [A mechanism, data flow, or failure case you understand.]
+- **Feedback and next step:** [Reviewer feedback, unresolved questions, and the next owner/action.]

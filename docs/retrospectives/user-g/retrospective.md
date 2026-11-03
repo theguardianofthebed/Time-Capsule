@@ -1,48 +1,34 @@
 # User G project retrospective
 
-**Student:** User G  
-**Status:** Unfilled template  
-**Final submission date:** Follow the main course guide; the agent supplement does not specify it.
-
-This is your own whole-project reflection. Complete it after doing the work. Use concrete examples from [your weekly logs](../../agent-logs/user-g/agent-log-w1.md) and real PRs. An agent may help organize or edit your account; it must not invent your experience or claim skills you have not demonstrated.
+Describe your own experience using examples from [your weekly logs](../../agent-logs/user-g/agent-log-w1.md) and real PRs. An agent may help edit your writing, but the experiences and learning claims must be yours. Follow the main course guide for final submission.
 
 ## What worked well
 
-[Which uses of Android Studio Agent Mode helped you? Describe one or two real tasks, the model used when relevant, and why the help was effective.]
+[Which uses of Android Studio Agent Mode helped? Give one or two real examples and explain why they were useful. Include the model when relevant.]
 
-**Evidence:** [Weekly log sections, Issue or PR links, or verification records.]
+**Evidence:** [Log sections, Issues, PRs, or recorded checks.]
 
 ## Where the agent fell short
 
-[Describe an actual mistake, misunderstanding, unnecessary complexity, weak comment, or verification gap. Explain how you noticed it and what you changed or asked the agent to change.]
+[Describe a mistake, misunderstanding, confusing code, or missed check. Explain how you noticed it and how it was corrected. Separate your decisions and manual changes from the agent's work.]
 
-**My contribution:** [Distinguish your manual work and judgment from the agent's work.]
-
-**Evidence:** [Real references, or state that no suitable example was observed.]
+**Evidence:** [Real examples, or explain that you did not observe a suitable example.]
 
 ## What I can now do myself
 
-[Describe tasks you can perform and explain without having the agent produce the answer. Include a concrete example that you have actually completed.]
-
-For relevant code, explain the purpose, input and output, main data flow, Android mechanism, error behavior, and how you checked it. Do not claim mastery from merely accepting generated code.
+[Describe something you can perform and explain independently. Use an example you actually completed, including how it works, a relevant failure case, and how you checked it.]
 
 ## What I would change next time
 
-[Describe a practical change to your prompts, task size, review, comments, testing, or shared rules. Connect it to your experience.]
+[Describe a practical improvement to your prompts, task size, review, comments, or testing. Connect it to your experience.]
 
-## Remaining learning needs
+## What I still need to learn
 
-[Identify anything you still need to understand or practice. Explain your next step.]
+[Identify a remaining gap and the next step you will take.]
 
-## Personal confirmation
+## Review before submission
 
-Complete these checks yourself after reviewing the text.
-
-- [ ] The experiences and contributions described here are accurate.
+- [ ] My examples and contributions are accurate.
 - [ ] I can explain the examples I chose.
-- [ ] I have separated agent output from my own decisions and manual work.
+- [ ] I separated my work from the agent's work.
 - [ ] I removed secrets and private data from the evidence.
-
-**Completed by:** [User G]  
-**Date:** [Actual completion date]
-

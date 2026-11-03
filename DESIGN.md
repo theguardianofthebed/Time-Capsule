@@ -1,29 +1,20 @@
-# TimeCapsule design document
+# TimeCapsule design
 
-**Team:** User F, User G, User J  
-**Prepared:** 3 November 2026, Asia/Seoul  
-**Contract source:** TimeCapsule Atlas `timecapsule`, revision **38**, instructions version **3**  
-**Status:** Current behavior/design contracts finalized; Atlas-tracked implementation not started, acceptance not verified and tests not run in the captured source. The repository already contains a provisional UI scaffold; that does not establish completed requirements or acceptance.
+TimeCapsule lets a signed-in user send a text/photo capsule to themselves or another registered user. The recipient can see its title and lock condition while the message is locked, then keep access after a valid online unlock.
 
-TimeCapsule lets an authenticated user send a text/photo capsule to themselves or another registered account. The recipient sees safe metadata while its time, location or combined condition is unmet, and gains permanent access after a valid online unlock. This team document records screen flow, navigation and the Material 3 design system required by the professor's agent supplement.
+This guide covers screens, navigation, and visual design. Detailed behavior and source records are in [CURRENT_CONTRACT.md](docs/agent-tools/CURRENT_CONTRACT.md) and [SOURCE_REGISTER.md](docs/agent-tools/SOURCE_REGISTER.md). Sections marked **Proposed** contain UI choices that the team must review before adopting them.
 
-**Status labels used here:** **Confirmed** means present in the current Atlas contract. **Proposed UI mapping** means a concrete documentation proposal for implementing that contract consistently; reconcile it with the checked-out Android resources and review it in the setup/UI PR before treating it as an adopted token. No proposed mapping changes MVP scope. See [SOURCE_REGISTER.md](docs/agent-tools/SOURCE_REGISTER.md) and [CURRENT_CONTRACT.md](docs/agent-tools/CURRENT_CONTRACT.md).
+## 1. Product and platform
 
-## 1 Product and platform boundaries
+The MVP includes accounts, self-send and delivery to another user, text and/or one original JPEG/PNG photo, Time/Location/Both locks, Received/Sent lists, recovery, local notifications, and continued access after unlock.
 
-**Confirmed — FR-01–FR-12, ARC-01–ARC-07, DD-07/DD-11/DD-24.**
+The approved target is **Kotlin with native Android Views and Material 3**. The repository contains a provisional Compose scaffold; resolve that difference in a separate reviewed UI task before expanding it. See [REPOSITORY_STATUS.md](docs/agent-tools/REPOSITORY_STATUS.md).
 
-The MVP includes accounts, direct A→A/A→B delivery, text and/or one original JPEG/PNG photo, Time/Location/Both locks, separate Received/Sent lists, protected locked content, current-condition verification, recovery, best-effort local notifications and permanent re-view.
+Check eligibility when the app opens, returns to the foreground, opens a capsule, or the user chooses Retry. Notifications follow a confirmed unlock during one of these checks. The design uses no alarms, geofences, boot receivers, periodic polling, background location, or FCM, and makes no exact-time notification promise for a closed app.
 
-The approved target is **Kotlin native Android Views**. Material 3 describes the theme/components intended for that target. Preserve pinned dependencies until a reviewed application change explicitly requires changing them.
+## 2. Screens and navigation
 
-**Verified repository discrepancy:** the checkout inspected on 3 November 2026 contains a provisional Compose and Navigation Compose scaffold. That is an implementation fact, while Views remains the captured approved target. This document does not imply that Views screens already exist and does not migrate the application. Before further UI implementation, complete a separate reviewed reconciliation task against the current approved contract. See [REPOSITORY_STATUS.md](docs/agent-tools/REPOSITORY_STATUS.md) for the exact commit, paths, and evidence limits.
-
-The app verifies on app-open, foreground resume, detail opening or explicit Retry. It installs no alarms, geofences, boot receivers, periodic polling, background location or FCM. A closed app is not promised an exact-time notification. The Sensors lecture does not create a requirement for an accelerometer or other unrelated sensor feature.
-
-## 2 Screen flow and navigation
-
-**Confirmed screen inventory — DD-07, DD-26–DD-28.** The proposed Back behavior below makes that inventory concrete without changing authorization or submission rules.
+The screen flow follows DD-07 and DD-26–DD-28:
 
 ```mermaid
 flowchart TD
@@ -32,192 +23,176 @@ flowchart TD
     Repair --> Lists["Capsules"]
     Profile -->|Yes| Lists
     Lists --> Detail["Capsule detail"]
-    Lists --> Compose["Create capsule"]
+    Lists --> Create["Create capsule"]
     Lists --> Account["Account"]
-    Compose --> Review["Review frozen submission boundary"]
+    Create --> Review["Review capsule"]
     Review --> Result{"Send result"}
     Result -->|Confirmed| Lists
-    Result -->|Unknown| Check["Check same operation"]
+    Result -->|Unknown| Check["Check status"]
     Result -->|Definite failure| Retry["Retry or new draft"]
     Check --> Result
     Retry --> Result
     Account -->|Sign out| Entry
 ```
 
-The diagram summarizes product navigation. It is not a class diagram or a claim about installed navigation libraries.
-
-| Screen/state | Content and primary action | Navigation, Back and recovery | Contract |
+| Screen | What the user sees and does | Key behavior | Contract |
 |---|---|---|---|
-| Welcome / Sign in | Email/password entry; register or sign in; explain invalid credentials separately from unavailable service. | After valid authentication, repair missing profile if needed, then load the active account. Sign-in cannot reveal another account's previous screen. | FR-01; DD-19, DD-26 |
-| Registration / Profile repair | Required nonblank display name; idempotent creation of own UID profile after Auth succeeds. | Failed profile write offers Retry. Sending stays disabled until the profile exists. Do not duplicate Auth registration merely to repair the profile. | DD-03, DD-19 |
-| Capsules | Received/Sent tabs; safe title, participant, lock condition and truthful status; empty/loading/error/stale states. | Card opens detail. Top-level navigation offers Capsules/Create/Account. Refresh discovers new received metadata. A→A appears in both tabs with one underlying ID. | FR-11; DD-07, DD-28 |
-| Create — Content | Optional title, body, single-photo selector/preview; title visibility disclosure. | Next validates text and/or supported photo. Back/Next preserve the editable draft. A title alone is not valid content. | FR-02, FR-04; DD-04, DD-27 |
-| Create — Recipient | Me or another user's exact UID; returned display name and explicit confirmation. | Every UID input edit clears earlier confirmation. Distinguish absent code from lookup unavailable. No searchable directory/friend list. | FR-03; DD-03, DD-19 |
-| Create — Lock | Time, Location or Both; date/time with zone; confirmed map pin/current point. | Manual pin works without location permission. Current-location acquisition explains permission/settings errors. Display fixed 150 m radius. | FR-05–FR-07; DD-12, DD-13, DD-22 |
-| Create — Review | Recipient code/name, disclosed title, chosen content and exact time/location condition. | Back edits only while DRAFT. Send validates and freezes one ID/snapshot before work starts. No new-ID restart while a previous result is unknown. | DD-14, DD-15, DD-27 |
-| Sending / Outcome unknown | Progress or “We could not confirm the result”; Check status for the same operation. | Content/recipient/condition edits disabled. Leaving the screen does not abandon an operation or authorize a second send. Recovery restores honest state. | DD-15, DD-21 |
-| Definite failure | Actual failure class; unchanged Retry, or abandon then create an edited new draft if unpublished failure is definite. | Retry keeps the original snapshot/ID; edited new draft uses a new ID. An absent server read alone is not definite failure. | DD-02, DD-21 |
-| Locked recipient detail | Safe metadata; Waiting for time/location or Verification required; Retry and relevant Settings action. | No body/photo preview. Check online and obtain a fresh qualifying sample when needed. Back returns to the same list context. | FR-08–FR-10; DD-08, DD-28 |
-| Confirmed content detail | Authorized text/photo; missing asset message if bytes cannot be loaded. | Once unlocked, leaving the location does not relock. Offline re-view requires the matching UID, confirmed marker and retained bytes. | FR-12; DD-06, DD-18 |
-| Account | Own exact UID with Copy; own display name editing; Sign out. | Sign out clears old account screens/content and invalidates callbacks before a next session becomes visible. | FR-01; DD-19, DD-26 |
-| Notification entry | Generic capsule-ready notification. | Route through authentication and confirmed detail state; a stale notification is never an authorization shortcut. | FR-10; DD-09, DD-24 |
+| Welcome / Sign in | Register or sign in with email and password. | Distinguish invalid credentials from an unavailable service. Load only the active account's screens and data. | FR-01; DD-19, DD-26 |
+| Registration / Profile repair | Enter a nonblank display name. | Create the profile for the authenticated UID. Retry a failed profile write without creating another Auth account. Sending stays disabled until the profile exists. | DD-03, DD-19 |
+| Capsules | Switch between Received and Sent; open a capsule; navigate to Create or Account. | Show title, participant, lock condition, and accurate loading/empty/error/stale states. Refresh finds new receipts. A self-send appears in both lists with one capsule ID. | FR-11; DD-07, DD-28 |
+| Create | Complete Content → Recipient → Lock → Review. | Preserve editable input between steps and validate before Send. See the creation rules below. | FR-02–FR-07; DD-27 |
+| Capsule detail | Read safe information while locked, then authorized text/photo after unlock. | Hide message and photo previews while locked. Explain verification failures and missing offline assets separately. | FR-08–FR-12; DD-06, DD-08, DD-18, DD-28 |
+| Account | Copy the user's UID, edit their display name, or sign out. | Clear old account screens and protected content on sign-out; late callbacks must not restore them. | FR-01; DD-19, DD-26 |
+| Notification entry | Open a generic capsule-ready notification. | Check authentication and capsule access before displaying content. A notification never grants access by itself. | FR-10; DD-09, DD-24 |
 
-### Create flow and Back behavior
+### Create a capsule
 
-The four steps are **Content → Recipient → Lock → Review**, with a persistent step label and clear Next/Back actions. The progress indicator communicates location in the flow; it does not permit bypassing required validation.
+The four steps have a visible step label and clear Next/Back controls. Forward navigation must not bypass validation.
 
-**Proposed UI mapping:** system Back moves to the preceding step while the draft is editable. Leaving Create with unsent edits shows a concise keep/discard choice consistent with actual draft retention. Do not promise drafts survive process death unless the implementation supports that promise. During SENDING/OUTCOME_UNKNOWN, Back may leave the status screen, but the operation remains frozen and recoverable; it does not become a new editable draft.
+| Step | Required behavior | Contract |
+|---|---|---|
+| Content | Allow optional title, message, and one photo with a preview. Explain that the title is visible while locked. Require nonblank text and/or a supported photo; a title alone is insufficient. | DD-04, DD-27 |
+| Recipient | Choose Me or enter another user's exact UID, their account code. Show the returned display name and ask for confirmation. Editing the UID clears that confirmation. Distinguish an unknown code from a failed lookup. Do not offer a user directory. | DD-03, DD-19 |
+| Lock | Choose Time, Location, or Both. Show the time zone and a confirmed map pin or current position. Manual pin selection works without location permission; current-position use handles permission/settings errors. Display the fixed 150 m radius. | DD-12, DD-13, DD-22 |
+| Review | Show recipient code/name, title disclosure, content, and the exact lock condition. Send validates the draft and freezes one capsule ID and an unchangeable copy of its contents and settings. | DD-14, DD-15, DD-27 |
 
-After confirmed success, open the safe Sent list/detail route. For self-send, purge raw composer display buffers and show the locked-recipient view. Viewing an A→B sender's content does not give B early recipient access.
+**Proposed Back behavior:** move to the previous step while the draft is editable. On leaving with unsent edits, offer a simple keep/discard choice that matches the implemented draft retention. Do not promise recovery after process death unless supported. During sending or an unknown outcome, Back may leave the screen but must not turn the operation into an editable draft.
 
-### Locked detail and first unlock
+| Send state | Allowed action | Required boundary |
+|---|---|---|
+| DRAFT | Edit, validate, and send. | Freeze the operation before network work begins. |
+| SENDING / OUTCOME_UNKNOWN | Show progress or offer Check status. | Keep the same ID and contents; disable edits and duplicate sends. Leaving the screen does not abandon the operation. |
+| Definite unpublished failure | Retry unchanged, or abandon and create an edited new draft. | Retry keeps the original ID and contents. An edited new draft needs a new ID. An absent server read alone does not prove failure. |
+| Confirmed success | Open Sent or the appropriate detail view. | For self-send, clear the creation screen's raw content and show the locked recipient view. |
 
-A locked detail uses one clear status explanation and a relevant action:
+These states follow DD-02, DD-15, and DD-21. Sender access to an A→B capsule does not give its recipient early access.
 
-| Situation | Example user-facing wording | Action |
+### Explain locked and unavailable states
+
+Use one clear explanation and a relevant next action. These are **proposed English UI strings**:
+
+| Situation | Wording | Action |
 |---|---|---|
 | Time not reached | “This capsule opens after [date, time, zone].” | Retry when appropriate |
-| Location not satisfied | “You are not within the required location yet.” | Check again |
-| Location unclear | “We could not confirm your current location.” | Retry / location settings |
-| Offline first verification | “Connect to check whether this capsule can open.” | Retry online |
-| Notification denied | “You can still open eligible capsules in the app.” | Optional notification settings |
-| Unlocked but missing local photo | “This photo is not available offline.” | Download again when online |
-| Send result unknown | “We could not confirm whether this capsule was sent.” | Check status |
+| Outside the location | “You are not within the required location yet.” | Check again |
+| Location cannot be verified | “We could not confirm your current location.” | Retry / location settings |
+| Offline first unlock | “Connect to check whether this capsule can open.” | Retry online |
+| Notifications denied | “You can still open eligible capsules in the app.” | Optional notification settings |
+| Unlocked photo missing locally | “This photo is not available offline.” | Download again when online |
+| Send outcome unknown | “We could not confirm whether this capsule was sent.” | Check status |
 
-These are **proposed English UI strings**, not evidence of an implemented screen. Avoid displaying backend terms such as transaction, snapshot digest or session generation to ordinary users. Explain those in code comments and developer documents instead.
+Keep backend terms such as transactions, digests, and session generations in developer guidance rather than user-facing messages.
 
-## 3 Material 3 design system
+## 3. Material 3 design system
 
-### 3.1 Confirmed visual identity
+### Visual identity
 
-DD-01 specifies the following identity and interaction constraints:
+DD-01 defines these shared values:
 
-| Token | Confirmed value | Intended visual use |
+| Token | Value | Use |
 |---|---|---|
-| Warm cream | `#FBF9F5` | Main canvas |
+| Warm cream | `#FBF9F5` | Main background |
 | Terracotta | `#A95640` | Primary accent |
-| Sage | `#F0F3E9` | Quiet supporting surfaces |
-| Dark ink | `#343C37` | Main readable text |
+| Sage | `#F0F3E9` | Supporting surfaces |
+| Dark ink | `#343C37` | Main text |
 | Pale border | `#E7E5DC` | Decorative separation |
-| Card surface | White | Rounded cards |
-| Heading family | Instrument Serif | Display/page headings |
-| Body family | DM Sans | Reading, controls and supporting copy |
-| Touch targets | At least 48 dp | All interactive controls |
+| Cards | White, rounded | Content groups |
+| Headings | Instrument Serif | Page and display headings |
+| Body | DM Sans | Text, controls, and supporting copy |
+| Touch targets | At least 48 × 48 dp | Interactive controls |
 
-Preserve these values when translating the prototype into Android resources. DD-01 also requires scrolling, keyboard-safe layout, system-bar insets, readable errors/status, content descriptions and labels that do not depend on color.
+### Proposed theme mapping
 
-### 3.2 Proposed Material 3 theme mapping
+Use one shared Material 3 theme for native Views, such as a compatible `Theme.Material3.Light.NoActionBar` theme. Prefer existing compatible components and preserve dependency pins unless a reviewed change requires an update. The [Material Components guide](https://github.com/material-components/material-components-android/blob/master/docs/getting-started.md) explains Views themes.
 
-Use a shared Material 3 theme for native Views, such as the compatible `Theme.Material3.Light.NoActionBar` family for the documented light presentation. Reuse an existing approved equivalent if the repository already has one. Material Components documents Material 3 themes for the View system in its [getting-started guide](https://github.com/material-components/material-components-android/blob/master/docs/getting-started.md).
-
-**Proposed UI mapping — not a newly installed dependency or a finished resource file:**
-
-| Role | Proposed mapping | Notes |
+| Role | Proposed mapping | Use |
 |---|---|---|
-| Primary / on-primary | Terracotta `#A95640` / white `#FFFFFF` | Main action buttons |
-| Background / on-background | Cream `#FBF9F5` / ink `#343C37` | Screen canvas and normal text |
-| Surface / on-surface | White `#FFFFFF` / ink `#343C37` | Cards, fields and sheets |
-| Supporting container / text | Sage `#F0F3E9` / ink `#343C37` | Secondary section backgrounds |
-| Decorative divider | Pale border `#E7E5DC` | Do not rely on this pale color alone to identify an interactive input |
-| Input outline / focus | Proposed stronger outline `#747C75`; terracotta focus | Reconcile with actual Material text-field state styles |
-| Error | Proposed `#B3261E`, with text/icon | Error feedback; do not communicate failure only by red color |
+| Primary / on-primary | Terracotta / white `#FFFFFF` | Main action buttons |
+| Background / on-background | Cream / ink | Main screen |
+| Surface / on-surface | White / ink | Cards, fields, sheets |
+| Supporting container / text | Sage / ink | Secondary groups |
+| Decorative divider | Pale border | Nonessential separation |
+| Input outline / focus | `#747C75` / terracotta | Visible field edges and focus |
+| Error | `#B3261E` with text/icon | Readable error feedback |
 
-The proposed outline/error mappings fill roles not individually specified in DD-01. Confirm them against the checked-out theme in a reviewed UI change. No automatic wallpaper/dynamic-color override or dark-theme scope expansion is introduced by this document. If dark mode already exists, document and verify its complete role set before merging theme changes.
+The outline and error colors are proposals, not confirmed DD-01 tokens. Review the mapping against the app's resources. Keep the shared palette consistent; dynamic color or dark mode needs a complete reviewed theme rather than an automatic override.
 
-For the listed plain foreground/background pairs, calculated sRGB contrast is approximately 10.81:1 for ink on cream, 11.37:1 for ink on white, 10.12:1 for ink on sage, and 5.13:1 for white on terracotta. These calculations are a token check, not a device accessibility test; opacity, disabled states, image overlays and font rendering still need inspection. The pale border against white is approximately 1.26:1, so keep visible labels and stronger meaningful control outlines.
+Calculated contrast is approximately 10.81:1 for ink on cream, 11.37:1 for ink on white, 10.12:1 for ink on sage, and 5.13:1 for white on terracotta. Pale border on white is only about 1.26:1, so use stronger outlines for meaningful controls. Check actual disabled states, opacity, overlays, and text rendering on a device.
 
-### 3.3 Proposed typography and spacing mapping
+### Proposed typography and spacing
 
-The type families are confirmed; this scale is a proposed consistent mapping. Use shared text appearances and dimension resources rather than repeating literal values across screens. Material's [Views typography guidance](https://github.com/material-components/material-components-android/blob/master/docs/theming/Typography.md) describes reusable theme typography.
+Keep the confirmed font families and use shared text styles and dimensions. The [Views typography guide](https://github.com/material-components/material-components-android/blob/master/docs/theming/Typography.md) explains reusable theme attributes.
 
-| Use | Family | Proposed size / line height | Behavior |
-|---|---|---|---|
-| Page heading | Instrument Serif | 28 sp / 34 sp | Wrap naturally; reserve for headings |
-| Section heading | DM Sans, medium | 20 sp / 28 sp | Short clear hierarchy |
-| Card title | DM Sans, medium | 18 sp / 24 sp | Allow wrapping |
-| Body / field input | DM Sans | 16 sp / 24 sp | Readable long text and form input |
-| Button / key label | DM Sans, medium | 14 sp / 20 sp | Label remains visible when text scales |
-| Supporting text / status | DM Sans | 14 sp / 20 sp | Never shrink critical errors to fit |
-| Small noncritical caption | DM Sans | 12 sp / 16 sp | Use sparingly |
-
-Use Android-supported font resources with a documented fallback for characters absent from the font, including Korean. Preserve real text scaling; do not convert all text sizes to fixed pixels. Do not download or bundle fonts without recording the actual source/license in the implementing PR.
-
-Proposed spacing uses a 4 dp base: 8 dp between related controls, 16 dp page/card content padding, and 24 dp between major sections. Proposed cards use a 16 dp corner radius; use the approved shape appearance consistently. Retain at least 48×48 dp effective touch targets even when an icon is visually smaller. These are shared defaults, not a reason to force a fixed-height screen.
-
-### 3.4 Proposed native component mapping
-
-Select existing compatible components first. Adding a Material dependency/version must follow the repository's normal reviewed dependency change, not an unrecorded “latest” upgrade.
-
-| UI purpose | Native Views mapping | Interaction rule |
+| Use | Family | Proposed size / line height |
 |---|---|---|
-| Top-level navigation | BottomNavigationView or the existing equivalent | Capsules / Create / Account; label each destination |
-| Received/Sent selection | TabLayout or existing labeled tabs | Separate data views; preserve one underlying self-send ID |
-| Capsule cards | MaterialCardView | Safe metadata only; full card target with readable state |
-| Email, password, title, message, UID | TextInputLayout with appropriate EditText | Persistent labels, inline validation and correct input type |
-| Primary/secondary actions | MaterialButton styles | One primary action per step; pending work cannot be duplicated |
-| Me/Other and Time/Location/Both | Labeled radio group or compatible segmented control | Clear single selection; not color-only |
-| Date and time | Compatible native/Material picker | Show zone/offset and validate strict future publication on server |
-| Map target | Google Maps native view/fragment | Pin plus explicit Confirm; current-position action is separate |
-| Four-step progress | Labeled step indicator | Current step is announced; validation controls forward progress |
-| Busy state | Progress indicator plus text | Explain the operation; do not show false completion |
-| Permission/recovery explanation | Inline text and dialog when needed | Explain the specific action; offer Retry/Settings where useful |
-| Notifications | Generic local notification | No protected body/photo preview; entry rechecks auth/state |
+| Page heading | Instrument Serif | 28 sp / 34 sp |
+| Section heading | DM Sans, medium | 20 sp / 28 sp |
+| Card title | DM Sans, medium | 18 sp / 24 sp |
+| Body / field input | DM Sans | 16 sp / 24 sp |
+| Button / key label | DM Sans, medium | 14 sp / 20 sp |
+| Supporting text / status | DM Sans | 14 sp / 20 sp |
+| Small noncritical caption | DM Sans | 12 sp / 16 sp |
 
-The confirmed screen flow is independent of these exact widget class choices. Avoid mixing two unrelated visual systems or creating a new custom widget for every ordinary button, field or card.
+Allow wrapping and system text scaling. Provide a font fallback for unsupported characters, including Korean, and record bundled font sources/licenses in the implementing PR. Never shrink an important error or action to fit a fixed box.
 
-## 4 State, data and failure behavior
+Use a proposed 4 dp spacing base: 8 dp between related controls, 16 dp for page/card padding, and 24 dp between sections. Cards use a proposed 16 dp corner radius. Keep touch targets at least 48 × 48 dp and allow content to scroll.
 
-**Confirmed — ARC-01–ARC-07 and DD-02/DD-14–DD-18/DD-21–DD-25.**
+### Proposed native components
 
-| Concern | Owner | What the screen may rely on |
+| Purpose | Views component | Interaction |
 |---|---|---|
-| Draft and screen state | UI/ViewModel | Input validation and frozen-operation presentation, not access authorization |
-| Session, lookup, publish/reconcile, lists, unlock, content | CapsuleRepository | Typed success/invalid/denied/unavailable/unknown outcomes scoped to the active session |
-| Time/account authorization and remote state | Firebase rules/operations | Online confirmation; local pending snapshots cannot grant first access |
-| Current location rule | Location adapter + pure evaluator | Fresh valid current sample; no historical arrival flag |
-| Photo acquisition/upload | Media adapter | Bounded original private copy and required upload acknowledgment |
-| Offline re-view | UID-private retained store and markers | Matching active UID, confirmed access provenance and actual bytes |
-| Notifications | Notification adapter | One best-effort presentation attempt after confirmed first unlock |
+| Main navigation | BottomNavigationView or existing equivalent | Capsules / Create / Account, with labels |
+| Received / Sent | TabLayout or existing labeled tabs | Separate lists; one ID for a self-send |
+| Capsule card | MaterialCardView | Safe metadata and readable state |
+| Text fields | TextInputLayout + appropriate EditText | Persistent labels, correct input type, inline errors |
+| Actions | MaterialButton styles | One primary action per step; prevent duplicate work |
+| Me/Other, Time/Location/Both | Labeled radio group or compatible segmented control | Clear single selection |
+| Date and time | Compatible native/Material picker | Show zone/offset; server requires an unlock time strictly later than its request time |
+| Map target | Google Maps native view/fragment | Explicit pin confirmation; separate current-position action |
+| Creation progress | Labeled step indicator | Announce the step; enforce validation |
+| Busy state | Progress indicator + text | Explain what is happening |
+| Permission/recovery | Inline explanation; dialog when needed | Relevant Retry/Settings action |
+| Notification | Generic local notification | No message/photo preview; check access on entry |
 
-A backend status and an asset-loading status are separate. For example, a capsule may remain UNLOCKED while its photo is unavailable offline. A send can be OUTCOME_UNKNOWN without being failed or confirmed. UI wording must preserve those distinctions.
+Use compatible existing components instead of adding a custom widget for each ordinary control.
 
-Protected access matrix:
+## 4. Data and access rules for screens
 
-| Actor | A→B protected content before B unlocks | A→A protected content before unlock |
+The UI reflects the repository's result; a screen state cannot grant access. Follow ARC-01–ARC-07 and the detailed contract for implementation.
+
+| Responsibility | Owner | Screen behavior |
+|---|---|---|
+| Draft and input state | UI / ViewModel | Validate input and show the frozen send operation. |
+| Session, recipient lookup, send/recovery, lists, unlock, content | CapsuleRepository | Handle success, invalid input, denied access, unavailable service, and unknown outcomes for the active account. |
+| Account/time authorization and remote state | Firebase rules/operations | Wait for online confirmation; a local pending write is insufficient. |
+| Current location | Location adapter + pure evaluator | Use a fresh valid sample, not a remembered visit. |
+| Photo selection/upload | Media adapter | Use a bounded original private copy and wait for required upload acknowledgment. |
+| Offline re-view | UID-private files and saved unlock records | Require the active UID, a server-confirmed unlock record, and the actual retained bytes. |
+| Notifications | Notification adapter | Make one best-effort attempt after confirmed first unlock. |
+
+Keep access and content-loading states separate. An unlocked capsule stays unlocked if its photo is unavailable offline. An unknown send result is neither confirmed success nor definite failure.
+
+| Viewer | A→B content before B unlocks | Self-send content before unlock |
 |---|---|---|
 | Sender A | Allowed through sender permission | Denied |
 | Intended recipient | Denied | Denied |
 | Unrelated account / signed out | Denied | Denied |
 
-After confirmed recipient unlock, authorized recipient re-view remains available online; offline additionally requires retained authorized assets. This table describes the contract, not completed security tests.
+After confirmed recipient unlock, access remains available even after leaving the location. Offline reading also needs the retained authorized content. A combined lock requires time and fresh location to qualify in the same online attempt.
 
-## 5 Accessibility and layout review
+## 5. Accessibility and review
 
-**Confirmed minimums — DD-01 and AC-10.** The implementation review checks:
+Use DD-01 and AC-10 when reviewing a screen:
 
-- All screens remain scrollable and usable with keyboard/system bars; no hidden Send/Retry controls.
-- All interactive controls meet the 48 dp target minimum; icons have meaningful labels, while ordinary text is not redundantly announced.
-- Larger system text does not clip the recipient UID, step title, errors or actions.
-- State uses words and/or meaningful icons as well as color.
-- Focus moves to the relevant invalid field, and Back does not erase unrelated valid draft data.
-- Long titles, email addresses and UIDs wrap or use an explicit copy affordance.
-- Loading, empty, failed and unavailable states have a visible next step.
-- Simulation controls, if present in a wireframe build, are explicitly marked local demo and excluded from ordinary production actions.
+- Keep screens usable with the keyboard and system bars; Send and Retry must remain reachable.
+- Give controls at least 48 dp touch targets and meaningful accessible labels.
+- Support larger system text without clipping UIDs, headings, errors, or actions.
+- Explain states with words/icons as well as color.
+- Focus the invalid field and preserve unrelated valid draft input.
+- Let long titles, emails, and UIDs wrap; provide Copy where useful.
+- Give loading, empty, failed, and unavailable states a clear next step.
+- Keep any wireframe simulation controls visibly marked as demos and out of production actions.
 
-The [Android Views accessibility guide](https://developer.android.com/guide/topics/ui/accessibility/views/apps-views) supports the touch-target and description rules. Actual runtime review is recorded under T-45 and applicable acceptance checks.
+Use the [Android Views accessibility guide](https://developer.android.com/guide/topics/ui/accessibility/views/apps-views) and [JOURNEYS.md](docs/agent-tools/JOURNEYS.md) for practical checks. A UI PR should include screenshots, affected source IDs, expected behavior, and actual verification. Review appearance separately from server authorization, location checks, and account isolation.
 
-## 6 Validation and maintenance
-
-Use [JOURNEYS.md](docs/agent-tools/JOURNEYS.md) for executable planned scenarios and their actual source IDs. Design changes require an updated screenshot/description, affected source IDs, expected behavior and human review in the same PR. A screenshot proves appearance in the captured state; it does not prove server rules, current-location correctness or account isolation.
-
-| Review area | Lead and shared reviewer | When | Dependency / scope |
-|---|---|---|---|
-| Screen wording and visual mapping | User F leads; one teammate reviews | Setup/UI PR before implementation acceptance | Current resources + DD-01/DD-07; MVP design support |
-| Navigation/state contract | User G leads; User J checks implementation | Before each affected feature PR | Current FR/AC/DD; MVP |
-| Runtime and data-boundary realization | User J leads; another teammate reviews | During implementation and before merge | Implemented adapters/rules + applicable tests; MVP |
-| Q&A readiness | Each student explains; a teammate asks follow-ups | At PR review and before WIP/final interview | Actual changed code and honest evidence; shared |
-
-For every nontrivial UI or data change, each member should be able to explain the user action, the screen state, the repository call, the authorization boundary, the failure path and the evidence used to verify it. Comments and logs support that explanation; they do not replace understanding.
-
-**Current result:** this design document is prepared. No Android implementation, UI walkthrough, Firebase provisioning, production rule deployment or acceptance pass is claimed by this package.
-
+User F coordinates screen wording and visual design, User G checks navigation and contract consistency, and User J checks implementation and data boundaries. Another teammate reviews each change. All three should be able to explain the user action, screen state, repository call, access rule, failure path, and how the behavior was checked.

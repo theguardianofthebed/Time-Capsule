@@ -1,4 +1,4 @@
-# Team formatting baseline. Merge with an existing approved file during setup.
+# Team formatting baseline.
 # This is editor guidance; it does not install or run a formatter or CI check.
 root = true
 

@@ -1,159 +1,133 @@
-# Coding and explanation conventions
+# Coding and comments
 
-Our team must be able to read, review, test, and explain every submitted change. Agents must therefore produce consistent code with easy English comments, reuse existing logic where appropriate, explain refactoring, and submit each logical change through a GitHub pull request.
-
-These conventions implement the team's instructions. Their exact formatting rules and comment examples are team conventions, not claims about wording required by the professor. Read [AGENTS.md](../../AGENTS.md), [WORKFLOW.md](WORKFLOW.md), [COURSE_BASELINE.md](COURSE_BASELINE.md), and the current sources identified in [SOURCE_REGISTER.md](SOURCE_REGISTER.md).
+Write code that all three students can read, review, test, and explain. Follow [AGENTS.md](../../AGENTS.md), the [workflow](WORKFLOW.md), and the approved [project sources](SOURCE_REGISTER.md). These detailed comment/style rules are team conventions that support the professor's explainability requirement.
 
 ## Consistent style
 
-First inspect the repository's approved style, formatter settings, and nearby code. Preserve those conventions. Where the repository has no established rule, use the defaults below. Resolve a genuine conflict in the task or PR instead of mixing styles or reformatting the whole project.
+Read nearby code and the repository's formatter settings first. Keep established conventions; use these defaults where no rule exists. Resolve an actual conflict in the task or PR rather than mixing styles.
 
-| Area | Default convention |
-| --- | --- |
-| Language and UI | Follow the current Kotlin and native Android Views design. Do not switch frameworks during a feature or cleanup task. |
-| Indentation | Kotlin/XML and ordinary source files use four spaces; JSON/YAML use two, as set in `.editorconfig`. Do not use tabs. |
-| Line length | Prefer 100 columns. Wrap naturally; do not damage URLs, strings, or readability to satisfy a strict count. |
-| Classes and interfaces | `UpperCamelCase` names that describe a responsibility. |
-| Functions and variables | `lowerCamelCase` names that describe the action or value. Avoid unexplained abbreviations. |
-| Constants | `UPPER_SNAKE_CASE` for genuine constants. Do not make a mutable value look like a constant. |
-| Resources and packages | Follow the existing Android resource and package naming conventions; use descriptive names. |
-| Imports | Use explicit imports. Remove unused imports. |
-| Mutability | Prefer `val`. Use `var` only when state must change, and keep ownership clear. |
-| Visibility | Use the narrowest visibility that supports the actual design. |
-| Null handling | Handle expected absence explicitly. Do not use `!!` to hide uncertainty; explain any justified exceptional use. |
-| Control flow | Prefer readable branches and small functions over dense chains, nested callbacks, or clever one-liners. |
-| Resources and messages | Follow the existing string-resource and localization pattern. Use English for developer comments. |
-| Formatting tools | Use the already configured tools. Do not add or upgrade a formatter, plugin, SDK, or dependency without including that change in the approved task. |
+| Area | Convention |
+|---|---|
+| Language and UI | Use Kotlin and the approved UI architecture. Read the [repository guide](REPOSITORY_STATUS.md) for the Views/Compose discrepancy before UI work. |
+| Indentation | Four spaces for Kotlin/XML and ordinary source; two for JSON/YAML, as set in `.editorconfig`. No tabs. |
+| Line length | Prefer 100 columns. Wrap for readability without breaking URLs or strings. |
+| Classes and interfaces | Descriptive `UpperCamelCase` names. |
+| Functions and variables | Descriptive `lowerCamelCase` names; avoid unexplained abbreviations. |
+| Constants | `UPPER_SNAKE_CASE` for genuine constants. |
+| Resources and packages | Follow the existing Android naming conventions. |
+| Imports | Use explicit imports and remove unused ones. |
+| Mutability and visibility | Prefer `val`; keep mutable state ownership clear and visibility as narrow as useful. |
+| Null handling | Handle expected absence explicitly. Do not hide uncertainty with `!!`; explain any justified exceptional use. |
+| Control flow | Prefer small functions and clear branches over dense chains or deeply nested callbacks. |
+| Strings and comments | Follow the project's string-resource/localization pattern. Write developer comments in English. |
+| Tools and dependencies | Use configured tools and approved versions. Include any necessary change explicitly in the task. |
 
-Keep the PR focused. Formatting unrelated files makes the actual behavior change harder to review. Do not create an abstraction solely to reduce a line count or to anticipate a feature that has not been approved.
+Keep formatting changes focused on the task. Do not reformat unrelated files or add abstractions only to reduce line counts or anticipate unapproved features.
 
-## English comments for every class and function
+## Comment every class and function
 
-Add clear English KDoc to every new or materially changed project-authored class, interface, object, and function. This includes agent-authored code, private helpers, constructors with meaningful behavior, lifecycle overrides, and test functions. Data classes and enums need a comment explaining the represented concept and any non-obvious values. Automatically generated framework files and third-party/vendor files are not edited solely to insert comments.
+Add clear English KDoc to every new or meaningfully changed handwritten class, interface, object, and function, including private helpers, meaningful constructors, lifecycle overrides, and test functions. Explain the concept represented by each data class/enum and any unusual values. Do not edit generated or vendor files solely to add comments.
 
-A simple declaration can have a short comment. A complex one needs enough detail to explain its contract. Write for a student who knows the supplied lectures but has not seen this implementation.
+A simple declaration needs a short comment; a complex one needs enough detail to explain its contract. Cover the relevant points:
 
-The comment should answer the relevant questions:
+- Its job and the meaning of significant inputs/output, including units.
+- Any change to state, UI, files, or remote data.
+- Failure, missing data, denial, or cancellation behavior.
+- Assumptions and boundaries that callers must respect.
 
-- What job does this class or function perform?
-- What do its significant inputs and output mean? State units when relevant.
-- What state, files, UI, or remote data can it change?
-- What can fail, be absent, be denied, or be cancelled, and what happens then?
-- What important assumption or boundary must remain true?
+Use `@param`, `@return`, `@property`, or `@throws` when useful. Avoid tags that repeat names or describe exceptions the code does not throw. Update comments in the same PR as behavior changes.
 
-Use `@param`, `@return`, `@property`, or `@throws` when they add useful information. Do not add tags that merely repeat a name or claim an exception that the function does not throw. Keep comments consistent with the implementation and update them in the same PR when behavior changes.
+For a custom getter/setter, explain its calculation or side effect in the property's KDoc. Explain nontrivial lambdas/callbacks beside the block or its meaningful steps. A simple click listener needs no essay, but its enclosing function still needs KDoc. Add nearby XML/configuration comments for an otherwise unclear permission, lifecycle effect, or unusual setting.
 
-For a custom property getter or setter, explain the calculation or side effect in the property's KDoc and add a nearby comment for a non-obvious step. For a nontrivial lambda or callback, put a short English explanation immediately before the block or at its meaningful steps. A trivial click listener does not require an essay, but its enclosing function still requires KDoc. XML and configuration changes need nearby comments when their purpose, permission, lifecycle impact, or unusual setting would otherwise be unclear.
+### Declaration example
 
-### Small teaching example
-
-The following is an illustrative display-only example. It is not a proposed TimeCapsule component, a product validation rule, or a change to the current application.
+This display-only example shows comment depth; it is not a component to add to TimeCapsule.
 
 ```kotlin
-/**
- * Prepares screen titles for display without changing the stored source text.
- *
- * This example performs no network, file, or Android lifecycle operation.
- */
+/** Prepares display titles while keeping the original stored text unchanged. */
 class ScreenTitleFormatter {
     /**
-     * Returns [rawTitle] without outer whitespace for a display preview.
-     *
-     * The caller keeps the original value. This method does not validate a capsule.
+     * Returns a display copy of [rawTitle] with outer whitespace removed.
+     * The caller keeps the original value; this method does not validate a capsule.
      */
     fun forPreview(rawTitle: String): String = rawTitle.trim()
 }
 ```
 
-`/** Formats the title. */` would say little beyond the function name. The longer comment is useful because it explains the boundary between display formatting and stored data or validation. Do not introduce a new class merely to copy this teaching example; follow the actual design.
+The useful information is the boundary between display formatting and stored data or validation. A comment that only repeats the function name would miss that boundary.
 
-## Finer comments for unfamiliar or complicated code
+## Explain unfamiliar or complicated steps
 
-Use [COURSE_BASELINE.md](COURSE_BASELINE.md) to judge explanation depth. Modern Activity Result launchers are taught; advanced interactions and mechanisms not demonstrated in the supplied lecture set need more explanation.
+Use [COURSE_BASELINE.md](COURSE_BASELINE.md) to judge explanation depth. Modern activity-result and permission launchers were taught, but complicated interactions still need finer comments.
 
-Comment each meaningful step or decision boundary. A useful step comment explains **why this operation is needed here** and **what could go wrong without it**. Do not narrate every obvious assignment or brace.
+Explain each meaningful step or decision: **why it is needed here and what failure it prevents**. Do not narrate obvious assignments or braces.
 
-| Mechanism | Questions the nearby comments should answer |
-| --- | --- |
-| Asynchronous work or coroutines, when used | What starts now and finishes later? What owns its lifetime? What does cancellation mean? Which thread or dispatcher matters? |
-| Lifecycle and UI updates | Can this screen disappear before the result arrives? Who stops the work or ignores an obsolete result? |
-| Session identity | Which UID/session owns the operation? Why must a result from an older session be rejected? |
-| Repository calls | Which responsibility belongs here? What does the caller receive on success or failure? |
-| Firebase operations | What is authenticated or authorized? What has the server confirmed? What remains uncertain offline? |
-| Cache, DataStore, and retained files | What is stored and why? What permits a read? When is it cleared? What must survive for recovery? |
-| Retry and reconciliation | How is the same operation recognized? Why is a retry safe? How is an uncertain result resolved? |
-| URI and media handling | Is this a reference or retained content? How long is access valid? Who closes or deletes the resource? |
-| Time or location rules | What are the units and source? Which approved boundary, freshness, or accuracy rule is applied? What happens if evidence is missing? |
+| Mechanism | Questions the comments should answer |
+|---|---|
+| Asynchronous work/coroutines | What starts now and finishes later? Who owns its lifetime? What does cancellation do? Which thread/dispatcher matters? |
+| Lifecycle/UI updates | Can the screen disappear before a result arrives? Who stops the work or ignores an obsolete result? |
+| Session identity | Which UID/session owns the operation? Why must an old session's result be rejected? |
+| Repository calls | What belongs in this layer? What reaches the caller on success or failure? |
+| Firebase | What is authenticated/authorized? What has the server confirmed? What remains uncertain offline? |
+| Cache, DataStore, retained files | What is stored, why, and for which UID? What permits a read? When is it cleared? What survives for recovery? |
+| Retry/reconciliation | How is the same operation recognized? Why is retry safe? How is an unknown result resolved? |
+| URI/media handling | Is this a reference or retained content? How long does access last? Who closes/deletes the resource? |
+| Time/location | What units and source are used? Which approved boundary, freshness, or accuracy check applies? What if evidence is missing? |
 
-Explain only behavior that the code actually implements. Do not write comments promising security, atomicity, persistence, or exact timing without matching implementation and evidence. Do not invent thresholds, requirement IDs, design IDs, issue numbers, or test results to make an explanation look complete.
+Comments must describe implemented behavior. Do not promise authorization, atomicity, persistence, or timing that the code does not provide. Use real contract IDs and values; never invent thresholds, Issue numbers, or test results.
 
-Here is a teaching fragment for reading a multiple-permission result. `grantResults` represents the callback's `Map<String, Boolean>`; this is not a complete permission request or a proposed unlock rule.
+This fragment explains a multiple-permission callback's `Map<String, Boolean>`. It is not a complete permission request or unlock rule.
 
 ```kotlin
-// Each key is a permission name; its value says whether that permission was granted.
-// Read the needed permission separately because the user can grant only some permissions.
+// Each permission has its own result because the user may grant only some of them.
+// Treat a missing entry as not granted instead of assuming permission is available.
 val fineLocationGranted =
     grantResults[Manifest.permission.ACCESS_FINE_LOCATION] == true
 ```
 
-Do not use a short comment as a substitute for understandable structure. If a block needs a long explanation because it combines unrelated responsibilities, consider separating those responsibilities within the approved design.
+If a block needs a long explanation because it mixes unrelated jobs, simplify the structure as well as the comments.
 
-## Reuse and readable structure
+## Reuse and structure
 
-Before adding logic, search the repository for an existing implementation and inspect its callers. Reuse a function only when its meaning and failure behavior match the new use. Similar-looking code can represent different rules.
+Search for existing logic and read its callers before adding another implementation. Reuse it only when its meaning and failure behavior match the new use.
 
-Keep each function focused on one understandable responsibility. Keep UI event handling, condition evaluation, remote access, and persistence in their approved places. Avoid duplicated business rules, shared mutable state with unclear ownership, deeply nested callback chains, and broad catch blocks that silently report success.
+Give each function one clear responsibility. Keep UI events, condition evaluation, remote access, and persistence in their approved layers. Avoid duplicated business rules, unclear shared mutable state, nested callback chains, and broad catch blocks that silently report success.
 
-When extracting common logic, keep names and parameters specific enough for a student to understand. Do not build a general framework for one small use case. Remove code made obsolete by the approved change, but do not remove unrelated work or rename large parts of the project for consistency alone.
+When extracting shared logic, use specific names and parameters. Remove code made obsolete by the approved change, while preserving unrelated work. A small task does not need a general framework.
 
-## Explain refactoring at the changed area
+## Explain refactoring beside the code
 
-A refactor must leave a short English explanation close to the affected class/function or the newly shared logic. State:
+Leave a short English note near the affected class/function or shared helper. Explain the original duplication, nesting, or mixed responsibility; how the revised structure improves it; and what behavior is preserved or intentionally changed.
 
-1. **Before:** the actual duplication, excessive nesting, mixed responsibility, or other concrete problem.
-2. **After:** the new structure and why it is easier to understand or maintain.
-3. **Behavior:** what is preserved, and any intentional behavior change that is separately covered by requirements and verification.
+Put the fuller explanation, affected callers, and verification in the PR. Small changes may need only two or three comment lines. Larger changes may need a KDoc paragraph and a link to the real Issue/design record.
 
-Keep the durable explanation in code. Put the detailed before/after comparison, affected callers, and verification evidence in the PR. A small refactor may need only two or three comment lines. A larger one may need a KDoc paragraph plus a link to a real issue or design record.
-
-### Hypothetical refactor comment
-
-This is an example of wording, not a claim that the current repository contains two duplicated preview screens. Use it only after replacing the situation with the facts observed in the actual change.
+For example, if two screens really repeat display formatting, an extracted helper could carry this note:
 
 ```kotlin
-// Refactor: Two preview screens previously repeated this display-only formatting.
-// Both now call this helper so the same formatting rule is maintained in one place.
-// Behavior is preserved: only outer whitespace is removed from the displayed copy.
+// Refactor note: this shared formatter replaces duplicate formatting in two screens.
+// Keeping the rule here prevents the screens from applying different formatting.
+// Display behavior is unchanged: only outer whitespace is removed from the copy.
 ```
 
-Keep the old implementation in Git history, not in a large commented-out block. Do not accumulate a chronological diary in source files. If a later change makes a refactor note inaccurate, revise it while retaining any explanation that remains useful. Use actual verified issue/PR identifiers when linking history; never insert a plausible-looking placeholder number.
+Keep the old implementation in Git history, not in a large commented-out block. Keep the note accurate as the code changes; source files should not become a chronological diary. If observable behavior changes, describe and verify that change explicitly.
 
-If the change alters observable behavior, describe that plainly. Do not call the whole change behavior-preserving merely because it also reduces duplication.
+## PR delivery and review
 
-## Pull requests for each logical change
+Submit every focused change through a GitHub PR, including code, tests, configuration, and documentation. Keep related commits and review fixes in that PR; use a separate branch/PR for unrelated work. Follow [WORKFLOW.md](WORKFLOW.md) and leave review and merge to humans.
 
-Every logical change must be submitted through a GitHub PR, including code, refactoring, tests, configuration, and documentation. A logical change is one reviewable task, not every individual line or commit. Several commits and review fixes can belong to the same task's PR. An unrelated task gets a separate branch and PR.
+If access blocks publication, preserve the branch/commits and complete PR description. Report **PR not opened**, the exact blocker, and the action needed. A prepared description is not a published PR.
 
-Follow the issue, branch, review, and verification steps in [WORKFLOW.md](WORKFLOW.md). Do not push directly to `main`, merge your own work without the required human review, or silently leave a completed change only on a local branch.
+Review the actual diff and callers:
 
-If a PR cannot be opened because access is unavailable, preserve the branch or patch and prepare the exact PR description. Report **PR not created**, the specific blocker, and the remaining action. A prepared description is not a posted PR. Do not invent a URL or mark the task complete.
-
-## Reviewer check
-
-Before requesting review, inspect the diff and answer these questions in the PR where applicable:
-
-- Does every new or materially changed class/function have useful English documentation?
-- Are unfamiliar steps explained near the code, including lifecycle, ownership, and failure behavior?
-- Do comments describe the implementation accurately instead of making unsupported promises?
-- Does the change follow the existing style and approved architecture?
-- Was existing logic checked before adding another implementation?
-- Does every refactored area explain the real before/after improvement and preserved or changed behavior?
-- Do the reported checks distinguish actual results, failures, and checks not run?
-- Can a teammate explain the changed data flow and one relevant failure case?
-- Is the work linked to its actual issue/design context and submitted as a PR?
-
-For the teaching `ScreenTitleFormatter` example, a reviewer can check that the method affects only the returned display string and does not pretend to perform validation. For a real repository change, the reviewer must examine its actual callers and evidence; the example supplies no test result or approval.
+- Does each new or meaningfully changed class/function have useful English KDoc?
+- Are unfamiliar steps explained, including ownership, lifecycle, and failure behavior?
+- Do comments match the implementation and approved contract?
+- Are style and responsibilities consistent, with suitable logic reused?
+- Does each refactored area explain its improvement and any behavior change?
+- Are checks reported honestly, including failures and work not verified?
+- Can a teammate explain the data flow and a relevant failure case?
+- Is the change linked to its real Issue and submitted as a PR?
 
 ## Reference
 
-The multiple-permission result type is documented by Android Developers in [ActivityResultContracts.RequestMultiplePermissions](https://developer.android.com/reference/kotlin/androidx/activity/result/contract/ActivityResultContracts.RequestMultiplePermissions). Other rules in this file are team conventions or project-source constraints, not new platform requirements. Check [SOURCE_REGISTER.md](SOURCE_REGISTER.md) for the current project evidence.
+Android Developers documents the multiple-permission result type in [ActivityResultContracts.RequestMultiplePermissions](https://developer.android.com/reference/kotlin/androidx/activity/result/contract/ActivityResultContracts.RequestMultiplePermissions). Use [SOURCE_REGISTER.md](SOURCE_REGISTER.md) for the project-specific contracts.

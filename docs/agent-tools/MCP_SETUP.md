@@ -1,62 +1,43 @@
-# Android Studio and GitHub tool setup
+# Android Studio and GitHub setup
 
-**Owner:** each student for personal authentication; User J coordinates reproducibility. **When:** before the student's first agent-created PR. **Dependency:** access to the TimeCapsule Android repository. **Scope:** shared development tooling supporting the MVP.
+Use Android Studio Agent Mode for project code. Each member keeps real MCP settings and credentials in their own Android Studio settings directory. The shared, token-free example is [mcp.redacted.json](mcp.redacted.json).
 
-The professor requires actual MCP settings to stay in each member's Android Studio settings folder and one token-free shared copy at `docs/agent-tools/mcp.redacted.json`. The supplied JSON is a **proposed configuration template**, not evidence that a connection or credential is already installed. MCP is an optional route for repository operations; a usable authenticated GitHub workflow is needed to satisfy the team's PR rule.
+GitHub MCP is one way to publish branches and PRs. An existing authenticated GitHub integration or CLI can also support the workflow; a configuration example alone does not provide access.
 
-## 1. Keep the coding agent inside Android Studio
+## Make the shared instructions available
 
-Open the Android application project in Android Studio and use Agent Mode. Record the actual Android Studio version and selected model in the student's log. Do not install another coding-agent IDE to follow this guide.
+Open the repository root in Android Studio. Confirm that the agent reads `AGENTS.md` and can use the skills in `.agents/skills/`. Select the required skill with the IDE's context/skill picker, or attach its file explicitly if discovery fails. Record the actual IDE version, selected model, and any discovery problem in your log.
 
-Keep root `AGENTS.md` and the team skills committed. Verify that the agent's context includes the root instructions. If Android is a subdirectory of the Git repository, keep the shared package and `.github` at the Git root, record the Android build working directory, and explicitly attach the root instructions/chosen skill when automatic discovery is unavailable. Check existing `GEMINI.md`, nested `AGENTS.md`, and IDE Rules for contradictions: Android Studio documents that a same-directory `GEMINI.md` takes precedence and that Rules are combined with agent-file instructions. Merge stale rules into the shared policy during the setup PR rather than maintaining conflicting copies.
+Keep IDE Rules and nested instruction files consistent with root `AGENTS.md`. A same-directory `GEMINI.md` takes precedence in Android Studio, and IDE Rules are combined with agent-file instructions. Resolve conflicts rather than maintaining contradictory copies. Use a course-compatible Android Studio version that supports the required shared files. See [SETUP.md](SETUP.md).
 
-The professor specifies `.agents/skills/`. Current Android Studio documentation supports that path; older releases used different locations. Use a course-compatible version that recognizes the required files. If discovery fails, attach the same shared skill/instructions explicitly for the session and record the limitation while fixing version/discovery settings; do not silently rename the required committed deliverables.
+## Configure GitHub MCP locally
 
-## 2. Configure the optional GitHub MCP connection locally
+1. Open **Settings → Tools → AI → MCP Servers** in Android Studio and enable MCP servers. Use the Settings UI to reach the IDE's configuration directory; do not guess a platform-specific path.
+2. Copy the structure from `docs/agent-tools/mcp.redacted.json` into your local settings.
+3. Replace the placeholder with your own authorized credential **only in those local settings**. Never put a real token in the tracked example, even temporarily.
+4. Limit the credential to the TimeCapsule repository and the read, push, Issue, and PR operations you need. Do not grant administration, workflow-management, organization-wide, or unrelated repository access merely to work around an unclear error.
+5. Save and inspect the tools offered by the server. Start with a read-only check of `theguardianofthebed/Time-Capsule`, its target branch (`main`), and a known Issue. Do not print authorization headers.
 
-Use **Settings → Tools → AI → MCP Servers** in Android Studio (the macOS application menu provides Settings). The IDE stores actual settings in its version-specific configuration directory. Use the settings UI instead of guessing a Windows or macOS path.
+The example uses Android Studio's `httpUrl` field with GitHub's official endpoint, `https://api.githubcopilot.com/mcp/`. Its `X-MCP-Toolsets` header selects `repos,issues,pull_requests`. These choices limit the tools requested; credential permissions and human review still apply.
 
-1. Enable MCP servers if using this route.
-2. Copy the structure of `mcp.redacted.json` into the local settings field.
-3. Replace the obvious placeholder with the member's own authorized credential **in that local settings field only**. Never edit the tracked redacted copy to hold a token, even briefly.
-4. Restrict the credential to the intended repository and operations. Repository read/push, Issue operations used by the workflow, and PR creation require corresponding access; do not add administration, workflow-management, organization-wide, or unrelated repository access merely to resolve a vague error.
-5. Save the local configuration and inspect the available tools. Start with a read-only check of the intended repository, default branch, and a known Issue. Do not print credential headers.
+The endpoint's name does not permit another coding agent. Use ordinary repository and PR operations. **Do not call `create_pull_request_with_copilot` or any equivalent tool that delegates coding to Copilot.** Project code must be produced in the professor's allowed environment.
 
-The example uses Android Studio's documented `httpUrl` configuration field. Its GitHub toolset header selects ordinary repository, Issue, and PR tooling. Check the actual tools exposed by your installed versions before use; toolset selection does not replace credential permissions or human review.
+## Check a real PR
 
-**Why the URL contains “githubcopilot”:** that is GitHub's official hosted MCP endpoint. Calling ordinary GitHub repository tools from Android Studio is a tool integration. The professor's ban on other coding agents still applies: never call `create_pull_request_with_copilot`, assign coding work to Copilot, or use an equivalent agent-delegation tool. Use the ordinary PR creation operation for code produced and reviewed in Android Studio.
+During an authorized task, review the diff, publish its branch, and open an ordinary PR. Check the returned URL, repository, base/head branches, files, and description. Another teammate reviews the PR before a human merges.
 
-The repository identifier recorded in prior team context is `theguardianofthebed/Time-Capsule`. Verify it against this checkout's actual remote before any write. The inspected default branch is `main`; verify the current remote and target branch before writes. This shared example does not prove that each member's personal connection has write access or is configured.
+If MCP cannot publish, preserve the branch and complete PR description. Report the specific error and use an available authorized IDE integration or CLI if appropriate. If a member opens the PR manually, record that step. Until the real PR exists, report **PR not opened**.
 
-## 3. Verify PR publication without confusing it with implementation
+Keep tokens out of prompts, logs, screenshots, PRs, and repository files. If a token is exposed, its owner must revoke or rotate it; an ignore rule does not remove a committed secret from Git history.
 
-Use the document setup PR as the first practical check. The member reviews and accepts the document changes, pushes the setup branch, then has the Android Studio agent open an ordinary PR. Verify the returned URL, base branch, head branch, changed files, and body in GitHub. Another teammate reviews it before a human merges.
+## Record your setup
 
-If MCP cannot publish, the agent should give a concrete diagnostic and preserve the prepared branch and PR body. Use an existing authenticated GitHub integration or GitHub CLI from the Android Studio workflow if available; do not ask another coding agent to recreate the code. If the member must open the PR manually, record that manual step and keep publication blocked until the actual PR URL exists.
+In your own weekly log, record the IDE version/model, how you checked instruction and skill discovery, the GitHub connection used, the repository/branch checked, and the actual PR URL or access blocker. Do not claim another member's setup is working without checking it.
 
-No token should be pasted into a chat prompt, weekly log, PR, screenshot, or repository file. If a token was committed, merely adding an ignore rule does not remove it from history: the credential owner must revoke/rotate the exposed token and handle repository cleanup through the team's review process.
+Update the shared redacted example through a PR when its structure changes. Keep each member's credentials local.
 
-## 4. Record the real setup state
-
-Each student records the following in their own weekly log after performing setup:
-
-| Field | Record after verification |
-|---|---|
-| Android Studio and model | Actual version and selected model name |
-| Root instructions | How inclusion was checked |
-| Skill discovery | Which team skill was successfully invoked |
-| GitHub route | MCP, existing IDE integration, or authenticated CLI |
-| Repository and base branch | Actual verified values |
-| Read check | What was read and result, without secrets |
-| Publication check | Actual setup PR URL, or exact blocker |
-
-Do not check off another member's setup or claim all three environments are identical without verifying them. When adding or changing a server later, update the shared redacted example in a PR; keep credentials and member-specific settings local.
-
-## References checked 3 November 2026
+## References
 
 - Professor supplement, Agent Usage Rules 1–6.
-- [Android Studio agent files](https://developer.android.com/studio/gemini/agent-files).
-- [Android Studio skills](https://developer.android.com/studio/gemini/skills).
-- [Android Studio MCP configuration](https://developer.android.com/studio/gemini/add-mcp-server).
+- [Android Studio agent files](https://developer.android.com/studio/gemini/agent-files), [skills](https://developer.android.com/studio/gemini/skills), [MCP configuration](https://developer.android.com/studio/gemini/add-mcp-server), and [context exclusions](https://developer.android.com/studio/gemini/aiexclude).
 - [GitHub remote MCP server and toolsets](https://github.com/github/github-mcp-server/blob/main/docs/remote-server.md).
-- [Android Studio context exclusions](https://developer.android.com/studio/gemini/aiexclude).

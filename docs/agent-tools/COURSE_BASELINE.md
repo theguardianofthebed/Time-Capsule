@@ -1,77 +1,69 @@
-# Course baseline for agent explanations
+# Course baseline for code explanations
 
-This document helps an agent judge how much explanation our team needs in code comments and reviews. The supplied lectures establish what was demonstrated in class. They do not add product features, replace the approved TimeCapsule design, or prove that every team member already understands every example.
+Use this guide to decide which code needs more explanation. The supplied lectures show what was demonstrated in class; they do not establish that every student understands every example. Follow [CODING_AND_COMMENTS.md](CODING_AND_COMMENTS.md) for the team's English comment rules and [SOURCE_REGISTER.md](SOURCE_REGISTER.md) for the approved project design.
 
-The requirement to leave easy English comments comes from the team's instructions. The specific comment levels in [CODING_AND_COMMENTS.md](CODING_AND_COMMENTS.md) are team conventions, not additional requirements attributed to the professor.
+## Topics covered
 
-Read [AGENTS.md](../../AGENTS.md), [SOURCE_REGISTER.md](SOURCE_REGISTER.md), and [WORKFLOW.md](WORKFLOW.md) before implementation. Source names below identify the supplied attachments; they do not mean that the lecture PDFs must be committed to GitHub.
-
-## What the supplied lectures demonstrate
-
-Page numbers are PDF page numbers and match the printed slide numbers.
+Page numbers refer to the supplied PDFs and match the printed slide numbers. The source filenames identify course materials; the PDFs do not need to be committed to the repository.
 
 | Source | Demonstrated concepts | Pages |
-| --- | --- | --- |
+|---|---|---|
 | `5_Android Intents (2).pdf` | Activities, view binding, button listeners, and starting another activity | 2–8 |
-| Same source | Explicit and implicit intents; component, action, URI, MIME type, extras, and `Bundle` | 9–19 |
+| Same source | Explicit/implicit intents; component, action, URI, MIME type, extras, and `Bundle` | 9–19 |
 | Same source | Choosers, missing handlers, `ActivityNotFoundException`, intent filters, `CATEGORY_DEFAULT`, and an intentionally exported sharing receiver | 20–24 |
-| Same source | Results returned by an activity; `setResult`, `finish`, and the historical result-request flow, with deprecated caller methods identified | 25–31 |
+| Same source | Activity results, `setResult`, `finish`, and the historical request flow with deprecated caller methods identified | 25–31 |
 | Same source | Modern Activity Result API: contracts, launchers, registration, callbacks, `StartActivityForResult`, and `GetContent` | 32–37 |
-| `9_Android Permission.pdf` | Permission purpose, delegation through intents, install-time versus runtime permissions, and manifest declarations | 2–9 |
-| Same source | Checking permission, explaining a rationale, and a location-permission example | 10–13 |
+| `9_Android Permission.pdf` | Permission purpose, delegation through intents, install-time/runtime permissions, and manifest declarations | 2–9 |
+| Same source | Permission checks, rationale, and a location-permission example | 10–13 |
 | Same source | `RequestPermission`, `RequestMultiplePermissions`, launcher callbacks, permission branching, denial, and graceful degradation | 14–18 |
-| Same source | Minimum permissions, requests connected to user actions, dependency permissions, transparency, and sensitive-access indicators | 19–20 |
-| `12_Android Sensors.pdf` | Sensor categories, hardware and software sensors, framework objects, and events | 2–9 |
-| Same source | Availability checks, sensor lists, nullable default sensors, event values and accuracy, and requested event rate | 10–13 |
+| Same source | Minimum permissions, requests tied to user actions, dependency permissions, transparency, and sensitive-access indicators | 19–20 |
+| `12_Android Sensors.pdf` | Sensor categories, hardware/software sensors, framework objects, and events | 2–9 |
+| Same source | Availability, sensor lists, nullable default sensors, event values/accuracy, and requested event rate | 10–13 |
 | Same source | Registering in `onResume`, unregistering in `onPause`, battery use, and a light-sensor example | 14–15 |
-| Team's statement in this request | UI Widgets were learned. The Intents examples also show TextView, Button, view binding, and click listeners. A separate UI Widgets lecture was not supplied. | User-reported; examples on Intents pp4–5 |
+| Team-reported coursework | UI Widgets; the Intents examples also show TextView, Button, view binding, and click listeners. No separate Widgets deck was supplied. | Intents pp4–5 for those examples |
 
-Modern permission launchers and activity-result callbacks are therefore part of the demonstrated baseline. They still require the normal class/function comments. Complex combinations, lifecycle edge cases, and unusual failure handling require finer comments even when their building blocks appeared in class.
+Modern activity-result and permission launchers are part of this baseline. They still need normal class/function comments. Add finer comments for complicated combinations, lifecycle edge cases, and unusual failure handling.
 
-## Limits of this baseline
+## Topics that need more explanation
 
-Use the wording **not demonstrated in the supplied lecture set** when discussing an unfamiliar mechanism. Do not claim that the team has never learned it.
+Say **not demonstrated in the supplied lectures**, rather than assuming a student has never learned a topic. The supplied materials do not establish coverage of Compose, coroutines, ViewModels, repositories, Firebase, DataStore, cache authorization, retry reconciliation, or background scheduling.
 
-The Sensors lecture concerns the Android sensor framework. It does not demonstrate TimeCapsule's geographic unlock rule, location freshness checks, distance calculation, or the combination of time and location conditions. It also does not instruct the team to add a light sensor or motion-based feature.
+The Sensors lecture covers Android's sensor framework. It does not teach TimeCapsule's geographic unlock rule, fresh-location checks, distance calculation, or combined time/location condition. A taught example also does not add a sensor feature to the project.
 
-The materials do not establish that Compose, coroutines, ViewModels, repository design, Firebase, DataStore, cache authorization, retry reconciliation, or background scheduling were taught. This is a reason to explain approved mechanisms carefully; it is not permission to introduce new architecture.
+Explain approved mechanisms where they are used:
 
-## Current project mechanisms that need finer comments
+| Area | What the nearby comments should explain |
+|---|---|
+| UI state and asynchronous work | Who owns the state/work, when results arrive, and what happens when the screen disappears |
+| Authentication/session changes | Which UID owns a result, why old-session callbacks are rejected, and what logout clears |
+| Repositories and remote calls | Each layer's job, what the server confirms, and how errors reach the caller |
+| Memory-only cache and retained content | How the stores differ, what permits a read, and how ownership/cleanup work |
+| DataStore markers and recovery journal | What each record means, when it is written/removed, and why it is separate from protected content |
+| Sending, retries, and reconciliation | How the same operation is recognized, what an unknown outcome means, and how duplicates are prevented |
+| Photos and content URIs | What the URI refers to, how access is obtained, and how needed bytes remain available |
+| Time/location conditions | Units, time source, boundaries, location freshness/accuracy, and why both enabled conditions must pass |
+| App-open, resume, detail, and retry checks | What starts the check and what happens when evidence is missing |
 
-The live design evidence recorded in [SOURCE_REGISTER.md](SOURCE_REGISTER.md) is separate from the lecture evidence. It records native Android Views; Firebase Auth, Firestore, and Storage; memory-only Firestore cache; DataStore markers and recovery journal; and UID-scoped app-private retained content. Explain these mechanisms where implemented, using the exact approved contracts.
+Use the exact approved thresholds and permissions. Commenting work does not authorize a framework, storage, or background-trigger change. Read [AGENTS.md](../../AGENTS.md), the [repository guide](REPOSITORY_STATUS.md), and the relevant contract before implementation.
 
-| Area being changed | Explain near the relevant code |
-| --- | --- |
-| Android Views and asynchronous state updates | Which object owns visible state, when a callback can arrive, and how lifecycle changes affect it |
-| Authentication and session changes | Which account owns a result, why a previous session's callback must be rejected, and what logout invalidates |
-| Repository and remote operations | What each layer is responsible for, what the server confirms, and how errors reach the caller |
-| Memory-only cache and retained content | Why these are different stores, which verified condition permits a read, and how UID ownership and cleanup are enforced |
-| DataStore markers and recovery journal | What a record means, when it is written or removed, and how it differs from the protected content itself |
-| Sending, retry, and reconciliation | How the same operation is recognized, what an uncertain outcome means, and how duplicate delivery is prevented |
-| Photos and content URIs | What the URI refers to, how read access is obtained, and how required bytes remain available |
-| Time and geographic conditions | Units, clock/source, boundary comparison, freshness and accuracy handling, and why both enabled conditions must pass |
-| App-open, resume, detail, and retry checks | What initiates a check, what can be reused, and what happens if evidence is unavailable |
+## Read lecture examples carefully
 
-Use the current design's actual thresholds and permissions. Do not introduce Room, switch to Compose, or add alarms, geofences, boot handling, background location, or FCM through a commenting or cleanup task. A source conflict must be resolved through the workflow; this document does not settle a new product decision.
+**Multiple-permission results.** Permission p14 calls the result a Boolean array. AndroidX actually returns `Map<String, Boolean>`, with a separate grant result for each permission name. Use the correct type and handle partial grants. [1]
 
-## Teaching examples that require care
+**Cached location.** Permission pp13 and 18 use `LocationManager.getLastKnownLocation`. It may return null or an old cached location; it does not request a fresh fix. A granted permission alone cannot establish the approved unlock conditions. Apply the project's freshness, accuracy, and failure rules. [2]
 
-**Permission result shape.** Permission p14 describes the multiple-permission result as an array of Boolean values. The AndroidX contract returns `Map<String, Boolean>`: each permission name has its own grant result. Use the correct type for the repository's dependency and explain partial grants. [1]
+**Permission denial.** Permission p18 has a short log saying the app cannot be used. Pages 15–16 show explanations, cancellation, and graceful degradation. Follow the approved feature-level denial behavior instead of copying that informal log into the UI.
 
-**Cached location.** Permission pp13 and 18 demonstrate `LocationManager.getLastKnownLocation`. That method can return null or an old cached location and does not request a fresh fix. A permission example alone is insufficient evidence for an unlock decision. Apply the project's approved freshness, accuracy, and failure rules. [2]
+**Activity results.** Intents pp26–31 show the historical approach, and p27 marks the caller methods deprecated. Pages 32–37 teach the modern API. Read the full sequence before adapting an example.
 
-**Denial handling.** Permission p18 contains a short log message about being unable to use the app. The same deck's pp15–16 shows an educational explanation, cancellation, and graceful degradation. Implement the approved feature-level denial behavior; do not copy an informal teaching log as product UI.
+**Exported components.** Intents pp22–24 deliberately expose an image-sharing receiver. This does not make `android:exported="true"` the default for internal screens. Explain why an exported component exists and how it validates input; an intent filter is not an authorization check. [3]
 
-**Historical activity-result code.** Intents pp26–31 explains the old approach, and p27 marks the caller methods deprecated. The deck then teaches the modern approach on pp32–37. Read the whole sequence before choosing an example to adapt.
+**Sensor lifecycle.** Sensors pp13–15 connect registration with unregistration, nullable availability, and battery use. Preserve the cleanup behavior when adapting relevant code.
 
-**Exported components.** Intents pp22–24 deliberately exposes an image-sharing receiver. That example does not make `android:exported="true"` a default for internal screens. Explain the purpose and validation of every intentionally exported component; an intent filter is not an authorization check. [3]
+## References
 
-**Sensor lifecycle.** Sensors pp13–15 connects listener registration with unregistration, nullable availability, and battery use. Preserve that reasoning when relevant; do not copy an isolated registration line without its cleanup behavior.
+Check these APIs against the repository's actual SDK and dependency versions:
 
-## Sources
-
-The three lecture PDFs and the team's UI Widgets statement are supplied course context. Their page references appear above. Official documentation below was checked while preparing this package on 2026-11-03; verify compatibility with the repository's actual SDK and dependency versions when implementing.
-
-1. Android Developers, [ActivityResultContracts.RequestMultiplePermissions](https://developer.android.com/reference/kotlin/androidx/activity/result/contract/ActivityResultContracts.RequestMultiplePermissions).
-2. Android Developers, [LocationManager and getLastKnownLocation](https://developer.android.com/reference/android/location/LocationManager).
-3. Android Developers, [Intents and intent filters](https://developer.android.com/guide/components/intents-filters).
+1. [ActivityResultContracts.RequestMultiplePermissions](https://developer.android.com/reference/kotlin/androidx/activity/result/contract/ActivityResultContracts.RequestMultiplePermissions).
+2. [LocationManager and getLastKnownLocation](https://developer.android.com/reference/android/location/LocationManager).
+3. [Intents and intent filters](https://developer.android.com/guide/components/intents-filters).

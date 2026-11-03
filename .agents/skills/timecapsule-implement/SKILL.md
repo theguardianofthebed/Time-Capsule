@@ -19,7 +19,7 @@ Use this procedure inside Android Studio Agent Mode. Read [AGENTS.md](../../../A
 5. Search for existing implementations of the same rule or responsibility. Reuse or extend them; avoid a parallel validator, repository, state machine, or permission helper with overlapping behavior.
 6. Implement a small end-to-end slice following the approved account/data contracts. For UI work, first read [REPOSITORY_STATUS.md](../../../docs/agent-tools/REPOSITORY_STATUS.md): the approved Views target and provisional Compose scaffold need a separate reviewed reconciliation task. Do not silently choose or migrate frameworks, add a duplicate database, or revive old background mechanisms.
 7. Add plain English KDoc for each new or materially changed handwritten class/function, including private helpers and overrides. Add step comments around unfamiliar asynchronous, session, authorization, storage, and recovery mechanisms. Keep comments faithful to the code.
-8. Present each diff for the student's review before acceptance. Explain what changed, why it is needed, and how a failure is handled. If restructuring existing code, apply the Before / After / Why policy from the refactor skill.
+8. Present each diff for the student's review before acceptance. Explain what changed, why it is needed, and how a failure is handled. If restructuring existing code, apply the local explanation policy from the refactor skill.
 
 ## Verify and publish
 

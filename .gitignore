@@ -24,8 +24,8 @@ Thumbs.db
 .env.*
 
 # Shared agent documents and local secret protection
-# Merge into the existing root .gitignore; preserve all existing exclusions.
-# The rules below track only this package and its necessary parent directories.
+# Shared document and sensitive-file rules used by the root .gitignore.
+# The rules below include specific shared files and their parent directories.
 # Do not replace these exact exceptions with broad recursive inclusion patterns.
 # Existing custom secret exclusions still apply to other files in these folders.
 

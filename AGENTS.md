@@ -2,7 +2,7 @@
 
 These are shared rules for the TimeCapsule Android application. They do not govern the Project Atlas website or its MCP gateway. Read this file before planning, editing, reviewing, or publishing a project change.
 
-## 0. Preserve repository scope and existing safety rules
+## 0. Repository scope and safety
 
 - Work only in `theguardianofthebed/Time-Capsule` unless the human explicitly authorizes another repository. Do not inspect or change unrelated accounts, files, repositories, services, credentials, or infrastructure.
 - Do not bypass repository permissions, authentication, branch rules, tests, security checks, or validation. Do not disable a safeguard to make a change appear successful.
@@ -12,7 +12,7 @@ These are shared rules for the TimeCapsule Android application. They do not gove
 - Read existing files before editing. Preserve unrelated work and teammates' ownership; do not implement another role's unfinished work merely to fill a placeholder.
 - Do not silently introduce requirements, architecture, dependencies, cloud resources, accounts, or stretch features. Surface an actual unresolved conflict and continue work that does not depend on it.
 
-**Repository layout:** the Git root is also the Gradle root, with the existing `:app` module under `app/`. Keep `app/`, `gradle/`, `prototype/`, and `spikes/` in place. Read [REPOSITORY_STATUS.md](docs/agent-tools/REPOSITORY_STATUS.md) for the inspected checkout and its outstanding design discrepancy.
+The Git root is also the Gradle root, with the `:app` module under `app/`. Keep `app/`, `gradle/`, `prototype/`, and `spikes/` in place. Read [REPOSITORY_STATUS.md](docs/agent-tools/REPOSITORY_STATUS.md) for the project layout and UI framework guidance.
 
 ## 1. Use the permitted environment and preserve human responsibility
 
@@ -33,7 +33,7 @@ The supplied contract summary is a dated snapshot. If a newer approved revision 
 Preserve these current boundaries:
 
 - Accounts and delivery to self or another registered user are MVP. Text and one supported photo, time/location/current AND locks, lists, recovery, and persistent authorized re-view remain in scope.
-- The approved target uses native Android Views and the selected Firebase service family, with memory-only Firestore caching, UID-scoped private retained content, and small DataStore markers/journals. The inspected checkout currently has a provisional Compose scaffold and no working Firebase integration. Read the discrepancy in [REPOSITORY_STATUS.md](docs/agent-tools/REPOSITORY_STATUS.md) before UI work; resolve it through a separate reviewed application task. Do not silently choose a different framework, add Room, or migrate the scaffold as incidental cleanup.
+- The approved target uses native Android Views and the selected Firebase service family, with memory-only Firestore caching, UID-scoped private retained content, and small DataStore markers/journals. The application contains a provisional Compose scaffold and no working Firebase integration. Read the discrepancy in [REPOSITORY_STATUS.md](docs/agent-tools/REPOSITORY_STATUS.md) before UI work; resolve it through a separate reviewed application task. Do not silently choose a different framework, add Room, or migrate the scaffold as incidental cleanup.
 - Evaluate through the approved app-open, foreground-resume, detail-open, and explicit-retry paths. Do not restore old alarm, geofence, boot-receiver, background-location, polling, or FCM designs from historical spikes.
 - First unlock requires the approved online authorization. A local pending write is not a confirmed send. A previous location visit does not satisfy a later combined lock. Follow the separate sender, recipient, and self-send access rules.
 - Voice, external links/QR, advanced social features, and location anti-spoofing are outside this MVP.
@@ -48,10 +48,10 @@ Read [CODING_AND_COMMENTS.md](docs/agent-tools/CODING_AND_COMMENTS.md) and [COUR
 2. Add short English comments at meaningful steps in complicated or unfamiliar code. Explain why a step exists, what runs later, which account/lifecycle owns it, and what failure it prevents. Do not merely restate obvious assignments.
 3. Follow the shared style and `.editorconfig`: spaces, consistent naming, explicit imports, focused functions, and readable control flow. Preserve approved dependencies and formatting tools; do not silently introduce another formatter or framework.
 4. Search for existing implementations before adding one. Keep one source for each shared business rule and respect the existing responsibility boundaries. Avoid duplicated validation, large all-purpose classes, deeply nested callbacks, and speculative abstraction.
-5. When refactoring, leave a short **Before / After / Why** explanation beside the changed responsibility. State whether behavior is preserved or intentionally changed. Put the detailed comparison and verification in the PR; keep old implementation copies in Git history rather than commented-out production code.
+5. When refactoring code, leave a short English note beside the changed responsibility explaining the previous problem, how the code is simpler, and why. State whether behavior is preserved or intentionally changed. Put the detailed comparison and verification in the PR; keep old implementation copies in Git history rather than commented-out production code.
 6. Update comments when behavior changes. Never claim a check, server acknowledgment, cancellation guarantee, or permission boundary that the code does not actually provide.
 
-These comment/style/refactoring rules are team requirements requested by User J. They support, but are more specific than, the professor's explainability requirement.
+These are the team's coding rules. The professor also requires every student to understand and explain the submitted code.
 
 ## 4. Deliver every coherent change through a GitHub PR
 

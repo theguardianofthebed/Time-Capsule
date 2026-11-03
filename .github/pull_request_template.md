@@ -1,65 +1,45 @@
-## Purpose and scope
+## Purpose
 
-[Explain the problem, why this change is needed, and the resulting behavior.]
+[Explain the problem, the result of this change, and why it is needed.]
 
-- **Issue:** [Link; use a closing keyword only when this PR actually completes it.]
-- **Change type:** [Feature / fix / refactor / test / documentation / configuration]
-- **Scope:** [MVP / approved stretch / team process; link the relevant decision.]
-- **Requirement, acceptance criteria, and design:** [Actual IDs or links; explain any not-applicable item.]
-- **Owner and requested human reviewer:** [User F, User G, or User J]
+- **Issue:** [Real link; use Closes only when this PR fully resolves it.]
+- **Type and scope:** [Feature / fix / refactor / test / documentation / configuration; MVP / approved stretch / team process]
+- **Requirement, design, and acceptance references:** [Actual IDs/links, or explain why not applicable.]
+- **Author and human reviewer:** [User F, User G, or User J; reviewer must be another teammate.]
 
-One PR covers one coherent task. Related review fixes stay here. Every change type, including documentation and configuration, follows this process.
+## Changes and explanation
 
-## What changed
+[Describe the important files, behavior, and decisions. For code, point to the English declaration comments and explanations of unfamiliar steps.]
 
-[Name the important files or components and explain how they now work. Identify any contract or dependency change.]
-
-## Comments and unfamiliar code
-
-[Point to the English class/function comments and finer comments for unfamiliar mechanisms. Explain any relevant concept beyond the lecture baseline. For a change without code, write “Not applicable” and why.]
-
-## Refactoring
-
-- **Before:** [Duplication, mixed responsibilities, or other concrete problem.]
-- **After and reason:** [What improved and why behavior is preserved or intentionally changed.]
-- **Local comment:** [Location of the concise before/after explanation.]
-- **Verification:** [Evidence covering behavior that could regress.]
-
-[If no refactoring occurred, replace this section's fields with that statement.]
+**Refactoring, if applicable:** [Explain the original problem, how the revised structure improves it, and whether behavior changes. Link the local refactor comment and relevant checks. Otherwise write Not applicable.]
 
 ## Verification
 
-| Check actually performed | Environment or procedure | Observed result and evidence |
-| --- | --- | --- |
+| Check performed | Environment or procedure | Actual result and evidence |
+|---|---|---|
 | [Fill in.] | [Fill in.] | [Fill in.] |
 
-**Not run or unresolved:** [Checks not performed, reasons, failures, and remaining risks. Do not report a test as passed without running it.]
+**Outstanding checks or problems:** [What was not run, why, and any remaining failure or uncertainty.]
 
-**UI evidence, when relevant:** [Sanitized screenshots or recording and the behavior shown.]
+**UI evidence, if relevant:** [Sanitized screenshots/recording and what they demonstrate.]
 
-## Agent use and student understanding
+## Agent use and learning
 
-- **Agent use:** [Actual environment and model; project code must use Android Studio Agent Mode. Identify documentation-only assistance honestly.]
-- **Individual log:** [Links to the involved students' relevant weekly entries.]
+- **Environment and model:** [Actual values; project code must use Android Studio Agent Mode. Identify documentation-only assistance honestly.]
 - **Agent contribution:** [Actual work.]
-- **Human decisions and manual changes:** [Actual work.]
-- **Explanation:** [Purpose, data flow, Android mechanism, failure behavior, and verification, as relevant.]
+- **Human decisions and manual fixes:** [Actual work.]
+- **Individual log:** [Links to the participating students' actual entries.]
+- **What the author can explain:** [Relevant purpose, data flow, Android mechanism, and failure behavior.]
 
-## Author checks
+## Review checklist
 
-- [ ] I inspected the complete diff, including agent changes.
-- [ ] English comments and style follow the shared rules for the affected code.
-- [ ] I checked for duplicated logic and unnecessary complexity.
-- [ ] Verification results are accurate; incomplete work is clearly marked.
+- [ ] The author inspected the complete diff, including agent changes.
+- [ ] Comments and style follow the shared rules; duplicated logic and unnecessary complexity were checked.
+- [ ] Verification results are accurate and unfinished work is identified.
 - [ ] No secrets or private user data were added.
 - [ ] Relevant design, journeys, and individual logs are updated.
+- [ ] Another teammate reviewed the latest diff and recorded their feedback.
 
-## Human review and merge
+**Human review result:** [Leave pending until the reviewer completes it.]
 
-**Reviewer:** [A teammate other than the PR author]  
-**Review result and evidence:** [Pending until the human reviewer completes it.]
-
-The agent must not claim human approval, approve its own work, or merge this PR. Keep incomplete verification or unresolved review clearly visible and use draft status when appropriate.
-
-Repository guidance: `AGENTS.md`, `docs/agent-tools/WORKFLOW.md`, and `docs/agent-tools/CODING_AND_COMMENTS.md`. Use actual repository permalinks when adding clickable links to this PR body.
-
+Related corrections stay in this PR. Keep it in draft when required checks or decisions are incomplete. Agents must not claim human approval, self-approve, or merge. Use real repository permalinks for file references.

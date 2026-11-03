@@ -1,10 +1,6 @@
-# Planned verification journeys
+# Verification journeys
 
-**Source:** TimeCapsule Atlas `timecapsule`, revision **38**, instructions version **3**, captured 3 November 2026 KST.  
-**Initial result for every journey and T item:** **NOT RUN**.  
-**Purpose:** Give students and Android Studio Agent Mode a repeatable verification sequence. These are procedures to run when the relevant implementation and test setup exist, not reports of successful execution.
-
-Journey numbers below are reading aids, not new requirement/design IDs. Existing **T-01–T-45** and **AC-01–AC-14** remain canonical. Test-to-AC links in the coverage table were read from the actual revision-38 relationships. Read the full affected T/AC and [CURRENT_CONTRACT.md](CURRENT_CONTRACT.md) before implementation or acceptance.
+Use these procedures to verify an implemented feature and record its actual result. They group the canonical T-01–T-45 tests and AC-01–AC-14 acceptance criteria from the [full contract reference](reference/timecapsule-contract-r38.json); journey numbers are navigation aids. Read the affected T/AC records and [implementation contract](CURRENT_CONTRACT.md) before a run.
 
 ## 1 How to run and record a journey
 
@@ -20,27 +16,27 @@ Use:
 
 Before each run, record app commit/build, Android API/device, backend/rules revision, tester/date, test IDs and fixture setup. Inspect results in the actual authorized repository/runtime. If emulator setup or a fault-injection seam does not exist, record that prerequisite instead of claiming a simulated conversation or screenshot proves the case.
 
-**Suggested ownership:** the feature author prepares/runs its cases; another teammate reproduces or reviews the important result before merge. Rotate across User F, User G and User J so each understands the whole flow. Period: during the affected PR and before its acceptance. Dependency: corresponding implementation and fixtures. Scope: MVP verification.
+The feature author prepares and runs the relevant cases. Another teammate reproduces or reviews the important results before merge. Rotate participation across User F, User G, and User J so everyone understands the full flow.
 
 ## 2 Coverage map
 
 A journey groups related tests. It does not automatically pass any AC or every test listed in the group.
 
-| Journey | Existing tests | Explicitly linked acceptance criteria | Initial result |
-|---|---|---|---|
-| 1. Account, profile and exact recipient | T-01, T-02, T-03, T-39 | AC-01, AC-02, AC-03, AC-11, AC-13 | NOT RUN |
-| 2. Four-step creation and invalid inputs | T-04, T-06, T-12 | AC-02, AC-03, AC-14 | NOT RUN |
-| 3. A to B delivery and truthful lists | T-08, T-27, T-35 | AC-03, AC-11 | NOT RUN |
-| 4. Self-send remains locked | T-07, T-44 | AC-03, AC-09, AC-11, AC-12, AC-13, AC-14 | NOT RUN |
-| 5. Server-time unlock and foreground recovery | T-13, T-14, T-24, T-25 | AC-04, AC-07, AC-10, AC-12 | NOT RUN |
-| 6. Single-photo validation and original-copy retry | T-05, T-09, T-31, T-36 | AC-02, AC-03, AC-10, AC-14 | NOT RUN |
-| 7. Location and current AND | T-16, T-17, T-18, T-19, T-20, T-42 | AC-05, AC-06, AC-07, AC-10 | NOT RUN |
-| 8. Permanent re-view and account cleanup | T-28, T-29, T-30, T-44 | AC-09, AC-10, AC-13, AC-14 | NOT RUN |
-| 9. Notifications and absent background registrations | T-26, T-32 | AC-05, AC-07, AC-08 | NOT RUN |
-| 10. Ambiguous publication and delayed writes | T-10, T-11, T-34, T-40 | AC-02, AC-03, AC-14 | NOT RUN |
-| 11. Backend access and atomic-pair rules | T-21, T-22, T-23, T-33, T-43 | AC-01, AC-11, AC-12, AC-14 | NOT RUN |
-| 12. Time zones and daylight-saving boundaries | T-15, T-41 | AC-04 | NOT RUN |
-| 13. Integrated flow, failures and native UI | T-37, T-38, T-45 | AC-01, AC-02, AC-03, AC-06, AC-10, AC-11 | NOT RUN |
+| Journey | Existing tests | Explicitly linked acceptance criteria |
+|---|---|---|
+| 1. Account, profile and exact recipient | T-01, T-02, T-03, T-39 | AC-01, AC-02, AC-03, AC-11, AC-13 |
+| 2. Four-step creation and invalid inputs | T-04, T-06, T-12 | AC-02, AC-03, AC-14 |
+| 3. A to B delivery and truthful lists | T-08, T-27, T-35 | AC-03, AC-11 |
+| 4. Self-send remains locked | T-07, T-44 | AC-03, AC-09, AC-11, AC-12, AC-13, AC-14 |
+| 5. Server-time unlock and foreground recovery | T-13, T-14, T-24, T-25 | AC-04, AC-07, AC-10, AC-12 |
+| 6. Single-photo validation and original-copy retry | T-05, T-09, T-31, T-36 | AC-02, AC-03, AC-10, AC-14 |
+| 7. Location and current AND | T-16, T-17, T-18, T-19, T-20, T-42 | AC-05, AC-06, AC-07, AC-10 |
+| 8. Permanent re-view and account cleanup | T-28, T-29, T-30, T-44 | AC-09, AC-10, AC-13, AC-14 |
+| 9. Notifications and absent background registrations | T-26, T-32 | AC-05, AC-07, AC-08 |
+| 10. Ambiguous publication and delayed writes | T-10, T-11, T-34, T-40 | AC-02, AC-03, AC-14 |
+| 11. Backend access and atomic-pair rules | T-21, T-22, T-23, T-33, T-43 | AC-01, AC-11, AC-12, AC-14 |
+| 12. Time zones and daylight-saving boundaries | T-15, T-41 | AC-04 |
+| 13. Integrated flow, failures and native UI | T-37, T-38, T-45 | AC-01, AC-02, AC-03, AC-06, AC-10, AC-11 |
 
 The map covers all 45 current planned tests. T-44 intentionally appears in both self-send and account cleanup; one well-recorded execution may supply relevant evidence to both reviews, without inventing a second run.
 

@@ -1,49 +1,46 @@
-# Source register and authority
+# Source register
 
-**Prepared:** 3 November 2026, Asia/Seoul  
-**Maintainer:** User G leads source/trace review; User J checks implementation implications; User F checks product wording. All three review meaningful changes.  
-**Use:** Read this register before using project context. It prevents an agent from reinstating obsolete scope or treating a prototype/test plan as a completed implementation.
+Use this register to choose the right source for a task. Course requirements and explicit team decisions take precedence over drafts, prototypes, and feasibility notes. User G coordinates source review, User J checks implementation implications, and User F checks product wording; all three review meaningful changes.
 
-## 1 Current authoritative references
+## 1 Authoritative references
 
-| Source | Locator read for this package | Authority and use |
+| Source | Reference | Use |
 |---|---|---|
-| Professor's agent supplement | `Term_Project_Agent_Usage_Supplement.docx`; Agent environment, Agent deliverables, Agent usage rules, submission summary | Official requirements for agent environment, team/individual documents, review and secret handling. It supplements the main course guide. |
-| Current TimeCapsule Atlas instructions | Atlas ID `timecapsule`; content revision **38**, instructions version **3**; retrieved 3 November 2026 KST | Current authorized contract interpretation and canonical IDs. Explicitly replaces earlier alternatives described in historical documents. |
-| Current numbered Atlas nodes | FR-01–FR-12, NFR-01–NFR-06; ARC-01–ARC-07; DD-01–DD-28; AC-01–AC-14; T-01–T-45 at revision 38 | Operative feature/design/acceptance/test statements. Read full current overview/constraints for the affected work. |
-| Explicit Atlas relationships | 378 relationships read at revision 38 | Actual requirement/design/AC/test links; do not infer new edges merely because items sound related. |
-| [CURRENT_CONTRACT.md](CURRENT_CONTRACT.md) | Compact local snapshot of the preceding current sources | Portable reading aid. Does not replace omitted detailed node clauses or a later authorized source revision. |
-| [timecapsule-contract-r38.json](reference/timecapsule-contract-r38.json) | Exact 112 node records and 378 relationships retrieved at revision 38; nine original source records from revision-history after-values | Complete local reference for every member without live MCP. Preserves original bilingual contents, IDs, statuses, source references and relationships. It is not an Atlas import/replacement payload. |
-| Current user instructions for this package | 3 November 2026 conversation, including the repository-integration follow-up | Easy English class/function comments; finer comments for unfamiliar code; consistent style; no duplication/spaghetti; explain before/after refactors; each logical change through a GitHub PR; anonymous User F/G/J labels and `user-f`/`user-g`/`user-j` paths. |
-| Current Android repository | [Time-Capsule at inspected commit](https://github.com/theguardianofthebed/Time-Capsule/tree/c7bb071cdda302f7562a549d5029e026b4c92a10); main inspected 3 November 2026 KST | Existing structure, instructions, build configuration, and provisional Compose scaffold. These facts establish what is checked in, not what is approved or successfully tested. See [REPOSITORY_STATUS.md](REPOSITORY_STATUS.md). |
-| [DESIGN.md](../../DESIGN.md) | Team screen/navigation and design-system document | Current product constraints are source-backed; newly specified Material 3 implementation mappings are explicitly labeled proposals. It does not claim the code exists. |
-| [JOURNEYS.md](JOURNEYS.md) | Planned verification journeys using existing source IDs | Execution aid. All initial results are NOT RUN; completing the written plan is not executing a test. |
+| Professor's agent supplement | `Term_Project_Agent_Usage_Supplement.docx`: Agent environment, deliverables, usage rules, and submission summary | Required agent environment, shared and individual files, review, and secret handling. |
+| Atlas instructions | Atlas `timecapsule`, content revision 38, instructions version 3 | Contract interpretation, explicit design selections, and canonical IDs. |
+| Atlas nodes | FR-01–FR-12, NFR-01–NFR-06; ARC-01–ARC-07; DD-01–DD-28; AC-01–AC-14; T-01–T-45 | Read the complete overview and constraints of every affected requirement, design, acceptance criterion, and test. |
+| Atlas relationships | 378 explicit relationships in revision 38 | Use the recorded links; do not invent an edge because two items sound related. |
+| [Full contract reference](reference/timecapsule-contract-r38.json) | 112 node records, 378 relationships, and nine source records with revision-history provenance | Exact bilingual records available locally without MCP. Read-only reference; not an Atlas import or replacement payload. |
+| [Implementation contract](CURRENT_CONTRACT.md) | Summary and indices of the full reference | Fast navigation and implementation boundaries; exact node clauses remain authoritative. |
+| [Agent instructions](../../AGENTS.md) | The team's shared rules | English comments, consistent style, reuse, explanations of code refactors, PR delivery, and anonymous student labels. |
+| [Android repository](https://github.com/theguardianofthebed/Time-Capsule) | Checked-out source and build configuration | Establishes actual implementation and dependencies. The [repository guide](REPOSITORY_STATUS.md) explains the project layout and UI framework issue. |
+| [Design document](../../DESIGN.md) | Screen flow and design-system guidance | Confirmed product decisions and explicitly labeled implementation proposals. |
+| [Verification journeys](JOURNEYS.md) | Procedures using existing T and AC IDs | Plan and record actual checks; a procedure alone does not establish a pass. |
 
-**Order when project information conflicts:** official course requirements → latest explicit authorized team/user decisions → current approved requirements → current workflow/milestones → original proposal → older notes and AI suggestions. Feasibility evidence informs design; it does not approve scope, a vendor or implementation by itself.
+When sources conflict, use this order: official course requirements → latest explicit authorized team/user decisions → approved requirements and design → workflow and milestones → proposals and historical notes. Feasibility results inform a design but do not approve scope or establish completed integration.
 
-The main course project guide was not attached to this request. The supplement says other features, schedule, code, slides and video follow that guide. Existing project MDs report milestones, but this package does not invent additional official submission dates or claim independent re-verification of the main guide.
+Use the main course guide for general project features, milestones, slides, video, and final submission. The agent supplement covers agent usage and its deliverables; it does not replace the main guide.
 
-## 2 What the professor actually requires
+## 2 Course requirements
 
-The supplement identifies **Android Studio Agent Mode** as the only permitted agent IDE for project code. Models selectable inside Android Studio may be used; record the chosen model. This package is documentation for that workflow. A document created here is not permission to use a prohibited coding agent later.
+Use Android Studio Agent Mode for project code and record the actual model selected there. The detailed submission guide is [COURSE_COMPLIANCE.md](COURSE_COMPLIANCE.md).
 
-| Deliverable/rule | Required placement or ownership from the supplement |
+| Requirement | Required location or practice |
 |---|---|
-| DESIGN.md | One team design document: screen flow/navigation and Material 3 theme, color, type and components. |
-| AGENTS.md | Team file at repository root, committed. |
-| Rules | Shared/committed; ensure not excluded by .gitignore, or include the rules in AGENTS.md. |
-| Team skills | Root `.agents/skills`, committed. |
-| MCP settings | Each member's actual settings belong in their Android Studio settings folder. Shared repository copy: `docs/agent-tools/mcp.redacted.json`, all tokens removed. |
-| Secrets | Never commit API keys, access tokens or keystore passwords; list secret files such as local.properties in .aiexclude. |
-| Human review | Review every change before acceptance; students remain responsible and must explain any submitted code in Q&A. |
-| Agent logs | Individual, one file per week, with separate feature sections for purpose, key prompts, agent changes/verification, errors and manual fixes. |
-| Retrospective | Individual `retrospective.md`: what worked, where the agent fell short, what the student can now do independently. |
+| Team design | Root `DESIGN.md`: screen flow/navigation and Material 3 theme, color, type, and components. |
+| Shared agent instructions | Root `AGENTS.md`, committed. Shared Rules may be included in this file. |
+| Shared skills | Root `.agents/skills/`, committed and available to the team. |
+| MCP configuration | Actual settings in each member's Android Studio settings directory; token-free copy at `docs/agent-tools/mcp.redacted.json`. |
+| Secret protection | No committed API keys, tokens, or keystore passwords; sensitive files such as `local.properties` listed in `.aiexclude`. |
+| Human review | Review every generated change before accepting it. Every student must explain the submitted code in Q&A. |
+| Weekly logs | Individual files, with per-feature purpose, key prompts, agent changes/checks, errors, manual fixes, and the model used. |
+| Retrospective | Individual account of what worked, agent limitations, and what the student can do independently. |
 
-Planned individual log submissions stated in the supplement: `agent-log-w1.md` by **13 November 2026**, `agent-log-w2.md` by **20 November**, `agent-log-w3.md` by **27 November**, and `agent-log-w4.md` by **4 December**. These are the professor's stated planned dates; follow later instructor announcements if they change.
+Planned weekly submissions are `agent-log-w1.md` on 13 November 2026, `agent-log-w2.md` on 20 November, `agent-log-w3.md` on 27 November, and `agent-log-w4.md` on 4 December. Follow later professor announcements. The supplement gives no submission time, platform, or final retrospective date.
 
-## 3 Historical project sources that were read
+## 3 Supporting project and lecture sources
 
-All 17 Markdown files inside `TimeCapsule_Project_Context_2026-10-07_Feasibility_Updated.zip` and both loose October 14 Markdown files were read. They remain useful provenance for roles, scope history and E1 feasibility. They are not instructions to reverse the current Atlas contract.
+The project context contains 17 Markdown files in `TimeCapsule_Project_Context_2026-10-07_Feasibility_Updated.zip` and two October 14 supplements. Use them for roles, scope history, and feasibility evidence; approved Atlas decisions govern implementation.
 
 | Group | Files |
 |---|---|
@@ -55,13 +52,13 @@ All 17 Markdown files inside `TimeCapsule_Project_Context_2026-10-07_Feasibility
 | History | 15_CONTEXT_CHANGELOG.md |
 | Later uploaded supplements | 16_TECHNICAL_BASELINE_AND_FEASIBILITY_2026-10-14.md; 17_DESIGN_DECISIONS_AND_ARCHITECTURE_DRAFT_2026-10-14.md |
 
-Lecture references supplied: `5_Android Intents (2).pdf`, `9_Android Permission.pdf`, and `12_Android Sensors.pdf`. The user also reports learning UI Widgets, but no separate UI Widgets slide deck was attached. Lecture examples describe taught mechanisms; they do not add unrelated features or replace the current application contract.
+Lecture sources are `5_Android Intents (2).pdf`, `9_Android Permission.pdf`, and `12_Android Sensors.pdf`. UI Widgets is also a reported class topic, but no separate deck is supplied. [COURSE_BASELINE.md](COURSE_BASELINE.md) identifies taught mechanisms and where agents should add explanation. A lecture example does not add an unrelated project feature.
 
-Do not automatically commit copyrighted lecture PDFs or the professor's DOCX to a public repository. The package's own summaries and source names are sufficient for the shared workflow; keep original course files in the team's permitted course location.
+Keep original course files in the team's permitted course location. Shared summaries and source names are sufficient for the repository; do not automatically publish the lecture PDFs or professor's DOCX.
 
-## 4 Atlas provenance records
+## 4 Atlas source records
 
-These are **source IDs retained by current nodes**, with their recorded document names. Source metadata was read from the relevant revision history; current-node instructions remain authoritative over historical source text. The exact source record objects are preserved in the frozen JSON's `sourceRecords`, with the retrieval revision in `sourceRecordHistory`: revision 13 after-values for eight records, and revision 11 for SRC-PROTOTYPE-20261031. These were not independently re-fetched as full source bytes at revision 38, and that provenance limit is explicit in the reference.
+The full reference preserves the source objects in `sourceRecords`. `sourceRecordHistory` identifies revision 13 after-values for eight records and revision 11 for `SRC-PROTOTYPE-20261031`. These are original provenance records, not full source files retrieved anew at revision 38.
 
 | Source ID | Recorded document/provenance | Interpretation |
 |---|---|---|
@@ -75,42 +72,39 @@ These are **source IDs retained by current nodes**, with their recorded document
 | SRC-DECISIONS-20261031 | TimeCapsule_Contract.md | Final design selections, including foreground-only triggers, vendor/dependency selections and durable original-photo copies. |
 | SRC-PROTOTYPE-20261031 | TimeCapsule Mobile App Prototype.zip | Historical inspected Figma Make source: App.tsx, theme.css, fonts.css and related entry/package files. Source for DD-01 visual identity and flows, not production behavior proof. |
 
-The recorded prototype URL is [TimeCapsule Mobile App Prototype](https://www.figma.com/make/TXMuk2CBolcTz4DAAfJPmT/TimeCapsule-Mobile-App-Prototype). This package used the current Atlas nodes and their recorded provenance; it does not claim to have independently inspected that ZIP or the live Figma project's current internals during this preparation.
+The recorded visual prototype is [TimeCapsule Mobile App Prototype](https://www.figma.com/make/TXMuk2CBolcTz4DAAfJPmT/TimeCapsule-Mobile-App-Prototype). The repository reference relies on the Atlas nodes and recorded source provenance; it does not establish the live Figma project's contents or runtime behavior.
 
-Atlas revision 13 applied the normalized contract and revision 14 cleaned superseded IDs. Instructions version 3 explicitly explains that source/constraint text saying an export was “not applied” describes its earlier preparation. Revision 38 was a later snapshot; it does not imply every design was changed in that revision.
+Instructions version 3 treats source text saying an export was “not applied” as preparation history. The normalized contract is applied; revision 38 identifies the frozen reference, not the revision where every individual decision was made.
 
-## 5 Conflicts already resolved by the current sources
+## 5 Contract interpretation
 
-| Older wording | Current source to follow |
+| Area | Rule to apply |
 |---|---|
-| Cross-user delivery is stretch. | FR-01/FR-03 and instructions v3: accounts and self/other delivery are MVP. Replace the stale ChatGPT project instruction. |
-| Firebase is only a candidate; cache decisions still open. | DD-11/DD-20 select the Firebase service family; ARC-06/DD-18 choose memory-only Firestore plus explicit UID-private retention. Provisioning/testing remain separate. |
-| Use alarm/geofence/boot recovery or background location. | ARC-07/DD-08/DD-24: foreground-only supported triggers; no production background registrations. |
-| Use separate D/DD/Q/FLOW identifier families. | Instructions v3: ARC-01–ARC-07 and DD-01–DD-28; preserve current links. |
-| Prototype supports multiple photos, name search or simulated unlock. | FR-03/FR-04/DD-07: exact UID confirmation, one original photo, no simulation shortcuts in production. |
-| E1 spike passed, so the feature is finished. | Evidence statuses are independent: E1 is isolated feasibility, not E2 application integration or an AC pass. |
-| Native wireframe build/model tests establish Firebase/security/device success. | Instructions v3 and T-45 require separate evidence; no inferred production passes. |
-| Legacy Korean summary differs from current English detailed contract. | Use current explicitly selected English overview plus instructions v3; record the discrepancy when relevant and do not revive the legacy alternative. |
+| Delivery | Accounts and self/other-user delivery are MVP: FR-01/FR-03 and instructions v3. |
+| Backend and retention | Firebase is selected by DD-11/DD-20. ARC-06/DD-18 select memory-only Firestore and explicit UID-private retention. Provisioning and verification require separate work. |
+| Verification triggers | ARC-07/DD-08/DD-24 use app-open, foreground resume, detail-open, and explicit Retry, without production background registrations. |
+| Design IDs | Use ARC-01–ARC-07 and DD-01–DD-28, with their recorded relationships. |
+| Recipient and content | FR-03/FR-04/DD-07 require exact UID confirmation, one supported original photo, and actual authorization instead of simulated unlock. |
+| Evidence | E1 is isolated feasibility; E2 is app integration; E3 is repeated verification. A wireframe/model/build result does not establish Firebase, security, device, or full acceptance success. |
+| Bilingual summaries | Follow the explicit English contract selection and instructions v3 when a historical summary differs. Report a material unresolved conflict. |
+| UI framework | Native Views is the approved target; the application has a provisional Compose scaffold. Resolve the implementation mismatch through a separate reviewed UI task. |
 
-The current repository introduces one additional discrepancy that is **not resolved by this document update**: a provisional Compose scaffold exists, while the revision-38 contract selects native Views. Do not describe the checkout as already implementing the Views target. A separate reviewed application task must reconcile it. Keep the original scaffold, build files, and directory locations intact until that task. The older open [documentation PR #5](https://github.com/theguardianofthebed/Time-Capsule/pull/5) also needs comparison with the current source register before any later merge.
+The frozen records contain `not_started` requirement/design statuses, `not_verified` ACs, and `not_run` tests. Those values describe the reference's recorded progress. Use actual implementation and test evidence to assess later progress, and update each record only through its authorized workflow.
 
-## 6 Refresh and change discipline
+## 6 Keeping references aligned
 
-Before a feature starts, the student/agent records the supplied authorized source revision, affected FR/NFR → ARC/DD → AC/T references, Issue, branch and expected behavior. For this package, read `nodeRecords` and follow `relationshipRecords` in the [frozen JSON](reference/timecapsule-contract-r38.json); live MCP is not required to obtain the complete revision-38 statements. If an authorized newer revision is supplied or accessible, check it and update the affected reference/documentation in the same reviewed PR. Do not use a cached count or this date as proof of freshness.
+For each substantive task, record the authorized source revision, affected FR/NFR → ARC/DD → AC/T references, Issue, branch, and expected behavior. Read `nodeRecords` and their actual `relationshipRecords` locally; live MCP is optional for this reference.
 
-The JSON has a documentation wrapper rather than the Atlas import schema. It contains original records and a contract-guidance excerpt, excluding actor/account membership information, glossary data, tool permissions and unrelated settings. Do not import it into Atlas or use it to replace live data. Reading it is enough to use the documented contract locally; any later Atlas mutation requires its separate authorized workflow.
+When an approved newer revision is available, review its changes and update the reference and related guidance through the same PR. Do not infer freshness from a cached count or mix conflicting revisions. State exact conflicting clauses when a material decision is missing, continue independent work, and obtain the responsible team's decision before implementing the disputed behavior.
 
-If two genuinely current sources disagree on a material behavior, state the exact conflicting clauses and continue independent work. Obtain the accountable team's decision before implementing that disputed behavior. Routine coding choices that preserve the contract do not require reopening settled product decisions.
+The JSON uses a documentation wrapper, not the Atlas import schema. It omits account membership, glossary data, tool permissions, and unrelated settings. Do not import it or use it to overwrite live Atlas data. Atlas changes follow their own authorized process.
 
-The source register describes decisions and provenance. Real test evidence belongs with the actual build/rules revision, environment, tester/date, expected/observed result and log/artifact link. No approval, test run, production provisioning or PR publication is implied by writing these documents.
+Record test evidence with the actual build/rules revision, environment, tester, expected and observed result, and evidence link. Documentation, PR publication, human approval, and acceptance are separate facts.
 
-## 7 Technical references used for the design-system mapping
+## 7 Technical references
 
-These references support platform terminology, not product scope or a Compose migration. Consult the installed dependency's documentation before implementation.
+Use the installed dependency's documentation when implementing the proposed design-system mappings in `DESIGN.md`.
 
-- [Material Components for Android getting started](https://github.com/material-components/material-components-android/blob/master/docs/getting-started.md) — Material 3 themes for native Views.
-- [Material typography for Android Views](https://github.com/material-components/material-components-android/blob/master/docs/theming/Typography.md) — reusable typography attributes.
-- [Android accessibility for Views](https://developer.android.com/guide/topics/ui/accessibility/views/apps-views) — touch targets and descriptions.
-
-Accessed 3 November 2026 KST. Detailed sizes, role mapping and component choices proposed in DESIGN.md are documentation proposals unless already identified as confirmed by DD-01.
-
+- [Material Components for Android](https://github.com/material-components/material-components-android/blob/master/docs/getting-started.md): Material 3 themes for native Views.
+- [Material typography for Android Views](https://github.com/material-components/material-components-android/blob/master/docs/theming/Typography.md): reusable typography attributes.
+- [Android accessibility for Views](https://developer.android.com/guide/topics/ui/accessibility/views/apps-views): touch targets and descriptions.

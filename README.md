@@ -1,70 +1,68 @@
 # TimeCapsule
 
-TimeCapsule is the Mobile Programming team project: an Android app for sending a text/photo capsule to yourself or another registered user, with time, location, or combined unlock conditions.
-
-## Current project status
-
-The repository contains an Android project and a provisional Compose UI scaffold. The preview does not authenticate users, send capsules, or verify unlock conditions. The approved project contract specifies native Android Views and the Firebase service family; those decisions are not proof of a completed integration. The Views/Compose discrepancy needs a separate reviewed reconciliation task before further UI implementation.
-
-See [Repository status](docs/agent-tools/REPOSITORY_STATUS.md) for the inspected commit, current paths, known discrepancies, and verification limits. This documentation change keeps the application directories and code in place.
+TimeCapsule is an Android app for sending a text/photo capsule to yourself or another registered user. A capsule opens when its time, location, or combined condition is met.
 
 ## Start here
 
-| Task | Read |
+| Task | Guide |
 |---|---|
-| Open the existing Android project | [Android checkout and skeleton setup](docs/ANDROID_SKELETON_SETUP.md) |
-| Configure shared agent instructions and personal tools | [Agent setup](docs/agent-tools/SETUP.md) |
-| Plan, edit, or review a change | [AGENTS.md](AGENTS.md) and [CONTRIBUTING.md](CONTRIBUTING.md) |
-| Understand the approved behavior | [Source register](docs/agent-tools/SOURCE_REGISTER.md) and [Current contract](docs/agent-tools/CURRENT_CONTRACT.md) |
+| Open and run the Android project | [Android setup](docs/ANDROID_SKELETON_SETUP.md) |
+| Set up the coding agent and tools | [Agent setup](docs/agent-tools/SETUP.md) |
+| Make or review a change | [AGENTS.md](AGENTS.md) and [CONTRIBUTING.md](CONTRIBUTING.md) |
+| Understand the app's rules | [Project contract](docs/agent-tools/CURRENT_CONTRACT.md) |
 | Work on screens and visual design | [DESIGN.md](DESIGN.md) |
-| Find logs, rules, templates, and course requirements | [Documentation index](docs/README.md) |
+| Find documents and individual logs | [Documentation index](docs/README.md) |
+| Understand the code structure and remaining work | [Repository guide](docs/agent-tools/REPOSITORY_STATUS.md) |
 
-## Team workflow
+## Working together
 
-Use Android Studio Agent Mode for project code. Add clear English comments for each new or meaningfully changed handwritten class/function, explain unfamiliar steps, follow the shared style, and document refactoring with a short Before / After / Why note. Every coherent code, test, configuration, or documentation change goes through a task branch and GitHub PR. Another teammate reviews it before a human merges.
+Use Android Studio Agent Mode for project code. Write easy English comments for each new or meaningfully changed class/function, explain unfamiliar steps, and follow the shared style. When refactoring, explain the problem being removed and how the revised code improves it.
 
-Shared documents identify the students as **User F**, **User G**, and **User J**. Individual logs and reflections use the matching `user-f`, `user-g`, and `user-j` directories.
+Each task uses a branch and GitHub PR. Review generated changes before accepting them; another teammate reviews the PR before a human merges it.
+
+Use **User F**, **User G**, and **User J** in shared documents, comments, and PR descriptions. Each student keeps their own records under `user-f`, `user-g`, or `user-j`.
 
 ## Repository layout
 
+Open the repository root in Android Studio. It contains both the Git repository and the Gradle project.
+
 | Path | Purpose |
 |---|---|
-| `app/` | Existing Android application module |
-| `gradle/`, `gradlew`, `gradlew.bat` | Checked-in Gradle configuration and wrapper |
-| `docs/` | Project setup, approved-source references, agent workflow, and individual coursework |
-| `.agents/skills/` | Shared task instructions for Android Studio agents |
+| `app/` | Android application and tests |
+| `gradle/`, `gradlew`, `gradlew.bat` | Gradle configuration and wrapper |
+| `docs/` | Setup guides, project references, and individual coursework |
+| `.agents/skills/` | Shared instructions for agent tasks |
 | `.github/` | Issue and PR templates |
-| `prototype/`, `spikes/` | Existing supporting-work directories; their presence does not establish application integration |
-
-The Git repository root is also the Gradle project root. Open this root in Android Studio; do not create a second Android project inside `app/` or copy a new template over the checkout.
+| `prototype/`, `spikes/` | Supporting prototypes and feasibility work |
 
 ### Detailed layout
+
 ```text
 Time-Capsule/
-├── .agents/                                      [NEW]
-│   └── skills/                                   [NEW]
-│       ├── timecapsule-implement/                 [NEW]
-│       │   └── SKILL.md                          [NEW]
-│       ├── timecapsule-record-learning/           [NEW]
-│       │   └── SKILL.md                          [NEW]
-│       ├── timecapsule-refactor/                  [NEW]
-│       │   └── SKILL.md                          [NEW]
-│       └── timecapsule-review/                    [NEW]
-│           └── SKILL.md                          [NEW]
+├── .agents/
+│   └── skills/
+│       ├── timecapsule-implement/
+│       │   └── SKILL.md
+│       ├── timecapsule-record-learning/
+│       │   └── SKILL.md
+│       ├── timecapsule-refactor/
+│       │   └── SKILL.md
+│       └── timecapsule-review/
+│           └── SKILL.md
 │
-├── .aiexclude                                    [NEW]
-├── .editorconfig                                 [NEW]
+├── .aiexclude
+├── .editorconfig
 │
-├── .github/                                      [NEW]
-│   ├── ISSUE_TEMPLATE/                           [NEW]
-│   │   └── implementation-task.md                [NEW]
-│   └── pull_request_template.md                  [NEW]
+├── .github/
+│   ├── ISSUE_TEMPLATE/
+│   │   └── implementation-task.md
+│   └── pull_request_template.md
 │
-├── .gitignore                                    [UPDATED]
-├── AGENTS.md                                     [UPDATED]
-├── CONTRIBUTING.md                               [UPDATED]
-├── DESIGN.md                                     [NEW]
-├── README.md                                     [UPDATED]
+├── .gitignore
+├── AGENTS.md
+├── CONTRIBUTING.md
+├── DESIGN.md
+├── README.md
 │
 ├── app/
 │   ├── .gitignore
@@ -150,49 +148,49 @@ Time-Capsule/
 │
 ├── docs/
 │   ├── .gitkeep
-│   ├── README.md                                 [NEW]
-│   ├── ANDROID_SKELETON_SETUP.md                  [UPDATED]
+│   ├── README.md
+│   ├── ANDROID_SKELETON_SETUP.md
 │   │
-│   ├── agent-tools/                              [NEW]
-│   │   ├── SETUP.md                              [NEW]
-│   │   ├── REPOSITORY_STATUS.md                  [NEW]
-│   │   ├── WORKFLOW.md                           [NEW]
-│   │   ├── CODING_AND_COMMENTS.md                [NEW]
-│   │   ├── COURSE_BASELINE.md                    [NEW]
-│   │   ├── COURSE_COMPLIANCE.md                  [NEW]
-│   │   ├── CURRENT_CONTRACT.md                   [NEW]
-│   │   ├── SOURCE_REGISTER.md                    [NEW]
-│   │   ├── JOURNEYS.md                           [NEW]
-│   │   ├── MCP_SETUP.md                          [NEW]
-│   │   ├── mcp.redacted.json                     [NEW]
-│   │   ├── GITIGNORE_ADDITIONS.txt                [NEW]
-│   │   └── reference/                            [NEW]
-│   │       └── timecapsule-contract-r38.json      [NEW]
+│   ├── agent-tools/
+│   │   ├── SETUP.md
+│   │   ├── REPOSITORY_STATUS.md
+│   │   ├── WORKFLOW.md
+│   │   ├── CODING_AND_COMMENTS.md
+│   │   ├── COURSE_BASELINE.md
+│   │   ├── COURSE_COMPLIANCE.md
+│   │   ├── CURRENT_CONTRACT.md
+│   │   ├── SOURCE_REGISTER.md
+│   │   ├── JOURNEYS.md
+│   │   ├── MCP_SETUP.md
+│   │   ├── mcp.redacted.json
+│   │   ├── GITIGNORE_ADDITIONS.txt
+│   │   └── reference/
+│   │       └── timecapsule-contract-r38.json
 │   │
-│   ├── agent-logs/                               [NEW]
-│   │   ├── user-f/                               [NEW]
-│   │   │   ├── agent-log-w1.md                    [NEW]
-│   │   │   ├── agent-log-w2.md                    [NEW]
-│   │   │   ├── agent-log-w3.md                    [NEW]
-│   │   │   └── agent-log-w4.md                    [NEW]
-│   │   ├── user-g/                               [NEW]
-│   │   │   ├── agent-log-w1.md                    [NEW]
-│   │   │   ├── agent-log-w2.md                    [NEW]
-│   │   │   ├── agent-log-w3.md                    [NEW]
-│   │   │   └── agent-log-w4.md                    [NEW]
-│   │   └── user-j/                               [NEW]
-│   │       ├── agent-log-w1.md                    [NEW]
-│   │       ├── agent-log-w2.md                    [NEW]
-│   │       ├── agent-log-w3.md                    [NEW]
-│   │       └── agent-log-w4.md                    [NEW]
+│   ├── agent-logs/
+│   │   ├── user-f/
+│   │   │   ├── agent-log-w1.md
+│   │   │   ├── agent-log-w2.md
+│   │   │   ├── agent-log-w3.md
+│   │   │   └── agent-log-w4.md
+│   │   ├── user-g/
+│   │   │   ├── agent-log-w1.md
+│   │   │   ├── agent-log-w2.md
+│   │   │   ├── agent-log-w3.md
+│   │   │   └── agent-log-w4.md
+│   │   └── user-j/
+│   │       ├── agent-log-w1.md
+│   │       ├── agent-log-w2.md
+│   │       ├── agent-log-w3.md
+│   │       └── agent-log-w4.md
 │   │
-│   └── retrospectives/                           [NEW]
-│       ├── user-f/                               [NEW]
-│       │   └── retrospective.md                  [NEW]
-│       ├── user-g/                               [NEW]
-│       │   └── retrospective.md                  [NEW]
-│       └── user-j/                               [NEW]
-│           └── retrospective.md                  [NEW]
+│   └── retrospectives/
+│       ├── user-f/
+│       │   └── retrospective.md
+│       ├── user-g/
+│       │   └── retrospective.md
+│       └── user-j/
+│           └── retrospective.md
 │
 ├── gradle/
 │   ├── gradle-daemon-jvm.properties

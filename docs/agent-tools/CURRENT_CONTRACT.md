@@ -1,20 +1,12 @@
-# Current TimeCapsule contract snapshot
+# TimeCapsule implementation contract
 
-**Captured:** 3 November 2026, Asia/Seoul  
-**Source:** TimeCapsule Traceability Atlas, atlas ID `timecapsule`, content revision **38**, agent instructions version **3**.  
-**Purpose:** Give every teammate and Android Studio agent the same current constraints, even when MCP is unavailable. This is a compact reading aid, not a new requirements baseline or a complete graph export.
+Use this guide for the project's behavior, architecture, dependency choices, and acceptance links. Read the exact affected FR/NFR, ARC/DD, AC, and T records in the [full contract reference](reference/timecapsule-contract-r38.json) before implementation. [SOURCE_REGISTER.md](SOURCE_REGISTER.md) identifies the authoritative sources; [DESIGN.md](../../DESIGN.md) covers screens and visual design; [JOURNEYS.md](JOURNEYS.md) gives verification procedures.
 
-The live source was read through `get_agent_context`, `get_elements` and all pages of `get_relationships`. It contained 18 requirements, 35 designs, 14 acceptance criteria, 45 planned tests and 378 explicit relationships. Every requirement/design was `not_started`; every AC was `not_verified`; every test was `not_run`. **The contracts are finalized; implementation and acceptance are not thereby complete.** Read current statuses again before updating them.
+The full reference contains Atlas revision 38 and instructions version 3. Find an ID in `nodeRecords`, read its `sections` and current English overview/constraints, and follow the explicit `source`/`target` links in `relationshipRecords`. `sourceRecords` and `sourceRecordHistory` retain provenance. `contractGuidance` contains the contract instructions. This is a read-only documentation reference, not an Atlas import, sync, or replacement payload.
 
-Read [SOURCE_REGISTER.md](SOURCE_REGISTER.md) for precedence and historical conflicts, [DESIGN.md](../../DESIGN.md) for the screen/design-system document, and [JOURNEYS.md](JOURNEYS.md) for planned verification. The complete retrieved node and relationship records are available in [timecapsule-contract-r38.json](reference/timecapsule-contract-r38.json), so every teammate can read the exact contract without live Atlas MCP. A later authorized contract revision supersedes this snapshot. Do not silently combine old and new behavior.
+The approved UI target is native Views; the application has a provisional Compose scaffold. Follow the [UI framework guidance](REPOSITORY_STATUS.md) before extending it. Implementation and test status require their own evidence.
 
-**How to read the frozen reference:** find an ID in `nodeRecords`, read its bilingual title/summary and `sections` (especially the current English overview/constraints), and follow its actual `source`/`target` links in `relationshipRecords`. `sourceRecords` preserves the nine original provenance records; `sourceRecordHistory` identifies the revision-history record each came from. `contractGuidance` contains the original instructions-v3 contract guidance, excluding the Atlas-editing section. The file is a documentation reference, **not an Atlas import, sync or replacement payload**.
-
-## Repository status versus the captured contract
-
-The repository inspected at commit `c7bb071cdda302f7562a549d5029e026b4c92a10` already contains a provisional Compose UI scaffold and repository/domain interfaces. The Atlas `not_started` values describe its tracked requirement/design statuses, not an empty repository. Its approved native Views target conflicts with the scaffold and must be reconciled in a separate reviewed application task before further UI implementation. This documentation update records both facts without migrating source code or changing the captured Atlas records. Read [REPOSITORY_STATUS.md](REPOSITORY_STATUS.md).
-
-## 1 Current scope and nonnegotiable behavior
+## 1 Scope and required behavior
 
 | Area | Current confirmed contract | Source IDs |
 |---|---|---|
@@ -29,9 +21,9 @@ The repository inspected at commit `c7bb071cdda302f7562a549d5029e026b4c92a10` al
 | Recovery and notifications | The complete trigger set is app-open, foreground resume, detail opening and explicit Retry. After a supported check confirms first unlock, attempt one generic local notification when permission permits. A missed notification never changes access. | FR-09, FR-10; DD-08, DD-09, DD-24 |
 | Local retention | Firestore memory-only cache; small DataStore markers/journal and UID-scoped app-private retained files. Offline recipient re-view needs the active UID, server-confirmed marker and actual retained bytes. First unlock is online. | FR-12, NFR-01; ARC-06; DD-06, DD-18 |
 | Logout/switch | Invalidate session generation before clearing old state; cancel listeners/work/account notifications; clear views, verified markers and protected files. Discard late old-session callbacks. Only opaque UID/ID/digest/status recovery information may survive logout for uncertain sends. | FR-01, NFR-01; ARC-06; DD-18 |
-| Product boundary | Approved target: native Android Views; the existing provisional Compose scaffold requires the separate reconciliation described above. No incidental framework migration, Room capsule database, background location, alarms, geofence registrations, boot receivers, periodic polling, FCM, always-on services, external links/QR, social graph, audio or one-view destruction. Direct camera input and mandatory compression are outside the required path. | DD-07, DD-11, DD-24, DD-25; instructions v3 |
+| Product boundary | Approved target: native Android Views; the provisional Compose scaffold needs the separate review described in the repository guide. No incidental framework migration, Room capsule database, background location, alarms, geofence registrations, boot receivers, periodic polling, FCM, always-on services, external links/QR, social graph, audio or one-view destruction. Direct camera input and mandatory compression are outside the required path. | DD-07, DD-11, DD-24, DD-25; instructions v3 |
 
-**Interpretation of older wording:** FR-06/FR-09 and some legacy extracts mention geofence/alarm “hints.” That does not require installing them. Instructions v3, ARC-07 and DD-08/DD-24 explicitly select foreground-only operation. Similarly, an older Korean ARC-06 summary mentions testing disk cache then falling back; the current English overview and instructions v3 already select memory-only Firestore. Preserve the current explicit selection.
+Instructions v3, ARC-07 and DD-08/DD-24 select foreground-only operation. ARC-06 and instructions v3 select memory-only Firestore. Apply those explicit decisions when reading historical hints or bilingual summaries in the source records.
 
 ## 2 Architecture in one page
 
@@ -112,11 +104,11 @@ This table reproduces DD-11/DD-20; it is a **pinned project selection**, not a c
 | Rules/configuration | Version firebase.json, firestore.rules, storage.rules and firestore.indexes.json together; production configuration and deployment are separate from this document |
 | Queries | Participant equality queries; default single-field indexes; stable client-side sort by createdAt then capsule ID |
 
-T-45 records JDK 25.0.3 in a historical wireframe setup. The current repo's supported Gradle JDK must be checked when running the build; do not confuse the JDK used to run Gradle with Java/Kotlin source target 17. No build was run while preparing this package.
+These approved target values may differ from the scaffold's checked-in configuration. Read the actual Gradle files before a build and handle required alignment in a reviewed implementation task. The JDK used to run Gradle is separate from Java/Kotlin source compatibility; T-45's wireframe environment is a test reference, not the target toolchain.
 
 ## 5 Acceptance and test index
 
-All ACs below were **not verified**, and every linked test was **not run** at capture time.
+Use the full obligations of each AC when assessing results. The table identifies planned coverage; record actual executions and acceptance evidence separately.
 
 | AC | Acceptance area | Explicit planned-test links in revision 38 |
 |---|---|---|
@@ -137,11 +129,6 @@ All ACs below were **not verified**, and every linked test was **not run** at ca
 
 An AC is not passed because one related test passes. Assess its complete obligations. Requirement/design/AC/test progress remains separate; do not cascade completion automatically.
 
-## 6 Provenance and refresh
+## 6 Updating the contract
 
-The normalized contract was applied by Atlas revision 13; revision 14 removed superseded identifiers. Revision 38 is the snapshot read for this package; it is not the date of every individual design decision. Some imported constraints still say “not applied to the live Atlas”; instructions v3 explicitly identify those as export-preparation history.
-
-Source references retained in current nodes include source-1 (historical design), source-3 (historical requirements), source-5 (historical traceability), source-6 (historical tests), SRC-CONTRACT-20261031, SRC-DECISIONS-20261031 and SRC-PROTOTYPE-20261031. [SOURCE_REGISTER.md](SOURCE_REGISTER.md) identifies these precisely and explains the limits of prototype evidence.
-
-Before the next substantive change, record the supplied authorized contract revision in the Issue/PR. If live Atlas or a newer approved export is available, check for relevant updates; lack of MCP does not prevent reading the complete revision-38 reference. Update this summary and frozen reference together only when a reviewed source change actually warrants it.
-
+Record the authorized contract revision in the Issue/PR. When a newer approved Atlas revision or export is available, review the affected changes and update this summary and the full reference together. Read the complete local reference when live MCP is unavailable. Use [SOURCE_REGISTER.md](SOURCE_REGISTER.md) for provenance and source precedence.

@@ -1,4 +1,4 @@
-# Context exclusions for Gemini in Android Studio. Merge existing protections.
+# Context exclusions for Gemini in Android Studio.
 # This does not replace .gitignore or remove secrets from Git history.
 local.properties
 secrets.properties

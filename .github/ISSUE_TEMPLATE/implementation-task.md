@@ -6,51 +6,39 @@ labels: ""
 assignees: ""
 ---
 
-## Goal and scope
+## Goal
 
-[Describe the problem and observable result. Keep this task small enough for one coherent PR.]
+[Describe the problem and the result this task should produce.]
 
-- **Type:** [Feature / fix / refactor / test / documentation / configuration]
-- **Scope:** [MVP / approved stretch / team process]
-- **Owner:** [User F, User G, or User J; collaboration is welcome.]
-- **Reviewer:** [A different teammate, using User F, User G, or User J]
-- **Deadline or work period:** [Actual agreed date or period]
-- **Dependencies:** [Issues, decisions, interfaces, access, or none with reason]
+- **Type and scope:** [Feature / fix / refactor / test / documentation / configuration; MVP / approved stretch / team process]
+- **Owner and reviewer:** [User F, User G, or User J; choose a different teammate to review.]
+- **Work period or deadline:** [Actual agreed date or period]
+- **Dependencies and decisions needed:** [Issues, interfaces, permissions, or missing decisions; explain if none.]
 
-## Requirement and design references
+## References
 
-- **Requirement:** [Existing ID and source, or reason not applicable.]
-- **Acceptance criteria:** [Existing IDs and sources, if applicable.]
-- **Design:** [Existing design IDs, sections, or paths.]
-- **Decisions needed before implementation:** [Concrete unresolved dependency, or none.]
-
-Do not invent requirement IDs or silently change the product scope.
+[Link the actual requirement, design, acceptance criteria, and test records. For documentation work, cite the relevant course/team rule when application IDs do not apply. Do not invent IDs.]
 
 ## Acceptance criteria
 
-- [ ] [An observable outcome.]
-- [ ] [Relevant failure, denial, boundary, or recovery behavior.]
+- [ ] [Observable result.]
+- [ ] [Relevant failure, denial, or recovery behavior, if applicable.]
 - [ ] [Required documentation or verification evidence.]
 
-Adapt these criteria to the actual change. A documentation task does not need artificial application behavior.
+## Plan and boundaries
 
-## Implementation boundaries
+- **Files or components:** [Inspect the repository first.]
+- **Existing logic to reuse:** [Actual functions/components.]
+- **Code needing extra explanation:** [Unfamiliar mechanisms or complicated steps.]
+- **Refactoring, if needed:** [The problem to simplify and the intended improvement.]
+- **Outside this task:** [Relevant limits.]
 
-- **Expected files or components:** [Fill in after inspecting the repository.]
-- **Existing logic to reuse:** [Actual functions or components.]
-- **Unfamiliar mechanisms to explain:** [Concepts needing finer English comments.]
-- **Refactoring needed:** [Before/after intent, or none.]
-- **Out of scope:** [Only meaningful limits for this task.]
+## Verification
 
-## Verification plan
+[Name the checks, required environment, and any manual verification owner. Record actual results in the PR.]
 
-[Name the checks that can show the criteria are met, the required environment, and who will perform any manual checks. Record results later in the PR.]
+## Delivery
 
-## Agent and PR workflow
+Follow root `AGENTS.md` and `docs/agent-tools/WORKFLOW.md`. Use Android Studio Agent Mode for project code, review each generated change before accepting it, and publish a task branch and PR. Keep related corrections in that PR; leave approval and merge to humans. Each participating student records their actual work in their own weekly log.
 
-Use Android Studio Agent Mode for agent-generated project code. Read the root `AGENTS.md` and `docs/agent-tools/WORKFLOW.md` before editing.
-
-Create a task branch and PR; include code, tests, documentation, and configuration changes in the same coherent review. Continue related fixes in that PR. Do not push directly to `main`, self-approve, or let an agent merge. Update each participating student's own weekly log with actual prompts, changes, verification, and manual fixes.
-
-**PR link:** [Add the real link after creation.]
-
+**PR:** [Add the real URL when opened.]
