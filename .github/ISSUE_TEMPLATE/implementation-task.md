@@ -39,6 +39,6 @@ assignees: ""
 
 ## Delivery
 
-Follow root `AGENTS.md` and `docs/agent-tools/WORKFLOW.md`. Use Android Studio Agent Mode for project code, review each generated change before accepting it, and publish a task branch and PR. Keep related corrections in that PR; leave approval and merge to humans. Each participating student records their actual work in their own weekly log.
+Follow root `AGENTS.md` and `docs/agent-tools/WORKFLOW.md`. Before agent work starts, explicitly identify the task owner as User G, User F, or User J; the agent must ask if this is missing. Use Android Studio Agent Mode for project code, review each generated change before accepting it, and publish a task branch and PR. The agent records its actual work in that owner's ongoing `docs/agent-logs/<student>/agent-log.md` and links the entry in the PR. Keep related corrections in that PR; leave approval and merge to humans. Each participating student separately writes their own weekly coursework log.
 
 **PR:** [Add the real URL when opened.]

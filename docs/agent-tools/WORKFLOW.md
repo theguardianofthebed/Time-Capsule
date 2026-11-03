@@ -4,7 +4,9 @@ Use this procedure for one focused task. [AGENTS.md](../../AGENTS.md) defines th
 
 ## 1. Define the task
 
-Identify the acting student, Issue, intended result, scope, work period, dependencies, and verification plan. Link the relevant requirement, design, acceptance criteria, and test records from the [source register](SOURCE_REGISTER.md). Use the [Issue template](../../.github/ISSUE_TEMPLATE/implementation-task.md); documentation tasks may cite a course or team rule where application IDs do not apply.
+Identify the acting student as **User G**, **User F**, or **User J**, then identify the Issue, intended result, scope, work period, dependencies, and verification plan. If the owner was not explicitly supplied for this task, ask **“Who owns this agent task: User G, User F, or User J?”** before making changes or publishing work. Do not guess from an account name or role. Read-only preparation may continue while waiting.
+
+Read the owner's ongoing `docs/agent-logs/<student>/agent-log.md` and start a factual task entry using the [log guide](../agent-logs/README.md). Delegated agents and follow-ups keep the same owner. Link the relevant requirement, design, acceptance criteria, and test records from the [source register](SOURCE_REGISTER.md). Use the [Issue template](../../.github/ISSUE_TEMPLATE/implementation-task.md); documentation tasks may cite a course or team rule where application IDs do not apply.
 
 Check that the repository is `theguardianofthebed/Time-Capsule`. Read existing files and applicable instructions, then create a task branch using the real Issue number. Preserve unrelated local changes. Resolve a missing decision before editing the part that depends on it; continue independent work.
 
@@ -43,7 +45,7 @@ Record the command or manual procedure, commit, date, environment, expected/actu
 
 After the student accepts the diff, inspect the intended files for secrets, unrelated edits, misleading comments, and duplicated logic. Commit, push the task branch, and open or update its PR using the [PR template](../../.github/pull_request_template.md).
 
-Use ordinary GitHub tools through the member's authorized integration. Do not call another coding agent to create the implementation. The PR should explain the outcome, decisions, trace references, unfamiliar code, any refactor, actual checks, and remaining work. Link the student's real weekly entry.
+Use ordinary GitHub tools through the member's authorized integration. Do not call another coding agent to create the implementation. The PR should explain the outcome, decisions, trace references, unfamiliar code, any refactor, actual checks, and remaining work. Complete and link the confirmed owner's ongoing agent-log entry before publication, then add the actual PR URL to the entry after opening the PR. Link a weekly coursework entry separately when the student has written it.
 
 Use `Closes #<issue-number>` for a completed Issue and `Refs #<issue-number>` for partial work. Keep review corrections in the same PR. An unrelated task gets a separate branch/PR; read-only work needs no empty PR.
 
@@ -59,7 +61,11 @@ Review can rotate: User F focuses on product meaning and readability, User G on 
 
 ## 6. Record the session
 
-Each student updates their own weekly log with the model, purpose, key prompts, agent changes/checks, errors, and manual fixes. Describe your own contribution to shared work. Personal reflections and claims of understanding must come from the student.
+Before every handoff or completion report, the agent updates the confirmed owner's ongoing `agent-log.md`. Record actual changes or findings, their purpose, affected files/records, checks and results, errors, remaining work, and real Issue/PR references. Include each delegated agent's contribution in the same task entry. Record review-only, documentation, failed, and blocked work too; never mark unfinished work complete or invent a successful check.
+
+Keep these entries understandable to teammates: explain the outcome first, use short sentences, and include technical details only when they explain a decision or failure. Preserve earlier entries and use a dated correction if an earlier fact needs fixing. Commit log changes through the task branch and PR.
+
+Each student separately updates their own weekly coursework log with the actual model, purpose, key prompts, agent changes/checks, errors, and manual fixes. The ongoing work log supplies facts but does not replace the weekly submission. Personal reflections, human review, and claims of understanding must come from the student.
 
 [COURSE_COMPLIANCE.md](COURSE_COMPLIANCE.md) lists the individual files and planned deadlines. A committed log is not automatically an individual course submission.
 

@@ -33,6 +33,18 @@ Choose the shared skill for the task: [implement](../.agents/skills/timecapsule-
 
 Use the [Issue template](../.github/ISSUE_TEMPLATE/implementation-task.md) to define a task and the [PR template](../.github/pull_request_template.md) to explain the result.
 
+## Ongoing agent work logs
+
+Every agent task needs an explicitly identified owner. The agent asks **User G, User F, or User J?** when the owner is missing, then records its factual changes, findings, checks, and remaining work in that contributor's ongoing log. See the [log guide and entry template](agent-logs/README.md).
+
+| Owner | Ongoing agent work log |
+|---|---|
+| User G | [agent-log.md](agent-logs/user-g/agent-log.md) |
+| User F | [agent-log.md](agent-logs/user-f/agent-log.md) |
+| User J | [agent-log.md](agent-logs/user-j/agent-log.md) |
+
+These factual work records support the individual coursework below; they do not replace weekly submissions or personal reflection.
+
 ## Individual coursework
 
 | Student | Weekly logs | Reflection |

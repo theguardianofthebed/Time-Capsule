@@ -6,6 +6,7 @@
 - **Type and scope:** [Feature / fix / refactor / test / documentation / configuration; MVP / approved stretch / team process]
 - **Requirement, design, and acceptance references:** [Actual IDs/links, or explain why not applicable.]
 - **Author and human reviewer:** [User F, User G, or User J; reviewer must be another teammate.]
+- **Confirmed agent-task owner:** [User G, User F, or User J, explicitly supplied by the requester. Never infer from GitHub identity.]
 
 ## Changes and explanation
 
@@ -28,7 +29,8 @@
 - **Environment and model:** [Actual values; project code must use Android Studio Agent Mode. Identify documentation-only assistance honestly.]
 - **Agent contribution:** [Actual work.]
 - **Human decisions and manual fixes:** [Actual work.]
-- **Individual log:** [Links to the participating students' actual entries.]
+- **Ongoing agent work log:** [Link the confirmed owner's factual entry in docs/agent-logs/user-g/agent-log.md, user-f/agent-log.md, or user-j/agent-log.md. Include delegated contributions and actual checks; add this PR's URL to the entry after publication.]
+- **Weekly coursework log, if written:** [Separate link to the student's actual weekly entry; personal reflection is written by the student.]
 - **What the author can explain:** [Relevant purpose, data flow, Android mechanism, and failure behavior.]
 
 ## Review checklist
@@ -36,6 +38,7 @@
 - [ ] The author inspected the complete diff, including agent changes.
 - [ ] Comments and style follow the shared rules; duplicated logic and unnecessary complexity were checked.
 - [ ] Verification results are accurate and unfinished work is identified.
+- [ ] The requester explicitly identified the G/F/J task owner, and that owner's ongoing agent-log entry records the actual work, checks, limits, and delegated contributions.
 - [ ] No secrets or private user data were added.
 - [ ] Relevant design, journeys, and individual logs are updated.
 - [ ] Another teammate reviewed the latest diff and recorded their feedback.
