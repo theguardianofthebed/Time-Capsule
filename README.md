@@ -37,3 +37,179 @@ Shared documents identify the students as **User F**, **User G**, and **User J**
 | `prototype/`, `spikes/` | Existing supporting-work directories; their presence does not establish application integration |
 
 The Git repository root is also the Gradle project root. Open this root in Android Studio; do not create a second Android project inside `app/` or copy a new template over the checkout.
+
+### Detailed layout
+```text
+Time-Capsule/
+├── .agents/                                      [NEW]
+│   └── skills/                                   [NEW]
+│       ├── timecapsule-implement/                 [NEW]
+│       │   └── SKILL.md                          [NEW]
+│       ├── timecapsule-record-learning/           [NEW]
+│       │   └── SKILL.md                          [NEW]
+│       ├── timecapsule-refactor/                  [NEW]
+│       │   └── SKILL.md                          [NEW]
+│       └── timecapsule-review/                    [NEW]
+│           └── SKILL.md                          [NEW]
+│
+├── .aiexclude                                    [NEW]
+├── .editorconfig                                 [NEW]
+│
+├── .github/                                      [NEW]
+│   ├── ISSUE_TEMPLATE/                           [NEW]
+│   │   └── implementation-task.md                [NEW]
+│   └── pull_request_template.md                  [NEW]
+│
+├── .gitignore                                    [UPDATED]
+├── AGENTS.md                                     [UPDATED]
+├── CONTRIBUTING.md                               [UPDATED]
+├── DESIGN.md                                     [NEW]
+├── README.md                                     [UPDATED]
+│
+├── app/
+│   ├── .gitignore
+│   ├── build.gradle.kts
+│   └── src/
+│       ├── androidTest/
+│       │   └── java/
+│       │       └── com/
+│       │           └── example/
+│       │               └── timecapsule/
+│       │                   └── ExampleInstrumentedTest.kt
+│       │
+│       ├── main/
+│       │   ├── AndroidManifest.xml
+│       │   ├── java/
+│       │   │   └── com/
+│       │   │       └── example/
+│       │   │           └── timecapsule/
+│       │   │               ├── MainActivity.kt
+│       │   │               │
+│       │   │               ├── data/
+│       │   │               │   └── CapsuleRepository.kt
+│       │   │               │
+│       │   │               ├── domain/
+│       │   │               │   └── model/
+│       │   │               │       └── Capsule.kt
+│       │   │               │
+│       │   │               └── ui/
+│       │   │                   ├── TimeCapsuleApp.kt
+│       │   │                   ├── screens/
+│       │   │                   │   ├── CapsuleDetailScreen.kt
+│       │   │                   │   ├── CreateCapsuleScreen.kt
+│       │   │                   │   ├── HomeScreen.kt
+│       │   │                   │   ├── ProfileScreen.kt
+│       │   │                   │   └── WelcomeScreen.kt
+│       │   │                   └── theme/
+│       │   │                       ├── Color.kt
+│       │   │                       ├── Theme.kt
+│       │   │                       └── Type.kt
+│       │   │
+│       │   ├── keepRules/
+│       │   │   └── rules.keep
+│       │   │
+│       │   └── res/
+│       │       ├── drawable/
+│       │       │   ├── ic_launcher_background.xml
+│       │       │   └── ic_launcher_foreground.xml
+│       │       ├── mipmap-anydpi/
+│       │       │   ├── ic_launcher.xml
+│       │       │   └── ic_launcher_round.xml
+│       │       ├── mipmap-hdpi/
+│       │       │   ├── ic_launcher.webp
+│       │       │   └── ic_launcher_round.webp
+│       │       ├── mipmap-mdpi/
+│       │       │   ├── ic_launcher.webp
+│       │       │   └── ic_launcher_round.webp
+│       │       ├── mipmap-xhdpi/
+│       │       │   ├── ic_launcher.webp
+│       │       │   └── ic_launcher_round.webp
+│       │       ├── mipmap-xxhdpi/
+│       │       │   ├── ic_launcher.webp
+│       │       │   └── ic_launcher_round.webp
+│       │       ├── mipmap-xxxhdpi/
+│       │       │   ├── ic_launcher.webp
+│       │       │   └── ic_launcher_round.webp
+│       │       ├── values/
+│       │       │   ├── colors.xml
+│       │       │   ├── strings.xml
+│       │       │   └── themes.xml
+│       │       └── xml/
+│       │           ├── backup_rules.xml
+│       │           └── data_extraction_rules.xml
+│       │
+│       └── test/
+│           └── java/
+│               └── com/
+│                   └── example/
+│                       └── timecapsule/
+│                           ├── ExampleUnitTest.kt
+│                           └── domain/
+│                               └── model/
+│                                   └── CapsuleDraftTest.kt
+│
+├── docs/
+│   ├── .gitkeep
+│   ├── README.md                                 [NEW]
+│   ├── ANDROID_SKELETON_SETUP.md                  [UPDATED]
+│   │
+│   ├── agent-tools/                              [NEW]
+│   │   ├── SETUP.md                              [NEW]
+│   │   ├── REPOSITORY_STATUS.md                  [NEW]
+│   │   ├── WORKFLOW.md                           [NEW]
+│   │   ├── CODING_AND_COMMENTS.md                [NEW]
+│   │   ├── COURSE_BASELINE.md                    [NEW]
+│   │   ├── COURSE_COMPLIANCE.md                  [NEW]
+│   │   ├── CURRENT_CONTRACT.md                   [NEW]
+│   │   ├── SOURCE_REGISTER.md                    [NEW]
+│   │   ├── JOURNEYS.md                           [NEW]
+│   │   ├── MCP_SETUP.md                          [NEW]
+│   │   ├── mcp.redacted.json                     [NEW]
+│   │   ├── GITIGNORE_ADDITIONS.txt                [NEW]
+│   │   └── reference/                            [NEW]
+│   │       └── timecapsule-contract-r38.json      [NEW]
+│   │
+│   ├── agent-logs/                               [NEW]
+│   │   ├── user-f/                               [NEW]
+│   │   │   ├── agent-log-w1.md                    [NEW]
+│   │   │   ├── agent-log-w2.md                    [NEW]
+│   │   │   ├── agent-log-w3.md                    [NEW]
+│   │   │   └── agent-log-w4.md                    [NEW]
+│   │   ├── user-g/                               [NEW]
+│   │   │   ├── agent-log-w1.md                    [NEW]
+│   │   │   ├── agent-log-w2.md                    [NEW]
+│   │   │   ├── agent-log-w3.md                    [NEW]
+│   │   │   └── agent-log-w4.md                    [NEW]
+│   │   └── user-j/                               [NEW]
+│   │       ├── agent-log-w1.md                    [NEW]
+│   │       ├── agent-log-w2.md                    [NEW]
+│   │       ├── agent-log-w3.md                    [NEW]
+│   │       └── agent-log-w4.md                    [NEW]
+│   │
+│   └── retrospectives/                           [NEW]
+│       ├── user-f/                               [NEW]
+│       │   └── retrospective.md                  [NEW]
+│       ├── user-g/                               [NEW]
+│       │   └── retrospective.md                  [NEW]
+│       └── user-j/                               [NEW]
+│           └── retrospective.md                  [NEW]
+│
+├── gradle/
+│   ├── gradle-daemon-jvm.properties
+│   ├── libs.versions.toml
+│   └── wrapper/
+│       ├── gradle-wrapper.jar
+│       └── gradle-wrapper.properties
+│
+├── build.gradle.kts
+├── gradle.properties
+├── gradlew
+├── gradlew.bat
+├── settings.gradle.kts
+│
+├── prototype/
+│   └── .gitkeep
+│
+└── spikes/
+    └── .gitkeep
+```
