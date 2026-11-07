@@ -9,6 +9,7 @@
 | [AGENTS.md](../AGENTS.md) | Follow the mandatory agent and repository rules |
 | [CONTRIBUTING.md](../CONTRIBUTING.md) | Name branches and commits, open PRs, and review changes |
 | [Workflow](agent-tools/WORKFLOW.md) | Complete one task from Issue to reviewed PR |
+| [Implementation order](agent-tools/IMPLEMENTATION_ORDER.md) | Choose a ready issue and verify every prerequisite |
 | [Coding and comments](agent-tools/CODING_AND_COMMENTS.md) | Write clear comments and explain refactoring |
 | [Course baseline](agent-tools/COURSE_BASELINE.md) | Check what the lectures cover and what needs extra explanation |
 | [MCP setup](agent-tools/MCP_SETUP.md) | Configure a personal tool connection |
@@ -19,7 +20,8 @@
 | Document | Purpose |
 |---|---|
 | [Repository guide](agent-tools/REPOSITORY_STATUS.md) | Code locations and implementation boundaries |
-| [DESIGN.md](../DESIGN.md) | Screen flow and visual design |
+| [DESIGN.md](../DESIGN.md) | S-01–S-08 screen contract and visual design |
+| [Views decision and starter baseline](agent-tools/UI_VIEWS_UPDATE_2026-11-07.md) | Confirmed UI update, matching repository versions, and pending Atlas reconciliation |
 | [Project contract](agent-tools/CURRENT_CONTRACT.md) | Detailed behavior and architecture rules |
 | [Source register](agent-tools/SOURCE_REGISTER.md) | Source authority and references |
 | [Full contract reference](agent-tools/reference/timecapsule-contract-r38.json) | Exact requirement, design, acceptance, and test records |

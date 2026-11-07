@@ -7,7 +7,8 @@ Use this register to choose the right source for a task. Course requirements and
 | Source | Reference | Use |
 |---|---|---|
 | Professor's agent supplement | `Term_Project_Agent_Usage_Supplement.docx`: Agent environment, deliverables, usage rules, and submission summary | Required agent environment, shared and individual files, review, and secret handling. |
-| Atlas instructions | Atlas `timecapsule`, content revision 38, instructions version 3 | Contract interpretation, explicit design selections, and canonical IDs. |
+| [7 November Views/screen decision](UI_VIEWS_UPDATE_2026-11-07.md) | User-supplied Kakao discussion, explicit eight-screen table, reference images, and current repository baseline | Latest narrow update for Views/XML + ViewBinding, S-01–S-08 grouping, starter compatibility, and implementation-order gates. Live Atlas reconciliation remains pending. |
+| Atlas instructions | Retained Atlas `timecapsule`, content revision 38, instructions version 3 | Contract interpretation, explicit design selections, and canonical IDs, with the narrow later decision above. |
 | Atlas nodes | FR-01–FR-12, NFR-01–NFR-06; ARC-01–ARC-07; DD-01–DD-28; AC-01–AC-14; T-01–T-45 | Read the complete overview and constraints of every affected requirement, design, acceptance criterion, and test. |
 | Atlas relationships | 378 explicit relationships in revision 38 | Use the recorded links; do not invent an edge because two items sound related. |
 | [Full contract reference](reference/timecapsule-contract-r38.json) | 112 node records, 378 relationships, and nine source records with revision-history provenance | Exact bilingual records available locally without MCP. Read-only reference; not an Atlas import or replacement payload. |
@@ -87,11 +88,13 @@ Instructions version 3 treats source text saying an export was “not applied”
 | Recipient and content | FR-03/FR-04/DD-07 require exact UID confirmation, one supported original photo, and actual authorization instead of simulated unlock. |
 | Evidence | E1 is isolated feasibility; E2 is app integration; E3 is repeated verification. A wireframe/model/build result does not establish Firebase, security, device, or full acceptance success. |
 | Bilingual summaries | Follow the explicit English contract selection and instructions v3 when a historical summary differs. Report a material unresolved conflict. |
-| UI framework | Native Views is the approved target; the application has a provisional Compose scaffold. Resolve the implementation mismatch through a separate reviewed UI task. |
+| UI framework | Views/XML + ViewBinding and S-01–S-08 are confirmed. #25 adopts the separately verified starter; application files in the documentation PR remain unchanged. |
 
 The frozen records contain `not_started` requirement/design statuses, `not_verified` ACs, and `not_run` tests. Those values describe the reference's recorded progress. Use actual implementation and test evidence to assess later progress, and update each record only through its authorized workflow.
 
 ## 6 Keeping references aligned
+
+Existing issue bodies retain an English contract capture at revision 46; the local JSON remains the unchanged revision 38 reference. The 7 November supplement is an explicit targeted decision, not an invented live revision. The legacy Sites MCP returned `410 ATLAS_MOVED`. A subsequently authorized new Project Atlas MCP connection did not list the Time Capsule target, so its live update is pending until the correct atlas is accessible. Preserve unrelated later issue refinements and reconcile the targeted Atlas proposal against a freshly read authorized revision before applying it.
 
 For each substantive task, record the authorized source revision, affected FR/NFR → ARC/DD → AC/T references, Issue, branch, and expected behavior. Read `nodeRecords` and their actual `relationshipRecords` locally; live MCP is optional for this reference.
 

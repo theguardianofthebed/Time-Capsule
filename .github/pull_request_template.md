@@ -6,6 +6,7 @@
 - **Type and scope:** [Feature / fix / refactor / test / documentation / configuration; MVP / approved stretch / team process]
 - **Requirement, design, and acceptance references:** [Actual IDs/links, or explain why not applicable.]
 - **Author and human reviewer:** [User F, User G, or User J; reviewer must be another teammate.]
+- **Prerequisite evidence:** [Selected base; each required Issue → merged PR/commit → relevant verification. Explain Not applicable for independent documentation work.]
 
 ## Changes and explanation
 

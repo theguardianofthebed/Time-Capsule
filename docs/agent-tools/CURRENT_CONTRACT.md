@@ -4,7 +4,7 @@ Use this guide for the project's behavior, architecture, dependency choices, and
 
 The full reference contains Atlas revision 38 and instructions version 3. Find an ID in `nodeRecords`, read its `sections` and current English overview/constraints, and follow the explicit `source`/`target` links in `relationshipRecords`. `sourceRecords` and `sourceRecordHistory` retain provenance. `contractGuidance` contains the contract instructions. This is a read-only documentation reference, not an Atlas import, sync, or replacement payload.
 
-The approved UI target is native Views; the application has a provisional Compose scaffold. Follow the [UI framework guidance](REPOSITORY_STATUS.md) before extending it. Implementation and test status require their own evidence.
+Apply the confirmed [7 November Views/screen update](UI_VIEWS_UPDATE_2026-11-07.md) alongside this retained reference: the UI uses **Views/XML + ViewBinding** and exactly S-01–S-08, with recipient and lock choices sharing S-05. The live legacy Atlas update is pending; no newer live revision is claimed. The repository still has its provisional Compose scaffold until #25 adopts the separate verified starter. Follow [the implementation order](IMPLEMENTATION_ORDER.md) before any feature work. Implementation and test status require their own evidence.
 
 ## 1 Scope and required behavior
 
@@ -21,7 +21,7 @@ The approved UI target is native Views; the application has a provisional Compos
 | Recovery and notifications | The complete trigger set is app-open, foreground resume, detail opening and explicit Retry. After a supported check confirms first unlock, attempt one generic local notification when permission permits. A missed notification never changes access. | FR-09, FR-10; DD-08, DD-09, DD-24 |
 | Local retention | Firestore memory-only cache; small DataStore markers/journal and UID-scoped app-private retained files. Offline recipient re-view needs the active UID, server-confirmed marker and actual retained bytes. First unlock is online. | FR-12, NFR-01; ARC-06; DD-06, DD-18 |
 | Logout/switch | Invalidate session generation before clearing old state; cancel listeners/work/account notifications; clear views, verified markers and protected files. Discard late old-session callbacks. Only opaque UID/ID/digest/status recovery information may survive logout for uncertain sends. | FR-01, NFR-01; ARC-06; DD-18 |
-| Product boundary | Approved target: native Android Views; the provisional Compose scaffold needs the separate review described in the repository guide. No incidental framework migration, Room capsule database, background location, alarms, geofence registrations, boot receivers, periodic polling, FCM, always-on services, external links/QR, social graph, audio or one-view destruction. Direct camera input and mandatory compression are outside the required path. | DD-07, DD-11, DD-24, DD-25; instructions v3 |
+| Product boundary | Confirmed UI: native Android Views, XML layouts and ViewBinding; eight main screens S-01–S-08. The provisional Compose scaffold is replaced only through reviewed #25 adoption. No incidental framework migration, Room capsule database, background location, alarms, geofence registrations, boot receivers, periodic polling, FCM, always-on services, external links/QR, social graph, audio or one-view destruction. Direct camera input and mandatory compression are outside the required path. | DD-07, DD-11, DD-24, DD-25; instructions v3 |
 
 Instructions v3, ARC-07 and DD-08/DD-24 select foreground-only operation. ARC-06 and instructions v3 select memory-only Firestore. Apply those explicit decisions when reading historical hints or bilingual summaries in the source records.
 
@@ -86,25 +86,26 @@ For detailed code work, read the full overview and constraints of the relevant n
 
 ## 4 Selected dependency and deployment contract
 
-This table reproduces DD-11/DD-20; it is a **pinned project selection**, not a claim that these are the newest releases or that any project has been provisioned. Do not auto-upgrade them as part of an unrelated task.
+This table combines the narrow 7 November starter decision with the retained service selections in DD-11/DD-20. Read [the exact starter baseline](UI_VIEWS_UPDATE_2026-11-07.md). Preserve the current repository versions for the starter; add and verify future service dependencies in #9. No build pass, newest-release claim, cloud provisioning, or dependency compatibility pass is implied.
 
 | Item | Selected value |
 |---|---|
-| UI | Kotlin native Android Views; constructor-injected repository adapters |
-| AGP / Gradle / built-in Kotlin | 9.0.1 / 9.1.0 / 2.2.10 |
-| Java/Kotlin target | 17 |
-| Android SDK | minSdk 26; compile/target 36 |
+| UI | Kotlin native Android Views + XML + ViewBinding; constructor-injected repository adapters |
+| Starter AGP / Gradle | 9.4.1 / 9.6.0, matching the checked-in repository |
+| Starter Gradle daemon / Java source target | JDK 25 / Java 11; these are separate settings |
+| Starter Kotlin | AGP built-in mechanism; the removed Compose-plugin catalog version is not an embedded-compiler pin |
+| Starter Android SDK | minSdk 26; compile/target 37 |
 | Core library desugaring | desugar_jdk_libs 2.1.5 |
 | Firebase | Android BoM 34.4.0; main auth/firestore/storage modules; no separate Firebase KTX artifacts |
 | Google services Gradle plugin | 4.4.4 |
 | Maps / Location | Maps SDK 19.2.0; play-services-location 21.3.0 |
 | DataStore Preferences / Lifecycle ViewModel | 1.1.7 / 2.9.4 |
 | Project/backend | Dedicated team Firebase project on Blaze; Firestore Standard/Native default database and default Storage bucket in asia-northeast3 |
-| Android application ID | com.timecapsule.app |
+| Starter application ID / namespace | com.example.timecapsule; matching future Firebase/Maps configuration must be reviewed in #9 |
 | Rules/configuration | Version firebase.json, firestore.rules, storage.rules and firestore.indexes.json together; production configuration and deployment are separate from this document |
 | Queries | Participant equality queries; default single-field indexes; stable client-side sort by createdAt then capsule ID |
 
-These approved target values may differ from the scaffold's checked-in configuration. Read the actual Gradle files before a build and handle required alignment in a reviewed implementation task. The JDK used to run Gradle is separate from Java/Kotlin source compatibility; T-45's wireframe environment is a test reference, not the target toolchain.
+The starter does not add Firebase/Maps/DataStore/Material libraries merely because the target design names them. Preserve Core KTX 1.19.1, Lifecycle runtime KTX 2.6.1, and the existing test pins; replace Activity Compose with Activity KTX at the same 1.13.0 version. #9 verifies the selected service pins against that adopted baseline before integration. Do not silently downgrade the toolchain to historical r38 values or rename an existing cloud app. T-45 must record the actual current toolchain and distinguish build checks, device walkthrough, and production acceptance.
 
 ## 5 Acceptance and test index
 
