@@ -8,7 +8,7 @@ Follow [the shared workflow](../../agent-tools/WORKFLOW.md) and [AGENTS.md](../.
 
 - **Task and purpose:** Review the professor's agent-usage requirements and simplify the repository's shared agent workflow without changing application code.
 - **Session date(s):** 7 November 2026.
-- **Issue and PR:** No Issue was identified for this existing documentation branch. PR link to be added after publication.
+- **Issue and PR:** Issue #7; https://github.com/theguardianofthebed/Time-Capsule/pull/8
 - **Requirement/design references:** Professor's `Term_Project_Agent_Usage_Supplement.docx`; `AGENTS.md`; `CURRENT_CONTRACT.md`; `WORKFLOW.md`; `CODING_AND_COMMENTS.md`.
 - **Agent environment:** Codex desktop app, used for repository documentation only. No Android application code was changed in this task.
 - **Model used:** Exact displayed model name was not recorded. Gemini 3.6 Flash was discussed but was not used for this documentation session.
