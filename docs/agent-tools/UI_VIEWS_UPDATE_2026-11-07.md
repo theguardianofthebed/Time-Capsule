@@ -9,7 +9,7 @@ Read [DESIGN.md](../../DESIGN.md) for the complete **S-01–S-08** screen contra
 - Make ViewBinding explicit in the existing native Views architecture and screen specification.
 - Use eight main screens. Content is S-04; recipient and lock choices share S-05; review and send are S-06. Loading, failure, locked/unlocked, profile repair, and send success are variants of these screens.
 - Adopt and verify the separate Views starter through [#25](https://github.com/theguardianofthebed/Time-Capsule/issues/25) before the shared foundation in #9 and dependent feature work.
-- Preserve the current repository's build versions and app identity in the starter. Adding the planned Firebase, Maps, retention, and other service adapters remains separate issue work.
+- Preserve the current repository's build versions and app identity in the starter, with the explicit AGP 9.3.0 compatibility correction below. Adding the planned Firebase, Maps, retention, and other service adapters remains separate issue work.
 - Treat each issue's `Blocked by` list as a mandatory implementation gate. Members may self-assign any issue whose prerequisites are merged and verified in their base.
 
 The scope remains accounts, delivery to self or another registered user, text and/or one photo, Time/Location/Both locks, lists, foreground recovery, local notifications, and permanent authorized re-view. This decision does not add a social directory, demo login, password reset, email-verification gate, background monitoring, Room, or FCM.
@@ -24,14 +24,16 @@ The existing ChatGPT Sites Atlas returned **410 ATLAS_MOVED**. The user then aut
 
 Relevant existing records are ARC-01; DD-01, DD-07, DD-11, DD-20, DD-26, DD-27, DD-28; and T-45. S-01–S-08 are screen labels within those records, not a new family of Atlas design nodes.
 
-## Current repository-compatible starter
+## Starter versions and Android Studio compatibility
 
-These values come from `main` commit `c7bb071cdda302f7562a549d5029e026b4c92a10`. They describe the starter's compatibility baseline, not the latest releases or a successful build result.
+The baseline comes from `main` commit `c7bb071cdda302f7562a549d5029e026b4c92a10`. The first package preserved AGP 9.4.1, but the user then reported that Android Studio rejected it and supported at most AGP 9.3.0. The corrected package therefore changes **AGP alone to 9.3.0**. This documented exception takes precedence over earlier blanket instructions to preserve every version. The remote application remains unchanged until the reviewed #25 adoption PR.
+
+[AGP 9.3's official requirements](https://developer.android.com/build/releases/agp-9-3-0-release-notes) specify Gradle 9.5.0 minimum and support API 37. Gradle's [Java 25 support](https://docs.gradle.org/9.1.0/release-notes.html#support-for-java-25) began in 9.1, so the existing Gradle 9.6.0/JDK 25 settings are retained. These source checks establish the documented compatibility basis, not an observed Sync, APK or device pass.
 
 | Setting | Starter value or treatment |
 |---|---|
 | Application ID and namespace | `com.example.timecapsule` |
-| Android Gradle Plugin | `9.4.1` |
+| Android Gradle Plugin | `9.3.0`; corrected from the initial package/repository's `9.4.1` |
 | Gradle wrapper | `9.6.0`; retain the original wrapper JAR and distribution checksum |
 | Gradle daemon JDK | `25`, as recorded in `gradle/gradle-daemon-jvm.properties` |
 | Java source / target compatibility | `11` |

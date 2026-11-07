@@ -21,7 +21,7 @@
 |---|---|
 | [Repository guide](agent-tools/REPOSITORY_STATUS.md) | Code locations and implementation boundaries |
 | [DESIGN.md](../DESIGN.md) | S-01–S-08 screen contract and visual design |
-| [Views decision and starter baseline](agent-tools/UI_VIEWS_UPDATE_2026-11-07.md) | Confirmed UI update, matching repository versions, and pending Atlas reconciliation |
+| [Views decision and starter baseline](agent-tools/UI_VIEWS_UPDATE_2026-11-07.md) | Confirmed UI update, starter versions with the AGP compatibility correction, and pending Atlas reconciliation |
 | [Project contract](agent-tools/CURRENT_CONTRACT.md) | Detailed behavior and architecture rules |
 | [Source register](agent-tools/SOURCE_REGISTER.md) | Source authority and references |
 | [Full contract reference](agent-tools/reference/timecapsule-contract-r38.json) | Exact requirement, design, acceptance, and test records |

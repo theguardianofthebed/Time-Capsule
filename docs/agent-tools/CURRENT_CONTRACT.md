@@ -91,7 +91,7 @@ This table combines the narrow 7 November starter decision with the retained ser
 | Item | Selected value |
 |---|---|
 | UI | Kotlin native Android Views + XML + ViewBinding; constructor-injected repository adapters |
-| Starter AGP / Gradle | 9.4.1 / 9.6.0, matching the checked-in repository |
+| Starter AGP / Gradle | 9.3.0 / 9.6.0; AGP-only correction for the reported Android Studio support ceiling |
 | Starter Gradle daemon / Java source target | JDK 25 / Java 11; these are separate settings |
 | Starter Kotlin | AGP built-in mechanism; the removed Compose-plugin catalog version is not an embedded-compiler pin |
 | Starter Android SDK | minSdk 26; compile/target 37 |
@@ -104,6 +104,8 @@ This table combines the narrow 7 November starter decision with the retained ser
 | Starter application ID / namespace | com.example.timecapsule; matching future Firebase/Maps configuration must be reviewed in #9 |
 | Rules/configuration | Version firebase.json, firestore.rules, storage.rules and firestore.indexes.json together; production configuration and deployment are separate from this document |
 | Queries | Participant equality queries; default single-field indexes; stable client-side sort by createdAt then capsule ID |
+
+The corrected starter uses **AGP 9.3.0** after Android Studio rejected the initially preserved 9.4.1. This is an explicit compatibility exception to the inspected repository baseline; the documentation PR does not change the remote Gradle files. Gradle 9.6.0, daemon JDK 25, Java target 11, SDK 37/37/26 and the remaining library pins are retained. [AGP 9.3](https://developer.android.com/build/releases/agp-9-3-0-release-notes) requires Gradle 9.5.0 or later and supports API 37; local Sync/build/device evidence is still required by #25.
 
 The starter does not add Firebase/Maps/DataStore/Material libraries merely because the target design names them. Preserve Core KTX 1.19.1, Lifecycle runtime KTX 2.6.1, and the existing test pins; replace Activity Compose with Activity KTX at the same 1.13.0 version. #9 verifies the selected service pins against that adopted baseline before integration. Do not silently downgrade the toolchain to historical r38 values or rename an existing cloud app. T-45 must record the actual current toolchain and distinguish build checks, device walkthrough, and production acceptance.
 
