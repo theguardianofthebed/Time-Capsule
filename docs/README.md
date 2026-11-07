@@ -1,18 +1,24 @@
 # TimeCapsule documentation
 
-## Set up and work
+## Four core agent documents
+
+| Guide | Use it to… |
+|---|---|
+| [AGENTS.md](../AGENTS.md) | Follow the mandatory agent and repository rules |
+| [Project contract](agent-tools/CURRENT_CONTRACT.md) | Read current scope, behavior, architecture, dependencies, and trace IDs |
+| [Workflow](agent-tools/WORKFLOW.md) | Complete one task from Issue to reviewed PR |
+| [Coding and comments](agent-tools/CODING_AND_COMMENTS.md) | Write clear comments and explain refactoring |
+
+Start with these four. The remaining files are supporting references, templates, configuration, or individual records rather than additional mandatory entry documents.
+
+## Setup and supporting references
 
 | Guide | Use it to… |
 |---|---|
 | [Android setup](ANDROID_SKELETON_SETUP.md) | Open the project and run local checks |
-| [Agent setup](agent-tools/SETUP.md) | Load shared instructions, choose a skill, and connect tools |
-| [AGENTS.md](../AGENTS.md) | Follow the mandatory agent and repository rules |
-| [CONTRIBUTING.md](../CONTRIBUTING.md) | Name branches and commits, open PRs, and review changes |
-| [Workflow](agent-tools/WORKFLOW.md) | Complete one task from Issue to reviewed PR |
-| [Coding and comments](agent-tools/CODING_AND_COMMENTS.md) | Write clear comments and explain refactoring |
-| [Course baseline](agent-tools/COURSE_BASELINE.md) | Check what the lectures cover and what needs extra explanation |
-| [MCP setup](agent-tools/MCP_SETUP.md) | Configure a personal tool connection |
-| [Course requirements](agent-tools/COURSE_COMPLIANCE.md) | Check deliverables, filenames, and submission dates |
+| [Agent setup](agent-tools/SETUP.md) | Confirm the four core documents and choose a skill |
+| [CONTRIBUTING.md](../CONTRIBUTING.md) | Check repository-specific branch and commit names |
+| [Course requirements](agent-tools/COURSE_COMPLIANCE.md) | Review the original deliverables and submission dates |
 
 ## Design and technical references
 
@@ -20,7 +26,6 @@
 |---|---|
 | [Repository guide](agent-tools/REPOSITORY_STATUS.md) | Code locations and implementation boundaries |
 | [DESIGN.md](../DESIGN.md) | Screen flow and visual design |
-| [Project contract](agent-tools/CURRENT_CONTRACT.md) | Detailed behavior and architecture rules |
 | [Source register](agent-tools/SOURCE_REGISTER.md) | Source authority and references |
 | [Full contract reference](agent-tools/reference/timecapsule-contract-r38.json) | Exact requirement, design, acceptance, and test records |
 | [Journeys](agent-tools/JOURNEYS.md) | Procedures for checking app behavior |

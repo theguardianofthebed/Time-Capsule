@@ -5,7 +5,7 @@ description: Refactor duplicated or tangled TimeCapsule code in Android Studio A
 
 # Refactor a TimeCapsule responsibility
 
-Read [AGENTS.md](../../../AGENTS.md), [CODING_AND_COMMENTS.md](../../../docs/agent-tools/CODING_AND_COMMENTS.md), [WORKFLOW.md](../../../docs/agent-tools/WORKFLOW.md), and the current source register before editing. Keep project coding inside Android Studio Agent Mode.
+Read [AGENTS.md](../../../AGENTS.md), [CURRENT_CONTRACT.md](../../../docs/agent-tools/CURRENT_CONTRACT.md), [CODING_AND_COMMENTS.md](../../../docs/agent-tools/CODING_AND_COMMENTS.md), and [WORKFLOW.md](../../../docs/agent-tools/WORKFLOW.md) before editing. Keep project coding inside Android Studio Agent Mode.
 
 ## Establish the behavior that must remain true
 

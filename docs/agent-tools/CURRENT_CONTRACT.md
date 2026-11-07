@@ -1,10 +1,10 @@
 # TimeCapsule implementation contract
 
-Use this guide for the project's behavior, architecture, dependency choices, and acceptance links. Read the exact affected FR/NFR, ARC/DD, AC, and T records in the [full contract reference](reference/timecapsule-contract-r38.json) before implementation. [SOURCE_REGISTER.md](SOURCE_REGISTER.md) identifies the authoritative sources; [DESIGN.md](../../DESIGN.md) covers screens and visual design; [JOURNEYS.md](JOURNEYS.md) gives verification procedures.
+This is the core guide for project scope, behavior, UI decisions, architecture, dependency choices, and trace IDs. Start here rather than opening every supporting document. Before implementation, read the exact affected FR/NFR, ARC/DD, AC, and T records in the [full contract reference](reference/timecapsule-contract-r38.json). Supporting source, design, and journey files provide deeper evidence when a task needs it; they are not additional mandatory entry documents for every task.
 
 The full reference contains Atlas revision 38 and instructions version 3. Find an ID in `nodeRecords`, read its `sections` and current English overview/constraints, and follow the explicit `source`/`target` links in `relationshipRecords`. `sourceRecords` and `sourceRecordHistory` retain provenance. `contractGuidance` contains the contract instructions. This is a read-only documentation reference, not an Atlas import, sync, or replacement payload.
 
-The approved UI target is native Views; the application has a provisional Compose scaffold. Follow the [UI framework guidance](REPOSITORY_STATUS.md) before extending it. Implementation and test status require their own evidence.
+The approved UI target is native Android Views, while the checked-in application has a provisional Compose scaffold. Resolve that mismatch in a separate reviewed UI task before expanding the UI. The Git root is the Gradle root, `app/` is the application module, and `prototype/` and `spikes/` hold non-production prototype and feasibility work. Implementation and test status require their own evidence.
 
 ## 1 Scope and required behavior
 
@@ -131,4 +131,4 @@ An AC is not passed because one related test passes. Assess its complete obligat
 
 ## 6 Updating the contract
 
-Record the authorized contract revision in the Issue/PR. When a newer approved Atlas revision or export is available, review the affected changes and update this summary and the full reference together. Read the complete local reference when live MCP is unavailable. Use [SOURCE_REGISTER.md](SOURCE_REGISTER.md) for provenance and source precedence.
+Record the authorized contract revision in the Issue/PR. When a newer approved Atlas revision or export is available, review the affected changes and update this summary and the full reference together. Read the complete local reference when live MCP is unavailable. Source precedence is: official course requirements, latest explicit approved team decisions, current approved requirements/design, then historical proposals and feasibility notes.

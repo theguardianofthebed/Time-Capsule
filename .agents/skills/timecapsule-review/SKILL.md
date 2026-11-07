@@ -5,7 +5,7 @@ description: Review a TimeCapsule diff or PR for contract correctness, readable 
 
 # Review a TimeCapsule change
 
-Read [AGENTS.md](../../../AGENTS.md), [WORKFLOW.md](../../../docs/agent-tools/WORKFLOW.md), [CODING_AND_COMMENTS.md](../../../docs/agent-tools/CODING_AND_COMMENTS.md), and the relevant approved contract. Use [COURSE_BASELINE.md](../../../docs/agent-tools/COURSE_BASELINE.md) to judge explanation depth.
+Read [AGENTS.md](../../../AGENTS.md), [CURRENT_CONTRACT.md](../../../docs/agent-tools/CURRENT_CONTRACT.md), [WORKFLOW.md](../../../docs/agent-tools/WORKFLOW.md), and [CODING_AND_COMMENTS.md](../../../docs/agent-tools/CODING_AND_COMMENTS.md).
 
 1. Resolve the actual branch/PR, base and head revision, scope, Issue, source revision, and intended behavior. Read the diff and the surrounding code needed to understand each change. Do not claim to have reviewed an unseen file or inaccessible PR.
 2. Check requirements, ownership, time/location rules, session changes, uncertain outcomes, permissions, and lifecycle behavior where affected. Distinguish a confirmed defect from a question or untested risk. Do not treat source finalization as implementation evidence.
