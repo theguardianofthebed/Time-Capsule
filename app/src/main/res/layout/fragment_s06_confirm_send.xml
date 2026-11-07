@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/s06RootView"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <!-- S-06 Confirm send screen placeholder -->
+    <TextView
+        android:id="@+id/tvS06Title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/title_s06_confirm_send"
+        android:textSize="18sp"
+        android:textStyle="bold" />
+
+</LinearLayout>
