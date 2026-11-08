@@ -53,7 +53,7 @@ Needed assistance in identifying the AppCompat theme incompatibility, applying t
 
 - **Task and purpose:** Established shared Android/Firebase foundation architecture, typed OperationResult hierarchy, session generation protection against stale account callbacks, replaceable adapter seams, memory-only Firestore cache configuration, and safe local Firebase emulator setup.
 - **Session date(s):** 8 November 2026.
-- **Issue and PR:** Issue #9 (https://github.com/theguardianofthebed/Time-Capsule/issues/9); implementation PR to be opened from `feature/9-reviewable`. PR #28 was the separate rollback of the accidental direct-to-main commit.
+- **Issue and PR:** Issue #9 (https://github.com/theguardianofthebed/Time-Capsule/issues/9); implementation Draft PR #29 (https://github.com/theguardianofthebed/Time-Capsule/pull/29) from `feature/9-reviewable`. PR #28 was the separate rollback of the accidental direct-to-main commit.
 - **Requirement/design references:** ARC-01, DD-10, DD-11, DD-20, NFR-01, NFR-06, FR-01, FR-02, FR-03, FR-09, AC-01, AC-03, AC-07, AC-09, AC-11, AC-12, AC-13, AC-14, T-02, T-10, T-32, T-33, T-40, T-43, T-44, T-45.
 - **Agent environment:** Android Studio Agent Mode.
 - **Model used:** Gemini Flash 3.6 (Android Studio Agent Mode).
@@ -92,4 +92,4 @@ Needed assistance in pinning Firebase/Maps/DataStore dependencies, defining type
 
 - **What I reviewed:** I confirmed that I reviewed the Issue #9 work. Specific files and details of my manual review are not recorded here.
 - **What I can explain:** Not yet recorded; no particular personal understanding is claimed by this entry.
-- **Feedback and next step:** My review is confirmed. Open the Issue #9 implementation PR, address remaining verification gaps, and request an independent teammate review (User F or User G).
+- **Feedback and next step:** My review is confirmed. Draft PR #29 is open; address remaining verification gaps and request an independent teammate review (User F or User G).
