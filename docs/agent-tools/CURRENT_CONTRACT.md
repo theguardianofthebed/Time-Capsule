@@ -1,10 +1,12 @@
 # TimeCapsule implementation contract
 
-Use this guide for the project's behavior, architecture, dependency choices, and acceptance links. Read the exact affected FR/NFR, ARC/DD, AC, and T records in the [full contract reference](reference/timecapsule-contract-r38.json) before implementation. [SOURCE_REGISTER.md](SOURCE_REGISTER.md) identifies the authoritative sources; [DESIGN.md](../../DESIGN.md) covers screens and visual design; [JOURNEYS.md](JOURNEYS.md) gives verification procedures.
+This is the core guide for project scope, behavior, UI decisions, architecture, dependency choices, and trace IDs. Start here rather than opening every supporting document. Before implementation, read the exact affected FR/NFR, ARC/DD, AC, and T records in the [full contract reference](reference/timecapsule-contract-r38.json). Supporting source, design, and journey files provide deeper evidence when a task needs it; they are not additional mandatory entry documents for every task.
 
 The full reference contains Atlas revision 38 and instructions version 3. Find an ID in `nodeRecords`, read its `sections` and current English overview/constraints, and follow the explicit `source`/`target` links in `relationshipRecords`. `sourceRecords` and `sourceRecordHistory` retain provenance. `contractGuidance` contains the contract instructions. This is a read-only documentation reference, not an Atlas import, sync, or replacement payload.
 
-Apply the confirmed [7 November Views/screen update](UI_VIEWS_UPDATE_2026-11-07.md) alongside this retained reference: the UI uses **Views/XML + ViewBinding** and exactly S-01–S-08, with recipient and lock choices sharing S-05. The live legacy Atlas update is pending; no newer live revision is claimed. The repository still has its provisional Compose scaffold until #25 adopts the separate verified starter. Follow [the implementation order](IMPLEMENTATION_ORDER.md) before any feature work. Implementation and test status require their own evidence.
+Apply the confirmed [7 November Views/screen update](UI_VIEWS_UPDATE_2026-11-07.md) alongside this retained reference: the UI uses **Views/XML + ViewBinding** and exactly S-01–S-08, with recipient and lock choices sharing S-05. The live legacy Atlas update is pending; no newer live revision is claimed. The Views starter proposed in #25 / PR #27 must still pass human review and relevant checks before it is adopted on `main`. Follow [the implementation order](IMPLEMENTATION_ORDER.md) before any feature work. Implementation and test status require their own evidence.
+
+The Git root is the Gradle root, `app/` is the application module, and `prototype/` and `spikes/` hold non-production prototype and feasibility work.
 
 ## 1 Scope and required behavior
 
@@ -105,7 +107,7 @@ This table combines the narrow 7 November starter decision with the retained ser
 | Rules/configuration | Version firebase.json, firestore.rules, storage.rules and firestore.indexes.json together; production configuration and deployment are separate from this document |
 | Queries | Participant equality queries; default single-field indexes; stable client-side sort by createdAt then capsule ID |
 
-The corrected starter uses **AGP 9.3.0** after Android Studio rejected the initially preserved 9.4.1. This is an explicit compatibility exception to the inspected repository baseline; the documentation PR does not change the remote Gradle files. Gradle 9.6.0, daemon JDK 25, Java target 11, SDK 37/37/26 and the remaining library pins are retained. [AGP 9.3](https://developer.android.com/build/releases/agp-9-3-0-release-notes) requires Gradle 9.5.0 or later and supports API 37; local Sync/build/device evidence is still required by #25.
+The corrected starter uses **AGP 9.3.0** after Android Studio rejected the initially preserved 9.4.1. This is an explicit compatibility exception to the earlier repository baseline; PR #27 proposes the actual application-side change, which remains subject to review. Gradle 9.6.0, daemon JDK 25, Java target 11, SDK 37/37/26 and the remaining library pins are retained. [AGP 9.3](https://developer.android.com/build/releases/agp-9-3-0-release-notes) requires Gradle 9.5.0 or later and supports API 37; local Sync/build/device evidence is still required by #25.
 
 The starter does not add Firebase/Maps/DataStore/Material libraries merely because the target design names them. Preserve Core KTX 1.19.1, Lifecycle runtime KTX 2.6.1, and the existing test pins; replace Activity Compose with Activity KTX at the same 1.13.0 version. #9 verifies the selected service pins against that adopted baseline before integration. Do not silently downgrade the toolchain to historical r38 values or rename an existing cloud app. T-45 must record the actual current toolchain and distinguish build checks, device walkthrough, and production acceptance.
 
@@ -134,4 +136,4 @@ An AC is not passed because one related test passes. Assess its complete obligat
 
 ## 6 Updating the contract
 
-Record the authorized contract revision in the Issue/PR. When a newer approved Atlas revision or export is available, review the affected changes and update this summary and the full reference together. Read the complete local reference when live MCP is unavailable. Use [SOURCE_REGISTER.md](SOURCE_REGISTER.md) for provenance and source precedence.
+Record the authorized contract revision in the Issue/PR. When a newer approved Atlas revision or export is available, review the affected changes and update this summary and the full reference together. Read the complete local reference when live MCP is unavailable. Use [SOURCE_REGISTER.md](SOURCE_REGISTER.md) for provenance and source precedence: official course requirements, latest explicit approved team decisions, current approved requirements/design, then historical proposals and feasibility notes.

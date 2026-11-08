@@ -1,6 +1,6 @@
 # Coding and comments
 
-Write code that all three students can read, review, test, and explain. Follow [AGENTS.md](../../AGENTS.md), the [workflow](WORKFLOW.md), and the approved [project sources](SOURCE_REGISTER.md). These detailed comment/style rules are team conventions that support the professor's explainability requirement.
+Write code that all three students can read, review, test, and explain. Follow [AGENTS.md](../../AGENTS.md), [CURRENT_CONTRACT.md](CURRENT_CONTRACT.md), and [WORKFLOW.md](WORKFLOW.md). These detailed comment/style rules are team conventions that support the professor's explainability requirement.
 
 ## Consistent style
 
@@ -8,7 +8,7 @@ Read nearby code and the repository's formatter settings first. Keep established
 
 | Area | Convention |
 |---|---|
-| Language and UI | Use Kotlin and the approved UI architecture. Read the [repository guide](REPOSITORY_STATUS.md) for the Views/Compose discrepancy before UI work. |
+| Language and UI | Use Kotlin and the UI architecture selected in [CURRENT_CONTRACT.md](CURRENT_CONTRACT.md). Resolve the recorded Views/Compose discrepancy as its own reviewed task. |
 | Indentation | Four spaces for Kotlin/XML and ordinary source; two for JSON/YAML, as set in `.editorconfig`. No tabs. |
 | Line length | Prefer 100 columns. Wrap for readability without breaking URLs or strings. |
 | Classes and interfaces | Descriptive `UpperCamelCase` names. |
@@ -58,7 +58,7 @@ The useful information is the boundary between display formatting and stored dat
 
 ## Explain unfamiliar or complicated steps
 
-Use [COURSE_BASELINE.md](COURSE_BASELINE.md) to judge explanation depth. Modern activity-result and permission launchers were taught, but complicated interactions still need finer comments.
+Use extra explanation for mechanisms that are complicated or were not clearly established by the course material. This includes Compose, coroutines, ViewModels, repositories, Firebase, DataStore, cache authorization, retry reconciliation, lifecycle races, and background scheduling. Modern activity-result and permission launchers still need finer comments when their interaction is complicated.
 
 Explain each meaningful step or decision: **why it is needed here and what failure it prevents**. Do not narrate obvious assignments or braces.
 
@@ -130,4 +130,4 @@ Review the actual diff and callers:
 
 ## Reference
 
-Android Developers documents the multiple-permission result type in [ActivityResultContracts.RequestMultiplePermissions](https://developer.android.com/reference/kotlin/androidx/activity/result/contract/ActivityResultContracts.RequestMultiplePermissions). Use [SOURCE_REGISTER.md](SOURCE_REGISTER.md) for the project-specific contracts.
+Android Developers documents the multiple-permission result type in [ActivityResultContracts.RequestMultiplePermissions](https://developer.android.com/reference/kotlin/androidx/activity/result/contract/ActivityResultContracts.RequestMultiplePermissions). Use [CURRENT_CONTRACT.md](CURRENT_CONTRACT.md) for the project-specific contract.

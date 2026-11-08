@@ -1,3 +1,13 @@
 <resources>
     <string name="app_name">TimeCapsule</string>
+    <string name="title_main_skeleton">TimeCapsule Views Skeleton</string>
+    <string name="subtitle_main_skeleton">S-01 to S-08 Screen Placeholders</string>
+    <string name="title_s01_sign_in">S-01: Sign In Placeholder</string>
+    <string name="title_s02_register">S-02: Register / Profile Repair Placeholder</string>
+    <string name="title_s03_capsule_list">S-03: Capsule List Placeholder</string>
+    <string name="title_s04_content_draft">S-04: Content Draft Placeholder</string>
+    <string name="title_s05_recipient_lock">S-05: Recipient &amp; Lock Selection Placeholder</string>
+    <string name="title_s06_confirm_send">S-06: Confirm Send &amp; Outcome Placeholder</string>
+    <string name="title_s07_capsule_detail">S-07: Capsule Detail Placeholder</string>
+    <string name="title_s08_account_settings">S-08: Account &amp; Settings Placeholder</string>
 </resources>

@@ -4,7 +4,7 @@ Use this procedure for one focused task. [AGENTS.md](../../AGENTS.md) defines th
 
 ## 1. Define the task
 
-Identify the acting student, Issue, intended result, scope, work period, dependencies, and verification plan. Link the relevant requirement, design, acceptance criteria, and test records from the [source register](SOURCE_REGISTER.md). Use the [Issue template](../../.github/ISSUE_TEMPLATE/implementation-task.md); documentation tasks may cite a course or team rule where application IDs do not apply.
+Identify the acting student, Issue, intended result, scope, work period, dependencies, and verification plan. Link the relevant requirement, design, acceptance criteria, and test records from [CURRENT_CONTRACT.md](CURRENT_CONTRACT.md). Use the [Issue template](../../.github/ISSUE_TEMPLATE/implementation-task.md); documentation tasks may cite a course or team rule where application IDs do not apply.
 
 Read [IMPLEMENTATION_ORDER.md](IMPLEMENTATION_ORDER.md) and the Issue's `Blocked by` checklist. Verify each prerequisite's implementation PR is merged into the selected base with the relevant recorded checks, and record its PR/commit/evidence. A closed issue or unmerged PR does not establish readiness. Confirm the approved Views contract is present in the base, self-assign a ready issue, and choose a different human reviewer. If blocked, identify the exact gate; reading/review/planning may continue, but implementation waits for that gate or an explicitly recorded maintainer scope change.
 
@@ -61,11 +61,13 @@ Apply fixes on the same branch, update comments and logs, rerun affected checks,
 
 Review can rotate: User F focuses on product meaning and readability, User G on requirements/design links, and User J on runtime and integration risks. All three still implement, review, test, and understand the whole app.
 
-## 6. Record the session
+## 6. Record the session automatically
 
-Each student updates their own weekly log with the model, purpose, key prompts, agent changes/checks, errors, and manual fixes. Describe your own contribution to shared work. Personal reflections and claims of understanding must come from the student.
+At the end of every implementation, review, refactoring, documentation, or configuration task, the agent prepares an update to the acting student's current weekly log without requiring a separate prompt. It records observed facts such as the model, purpose, key prompts, agent changes/checks, errors, Issue, and PR.
 
-[COURSE_COMPLIANCE.md](COURSE_COMPLIANCE.md) lists the individual files and planned deadlines. A committed log is not automatically an individual course submission.
+Before writing manual fixes, personal review, understanding, or learning claims, the agent asks the student for those facts. It must not guess them. The agent then shows the completed log diff, and the student checks its accuracy before submission. If the student or week is unknown, ask before selecting a log file.
+
+Each student uses their own folder under `docs/agent-logs/` and keeps `agent-log-w1.md` through `agent-log-w4.md`. Planned deadlines are 13, 20, and 27 November and 4 December 2026. Each student completes their own `docs/retrospectives/<student>/retrospective.md` from actual weekly evidence. A committed file is not automatically an individual course submission; follow the professor's actual submission channel.
 
 Keep progress claims precise: a published PR can still await review; a merged PR can still lack acceptance evidence. Update Atlas implementation, acceptance, and test statuses separately, only when the relevant evidence supports them. End the session with the result, checks, remaining work, log location, real PR URL or blocker, and next human action.
 
