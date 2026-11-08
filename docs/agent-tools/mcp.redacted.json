@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "github": {
+      "httpUrl": "https://api.githubcopilot.com/mcp/",
+      "headers": {
+        "Authorization": "Bearer REPLACE_IN_LOCAL_ANDROID_STUDIO_SETTINGS_ONLY",
+        "X-MCP-Toolsets": "repos,issues,pull_requests"
+      }
+    }
+  }
+}
