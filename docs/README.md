@@ -25,7 +25,9 @@ Start with these four. The remaining files are supporting references, templates,
 | Document | Purpose |
 |---|---|
 | [Repository guide](agent-tools/REPOSITORY_STATUS.md) | Code locations and implementation boundaries |
-| [DESIGN.md](../DESIGN.md) | Screen flow and visual design |
+| [DESIGN.md](../DESIGN.md) | S-01–S-08 screen contract and visual design |
+| [Views decision and starter baseline](agent-tools/UI_VIEWS_UPDATE_2026-11-07.md) | Confirmed 7 November UI update and AGP 9.3.0 exception |
+| [Implementation order](agent-tools/IMPLEMENTATION_ORDER.md) | Issue prerequisites and readiness gates |
 | [Source register](agent-tools/SOURCE_REGISTER.md) | Source authority and references |
 | [Full contract reference](agent-tools/reference/timecapsule-contract-r38.json) | Exact requirement, design, acceptance, and test records |
 | [Journeys](agent-tools/JOURNEYS.md) | Procedures for checking app behavior |
