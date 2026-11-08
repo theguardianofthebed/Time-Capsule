@@ -11,7 +11,7 @@ Follow [the shared workflow](../../agent-tools/WORKFLOW.md) and [AGENTS.md](../.
 - **Issue and PR:** Issue #25, PR #27 (https://github.com/theguardianofthebed/Time-Capsule/pull/27).
 - **Requirement/design references:** DD-01, DD-07, DD-11, instructions v3.
 - **Agent environment:** Android Studio Agent Mode.
-- **Model used:** Gemini Flash 3.6 (Android Studio Agent Mode).
+- **Model used:** Gemini-3.6-flash (Android Studio Agent Mode).
 
 ### Purpose of agent use
 
@@ -49,47 +49,35 @@ Needed assistance in identifying the AppCompat theme incompatibility, applying t
 
 ---
 
-## Task: Issue #9 Shared Android/Firebase Foundation
+## Feature or task 2
 
-- **Task and purpose:** Established shared Android/Firebase foundation architecture, typed OperationResult hierarchy, session generation protection against stale account callbacks, replaceable adapter seams, memory-only Firestore cache configuration, and safe local Firebase emulator setup.
-- **Session date(s):** 8 November 2026.
-- **Issue and PR:** Issue #9 (https://github.com/theguardianofthebed/Time-Capsule/issues/9), PR #28 (pending student review).
-- **Requirement/design references:** ARC-01, DD-10, DD-11, DD-20, NFR-01, NFR-06, FR-01, FR-02, FR-03, FR-09, AC-01, AC-03, AC-07, AC-09, AC-11, AC-12, AC-13, AC-14, T-02, T-10, T-32, T-33, T-40, T-43, T-44, T-45.
-- **Agent environment:** Android Studio Agent Mode.
-- **Model used:** Gemini Flash 3.6 (Android Studio Agent Mode).
+- **Task and purpose:** [What you worked on and why.]
+- **Session date(s):** [Actual dates.]
+- **Issue and PR:** [Real links, or the publication blocker.]
+- **Requirement/design references:** [Relevant IDs or paths, if applicable.]
+- **Agent environment:** [Actual environment; project coding must use Android Studio Agent Mode.]
+- **Model used:** [Exact displayed model name, including any switch during the task.]
 
 ### Purpose of agent use
 
-Needed assistance in pinning Firebase/Maps/DataStore dependencies, defining typed result boundaries (`OperationResult`), implementing session generation tracking (`DefaultSessionTracker`), creating adapter interfaces, configuring memory-only Firestore cache, setting up local Firebase emulator scaffolding with deny-all security baselines, and writing unit tests for repository seams and stale callback rejection.
+[What help did you need? What did you decide or do yourself?]
 
 ### Key prompts
 
-- "TimeCapsule — Issue #9: Shared Android/Firebase Foundation ... Complete the bounded foundation, verify it, present the changes to me..."
+[Include the important prompts and corrections. Mark redacted or paraphrased text.]
 
 ### What the agent changed and verified
 
-- **Changes:**
-  - `gradle/libs.versions.toml`: Pinned Firebase BoM 34.4.0, Auth, Firestore, Storage, Google Services 4.4.4, Maps 19.2.0, Location 21.3.0, DataStore 1.1.7, ViewModel 2.9.4, Desugaring 2.1.5.
-  - `build.gradle.kts` & `app/build.gradle.kts`: Applied plugin, desugaring, and dependencies with conditional google-services application for credential-free local builds.
-  - `firebase.json`, `firestore.rules`, `firestore.indexes.json`, `storage.rules`: Initialized versioned emulator & deny-all security rules.
-  - `app/src/main/java/com/example/timecapsule/`: Created `OperationResult` sealed result hierarchy, `SessionSnapshot`, `SessionProvider`, `RecipientProfile`, `CapsuleListsSnapshot`, updated `CapsuleRepository`, implemented `DefaultSessionTracker`, `FirestoreCachePolicy` (memory-only cache), `AuthAdapter`, `FirestoreAdapter`, `StorageAdapter`, `LocationAdapter`, `LocalRetentionAdapter`, `AppDependencyContainer`, and `FirebaseConfig`.
-  - `app/src/test/java/com/example/timecapsule/`: Created unit tests `OperationResultTest`, `SessionProtectionTest`, `MemoryCacheConfigTest`, `RepositorySeamsTest`.
-- **Checks and results:**
-  - `gradle_sync`: PASS
-  - `:app:assembleDebug`: PASS
-  - `:app:testDebugUnitTest`: PASS (17 passed unit tests)
-  - `:app:lintDebug`: PASS
-  - `:app:connectedDebugAndroidTest`: PASS (2 passed on emulator-5554)
-  - `git diff --check`: PASS (clean)
-- **Remaining checks:**
-  - Cloud Firebase deployment & live authentication (deferred to downstream feature issues #10-#23).
+- **Changes:** [Relevant files or behavior.]
+- **Checks and results:** [Actual commands or actions, environment, observed result, and evidence.]
+- **Remaining checks:** [Anything not run, failed, or blocked, and why.]
 
 ### Errors and manual fixes
 
-- Resolved compiler warnings for missing trailing commas, parentheses, and catch parameter signatures. All checks passed without manual code edits.
+[Describe any error and how it was corrected. Separate the agent's correction from your own manual work. Say that no fix was needed only if that is true.]
 
 ### My review and understanding
 
-- **What I reviewed:** [Awaiting student review]
-- **What I can explain:** [Awaiting student response]
-- **Feedback and next step:** [Awaiting student confirmation, PR review request to User F/G]
+- **What I reviewed:** [The changes you inspected before accepting them.]
+- **What I can explain:** [A mechanism, data flow, or failure case you understand.]
+- **Feedback and next step:** [Reviewer feedback, unresolved questions, and the next owner/action.]
