@@ -1,0 +1,9 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Initial security rules baseline: deny all access until specific issue security rules are reviewed.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
