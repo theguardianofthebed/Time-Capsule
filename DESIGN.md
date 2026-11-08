@@ -8,64 +8,65 @@ This guide covers screens, navigation, and visual design. Detailed behavior and 
 
 The MVP includes accounts, self-send and delivery to another user, text and/or one original JPEG/PNG photo, Time/Location/Both locks, Received/Sent lists, recovery, local notifications, and continued access after unlock.
 
-The approved target is **Kotlin with native Android Views and Material 3**. The repository contains a provisional Compose scaffold; resolve that difference in a separate reviewed UI task before expanding it. See [REPOSITORY_STATUS.md](docs/agent-tools/REPOSITORY_STATUS.md).
+The approved UI is **Kotlin with native Android Views, XML layouts, and ViewBinding**, following the existing Material 3 visual direction. ViewBinding connects Kotlin to the generated bindings for XML layouts. “Compose” in the S-04 label means writing content, not Jetpack Compose. Adopt the separate starter through #25 before feature UI work; keep the [current repository-compatible versions](docs/agent-tools/UI_VIEWS_UPDATE_2026-11-07.md). The starter's plain layout placeholders do not establish the final Material 3 design or service integration.
 
 Check eligibility when the app opens, returns to the foreground, opens a capsule, or the user chooses Retry. Notifications follow a confirmed unlock during one of these checks. The design uses no alarms, geofences, boot receivers, periodic polling, background location, or FCM, and makes no exact-time notification promise for a closed app.
 
-## 2. Screens and navigation
+## 2. Eight main screens
 
-The screen flow follows DD-07 and DD-26–DD-28:
+Use exactly **S-01–S-08**. These are screen labels inside the existing DD-01/DD-07/DD-26–DD-28 design records, not new Atlas node families. The 7 November team screen table refines the existing navigation; the attached images supply visual direction and state variations. Loading, errors, profile repair, send success, and locked/unlocked detail are variants within the eight screens.
+
+| ID / screen | Main content and actions | Required error / locked states | Existing references |
+|---|---|---|---|
+| **S-01 Sign in** | Email/password authentication; move to registration; successful session opens the active account's lists. | Invalid credentials, expired session, unavailable network/service; no previous account's data. | FR-01, AC-01; DD-19, DD-26 |
+| **S-02 Register** | Firebase Authentication email/password account creation, nonblank display name, and confirmation input; offer a Sign in link. Successful active session plus profile enters S-03. Missing-profile repair is a variant here. | Required input, mismatched confirmation, duplicate/failed account creation, and profile-write failure. Retry profile setup after successful Auth without creating a second account; sending waits for the profile. | FR-01; DD-03, DD-19 |
+| **S-03 Capsule lists** | Received/Sent tabs, new capsule, refresh, and account menu. Self-send appears in both tabs with one underlying ID. | Empty, loading, failed, stale/cache/offline; time waiting, location waiting, and available states. Locked cards show safe metadata only. | FR-03, FR-11; AC-03, AC-11; DD-07, DD-28 |
+| **S-04 Content / Compose** | Message text, select/remove one photo, Next. Preserve the existing optional title and explain that it is visible while locked. | No text/photo, title-only content, zero-byte or over-5-MiB file, unsupported JPEG/PNG format, and read failure. Keep other valid input. | FR-02, FR-04; AC-02; DD-04, DD-25, DD-27 |
+| **S-05 Recipient and locks** | Self or exact UID recipient code with name confirmation; Time/Location/Both; future date/time; confirmed Google Maps point or current location. | Unknown recipient vs unavailable/denied lookup; no lock; current/past time; missing map confirmation; permission/service/location errors. Editing UID clears identity confirmation. | FR-03, FR-05, FR-06, FR-07; DD-03, DD-12, DD-13, DD-22 |
+| **S-06 Confirm send** | Summarize content, recipient, title disclosure, and exact conditions; Send or Back to edit while still a draft. Confirmed success leads to Sent. | Disable duplicate Send and edits during sending/unknown outcome. Explain upload failure, definite rejection, and uncertain server result. Check/retry the same frozen operation with the same `capsuleId`; no new-ID editable replacement while uncertain. | AC-02, AC-03, AC-10, AC-14; DD-14, DD-15, DD-21, DD-27 |
+| **S-07 Capsule detail** | Locked recipient view shows metadata only. After authorized unlock, show text/photo and permanent re-view. Offer current-condition verification. A→B sender's own-content view is an explicit variant. | Time/location waiting; verification needs internet, permission, or a fresh usable location; denied access; post-unlock photo-loading failure. Sender copy never unlocks B; self-send stays locked in both tabs until recipient authorization. | FR-08, FR-09, FR-12; AC-04–AC-10; DD-06, DD-08, DD-18, DD-28 |
+| **S-08 Account and permissions** | Show/copy own recipient code, maintain own display name, sign out, and explain permissions/services. | Notification denial does not block in-app reading. Location denial keeps affected location unlock pending. Logout/switch clears protected state before another session starts. | FR-01, FR-10; NFR-02, NFR-05; DD-19, DD-24, DD-26 |
+
+A successful registration may already establish a signed-in Firebase session. Once its profile is ready, continue to S-03 without forcing another sign-in; the Sign in link remains optional navigation.
+
+Notification entry checks the session and access, then routes to S-07; it is not a ninth main screen. Profile repair stays in S-02. Send progress, unknown outcome, definite failure, and success stay in S-06. The sender-copy and recipient-locked/unlocked variations stay in S-07.
 
 ```mermaid
 flowchart TD
-    Entry["Welcome and sign in"] --> Profile{"Profile complete"}
-    Profile -->|No| Repair["Create or repair display name"]
-    Repair --> Lists["Capsules"]
-    Profile -->|Yes| Lists
-    Lists --> Detail["Capsule detail"]
-    Lists --> Create["Create capsule"]
-    Lists --> Account["Account"]
-    Create --> Review["Review capsule"]
-    Review --> Result{"Send result"}
-    Result -->|Confirmed| Lists
-    Result -->|Unknown| Check["Check status"]
-    Result -->|Definite failure| Retry["Retry or new draft"]
-    Check --> Result
-    Retry --> Result
-    Account -->|Sign out| Entry
+    SignIn["S-01 Sign in"] --> Register["S-02 Register"]
+    Register -->|Sign in link| SignIn
+    SignIn --> Lists["S-03 Capsule lists"]
+    Register -->|Active session and profile ready| Lists
+    Lists --> Content["S-04 Content"]
+    Content --> Conditions["S-05 Recipient and locks"]
+    Conditions --> Confirm["S-06 Confirm send"]
+    Confirm -->|Confirmed send| Lists
+    Lists --> Detail["S-07 Capsule detail"]
+    Lists --> Account["S-08 Account and permissions"]
+    Account -->|Sign out| SignIn
 ```
-
-| Screen | What the user sees and does | Key behavior | Contract |
-|---|---|---|---|
-| Welcome / Sign in | Register or sign in with email and password. | Distinguish invalid credentials from an unavailable service. Load only the active account's screens and data. | FR-01; DD-19, DD-26 |
-| Registration / Profile repair | Enter a nonblank display name. | Create the profile for the authenticated UID. Retry a failed profile write without creating another Auth account. Sending stays disabled until the profile exists. | DD-03, DD-19 |
-| Capsules | Switch between Received and Sent; open a capsule; navigate to Create or Account. | Show title, participant, lock condition, and accurate loading/empty/error/stale states. Refresh finds new receipts. A self-send appears in both lists with one capsule ID. | FR-11; DD-07, DD-28 |
-| Create | Complete Content → Recipient → Lock → Review. | Preserve editable input between steps and validate before Send. See the creation rules below. | FR-02–FR-07; DD-27 |
-| Capsule detail | Read safe information while locked, then authorized text/photo after unlock. | Hide message and photo previews while locked. Explain verification failures and missing offline assets separately. | FR-08–FR-12; DD-06, DD-08, DD-18, DD-28 |
-| Account | Copy the user's UID, edit their display name, or sign out. | Clear old account screens and protected content on sign-out; late callbacks must not restore them. | FR-01; DD-19, DD-26 |
-| Notification entry | Open a generic capsule-ready notification. | Check authentication and capsule access before displaying content. A notification never grants access by itself. | FR-10; DD-09, DD-24 |
 
 ### Create a capsule
 
-The four steps have a visible step label and clear Next/Back controls. Forward navigation must not bypass validation.
+Creation uses **three screens: S-04 → S-05 → S-06**. Keep the four logical checks—content, recipient, lock, and review—within this flow. Recipient and lock are two sections of S-05, not separate main screens. Use a three-position progress indicator matching those screens and preserve editable input on Back/Next.
 
-| Step | Required behavior | Contract |
+| Screen / section | Required behavior | Contract |
 |---|---|---|
-| Content | Allow optional title, message, and one photo with a preview. Explain that the title is visible while locked. Require nonblank text and/or a supported photo; a title alone is insufficient. | DD-04, DD-27 |
-| Recipient | Choose Me or enter another user's exact UID, their account code. Show the returned display name and ask for confirmation. Editing the UID clears that confirmation. Distinguish an unknown code from a failed lookup. Do not offer a user directory. | DD-03, DD-19 |
-| Lock | Choose Time, Location, or Both. Show the time zone and a confirmed map pin or current position. Manual pin selection works without location permission; current-position use handles permission/settings errors. Display the fixed 150 m radius. | DD-12, DD-13, DD-22 |
-| Review | Show recipient code/name, title disclosure, content, and the exact lock condition. Send validates the draft and freezes one capsule ID and an unchangeable copy of its contents and settings. | DD-14, DD-15, DD-27 |
+| S-04 Content | Optional title, message, one photo and preview. Explain that the title is visible while locked. Require nonblank text and/or one original JPEG/PNG of 1–5,242,880 bytes; a title alone is insufficient. | DD-04, DD-25, DD-27 |
+| S-05 Recipient | Choose Me or enter another user's exact UID. Show the returned display name and ask for confirmation. Editing the UID clears confirmation. Distinguish an absent code from failed lookup; do not offer a user directory. | DD-03, DD-19 |
+| S-05 Lock | Choose Time, Location, or Both. Show zone/offset and a confirmed map pin or current position. Manual pin selection works without location permission. Show the fixed 150 m radius. Current unlock checks require age ≤60 s and reported accuracy ≤100 m. | DD-05, DD-12, DD-13, DD-22 |
+| S-06 Review | Show recipient code/name, title disclosure, content, and exact conditions. Send validates the draft and freezes one capsule ID plus an unchangeable content/settings snapshot. Backend time remains authoritative. | DD-14, DD-15, DD-27 |
 
-**Proposed Back behavior:** move to the previous step while the draft is editable. On leaving with unsent edits, offer a simple keep/discard choice that matches the implemented draft retention. Do not promise recovery after process death unless supported. During sending or an unknown outcome, Back may leave the screen but must not turn the operation into an editable draft.
+**Proposed Back behavior:** move to the previous screen while the draft is editable. On leaving with unsent edits, offer a simple keep/discard choice that matches implemented draft retention. Do not promise recovery after process death unless supported. During sending or an unknown outcome, Back may leave the screen but must not turn the operation into an editable draft.
 
-| Send state | Allowed action | Required boundary |
+| Send state in S-06 | Allowed action | Required boundary |
 |---|---|---|
 | DRAFT | Edit, validate, and send. | Freeze the operation before network work begins. |
 | SENDING / OUTCOME_UNKNOWN | Show progress or offer Check status. | Keep the same ID and contents; disable edits and duplicate sends. Leaving the screen does not abandon the operation. |
 | Definite unpublished failure | Retry unchanged, or abandon and create an edited new draft. | Retry keeps the original ID and contents. An edited new draft needs a new ID. An absent server read alone does not prove failure. |
-| Confirmed success | Open Sent or the appropriate detail view. | For self-send, clear the creation screen's raw content and show the locked recipient view. |
+| Confirmed success | Open S-03 Sent or the appropriate S-07 detail variant. | For self-send, clear the creation screen's raw content and show the locked recipient view. |
 
-These states follow DD-02, DD-15, and DD-21. Sender access to an A→B capsule does not give its recipient early access.
+These states follow DD-02, DD-15, and DD-21. The images' mock map, simulated delivery/time/location text, sample accounts, and demo entry are prototype annotations; production behavior must use the approved real adapters. A screenshot's character counter or password hint does not introduce a new validation threshold.
 
 ### Explain locked and unavailable states
 

@@ -10,6 +10,8 @@ Follow this sequence:
 
 Create or identify the Issue before implementation. Use the [task template](.github/ISSUE_TEMPLATE/implementation-task.md) to record the goal, scope, owner, work period, dependencies, relevant requirement/design/test references, and verification plan. Documentation tasks can cite a course or team rule instead of an application requirement.
 
+Before implementing, follow [the required issue order](docs/agent-tools/IMPLEMENTATION_ORDER.md). Self-assign a ready issue and record User F/G/J, work period, and a different human reviewer. Each `Blocked by` issue must have its implementation merged into your selected base with relevant verification evidence; a closed issue or unmerged PR is insufficient. Read/review/planning can continue while blocked.
+
 Read the relevant [project sources](docs/agent-tools/SOURCE_REGISTER.md) and existing files before editing. Preserve teammates' work. Agree on any missing product or architecture decision before implementing the affected part. The [repository guide](docs/agent-tools/REPOSITORY_STATUS.md) explains the application structure and the Views/Compose discrepancy.
 
 ## Branches and commits

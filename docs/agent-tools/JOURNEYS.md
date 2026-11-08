@@ -1,6 +1,6 @@
 # Verification journeys
 
-Use these procedures to verify an implemented feature and record its actual result. They group the canonical T-01–T-45 tests and AC-01–AC-14 acceptance criteria from the [full contract reference](reference/timecapsule-contract-r38.json); journey numbers are navigation aids. Read the affected T/AC records and [implementation contract](CURRENT_CONTRACT.md) before a run.
+Use these procedures to verify an implemented feature and record its actual result. Apply the [Views/eight-screen update](UI_VIEWS_UPDATE_2026-11-07.md) and actual starter baseline to T-45; historical toolchain/screen-count text in the unchanged reference is not the new starter contract. They group the canonical T-01–T-45 tests and AC-01–AC-14 acceptance criteria from the [full contract reference](reference/timecapsule-contract-r38.json); journey numbers are navigation aids. Read the affected T/AC records and [implementation contract](CURRENT_CONTRACT.md) before a run.
 
 ## 1 How to run and record a journey
 
@@ -10,7 +10,7 @@ Use:
 
 - A dedicated local Firebase Auth/Firestore/Storage emulator setup for rules and controlled network/publication failures.
 - Synthetic accounts **A** (sender), **B** (recipient), **C** (unrelated), and a signed-out session. Keep passwords/tokens out of logs.
-- A Google Play-enabled API 36 emulator for target integration and a physical Android phone for location/lifecycle evidence. Use an API 26–32 device/emulator for the document-selector photo fallback.
+- A Google Play-enabled emulator compatible with the adopted starter (compile/target API 37, minimum API 26), plus a physical Android phone for location/lifecycle evidence. Record the actual runtime API; use an API 26–32 device/emulator for the document-selector photo fallback.
 - Known JPEG/PNG fixtures: small valid file, exactly 5,242,880 bytes, oversized, zero bytes, misleading MIME/format, and unreadable input.
 - A controlled test seam for delayed ACK, pending writes, process restart and malformed location. The test seam must not become a production “force unlock” UI.
 
@@ -25,7 +25,7 @@ A journey groups related tests. It does not automatically pass any AC or every t
 | Journey | Existing tests | Explicitly linked acceptance criteria |
 |---|---|---|
 | 1. Account, profile and exact recipient | T-01, T-02, T-03, T-39 | AC-01, AC-02, AC-03, AC-11, AC-13 |
-| 2. Four-step creation and invalid inputs | T-04, T-06, T-12 | AC-02, AC-03, AC-14 |
+| 2. S-04–S-06 creation and invalid inputs | T-04, T-06, T-12 | AC-02, AC-03, AC-14 |
 | 3. A to B delivery and truthful lists | T-08, T-27, T-35 | AC-03, AC-11 |
 | 4. Self-send remains locked | T-07, T-44 | AC-03, AC-09, AC-11, AC-12, AC-13, AC-14 |
 | 5. Server-time unlock and foreground recovery | T-13, T-14, T-24, T-25 | AC-04, AC-07, AC-10, AC-12 |
@@ -56,11 +56,11 @@ The map covers all 45 current planned tests. T-44 intentionally appears in both 
 
 **Evidence:** screen states, redacted typed error classes, rules decisions and matching test IDs. Do not capture passwords or protected message content.
 
-## 4 Journey 2 Four-step creation and invalid inputs
+## 4 Journey 2 S-04–S-06 creation and invalid inputs
 
 **Related design:** DD-04, DD-07, DD-14, DD-15, DD-27.
 
-1. Walk Content → Recipient → Lock → Review with text-only, photo-only and both.
+1. Walk S-04 Content → S-05 Recipient and locks → S-06 Confirm send with text-only, photo-only and both. Check recipient and lock sections separately inside S-05.
 2. Try no body/photo, title-only content, missing recipient, absent lock and invalid photo.
 3. Enter an optional title; verify the content/review screen explains that the recipient can see it while locked.
 4. Move Back/Next and inspect draft preservation. At Send, observe the assigned operation ID/snapshot.

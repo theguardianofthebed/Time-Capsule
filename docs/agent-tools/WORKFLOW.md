@@ -6,6 +6,8 @@ Use this procedure for one focused task. [AGENTS.md](../../AGENTS.md) defines th
 
 Identify the acting student, Issue, intended result, scope, work period, dependencies, and verification plan. Link the relevant requirement, design, acceptance criteria, and test records from [CURRENT_CONTRACT.md](CURRENT_CONTRACT.md). Use the [Issue template](../../.github/ISSUE_TEMPLATE/implementation-task.md); documentation tasks may cite a course or team rule where application IDs do not apply.
 
+Read [IMPLEMENTATION_ORDER.md](IMPLEMENTATION_ORDER.md) and the Issue's `Blocked by` checklist. Verify each prerequisite's implementation PR is merged into the selected base with the relevant recorded checks, and record its PR/commit/evidence. A closed issue or unmerged PR does not establish readiness. Confirm the approved Views contract is present in the base, self-assign a ready issue, and choose a different human reviewer. If blocked, identify the exact gate; reading/review/planning may continue, but implementation waits for that gate or an explicitly recorded maintainer scope change.
+
 Check that the repository is `theguardianofthebed/Time-Capsule`. Read existing files and applicable instructions, then create a task branch using the real Issue number. Preserve unrelated local changes. Resolve a missing decision before editing the part that depends on it; continue independent work.
 
 ## 2. Implement and explain
@@ -32,6 +34,8 @@ Use the checked-in Gradle wrapper, SDK/toolchain settings, and dependency versio
 | Run local JVM tests | `:app:testDebugUnitTest` |
 | Run Android lint | `:app:lintDebug` |
 | Run tests on a device or emulator | `:app:connectedDebugAndroidTest` |
+
+Each feature must verify its own affected behavior before dependent implementation starts; #23 collects full integrated acceptance later. #9 owns the initial test seams. Do not postpone feature verification until #23.
 
 Choose the checks relevant to the change. For account access, locks, retries, media, or lifecycle behavior, include an appropriate failure case from [JOURNEYS.md](JOURNEYS.md) and the detailed test contract. Use authorized test accounts and data.
 

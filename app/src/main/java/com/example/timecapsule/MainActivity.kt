@@ -1,16 +1,27 @@
 package com.example.timecapsule
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
-import androidx.compose.material3.MaterialTheme
-import com.example.timecapsule.ui.TimeCapsuleApp
+import androidx.appcompat.app.AppCompatActivity
+import com.example.timecapsule.databinding.ActivityMainBinding
 
-class MainActivity : ComponentActivity() {
+/**
+ * Main activity for the TimeCapsule application using native Views and ViewBinding.
+ * Serves as the base container for S-01 through S-08 screen placeholders.
+ */
+class MainActivity : AppCompatActivity() {
+
+    private lateinit var binding: ActivityMainBinding
+
+    /**
+     * Initializes the main XML layout through ViewBinding.
+     */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent {
-            MaterialTheme { TimeCapsuleApp() }
-        }
+        // Inflate the layout using generated ViewBinding
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+
+        // Title text is accessible via ViewBinding
+        binding.tvMainTitle.text = getString(R.string.app_name)
     }
 }

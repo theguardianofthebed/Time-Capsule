@@ -13,7 +13,16 @@ assignees: ""
 - **Type and scope:** [Feature / fix / refactor / test / documentation / configuration; MVP / approved stretch / team process]
 - **Owner and reviewer:** [User F, User G, or User J; choose a different teammate to review.]
 - **Work period or deadline:** [Actual agreed date or period]
-- **Dependencies and decisions needed:** [Issues, interfaces, permissions, or missing decisions; explain if none.]
+- **Blocked by (hard implementation prerequisites):** [Exact Issue numbers, or explicitly none; follow docs/agent-tools/IMPLEMENTATION_ORDER.md.]
+- **Readiness:** [READY / BLOCKED after checking the current base and every prerequisite.]
+
+## Prerequisite evidence
+
+- [ ] The approved contract is present in the selected base.
+- [ ] Each prerequisite implementation is merged into that base and has relevant verification evidence; record Issue → PR/merge commit → check evidence. A closed Issue alone is insufficient.
+- [ ] The owner self-assigned using their own account and identified User F/G/J; a different human reviewer and actual work period are recorded.
+
+[If blocked, name the missing gate. Reading/review/planning may continue; implementation waits unless a maintainer explicitly records a scope/dependency change.]
 
 ## References
 

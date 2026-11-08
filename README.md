@@ -10,15 +10,18 @@ TimeCapsule is an Android app for sending a text/photo capsule to yourself or an
 | Set up the coding agent and tools | [Agent setup](docs/agent-tools/SETUP.md) |
 | Make or review a change | [AGENTS.md](AGENTS.md) and [CONTRIBUTING.md](CONTRIBUTING.md) |
 | Understand the app's rules | [Project contract](docs/agent-tools/CURRENT_CONTRACT.md) |
+| Choose an implementation issue | [Required order and readiness](docs/agent-tools/IMPLEMENTATION_ORDER.md) |
 | Work on screens and visual design | [DESIGN.md](DESIGN.md) |
 | Find documents and individual logs | [Documentation index](docs/README.md) |
 | Understand the code structure and remaining work | [Repository guide](docs/agent-tools/REPOSITORY_STATUS.md) |
+
+The UI contract is **Android Views/XML + ViewBinding** with **eight main screens, S-01–S-08**. Read [the confirmed update](docs/agent-tools/UI_VIEWS_UPDATE_2026-11-07.md) and [DESIGN.md](DESIGN.md). The application still has its earlier Compose scaffold until the separately tested starter is adopted through #25; this documentation change does not migrate application code.
 
 ## Working together
 
 Use Android Studio Agent Mode for project code. Write easy English comments for each new or meaningfully changed class/function, explain unfamiliar steps, and follow the shared style. When refactoring, explain the problem being removed and how the revised code improves it.
 
-Each task uses a branch and GitHub PR. Review generated changes before accepting them; another teammate reviews the PR before a human merges it.
+Choose an issue whose [required prerequisites](docs/agent-tools/IMPLEMENTATION_ORDER.md) are merged and verified in your base, then self-assign it. Each task uses a branch and GitHub PR. Review generated changes before accepting them; another teammate reviews the PR before a human merges it.
 
 Use **User F**, **User G**, and **User J** in shared documents, comments, and PR descriptions. Each student keeps their own records under `user-f`, `user-g`, or `user-j`.
 
@@ -36,6 +39,8 @@ Open the repository root in Android Studio. It contains both the Git repository 
 | `prototype/`, `spikes/` | Supporting prototypes and feasibility work |
 
 ### Detailed layout
+
+This is the checked-in application layout; the separate Views package has its own migration manifest. Keep this distinction until #25 is merged.
 
 ```text
 Time-Capsule/
@@ -155,6 +160,8 @@ Time-Capsule/
 │   │   ├── SETUP.md
 │   │   ├── REPOSITORY_STATUS.md
 │   │   ├── WORKFLOW.md
+│   │   ├── IMPLEMENTATION_ORDER.md
+│   │   ├── UI_VIEWS_UPDATE_2026-11-07.md
 │   │   ├── CODING_AND_COMMENTS.md
 │   │   ├── COURSE_BASELINE.md
 │   │   ├── COURSE_COMPLIANCE.md
