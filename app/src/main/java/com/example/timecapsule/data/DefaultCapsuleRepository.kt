@@ -24,7 +24,11 @@ class DefaultCapsuleRepository(
     override fun session(): SessionSnapshot = sessionTracker.currentSession()
 
     override suspend fun getRecipient(uid: String): OperationResult<RecipientProfile> {
-        return firestoreAdapter.getRecipientProfile(uid)
+        val cleanUid = uid.trim()
+        if (cleanUid.isBlank()) {
+            return OperationResult.Invalid("Recipient UID must not be blank.")
+        }
+        return firestoreAdapter.getRecipientProfile(cleanUid)
     }
 
     override suspend fun publish(frozenOperation: CapsuleDraft): OperationResult<String> {
@@ -36,7 +40,7 @@ class DefaultCapsuleRepository(
     }
 
     override suspend fun lists(uid: String): OperationResult<CapsuleListsSnapshot> {
-        return OperationResult.Success(CapsuleListsSnapshot(emptyList(), emptyList()))
+        return OperationResult.Unavailable("Capsule lists query requires Issue #21 implementation.")
     }
 
     override suspend fun verifyUnlock(capsuleId: String): OperationResult<Availability> {

@@ -42,24 +42,17 @@ class S01SignInFragment : Fragment() {
         viewModel = ViewModelProvider(this, factory)[S01SignInViewModel::class.java]
 
         viewModel.signInState.observe(viewLifecycleOwner) { result ->
+            binding.btnSignIn.isEnabled = true
             when (result) {
                 is OperationResult.Success -> {
                     binding.tvStatusMessage.text = getString(R.string.msg_sign_in_success)
                     onSignInSuccessListener?.invoke(result.data)
                     viewModel.clearState()
                 }
-                is OperationResult.Invalid -> {
-                    binding.tvStatusMessage.text = result.message
-                }
-                is OperationResult.Denied -> {
-                    binding.tvStatusMessage.text = result.message
-                }
-                is OperationResult.Unavailable -> {
-                    binding.tvStatusMessage.text = result.message
-                }
-                is OperationResult.OutcomeUnknown -> {
-                    binding.tvStatusMessage.text = result.message
-                }
+                is OperationResult.Invalid -> binding.tvStatusMessage.text = result.message
+                is OperationResult.Denied -> binding.tvStatusMessage.text = result.message
+                is OperationResult.Unavailable -> binding.tvStatusMessage.text = result.message
+                is OperationResult.OutcomeUnknown -> binding.tvStatusMessage.text = result.message
                 null -> {}
             }
         }
@@ -67,6 +60,7 @@ class S01SignInFragment : Fragment() {
         binding.btnSignIn.setOnClickListener {
             val email = binding.etEmail.text.toString()
             val password = binding.etPassword.text.toString()
+            binding.btnSignIn.isEnabled = false
             binding.tvStatusMessage.text = getString(R.string.msg_signing_in)
             viewModel.signIn(email, password)
         }

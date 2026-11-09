@@ -155,3 +155,51 @@ Needed assistance in diagnosing the Android 17 (API 37) `ACCESS_LOCAL_NETWORK` l
   - The debugging process showed that successful builds do not guarantee working emulator connectivity. Checking the actual installed permissions and network logs was useful for identifying the cause.
   - The corrected test environment passed all 9 instrumentation tests. However, passing tests does not mean every Issue #10 requirement is complete.
   - Next, I will review the remaining account/session and profile-repair issues with the teammate, verify any corrections, and complete the PR review before merging. Once Issue #10 is merged and verified, the team can proceed with Issues #11 and #12 concurrently.
+
+---
+
+## Task: Issue #10 Final Critical Fixes Before Merge
+
+- **Task and purpose:** Completed final critical Issue #10 defects: restored authenticated session state on app restart, implemented recoverable profile creation and Profile Repair without duplicate Auth account creation, established exact recipient lookup with explicit confirmation boundary, fail-closed initialization for Debug/Release environments, disabled duplicate UI submissions during in-flight operations, and added unit test coverage.
+- **Session date(s):** 10 November 2026.
+- **Issue and PR:** Issue #10 (https://github.com/theguardianofthebed/Time-Capsule/issues/10), Draft PR #33 (https://github.com/theguardianofthebed/Time-Capsule/pull/33) on `feature/10-accounts-recipient`.
+- **Requirement/design references:** DD-03, DD-11, DD-19, DD-20, AC-01, AC-12, FR-01, FR-03.
+- **Agent environment:** Android Studio Agent Mode.
+- **Model used:** Gemini Flash 3.6 (Android Studio Agent Mode).
+
+### Purpose of agent use
+
+Needed assistance in implementing session restoration in `AccountSessionManager` and `MainActivity`, recoverable profile creation logic, recipient lookup and confirmation state, fail-closed Release/Debug initialization, duplicate UI submission prevention, and writing comprehensive unit tests (`SessionRestorationTest`, `ProfileRepairTest`, `RecipientConfirmationTest`, `StaleSessionCallbackTest`).
+
+### Key prompts
+
+- "Issue #10 — Final Critical Fixes Before Merge ... Fix only the critical remaining Issue #10 defects so the team can safely merge PR #33 ..."
+
+### What the agent changed and verified
+
+- **Changes:**
+  - `app/src/main/java/com/example/timecapsule/MainActivity.kt`: Called `restoreSessionIfAuthenticated()` on startup and applied Debug/Release fail-closed config checks.
+  - `app/src/main/java/com/example/timecapsule/data/AccountSessionManager.kt`: Added `restoreSessionIfAuthenticated()`, `lookupRecipient()`, `confirmRecipient()`, empty display name validation, and profile repair handling.
+  - `app/src/main/java/com/example/timecapsule/data/DefaultCapsuleRepository.kt`: Updated `lists(uid)` to return `OperationResult.Unavailable` instead of fake empty list success.
+  - `app/src/main/java/com/example/timecapsule/domain/model/RecipientProfile.kt`: Added `RecipientConfirmation` data class.
+  - `app/src/main/java/com/example/timecapsule/ui/s01/S01SignInFragment.kt` & `ui/s02/S02RegisterFragment.kt`: Disabled submit buttons while in-flight to prevent duplicate requests.
+  - `firestore.rules`: Updated `create, update` rules to enforce `displayName.size() > 0`.
+  - `app/src/test/java/com/example/timecapsule/`: Added unit tests `SessionRestorationTest`, `ProfileRepairTest`, `RecipientConfirmationTest`, `StaleSessionCallbackTest`.
+- **Checks and results:**
+  - `gradle_sync`: PASS
+  - `:app:assembleDebug`: PASS
+  - `:app:testDebugUnitTest`: PASS (41 unit tests passed)
+  - `:app:lintDebug`: PASS
+  - `:app:connectedDebugAndroidTest`: PASS (9 instrumentation tests passed on `emulator-5554` API 37)
+- **Remaining checks:**
+  - Full capsule publication, unlocking, and media storage (deferred to Issues #11, #12, #14).
+
+### Errors and manual fixes
+
+- Resolved minor compiler warnings for unused functions and lambda parameter positioning. All tests passed without manual code fixes.
+
+### My review and understanding
+
+- **What I reviewed:** [Awaiting student review]
+- **What I can explain:** [Awaiting student response]
+- **Feedback and next step:** [Awaiting student confirmation]

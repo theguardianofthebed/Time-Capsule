@@ -41,6 +41,7 @@ class S02RegisterFragment : Fragment() {
         viewModel = ViewModelProvider(this, factory)[S02RegisterViewModel::class.java]
 
         viewModel.registerState.observe(viewLifecycleOwner) { result ->
+            binding.btnRegister.isEnabled = true
             when (result) {
                 is OperationResult.Success -> {
                     binding.tvStatusMessage.text = getString(R.string.msg_account_created)
@@ -60,6 +61,7 @@ class S02RegisterFragment : Fragment() {
             val password = binding.etPassword.text.toString()
             val displayName = binding.etDisplayName.text.toString()
 
+            binding.btnRegister.isEnabled = false
             binding.tvStatusMessage.text = getString(R.string.msg_creating_account)
             viewModel.registerAndCreateProfile(email, password, displayName)
         }

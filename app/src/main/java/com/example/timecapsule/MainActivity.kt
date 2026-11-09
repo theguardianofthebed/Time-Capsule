@@ -3,7 +3,6 @@ package com.example.timecapsule
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
-import com.example.timecapsule.BuildConfig
 import com.example.timecapsule.config.FirebaseConfig
 import com.example.timecapsule.data.AccountSessionManager
 import com.example.timecapsule.data.DefaultCapsuleRepository
@@ -30,7 +29,7 @@ class MainActivity : AppCompatActivity() {
         private set
 
     /**
-     * Initializes dependency container, ViewBinding, and initial fragment screen.
+     * Initializes dependency container, ViewBinding, restored session state, and initial fragment screen.
      */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -39,11 +38,19 @@ class MainActivity : AppCompatActivity() {
 
         binding.tvMainTitle.text = getString(R.string.app_name)
 
-        // Connect debug emulator endpoints and initialize demo FirebaseApp if missing
-        val emulatorInitialized = FirebaseConfig.setupDebugEmulatorConnection(applicationContext, BuildConfig.DEBUG)
-        if (!emulatorInitialized) {
-            binding.tvMainSubtitle.text = "Firebase Initialization Failed (Fail-Closed)"
-            return
+        // Connect debug emulator endpoints in DEBUG builds; verify config availability in RELEASE builds
+        val isDebug = BuildConfig.DEBUG
+        if (isDebug) {
+            val emulatorInitialized = FirebaseConfig.setupDebugEmulatorConnection(applicationContext, true)
+            if (!emulatorInitialized) {
+                binding.tvMainSubtitle.text = "Firebase Initialization Failed (Fail-Closed)"
+                return
+            }
+        } else {
+            if (!FirebaseConfig.isFirebaseAvailable(applicationContext)) {
+                binding.tvMainSubtitle.text = "Firebase Configuration Missing (Fail-Closed)"
+                return
+            }
         }
 
         // Initialize lightweight dependency container and AccountSessionManager
@@ -76,7 +83,7 @@ class MainActivity : AppCompatActivity() {
         )
 
         if (savedInstanceState == null) {
-            val activeUid = container.authAdapter.activeUid()
+            val activeUid = container.accountSessionManager.restoreSessionIfAuthenticated()
             if (activeUid.isNullOrBlank()) {
                 navigateToSignIn()
             } else {
