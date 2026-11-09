@@ -18,23 +18,35 @@ if (hasValidReleaseConfig || hasValidDebugConfig) {
     apply(plugin = "com.google.gms.google-services")
 }
 
-// Validate Release configuration safety when any Release build task is scheduled.
-// Using taskGraph.whenReady ensures aggregate tasks (e.g. assemble, build) also enforce Release safety.
-gradle.taskGraph.whenReady {
-    val isReleaseTaskScheduled = allTasks.any { task ->
-        task.name.contains("Release", ignoreCase = true)
-    }
+// Configuration-cache-compatible Release configuration safety task.
+val validateReleaseGoogleServices = tasks.register("validateReleaseGoogleServices") {
+    val rootExists = file("google-services.json").exists()
+    val releaseExists = file("src/release/google-services.json").exists()
+    val debugExists = file("src/debug/google-services.json").exists()
+    val isValidRelease = rootExists || releaseExists
 
-    if (isReleaseTaskScheduled && !hasValidReleaseConfig) {
-        val causeMsg = if (hasDebugGoogleServices) {
-            "Debug-only configuration (app/src/debug/google-services.json) is not permitted for Release builds."
-        } else {
-            "No Release Firebase configuration found."
+    inputs.property("isValidRelease", isValidRelease)
+    inputs.property("debugExists", debugExists)
+
+    doLast {
+        if (!isValidRelease) {
+            val causeMsg = if (debugExists) {
+                "Debug-only configuration (app/src/debug/google-services.json) is not permitted for Release builds."
+            } else {
+                "No Release Firebase configuration found."
+            }
+            throw GradleException(
+                "Release build requires google-services.json in app/ or app/src/release/. $causeMsg " +
+                "Provide production Firebase configuration before building Release artifacts."
+            )
         }
-        throw GradleException(
-            "Release build requires google-services.json in app/ or app/src/release/. $causeMsg " +
-            "Provide production Firebase configuration before building Release artifacts."
-        )
+    }
+}
+
+// Attach validation to all Release tasks and tasks that trigger Release builds.
+tasks.configureEach {
+    if (name.contains("Release", ignoreCase = true) && name != "validateReleaseGoogleServices") {
+        dependsOn(validateReleaseGoogleServices)
     }
 }
 
