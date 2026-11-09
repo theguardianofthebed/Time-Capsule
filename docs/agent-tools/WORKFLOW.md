@@ -4,9 +4,11 @@ Use this procedure for one focused task. [AGENTS.md](../../AGENTS.md) defines th
 
 ## 1. Define the task
 
-Identify the acting student, Issue, intended result, scope, work period, dependencies, and verification plan. Link the relevant requirement, design, acceptance criteria, and test records from [CURRENT_CONTRACT.md](CURRENT_CONTRACT.md). Use the [Issue template](../../.github/ISSUE_TEMPLATE/implementation-task.md); documentation tasks may cite a course or team rule where application IDs do not apply.
+Explicitly identify the acting owner as User F/G/J. If not supplied, ask before changes or publication and continue read-only preparation. Never infer this from the publishing account. Start a task entry in the owner's ongoing [agent log](../agent-logs/README.md). Identify the Issue, intended result, scope, work period, dependencies, and verification plan. Link the relevant requirement, design, acceptance criteria, and test records from [CURRENT_CONTRACT.md](CURRENT_CONTRACT.md). Use the [Issue template](../../.github/ISSUE_TEMPLATE/implementation-task.md); documentation tasks may cite a course or team rule where application IDs do not apply.
 
 Read [IMPLEMENTATION_ORDER.md](IMPLEMENTATION_ORDER.md) and the Issue's `Blocked by` checklist. Verify each prerequisite's implementation PR is merged into the selected base with the relevant recorded checks, and record its PR/commit/evidence. A closed issue or unmerged PR does not establish readiness. Confirm the approved Views contract is present in the base, self-assign a ready issue, and choose a different human reviewer. If blocked, identify the exact gate; reading/review/planning may continue, but implementation waits for that gate or an explicitly recorded maintainer scope change.
+
+Complete all eight gates in [READINESS.md](READINESS.md) and retain the evidence plus validator output in the task handoff. Inspect current Issues, branches, open PRs, and handoffs before claiming work. Record owner, branch, PR, period, MVP/stretch scope, affected files/components, deliverable, dependencies, status, and remaining work in the Issue and handoff. Publish the claim before implementation, then re-read it to detect concurrent claims. This is cooperative coordination, not an atomic lock. If another task overlaps, pause that boundary until the owners explicitly agree to shared work or a transfer; independent tasks may continue.
 
 Check that the repository is `theguardianofthebed/Time-Capsule`. Read existing files and applicable instructions, then create a task branch using the real Issue number. Preserve unrelated local changes. Resolve a missing decision before editing the part that depends on it; continue independent work.
 
@@ -47,7 +49,7 @@ Record the command or manual procedure, commit, date, environment, expected/actu
 
 After the student accepts the diff, inspect the intended files for secrets, unrelated edits, misleading comments, and duplicated logic. Commit, push the task branch, and open or update its PR using the [PR template](../../.github/pull_request_template.md).
 
-Use ordinary GitHub tools through the member's authorized integration. Do not call another coding agent to create the implementation. The PR should explain the outcome, decisions, trace references, unfamiliar code, any refactor, actual checks, and remaining work. Link the student's real weekly entry.
+Use ordinary GitHub tools through the member's authorized integration. Do not call another coding agent to create the implementation. The PR should explain the outcome, decisions, trace references, unfamiliar code, any refactor, actual checks, and remaining work. Link the confirmed owner's ongoing entry and the weekly coursework entry if prepared. After opening the PR, add its actual URL to the ongoing log.
 
 Use `Closes #<issue-number>` for a completed Issue and `Refs #<issue-number>` for partial work. Keep review corrections in the same PR. An unrelated task gets a separate branch/PR; read-only work needs no empty PR.
 
@@ -61,15 +63,19 @@ Apply fixes on the same branch, update comments and logs, rerun affected checks,
 
 Review can rotate: User F focuses on product meaning and readability, User G on requirements/design links, and User J on runtime and integration risks. All three still implement, review, test, and understand the whole app.
 
-## 6. Record the session automatically
+## 6. Checkpoint and resume
 
-At the end of every implementation, review, refactoring, documentation, or configuration task, the agent prepares an update to the acting student's current weekly log without requiring a separate prompt. It records observed facts such as the model, purpose, key prompts, agent changes/checks, errors, Issue, and PR.
+Update the [handoff template](handoffs/TEMPLATE.md) before a session ends, before a context limit, and after an important verified milestone. Store it as `docs/agent-tools/handoffs/issue-N-owner-branch.md` in the task branch. Record the exact branch/base/head, changed and uncommitted files, completed work, remaining implementation, test gaps, failed commands, blockers, decisions, active ownership, PR, and the first next action. Never store credentials or private capsule data. A draft PR may preserve incomplete work, but must clearly identify what remains.
 
-Before writing manual fixes, personal review, understanding, or learning claims, the agent asks the student for those facts. It must not guess them. The agent then shows the completed log diff, and the student checks its accuracy before submission. If the student or week is unknown, ask before selecting a log file.
+On resume, read the handoff, current Issue/PR discussions, owner log, repository diff, and fresh contract guidance. Compare the recorded head to the actual branch. Re-run the readiness preflight against the new base and current active work; do not trust an old READY label. Preserve uncommitted work, reconcile conflicts without discarding either contributor's changes, and continue only within the recorded boundary. Transfer ownership explicitly, preserving both contributors' factual records.
 
-Each student uses their own folder under `docs/agent-logs/` and keeps `agent-log-w1.md` through `agent-log-w4.md`. Planned deadlines are 13, 20, and 27 November and 4 December 2026. Each student completes their own `docs/retrospectives/<student>/retrospective.md` from actual weekly evidence. A committed file is not automatically an individual course submission; follow the professor's actual submission channel.
+## 7. Record the session automatically
 
-Keep progress claims precise: a published PR can still await review; a merged PR can still lack acceptance evidence. Update Atlas implementation, acceptance, and test statuses separately, only when the relevant evidence supports them. End the session with the result, checks, remaining work, log location, real PR URL or blocker, and next human action.
+Before every handoff, update the owner's ongoing `docs/agent-logs/<student>/agent-log.md` using the [log guide](../agent-logs/README.md). Record observed changes/findings, their purpose, checks and limits, errors, remaining work, real Issue/PR references, and each delegated contribution. Do not wait for a separate request or claim unfinished work complete.
+
+Prepare factual input for the student's current weekly log separately. The individual filenames remain `agent-log-w1.md` through `agent-log-w4.md`, with planned deadlines 13, 20, and 27 November and 4 December 2026. Ask for the week if unknown. Human review, manual fixes, understanding, and reflection remain pending until the student supplies them. Show the log diff for accuracy review before submission. A commit does not submit coursework.
+
+End with what changed, evidence, remaining work, handoff/log links, real PR URL or blocker, and next human action. Keep implementation, merge, and acceptance statuses distinct. Atlas updates require separate authorization and evidence; this governance task leaves the live Atlas unchanged.
 
 ## References
 

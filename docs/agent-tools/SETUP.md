@@ -52,7 +52,7 @@ Review every generated change before accepting it. Ask the agent to explain anyt
 
 Give the agent an authorized GitHub connection so it can publish each task branch and PR. [MCP_SETUP.md](MCP_SETUP.md) describes the MCP option. Keep actual MCP credentials in your Android Studio settings directory. The committed [mcp.redacted.json](mcp.redacted.json) contains placeholders only.
 
-Use ordinary GitHub tools for repository, Issue, branch, and PR work. Do not use a tool that delegates project coding to another agent. GitHub access also does not grant access to Project Atlas; the full contract reference is available in the repository.
+Use ordinary GitHub tools for repository, Issue, branch, and PR work. Do not use a tool that delegates project coding to another agent. GitHub access also does not grant access to Project Atlas. The repository includes [revision 55 verification metadata](reference/timecapsule-contract-r55-verification.json) and the historical public r38 reference, not the complete current r55 text. Read current affected records through authorized MCP access or a privately supplied current snapshot. The correct TimeCapsule MCP at `atlastree.app` worked during the 10 November synchronization; every member still verifies their own access.
 
 Verify your own connection before relying on it. If PR publication fails, preserve the branch and prepared PR text, record the blocker, and finish publication when access is restored. A real PR URL confirms that the PR was opened.
 

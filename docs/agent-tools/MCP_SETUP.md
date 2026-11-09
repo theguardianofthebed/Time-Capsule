@@ -30,6 +30,10 @@ If MCP cannot publish, preserve the branch and complete PR description. Report t
 
 Keep tokens out of prompts, logs, screenshots, PRs, and repository files. If a token is exposed, its owner must revoke or rotate it; an ignore rule does not remove a committed secret from Git history.
 
+## Read the current contract
+
+The TimeCapsule MCP at `atlastree.app` was successfully read on 10 November 2026 at revision 55. Check your own identity/access and list accessible atlases before selecting `timecapsule`; do not substitute another atlas. Earlier migration/access failures are historical observations. The [r55 verification metadata](reference/timecapsule-contract-r55-verification.json) is not a full contract. If a later session lacks MCP access, obtain an authorized privately supplied current snapshot and report the access gap; the public r38 reference is historical. Reading the contract does not authorize editing the live Atlas.
+
 ## Record your setup
 
 In your own weekly log, record the IDE version/model, how you checked instruction and skill discovery, the GitHub connection used, the repository/branch checked, and the actual PR URL or access blocker. Do not claim another member's setup is working without checking it.
