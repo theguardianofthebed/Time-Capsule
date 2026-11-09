@@ -56,3 +56,13 @@ The coordinating agent observed PR #29 merged at 00:56 KST into main commit `c60
 ### Public snapshot publication limit
 
 Automatic approval review rejected uploading the full private Atlas r55 snapshot to the public repository without explicit public-disclosure consent. The full snapshot was retained privately. The public PR contains revision/count/hash verification metadata, existing public contract summaries and governance changes; it does not contain the full private payload. Publishing that full snapshot remains pending the requester’s explicit approval.
+
+## 2026-11-10-visual-design-alignment — Screenshot-aligned UI design review proposal
+
+- **Owner / period / scope:** User J; 10 November 2026 (KST); MVP design documentation preparation before Issue #12, not Android implementation.
+- **Environment/model:** ChatGPT GPT-6 via authorized GitHub connector and read-only TimeCapsule Atlas access. No Android source was coded using ChatGPT or another coding agent.
+- **PR:** [#32](https://github.com/theguardianofthebed/Time-Capsule/pull/32), open for review, not merged. Related Issues #12 and #22; Issue #12 implementation still depends on #10.
+- **Request:** Compare the 18 supplied October 14 PNG prototype screenshots to the current DESIGN.md, reconcile visual-document staleness with the smallest necessary edits, preserve section structure, and open a documentation-only PR.
+- **Work performed:** Updated only DESIGN.md §3's proposed colors, typography, native component guidance, screenshot coverage and prototype limitations, plus one explanatory note in CURRENT_CONTRACT.md. Checked actual current DD-01/DD-02/DD-07 text in the TimeCapsule Atlas at revision 55; **the live Atlas was not modified**. Original screenshot pixels, rather than unavailable TypeScript/CSS, support the proposed color values.
+- **Verification:** Checked main baseline `6ec6215786447882d9aca2e9e9c18d5d0fd8eda0`; inspected the two-file source diff and section headings; confirmed eight-screen/three-screen contracts are preserved and no application or Atlas files changed. Android build, device, backend and formal accessibility checks: NOT RUN (documentation-only). Exact original CSS variables, typography identity and team visual approval: PENDING.
+- **Handoff / human inputs:** Review of palette/typography/tab naming by User F and DD-01/DD-07 compatibility by User G is pending. User J's personal review, manual fixes, learning and weekly course submission are not claimed. Do not count this proposed documentation revision as a completed Atlas update.
