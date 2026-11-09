@@ -1,4 +1,8 @@
-# User J agent log week 1
+# Agent Log – Week 1 (MM/DD – MM/DD)
+
+- Name / Student ID:
+- Model(s) used:
+- My changes to the team's Agent Tools this week:
 
 The planned submission date is **13 November 2026**; follow any later professor announcement. Add one feature/task section for each piece of work. Describe your own contribution and use real prompts, results, and examples. If you did not use an agent this week, say so honestly.
 
@@ -13,13 +17,15 @@ Follow [the shared workflow](../../agent-tools/WORKFLOW.md) and [AGENTS.md](../.
 - **Agent environment:** Android Studio Agent Mode.
 - **Model used:** Gemini Flash 3.6 (Android Studio Agent Mode).
 
-### Purpose of agent use
+**Goal**
 
 Needed assistance in identifying the AppCompat theme incompatibility, applying the Material 3 theme fix, adding an instrumented regression test, running Gradle/Android test suites, and performing live emulator runtime verification.
 
-### Key prompts
+**Requests and prompts**
 
-- "TimeCapsule — Fix PR #27 AppCompat Theme Compatibility ... Change Theme.TimeCapsule parent to Theme.Material3.DayNight.NoActionBar ..."
+| # | Request summary | Actual prompt (key part) | Why it worked (or didn't) |
+|---|-----------------|--------------------------|---------------------------|
+| 1 |  | "TimeCapsule — Fix PR #27 AppCompat Theme Compatibility ... Change Theme.TimeCapsule parent to Theme.Material3.DayNight.NoActionBar ..." | |
 
 ### What the agent changed and verified
 
@@ -58,14 +64,16 @@ Needed assistance in identifying the AppCompat theme incompatibility, applying t
 - **Agent environment:** Android Studio Agent Mode.
 - **Model used:** Gemini Flash 3.6 (Android Studio Agent Mode).
 
-### Purpose of agent use
+**Goal**
 
 Needed assistance in pinning Firebase/Maps/DataStore dependencies, defining typed result boundaries (`OperationResult`), implementing session generation tracking (`DefaultSessionTracker`), creating adapter interfaces, configuring memory-only Firestore cache, setting up local Firebase emulator scaffolding with deny-all security baselines, and writing unit tests for repository seams, delayed operation stale callback rejection, memory cache settings, release build safety, and security rules baseline.
 
-### Key prompts
+**Requests and prompts**
 
-- "TimeCapsule — Issue #9: Shared Android/Firebase Foundation ... Complete the bounded foundation, verify it, present the changes to me..."
-- "TimeCapsule Issue #9 — Safely Resume Interrupted Work ... Continue from the verified recovery checkpoint. Preserve all existing work, complete only the remaining Issue #9 tests and minimal corrections..."
+| # | Request summary | Actual prompt (key part) | Why it worked (or didn't) |
+|---|-----------------|--------------------------|---------------------------|
+| 1 |  | "TimeCapsule — Issue #9: Shared Android/Firebase Foundation ... Complete the bounded foundation, verify it, present the changes to me..." | |
+| 2 |  | "TimeCapsule Issue #9 — Safely Resume Interrupted Work ... Continue from the verified recovery checkpoint. Preserve all existing work, complete only the remaining Issue #9 tests and minimal corrections..." | |
 
 ### What the agent changed and verified
 
