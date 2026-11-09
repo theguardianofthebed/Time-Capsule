@@ -1,7 +1,7 @@
 package com.example.timecapsule.data.adapter
 
-import android.content.Context
-import com.example.timecapsule.config.FirebaseConfig
+import com.example.timecapsule.domain.model.RecipientProfile
+import com.example.timecapsule.domain.result.OperationResult
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreSettings
 import com.google.firebase.firestore.MemoryCacheSettings
@@ -28,7 +28,7 @@ object FirestoreCachePolicy {
 }
 
 /**
- * Replaceable adapter boundary for Firestore remote capsule metadata operations.
+ * Replaceable adapter boundary for Firestore remote capsule and recipient metadata operations.
  */
 interface FirestoreAdapter {
     /** True if Firestore adapter is configured and ready. */
@@ -36,22 +36,10 @@ interface FirestoreAdapter {
 
     /** Returns the configured memory-only [FirebaseFirestore] instance or null if unavailable. */
     fun firestoreInstance(): FirebaseFirestore?
-}
 
-/**
- * Production implementation of [FirestoreAdapter] bound to [FirebaseConfig.getMemoryOnlyFirestore].
- * Enforces memory-only cache configuration before returning the Firestore SDK instance.
- */
-class DefaultFirestoreAdapter(
-    private val contextSupplier: () -> Context? = { null }
-) : FirestoreAdapter {
+    /** Performs exact recipient profile lookup in `recipientDirectory/{uid}`. */
+    suspend fun getRecipientProfile(uid: String): OperationResult<RecipientProfile>
 
-    override fun isAvailable(): Boolean {
-        val ctx = contextSupplier()
-        return ctx != null && FirebaseConfig.isFirebaseAvailable(ctx)
-    }
-
-    override fun firestoreInstance(): FirebaseFirestore? {
-        return FirebaseConfig.getMemoryOnlyFirestore(contextSupplier())
-    }
+    /** Creates or updates public recipient profile in `recipientDirectory/{uid}`. */
+    suspend fun saveRecipientProfile(profile: RecipientProfile): OperationResult<Unit>
 }

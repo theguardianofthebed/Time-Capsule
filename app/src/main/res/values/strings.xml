@@ -2,12 +2,34 @@
     <string name="app_name">TimeCapsule</string>
     <string name="title_main_skeleton">TimeCapsule Views Skeleton</string>
     <string name="subtitle_main_skeleton">S-01 to S-08 Screen Placeholders</string>
-    <string name="title_s01_sign_in">S-01: Sign In Placeholder</string>
-    <string name="title_s02_register">S-02: Register / Profile Repair Placeholder</string>
-    <string name="title_s03_capsule_list">S-03: Capsule List Placeholder</string>
-    <string name="title_s04_content_draft">S-04: Content Draft Placeholder</string>
-    <string name="title_s05_recipient_lock">S-05: Recipient &amp; Lock Selection Placeholder</string>
-    <string name="title_s06_confirm_send">S-06: Confirm Send &amp; Outcome Placeholder</string>
-    <string name="title_s07_capsule_detail">S-07: Capsule Detail Placeholder</string>
-    <string name="title_s08_account_settings">S-08: Account &amp; Settings Placeholder</string>
+    <string name="title_s01_sign_in">S-01: Sign In</string>
+    <string name="title_s02_register">S-02: Register &amp; Profile Repair</string>
+    <string name="title_s03_capsule_list">S-03: Capsule List</string>
+    <string name="title_s04_content_draft">S-04: Content Draft</string>
+    <string name="title_s05_recipient_lock">S-05: Recipient &amp; Lock Selection</string>
+    <string name="title_s06_confirm_send">S-06: Confirm Send</string>
+    <string name="title_s07_capsule_detail">S-07: Capsule Detail</string>
+    <string name="title_s08_account_settings">S-08: Account &amp; Settings</string>
+
+    <string name="hint_email">Email address</string>
+    <string name="hint_password">Password</string>
+    <string name="hint_display_name">Display Name</string>
+    <string name="hint_recipient_uid">Recipient Auth UID</string>
+    <string name="label_public_uid">My Public Auth UID:</string>
+
+    <string name="btn_sign_in">Sign In</string>
+    <string name="btn_register">Create Account</string>
+    <string name="btn_go_to_register">Don\'t have an account? Register</string>
+    <string name="btn_update_profile">Update Display Name</string>
+    <string name="btn_copy_uid">Copy Auth UID</string>
+    <string name="btn_sign_out">Sign Out</string>
+
+    <string name="msg_signing_in">Signing in…</string>
+    <string name="msg_sign_in_success">Sign in successful!</string>
+    <string name="msg_creating_account">Creating account…</string>
+    <string name="msg_account_created">Account &amp; profile created successfully!</string>
+    <string name="msg_profile_updated">Profile display name updated successfully!</string>
+    <string name="msg_signed_out">Signed out successfully.</string>
+    <string name="err_adapter_unavailable">Required service adapters unavailable.</string>
+    <string name="err_session_unavailable">Session unauthenticated or service unavailable.</string>
 </resources>
