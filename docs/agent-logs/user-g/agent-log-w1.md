@@ -104,7 +104,7 @@ I used the agent to remove obsolete Compose dependencies and files, configure AG
 
 - **Task and purpose:** Implement Firebase Auth, Firestore recipientDirectory matching rules, AccountSessionManager, and S-01, S-02, S-08 views/ViewModels for Issue #10.
 - **Session date(s):** 7–10 November 2026.
-- **Issue and PR:** [Issue #10](https://github.com/theguardianofthebed/Time-Capsule/issues/10); PR pending (Branch feature/10-accounts-recipient).
+- **Issue and PR:** [Issue #10](https://github.com/theguardianofthebed/Time-Capsule/issues/10); [PR #33](https://github.com/theguardianofthebed/Time-Capsule/pull/33) (Branch `feature/10-accounts-recipient`; still in review).
 - **Requirement/design references:** `FR-01`, `FR-03`, `DD-03`, `DD-19`, `DD-26`, `ARC-01`, `ARC-06`, `DD-18`.
 - **Agent environment:** Android Studio Agent Mode.
 - **Model used:** Gemini 3.6 Flash.
