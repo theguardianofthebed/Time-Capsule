@@ -88,74 +88,80 @@ Keep backend terms such as transactions, digests, and session generations in dev
 
 ### Visual identity
 
-DD-01 defines these shared values:
+The current **DD-01** record in the TimeCapsule Atlas (revision 55, inspected 10 November 2026) retains the original cream `#FBF9F5`, terracotta `#A95640`, sage `#F0F3E9`, ink `#343C37` and border `#E7E5DC` values, with Instrument Serif headings and DM Sans body text. The supplied October 14 prototype PNGs show a related but visibly softer, less saturated visual treatment. The following **screenshot-aligned values are a proposed visual revision for team review**, not an already-approved replacement of DD-01. These are frequent exact pixels sampled from rendered PNGs, not verified CSS variables; confirm the original TypeScript/CSS tokens before treating them as final design-system constants.
 
-| Token | Value | Use |
-|---|---|---|
-| Warm cream | `#FBF9F5` | Main background |
-| Terracotta | `#A95640` | Primary accent |
-| Sage | `#F0F3E9` | Supporting surfaces |
-| Dark ink | `#343C37` | Main text |
-| Pale border | `#E7E5DC` | Decorative separation |
-| Cards | White, rounded | Content groups |
-| Headings | Instrument Serif | Page and display headings |
-| Body | DM Sans | Text, controls, and supporting copy |
-| Touch targets | At least 48 × 48 dp | Interactive controls |
+| Role | Current DD-01 | Screenshot sample | Intended use |
+|---|---|---|---|
+| Main background | `#FBF9F5` | `#F9F8F4` | Warm off-white page background |
+| Primary accent | `#A95640` | `#865B4B` | Muted brown primary actions, active tabs and emphasis |
+| Main text | `#343C37` | `#3D3933` | Dark warm-neutral headings and body |
+| Card surface | White | `#FFFDF9` | Rounded content cards, inputs and sheets |
+| Muted surface | Sage `#F0F3E9` | `#ECE8DF` | Subtle selected segments, information panels and secondary surfaces |
+| Border | `#E7E5DC` | `#E8E3DA` | Quiet separators and card outlines, not the only meaningful control outline |
+| Opened state | No separate token | `#E6EBD9` | Soft green confirmed-opened indicator only |
+| Error background | No separate token | `#F7EAE4` | Gentle red-tinted field feedback together with explanatory text |
+
+The prototype also uses restrained thin-line icons, subtle pill filters, outlined input controls, generous whitespace, small tracked uppercase eyebrow labels, and a fixed bottom tab bar. Its bottom labels read **Moments / Create / Account**; the existing DD-01/DD-07 wording uses **Capsules / Create / Account**. "Moments" is a proposed display label for the same capsule-list destination, not a newly approved navigation change. Preserve the existing S-01–S-08 screen IDs and destinations.
+
+The PNG set visually documents S-03 Received/Sent, S-04 photo validation, S-05 recipient and Time/Place/Both variants, S-06 review/send outcome, S-07 sender/locked/opened details, and S-08 account/permissions. S-01/S-02 visual references are not included in this supplied set; do not invent their precise appearance. These screenshots were supplied in the project conversation and are **not bundled in this repository**. The source TypeScript/CSS is also not present in the checked-in `prototype/` directory, so exact font-family and spacing values require a separate source review.
 
 ### Proposed theme mapping
 
-Use one shared Material 3 theme for native Views, such as a compatible `Theme.Material3.Light.NoActionBar` theme. Prefer existing compatible components and preserve dependency pins unless a reviewed change requires an update. The [Material Components guide](https://github.com/material-components/material-components-android/blob/master/docs/getting-started.md) explains Views themes.
+Use the existing native Views Material 3-compatible theme (the current starter uses `Theme.Material3.DayNight.NoActionBar`) and map the screenshot-aligned tokens through shared Android color/style resources **after design approval**. Do not change dependencies or create a parallel UI framework. The [Material Components guide](https://github.com/material-components/material-components-android/blob/master/docs/getting-started.md) explains Views theming.
 
 | Role | Proposed mapping | Use |
 |---|---|---|
-| Primary / on-primary | Terracotta / white `#FFFFFF` | Main action buttons |
-| Background / on-background | Cream / ink | Main screen |
-| Surface / on-surface | White / ink | Cards, fields, sheets |
-| Supporting container / text | Sage / ink | Secondary groups |
-| Decorative divider | Pale border | Nonessential separation |
-| Input outline / focus | `#747C75` / terracotta | Visible field edges and focus |
-| Error | `#B3261E` with text/icon | Readable error feedback |
+| Primary / on-primary | Muted brown `#865B4B` / white `#FFFFFF` | Main action buttons and selected controls |
+| Background / on-background | Cream `#F9F8F4` / ink `#3D3933` | Main screens |
+| Surface / on-surface | `#FFFDF9` / ink `#3D3933` | Cards, fields and sheets |
+| Secondary container / text | `#ECE8DF` / ink `#3D3933` | Secondary information and selection surfaces |
+| Opened indicator | `#E6EBD9` with a readable dark label | Confirmed-opened state only |
+| Decorative divider | `#E8E3DA` | Nonessential borders and separators |
+| Input outline / focus | Readable neutral outline / muted brown | Visible field edges and keyboard focus; confirm final neutral outline on a device |
+| Error | `#F7EAE4` surface plus `#B3261E` proposed error text/icon | Inline explanation, never color-only feedback |
 
-The outline and error colors are proposals, not confirmed DD-01 tokens. Review the mapping against the app's resources. Keep the shared palette consistent; dynamic color or dark mode needs a complete reviewed theme rather than an automatic override.
-
-Calculated contrast is approximately 10.81:1 for ink on cream, 11.37:1 for ink on white, 10.12:1 for ink on sage, and 5.13:1 for white on terracotta. Pale border on white is only about 1.26:1, so use stronger outlines for meaningful controls. Check actual disabled states, opacity, overlays, and text rendering on a device.
+Contrast from the sampled swatches is approximately 10.79:1 for ink on cream, 11.29:1 for ink on the card surface, 9.38:1 for ink on the muted surface, and 5.81:1 for white on muted brown. The pale border on the card surface is about 1.26:1 and **cannot be the sole indicator** for a required input or selected control. Check disabled states, opacity, focus outlines and actual device rendering. The screenshots show a light visual treatment only; a corresponding dark theme is not approved merely because the current theme parent supports DayNight.
 
 ### Proposed typography and spacing
 
-Keep the confirmed font families and use shared text styles and dimensions. The [Views typography guide](https://github.com/material-components/material-components-android/blob/master/docs/theming/Typography.md) explains reusable theme attributes.
+DD-01 currently assigns **Instrument Serif to headings** and **DM Sans to body text**. The screenshot rendering appears primarily sans-serif for ordinary page headings and uses more expressive italic lettering for sentimental sign-offs. The PNGs do not prove the exact font names. **Proposed adjustment for team review:** use a clean sans-serif display hierarchy for functional headings and reserve serif/italic accents for decorative letter content, subject to verifying the original CSS/fonts. Do not represent this suggested adjustment as an approved font-family change until DD-01 is reconciled.
 
-| Use | Family | Proposed size / line height |
+| Use | Proposed treatment | Proposed size / line height |
 |---|---|---|
-| Page heading | Instrument Serif | 28 sp / 34 sp |
+| Page heading | Clear, warm dark sans-serif display; exact font pending source check | 28 sp / 34 sp |
 | Section heading | DM Sans, medium | 20 sp / 28 sp |
 | Card title | DM Sans, medium | 18 sp / 24 sp |
 | Body / field input | DM Sans | 16 sp / 24 sp |
 | Button / key label | DM Sans, medium | 14 sp / 20 sp |
 | Supporting text / status | DM Sans | 14 sp / 20 sp |
-| Small noncritical caption | DM Sans | 12 sp / 16 sp |
+| Eyebrow / small noncritical caption | Uppercase or tracked DM Sans where appropriate | 12 sp / 16 sp |
+| Decorative letter sign-off | Italic serif accent only when appropriate, not a functional label | Reviewed per component |
 
-Allow wrapping and system text scaling. Provide a font fallback for unsupported characters, including Korean, and record bundled font sources/licenses in the implementing PR. Never shrink an important error or action to fit a fixed box.
+Allow wrapping and system text scaling. Provide a Korean fallback and record bundled font sources/licenses in the implementing PR. Never shrink important errors or actions to fit a fixed box.
 
-Use a proposed 4 dp spacing base: 8 dp between related controls, 16 dp for page/card padding, and 24 dp between sections. Cards use a proposed 16 dp corner radius. Keep touch targets at least 48 × 48 dp and allow content to scroll.
+Retain the proposed 4 dp spacing base, with 8 dp between related controls, 16 dp for page/card padding and 24 dp between sections. Cards may use a proposed 16 dp corner radius; match screenshot proportions after checking on Android. Keep touch targets at least 48 × 48 dp and scroll content under the keyboard and system insets.
 
 ### Proposed native components
 
 | Purpose | Views component | Interaction |
 |---|---|---|
-| Main navigation | BottomNavigationView or existing equivalent | Capsules / Create / Account, with labels |
-| Received / Sent | TabLayout or existing labeled tabs | Separate lists; one ID for a self-send |
-| Capsule card | MaterialCardView | Safe metadata and readable state |
-| Text fields | TextInputLayout + appropriate EditText | Persistent labels, correct input type, inline errors |
-| Actions | MaterialButton styles | One primary action per step; prevent duplicate work |
-| Me/Other, Time/Location/Both | Labeled radio group or compatible segmented control | Clear single selection |
-| Date and time | Compatible native/Material picker | Show zone/offset; server requires an unlock time strictly later than its request time |
-| Map target | Google Maps native view/fragment | Explicit pin confirmation; separate current-position action |
-| Creation progress | Labeled step indicator | Announce the step; enforce validation |
-| Busy state | Progress indicator + text | Explain what is happening |
-| Permission/recovery | Inline explanation; dialog when needed | Relevant Retry/Settings action |
+| Main navigation | BottomNavigationView or existing equivalent | Capsule list / Create / Account; screenshot label "Moments" pending approval |
+| Received / Sent | TabLayout or existing labeled tabs | Active underline, separate lists; one ID for a self-send |
+| Capsule card | MaterialCardView | Warm card surface, subtle border, readable lock/status and safe metadata |
+| Status chip | Text/icon in an accessible labeled container | "Sealed" and "Opened" are display copy, not proof of remote authorization |
+| Text fields | TextInputLayout + appropriate EditText | Persistent labels, outlined surface, exact-code error and confirmation states |
+| Actions | MaterialButton styles | Muted-brown primary action, outlined secondary action; prevent duplicate work |
+| Me/Other, Time/Location/Both | Labeled radio group or compatible segmented control | Clear selected state; maintain explicit UID confirmation |
+| Date and time | Compatible native/Material picker | Show zone/offset; server requires unlock time strictly later than request time |
+| Map target | Google Maps native view/fragment | Replace prototype's mock map; explicit target confirmation and current-position action |
+| Creation progress | Three-position labeled step indicator | S-04 Content → S-05 Recipient and locks → S-06 Review; four logical checks remain inside these screens |
+| Busy state | Progress indicator + text | Show the actual operation and disable duplicate actions |
+| Permission/recovery | Inline explanation; dialog when needed | Relevant Retry/Settings; outcome unknown stays unknown |
 | Notification | Generic local notification | No message/photo preview; check access on entry |
 
-Use compatible existing components instead of adding a custom widget for each ordinary control.
+Keep S-04 photo-only/text-only validation, title-visible-while-locked disclosure, S-05 exact UID and current-condition semantics, and S-06 frozen-send and reconciliation behavior unchanged. The PNGs' mock map, example UIDs such as `TC-JAMIE1`, sample timestamps, simulated send/unlock text and demo permission toggles **are reference visuals only**, not actual accounts, Firebase UID formats, map implementations or acceptance tests. For S-05 the screenshot's "Found Jamie" presentation alone does not replace the required explicit recipient confirmation. For S-06 a simulated success must never appear as a real backend-acknowledged send.
+
+Use compatible existing components instead of adding a custom widget for each ordinary control. The screenshot-aligned tokens, font assignment and "Moments" label require design review and later DD-01/DD-07 reconciliation; the existing behavior, eight screens, three creation screens and implementation gates do not change in this documentation proposal.
 
 ## 4. Data and access rules for screens
 

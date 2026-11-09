@@ -8,6 +8,8 @@ The TimeCapsule MCP at `atlastree.app` was read successfully on **10 November 20
 
 Apply the confirmed [7 November Views/screen update](UI_VIEWS_UPDATE_2026-11-07.md) alongside the capture: **Views/XML + ViewBinding**, exactly **S-01–S-08**, recipient and lock choices together in S-05, and **AGP 9.3.0**. The later approved starter toolchain and application identity take precedence over the older DD-11/DD-20/T-45 values retained in the Atlas. #25 and PR #29's bounded #9 foundation are merged on `main`; #9 verification readiness remains pending. Follow [the implementation order](IMPLEMENTATION_ORDER.md) before feature work.
 
+**Visual proposal pending review:** [DESIGN.md §3](../../DESIGN.md) compares the October 14 prototype screenshots with the still-current DD-01 palette, typography and navigation wording. Screenshot-derived swatches and the proposed "Moments" tab label are **not yet an approved Atlas contract revision**; the actual TypeScript/CSS tokens are unavailable in the repository. Preserve the r55 DD-01/DD-07 text and the confirmed S-01–S-08, S-04 → S-05 → S-06 flow until the team reviews and authorizes any visual contract changes. No implementation or acceptance status changes follow from this design-document PR.
+
 ### Implementation evidence, separate from specification
 
 Final inspected baseline: `main` at `c60d866cdc9794af97db129c946b66711270f6b9`. PR #29 merged externally at **00:56:26 KST on 10 November 2026**, during this audit. The earlier observation at `59f3a0b` preceded that merge. This is a dated observation, not a permanent readiness certificate.
