@@ -88,37 +88,37 @@ Keep backend terms such as transactions, digests, and session generations in dev
 
 ### Visual identity
 
-The current **DD-01** record in the TimeCapsule Atlas (revision 55, inspected 10 November 2026) retains the original cream \`#FBF9F5\`, terracotta \`#A95640\`, sage \`#F0F3E9\`, ink \`#343C37\` and border \`#E7E5DC\` values, with Instrument Serif headings and DM Sans body text. The supplied October 14 prototype PNGs show a related but visibly softer, less saturated visual treatment. The following **screenshot-aligned values are a proposed visual revision for team review**, not an already-approved replacement of DD-01. These are frequent exact pixels sampled from rendered PNGs, not verified CSS variables; confirm the original TypeScript/CSS tokens before treating them as final design-system constants.
+The current **DD-01** record in the TimeCapsule Atlas (revision 55, inspected 10 November 2026) retains the original cream `#FBF9F5`, terracotta `#A95640`, sage `#F0F3E9`, ink `#343C37` and border `#E7E5DC` values, with Instrument Serif headings and DM Sans body text. The supplied October 14 prototype PNGs show a related but visibly softer, less saturated visual treatment. The following **screenshot-aligned values are a proposed visual revision for team review**, not an already-approved replacement of DD-01. These are frequent exact pixels sampled from rendered PNGs, not verified CSS variables; confirm the original TypeScript/CSS tokens before treating them as final design-system constants.
 
 | Role | Current DD-01 | Screenshot sample | Intended use |
 |---|---|---|---|
-| Main background | \`#FBF9F5\` | \`#F9F8F4\` | Warm off-white page background |
-| Primary accent | \`#A95640\` | \`#865B4B\` | Muted brown primary actions, active tabs and emphasis |
-| Main text | \`#343C37\` | \`#3D3933\` | Dark warm-neutral headings and body |
-| Card surface | White | \`#FFFDF9\` | Rounded content cards, inputs and sheets |
-| Muted surface | Sage \`#F0F3E9\` | \`#ECE8DF\` | Subtle selected segments, information panels and secondary surfaces |
-| Border | \`#E7E5DC\` | \`#E8E3DA\` | Quiet separators and card outlines, not the only meaningful control outline |
-| Opened state | No separate token | \`#E6EBD9\` | Soft green confirmed-opened indicator only |
-| Error background | No separate token | \`#F7EAE4\` | Gentle red-tinted field feedback together with explanatory text |
+| Main background | `#FBF9F5` | `#F9F8F4` | Warm off-white page background |
+| Primary accent | `#A95640` | `#865B4B` | Muted brown primary actions, active tabs and emphasis |
+| Main text | `#343C37` | `#3D3933` | Dark warm-neutral headings and body |
+| Card surface | White | `#FFFDF9` | Rounded content cards, inputs and sheets |
+| Muted surface | Sage `#F0F3E9` | `#ECE8DF` | Subtle selected segments, information panels and secondary surfaces |
+| Border | `#E7E5DC` | `#E8E3DA` | Quiet separators and card outlines, not the only meaningful control outline |
+| Opened state | No separate token | `#E6EBD9` | Soft green confirmed-opened indicator only |
+| Error background | No separate token | `#F7EAE4` | Gentle red-tinted field feedback together with explanatory text |
 
 The prototype also uses restrained thin-line icons, subtle pill filters, outlined input controls, generous whitespace, small tracked uppercase eyebrow labels, and a fixed bottom tab bar. Its bottom labels read **Moments / Create / Account**; the existing DD-01/DD-07 wording uses **Capsules / Create / Account**. "Moments" is a proposed display label for the same capsule-list destination, not a newly approved navigation change. Preserve the existing S-01–S-08 screen IDs and destinations.
 
-The PNG set visually documents S-03 Received/Sent, S-04 photo validation, S-05 recipient and Time/Place/Both variants, S-06 review/send outcome, S-07 sender/locked/opened details, and S-08 account/permissions. S-01/S-02 visual references are not included in this supplied set; do not invent their precise appearance. These screenshots were supplied in the project conversation and are **not bundled in this repository**. The source TypeScript/CSS is also not present in the checked-in \`prototype/\` directory, so exact font-family and spacing values require a separate source review.
+The PNG set visually documents S-03 Received/Sent, S-04 photo validation, S-05 recipient and Time/Place/Both variants, S-06 review/send outcome, S-07 sender/locked/opened details, and S-08 account/permissions. S-01/S-02 visual references are not included in this supplied set; do not invent their precise appearance. These screenshots were supplied in the project conversation and are **not bundled in this repository**. The source TypeScript/CSS is also not present in the checked-in `prototype/` directory, so exact font-family and spacing values require a separate source review.
 
 ### Proposed theme mapping
 
-Use the existing native Views Material 3-compatible theme (the current starter uses \`Theme.Material3.DayNight.NoActionBar\`) and map the screenshot-aligned tokens through shared Android color/style resources **after design approval**. Do not change dependencies or create a parallel UI framework. The [Material Components guide](https://github.com/material-components/material-components-android/blob/master/docs/getting-started.md) explains Views theming.
+Use the existing native Views Material 3-compatible theme (the current starter uses `Theme.Material3.DayNight.NoActionBar`) and map the screenshot-aligned tokens through shared Android color/style resources **after design approval**. Do not change dependencies or create a parallel UI framework. The [Material Components guide](https://github.com/material-components/material-components-android/blob/master/docs/getting-started.md) explains Views theming.
 
 | Role | Proposed mapping | Use |
 |---|---|---|
-| Primary / on-primary | Muted brown \`#865B4B\` / white \`#FFFFFF\` | Main action buttons and selected controls |
-| Background / on-background | Cream \`#F9F8F4\` / ink \`#3D3933\` | Main screens |
-| Surface / on-surface | \`#FFFDF9\` / ink \`#3D3933\` | Cards, fields and sheets |
-| Secondary container / text | \`#ECE8DF\` / ink \`#3D3933\` | Secondary information and selection surfaces |
-| Opened indicator | \`#E6EBD9\` with a readable dark label | Confirmed-opened state only |
-| Decorative divider | \`#E8E3DA\` | Nonessential borders and separators |
+| Primary / on-primary | Muted brown `#865B4B` / white `#FFFFFF` | Main action buttons and selected controls |
+| Background / on-background | Cream `#F9F8F4` / ink `#3D3933` | Main screens |
+| Surface / on-surface | `#FFFDF9` / ink `#3D3933` | Cards, fields and sheets |
+| Secondary container / text | `#ECE8DF` / ink `#3D3933` | Secondary information and selection surfaces |
+| Opened indicator | `#E6EBD9` with a readable dark label | Confirmed-opened state only |
+| Decorative divider | `#E8E3DA` | Nonessential borders and separators |
 | Input outline / focus | Readable neutral outline / muted brown | Visible field edges and keyboard focus; confirm final neutral outline on a device |
-| Error | \`#F7EAE4\` surface plus \`#B3261E\` proposed error text/icon | Inline explanation, never color-only feedback |
+| Error | `#F7EAE4` surface plus `#B3261E` proposed error text/icon | Inline explanation, never color-only feedback |
 
 Contrast from the sampled swatches is approximately 10.79:1 for ink on cream, 11.29:1 for ink on the card surface, 9.38:1 for ink on the muted surface, and 5.81:1 for white on muted brown. The pale border on the card surface is about 1.26:1 and **cannot be the sole indicator** for a required input or selected control. Check disabled states, opacity, focus outlines and actual device rendering. The screenshots show a light visual treatment only; a corresponding dark theme is not approved merely because the current theme parent supports DayNight.
 
@@ -159,7 +159,7 @@ Retain the proposed 4 dp spacing base, with 8 dp between related controls, 16 dp
 | Permission/recovery | Inline explanation; dialog when needed | Relevant Retry/Settings; outcome unknown stays unknown |
 | Notification | Generic local notification | No message/photo preview; check access on entry |
 
-Keep S-04 photo-only/text-only validation, title-visible-while-locked disclosure, S-05 exact UID and current-condition semantics, and S-06 frozen-send and reconciliation behavior unchanged. The PNGs' mock map, example UIDs such as \`TC-JAMIE1\`, sample timestamps, simulated send/unlock text and demo permission toggles **are reference visuals only**, not actual accounts, Firebase UID formats, map implementations or acceptance tests. For S-05 the screenshot's "Found Jamie" presentation alone does not replace the required explicit recipient confirmation. For S-06 a simulated success must never appear as a real backend-acknowledged send.
+Keep S-04 photo-only/text-only validation, title-visible-while-locked disclosure, S-05 exact UID and current-condition semantics, and S-06 frozen-send and reconciliation behavior unchanged. The PNGs' mock map, example UIDs such as `TC-JAMIE1`, sample timestamps, simulated send/unlock text and demo permission toggles **are reference visuals only**, not actual accounts, Firebase UID formats, map implementations or acceptance tests. For S-05 the screenshot's "Found Jamie" presentation alone does not replace the required explicit recipient confirmation. For S-06 a simulated success must never appear as a real backend-acknowledged send.
 
 Use compatible existing components instead of adding a custom widget for each ordinary control. The screenshot-aligned tokens, font assignment and "Moments" label require design review and later DD-01/DD-07 reconciliation; the existing behavior, eight screens, three creation screens and implementation gates do not change in this documentation proposal.
 
