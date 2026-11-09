@@ -46,13 +46,6 @@ class MemoryCacheConfigTest {
     fun getMemoryOnlyFirestoreFailsSafelyWhenUninitialized() {
         FirebaseConfig.resetEmulatorModeForTesting()
         val instance = FirebaseConfig.getMemoryOnlyFirestore(context = null)
-
-        // Without initialized FirebaseApp in pure unit test, instance creation fails safely or returns null.
-        if (instance != null) {
-            assertTrue(
-                "Memory-only cache settings must be applied before first use",
-                instance.firestoreSettings.cacheSettings is MemoryCacheSettings
-            )
-        }
+        assertNull("getMemoryOnlyFirestore must return null safely when Firebase context is null", instance)
     }
 }

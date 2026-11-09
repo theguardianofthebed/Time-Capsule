@@ -4,8 +4,6 @@ plugins {
 }
 
 // Apply google-services plugin conditionally.
-// Debug foundation builds succeed without google-services.json for credential-free local development.
-// Apply google-services plugin conditionally.
 // Debug builds allow credential-free local development when no google-services.json is provided.
 // Release builds strictly require root (app/google-services.json) or Release (app/src/release/google-services.json) config.
 // Debug-only configuration (app/src/debug/google-services.json) does NOT qualify for Release builds.
@@ -13,17 +11,21 @@ val hasRootGoogleServices = file("google-services.json").exists()
 val hasDebugGoogleServices = file("src/debug/google-services.json").exists()
 val hasReleaseGoogleServices = file("src/release/google-services.json").exists()
 
-val isReleaseBuildRequested = gradle.startParameter.taskNames.any { name ->
-    name.contains("Release", ignoreCase = true)
-}
-
 val hasValidReleaseConfig = hasRootGoogleServices || hasReleaseGoogleServices
 val hasValidDebugConfig = hasRootGoogleServices || hasDebugGoogleServices
 
-if (isReleaseBuildRequested) {
-    if (hasValidReleaseConfig) {
-        apply(plugin = "com.google.gms.google-services")
-    } else {
+if (hasValidReleaseConfig || hasValidDebugConfig) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
+// Validate Release configuration safety when any Release build task is scheduled.
+// Using taskGraph.whenReady ensures aggregate tasks (e.g. assemble, build) also enforce Release safety.
+gradle.taskGraph.whenReady {
+    val isReleaseTaskScheduled = allTasks.any { task ->
+        task.name.contains("Release", ignoreCase = true)
+    }
+
+    if (isReleaseTaskScheduled && !hasValidReleaseConfig) {
         val causeMsg = if (hasDebugGoogleServices) {
             "Debug-only configuration (app/src/debug/google-services.json) is not permitted for Release builds."
         } else {
@@ -34,8 +36,6 @@ if (isReleaseBuildRequested) {
             "Provide production Firebase configuration before building Release artifacts."
         )
     }
-} else if (hasValidDebugConfig) {
-    apply(plugin = "com.google.gms.google-services")
 }
 
 android {
