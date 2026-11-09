@@ -30,3 +30,9 @@ Read [AGENTS.md](../../../AGENTS.md), [CURRENT_CONTRACT.md](../../../docs/agent-
 ## Handoff question
 
 Ask the student to explain: “Where did this responsibility live before, where does it live now, and what observation supports the claim that the intended behavior is unchanged?” Record their own answer or learning gap, not an invented achievement.
+
+## Ownership, dependencies, and recovery
+
+Read [READINESS.md](../../../docs/agent-tools/READINESS.md). Use the explicitly confirmed User F/G/J owner; ask if absent and continue only read-only preparation until identified. Before implementation or refactoring, inspect current Issues, branches, PRs, and handoffs, complete all eight readiness gates, and run the validator with fresh evidence. A closed Issue, unmerged PR, or isolated spike cannot satisfy a predecessor. If any gate is missing or fails, report BLOCKED and limit work to planning/review. Do not bypass a dependency by narrowing a slice without an approved dependency change.
+
+Keep the existing owner and boundaries on resume. Re-read current discussions and compare actual branch/base/head/diff to the handoff, then rerun readiness. Record approved sharing/transfers before overlapping work. Update the owner's ongoing [agent log](../../../docs/agent-logs/README.md) and [handoff](../../../docs/agent-tools/handoffs/TEMPLATE.md) before interruption or completion, including delegated contributions, unfinished implementation, test gaps, and the first next action. Weekly coursework and personal learning remain separate; never invent human confirmation. An agent review is not a human PR approval.

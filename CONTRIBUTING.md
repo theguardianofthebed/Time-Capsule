@@ -10,9 +10,9 @@ Follow this sequence:
 
 Create or identify the Issue before implementation. Use the [task template](.github/ISSUE_TEMPLATE/implementation-task.md) to record the goal, scope, owner, work period, dependencies, relevant requirement/design/test references, and verification plan. Documentation tasks can cite a course or team rule instead of an application requirement.
 
-Before implementing, follow [the required issue order](docs/agent-tools/IMPLEMENTATION_ORDER.md). Self-assign a ready issue and record User F/G/J, work period, and a different human reviewer. Each `Blocked by` issue must have its implementation merged into your selected base with relevant verification evidence; a closed issue or unmerged PR is insufficient. Read/review/planning can continue while blocked.
+Explicitly identify the task owner as User F/G/J; do not infer it from a GitHub account. Record the task in that owner's ongoing [agent log](docs/agent-logs/README.md). Before implementing, complete [READINESS.md](docs/agent-tools/READINESS.md) and inspect existing claims, branches, PRs, and handoffs for overlap. Follow [the required issue order](docs/agent-tools/IMPLEMENTATION_ORDER.md). Self-assign a ready issue and record User F/G/J, work period, and a different human reviewer. Each `Blocked by` issue must have its implementation merged into your selected base with relevant verification evidence; a closed issue or unmerged PR is insufficient. Read/review/planning can continue while blocked.
 
-Read the relevant [project sources](docs/agent-tools/SOURCE_REGISTER.md) and existing files before editing. Preserve teammates' work. Agree on any missing product or architecture decision before implementing the affected part. The [repository guide](docs/agent-tools/REPOSITORY_STATUS.md) explains the application structure and the Views/Compose discrepancy.
+Read the relevant [project sources](docs/agent-tools/SOURCE_REGISTER.md) and existing files before editing. Preserve teammates' work. Agree on any missing product or architecture decision before implementing the affected part. The [repository guide](docs/agent-tools/REPOSITORY_STATUS.md) explains the application structure and the approved Views/XML + ViewBinding structure.
 
 ## Branches and commits
 
@@ -69,4 +69,4 @@ Run checks that can reveal problems in the changed behavior. Use the checked-in 
 
 Apply fixes on the same branch, rerun affected checks, and obtain review of the updated diff. Keep the PR in draft when a required decision or check is incomplete. A human merges after review, verification, and conflict resolution. Agents must not self-approve, merge, or enable automatic merging.
 
-Each student records their own work in the weekly log and writes their own retrospective. See [course requirements](docs/agent-tools/COURSE_COMPLIANCE.md) for filenames and deadlines.
+Before each handoff, update the owner’s ongoing agent log and the [resumable handoff](docs/agent-tools/handoffs/TEMPLATE.md), including unfinished implementation and tests. Each student separately records their own work in the weekly log and writes their own retrospective. See [course requirements](docs/agent-tools/COURSE_COMPLIANCE.md) for filenames and deadlines.

@@ -1,0 +1,45 @@
+{
+  "issue": 10,
+  "checked_at": "REPLACE_WITH_CURRENT_ISO_UTC_TIME",
+  "selected_base": "REPLACE_WITH_FULL_COMMIT_SHA",
+  "owner": "User J",
+  "owner_confirmation": "REPLACE_WITH_EXPLICIT_TASK_CONFIRMATION",
+  "branch": "feature/10-accounts",
+  "period": "REPLACE_WITH_AGREED_PERIOD",
+  "scope": "MVP",
+  "reviewer": "User G",
+  "components": ["app/src/main/java/com/example/timecapsule/auth"],
+  "deliverable": "REPLACE_WITH_BOUNDED_DELIVERABLE",
+  "contract_approval": "REPLACE_WITH_RECORD_REVISION_AND_APPROVAL_REFERENCE",
+  "blocking_failures": [],
+  "inventory": {
+    "issues": "REPLACE_WITH_INSPECTED_ISSUE_REFERENCES",
+    "branches": "REPLACE_WITH_INSPECTED_BRANCH_REFERENCES",
+    "prs": "REPLACE_WITH_INSPECTED_PR_REFERENCES",
+    "handoffs": "REPLACE_WITH_INSPECTED_HANDOFF_REFERENCES_OR_OBSERVED_NONE",
+    "compatible": false,
+    "compatibility_evidence": "REPLACE_WITH_INTERFACE_AND_FILE_COMPARISON",
+    "active_claims": []
+  },
+  "dependencies": [
+    {
+      "issue": 9,
+      "pr": "https://github.com/theguardianofthebed/Time-Capsule/pull/29",
+      "merged": false,
+      "merge_commit": "REPLACE_ONLY_AFTER_MERGE",
+      "implementation_inspection": "REPLACE_WITH_CURRENT_BASE_BEHAVIOR_INSPECTION_AND_REVERT_CHECK",
+      "paths": ["REPLACE_WITH_IMPLEMENTATION_PATH_IN_SELECTED_BASE"],
+      "checks": [
+        {
+          "result": "NOT RUN",
+          "procedure": "REPLACE_WITH_RELEVANT_CHECK",
+          "expected_actual": "REPLACE_WITH_OBSERVED_RESULTS",
+          "commit": "REPLACE_WITH_FULL_TESTED_COMMIT_SHA",
+          "environment": "REPLACE_WITH_ENVIRONMENT_AND_DATE",
+          "evidence": "REPLACE_WITH_RECORDED_EVIDENCE"
+        }
+      ],
+      "blocking_failures": []
+    }
+  ]
+}

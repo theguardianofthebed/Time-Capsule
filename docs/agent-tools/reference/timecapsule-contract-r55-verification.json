@@ -1,0 +1,17 @@
+{
+  "artifactPurpose": "Public revision-verification record. Full r55 snapshot retained privately pending explicit public-disclosure approval. Not an Atlas import.",
+  "atlasId": "timecapsule",
+  "revision": 55,
+  "instructionsVersion": 3,
+  "capturedDate": "2026-11-10 Asia/Seoul",
+  "counts": {
+    "elements": 112,
+    "relationships": 378,
+    "sources": 9
+  },
+  "previousPublicReference": "timecapsule-contract-r38.json",
+  "relationshipComparison": "All378 IDs/endpoints/types identical to public r38 reference.",
+  "privateSnapshotSha256": "aa19139f706adcb4d9a3fa6ebc35ec89156291c8a9d3b7eb1eb5f46abe52f4c7",
+  "implementationReference": "c60d866cdc9794af97db129c946b66711270f6b9",
+  "statusBoundary": "Atlas contract statuses are separate from GitHub implementation evidence."
+}

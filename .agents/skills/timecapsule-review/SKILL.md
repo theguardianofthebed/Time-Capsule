@@ -19,3 +19,9 @@ Read [AGENTS.md](../../../AGENTS.md), [CURRENT_CONTRACT.md](../../../docs/agent-
 Keep this review read-only unless fixes are requested. If authorized to fix, use the same task branch/PR when appropriate and repeat affected verification. The agent's assessment is advisory: a teammate performs the actual human review, approval, and acceptance. Never post a human approval, self-approve the author's work, or merge on the student's behalf.
 
 Output: reviewed revisions/scope, findings, evidence and limitations, explanation questions, and the next human action. Do not equate “no issue found” with a guaranteed correct program.
+
+## Ownership, dependencies, and recovery
+
+Read [READINESS.md](../../../docs/agent-tools/READINESS.md). Use the explicitly confirmed User F/G/J owner; ask if absent and continue only read-only preparation until identified. Before implementation or refactoring, inspect current Issues, branches, PRs, and handoffs, complete all eight readiness gates, and run the validator with fresh evidence. A closed Issue, unmerged PR, or isolated spike cannot satisfy a predecessor. If any gate is missing or fails, report BLOCKED and limit work to planning/review. Do not bypass a dependency by narrowing a slice without an approved dependency change.
+
+Keep the existing owner and boundaries on resume. Re-read current discussions and compare actual branch/base/head/diff to the handoff, then rerun readiness. Record approved sharing/transfers before overlapping work. Update the owner's ongoing [agent log](../../../docs/agent-logs/README.md) and [handoff](../../../docs/agent-tools/handoffs/TEMPLATE.md) before interruption or completion, including delegated contributions, unfinished implementation, test gaps, and the first next action. Weekly coursework and personal learning remain separate; never invent human confirmation. An agent review is not a human PR approval.
