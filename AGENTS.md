@@ -47,22 +47,20 @@ Follow [WORKFLOW.md](docs/agent-tools/WORKFLOW.md):
 
 **Requirement → Acceptance Criteria → Design → GitHub Issue → Implementation → PR → Review → Test → Merge.**
 
+- Before coding, complete the eight-gate [readiness preflight](docs/agent-tools/READINESS.md), inspect active claims/branches/PRs, and record owner, bounded scope, period, branch, base commit, predecessor merge and verification evidence. Missing or contradictory evidence means **BLOCKED**; planning may continue. An unmerged PR, closed Issue, or isolated spike cannot satisfy an implementation dependency.
+- Keep a resumable [handoff](docs/agent-tools/handoffs/TEMPLATE.md) with unfinished work and exact next steps. Do not begin a competing implementation; use explicit shared boundaries or a recorded transfer.
 - Use a task branch and preserve teammates' work. Do not push directly to `main`, force-push shared history, self-approve, or merge automatically.
 - Run checks relevant to the actual change and record their commands, environment, results, and limits honestly. Use `NOT RUN`, `BLOCKED`, or `FAILED` when applicable.
 - A teammate reviews the change, and a human performs the merge. Opening a PR does not prove implementation, review, testing, or acceptance.
 - Return the actual PR URL. If publication is blocked, preserve the work and report `PR not opened` with the exact blocker.
 
-## 6. Automatic individual log update
+## 6. Explicit ownership and automatic work records
 
-After every implementation, review, refactoring, documentation, or configuration task, automatically prepare an update to the acting student's current weekly log at `docs/agent-logs/<student>/agent-log-wN.md`.
+Every task has one owner explicitly identified by the requester as **User F**, **User G**, or **User J**. If missing, ask which student owns this task before changes or publication; read-only preparation may continue. Never infer ownership from a GitHub account, role, branch, or historical entry. Follow-ups and delegated work inherit the confirmed owner.
 
-- Record objective facts observed in the session without waiting for a separate request: date, model, task and purpose, key prompts and corrections, changed files or behavior, checks and results, errors, agent corrections, Issue, and PR.
-- Before recording personal claims, ask the student what they reviewed, what they changed manually, what they can explain, and what remains unclear. Never invent manual fixes, participation, understanding, or learning.
-- If the current student or week is unknown, ask before choosing a file. Do not write into another student's record.
-- Show the completed log diff to the student for review. The student must confirm that it accurately describes the session before submission.
-- A committed log is not automatically an individual course submission. Follow the professor's actual submission channel and deadline.
+Start and maintain the owner's ongoing `docs/agent-logs/<student>/agent-log.md` using the [log guide](docs/agent-logs/README.md). Record factual work, purpose, files/records, checks, failures, remaining work, and each delegated contribution before every handoff. Preserve earlier entries and add dated corrections. Link the real PR after publication.
 
-Final retrospectives follow the same evidence rule but are not generated after every task. Each student completes their own `retrospective.md` from real weekly entries and project experience.
+Separately prepare factual input for the student's current `agent-log-wN.md`; retain the professor's weekly filenames and deadlines. If the week is unknown, ask before choosing it. Human review, manual fixes, understanding, and reflections must come from that student. Leave them pending until supplied, show the log diff, and obtain the student's accuracy confirmation before submission. A committed log is not a course submission. Final retrospectives use the same evidence rule.
 
 ## 7. Credentials and final handoff
 

@@ -17,7 +17,7 @@ Use this procedure inside Android Studio Agent Mode. Read [AGENTS.md](../../../A
 ## Make the smallest complete change
 
 5. Search for existing implementations of the same rule or responsibility. Reuse or extend them; avoid a parallel validator, repository, state machine, or permission helper with overlapping behavior.
-6. Implement a small end-to-end slice following the approved account/data contracts. For UI work, follow the Views/Compose reconciliation rule in `CURRENT_CONTRACT.md`. Do not silently choose or migrate frameworks, add a duplicate database, or revive old background mechanisms.
+6. Implement a small end-to-end slice following the approved account/data contracts. For UI work, follow the approved Kotlin + Views/XML + ViewBinding rule in `CURRENT_CONTRACT.md`. Do not silently choose or migrate frameworks, add a duplicate database, or revive old background mechanisms.
 7. Add plain English KDoc for each new or materially changed handwritten class/function, including private helpers and overrides. Add step comments around unfamiliar asynchronous, session, authorization, storage, and recovery mechanisms. Keep comments faithful to the code.
 8. Present each diff for the student's review before acceptance. Explain what changed, why it is needed, and how a failure is handled. If restructuring existing code, apply the local explanation policy from the refactor skill.
 
@@ -31,3 +31,9 @@ Use this procedure inside Android Studio Agent Mode. Read [AGENTS.md](../../../A
 ## Handoff
 
 Report the resulting behavior, relevant trace IDs/files, actual verification and gaps, one unfamiliar mechanism to explain, log location, PR URL or blocker, and next human review action. Distinguish PR opened, merged, and accepted behavior.
+
+## Ownership, dependencies, and recovery
+
+Read [READINESS.md](../../../docs/agent-tools/READINESS.md). Use the explicitly confirmed User F/G/J owner; ask if absent and continue only read-only preparation until identified. Before implementation or refactoring, inspect current Issues, branches, PRs, and handoffs, complete all eight readiness gates, and run the validator with fresh evidence. A closed Issue, unmerged PR, or isolated spike cannot satisfy a predecessor. If any gate is missing or fails, report BLOCKED and limit work to planning/review. Do not bypass a dependency by narrowing a slice without an approved dependency change.
+
+Keep the existing owner and boundaries on resume. Re-read current discussions and compare actual branch/base/head/diff to the handoff, then rerun readiness. Record approved sharing/transfers before overlapping work. Update the owner's ongoing [agent log](../../../docs/agent-logs/README.md) and [handoff](../../../docs/agent-tools/handoffs/TEMPLATE.md) before interruption or completion, including delegated contributions, unfinished implementation, test gaps, and the first next action. Weekly coursework and personal learning remain separate; never invent human confirmation. An agent review is not a human PR approval.

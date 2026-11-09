@@ -2,7 +2,15 @@
 
 Choose work by its **prerequisites**, then self-assign it. All implementation issues in this guide are MVP work. User F, User G, and User J may choose any ready issue; their usual review strengths do not create exclusive coding areas.
 
-The [Views and eight-screen decision](UI_VIEWS_UPDATE_2026-11-07.md) and [DESIGN.md](../../DESIGN.md) govern the UI. [#25](https://github.com/theguardianofthebed/Time-Capsule/issues/25) adopts the tested starter. Its documentation, package, or issue being present does not mean the application migration is complete.
+The [Views and eight-screen decision](UI_VIEWS_UPDATE_2026-11-07.md) and [DESIGN.md](../../DESIGN.md) govern the UI. [#25](https://github.com/theguardianofthebed/Time-Capsule/issues/25) adopts the tested starter. Its bounded starter implementation is now merged through PR #27/#26 with recorded build/binding/launch evidence. This does not complete downstream screen behavior or backend acceptance.
+
+## Current readiness snapshot
+
+Checked after the external merge at **00:56 KST on 10 November 2026**: #25 is **DONE** for the starter boundary; #9 is **MERGED / VERIFICATION PENDING**. PR #29 merged as `c60d866cdc9794af97db129c946b66711270f6b9` and is present in main. Its newer log records 25 unit tests and cache/configuration corrections, while its description remains stale. Actual emulator connectivity/rules execution is unrecorded; review the applicability of the recorded bounded unit/configuration checks and classify the unspecified follow-up. Full account/capsule rules acceptance remains downstream, not a new #9 gate. #10 stays **BLOCKED** pending a fresh bounded-evidence and owner/reviewer preflight, rather than on an unmerged PR. #11–#23 additionally require unfinished predecessor features.
+
+A post-review comment reports an additional problem to be tracked in a new issue, but does not specify the defect, severity or a verification exception ([comment](https://github.com/theguardianofthebed/Time-Capsule/pull/29#issuecomment-6744585480)). Confirm that follow-up scope before relying on the foundation; no specific runtime failure is asserted here.
+
+Use the [three visual roadmap views](ISSUE_ROADMAP.md) to see what each issue enables. [dependencies.json](dependencies.json) preserves the 52 direct prerequisite edges in the current issue bodies. It is a dated status snapshot, not authorization to code. Follow the [repeatable readiness preflight](WORKFLOW.md) before claiming or resuming work.
 
 ## Before implementing an issue
 
@@ -10,7 +18,8 @@ The [Views and eight-screen decision](UI_VIEWS_UPDATE_2026-11-07.md) and [DESIGN
 2. For every prerequisite, verify that its required implementation is merged into your selected base, its relevant checks have recorded results, and that implementation has not been reverted or left with an unresolved failure that blocks your task. Record the PR/merge commit and evidence in the issue or task handoff. A closed issue, draft PR, local ZIP, checkbox, or planned test alone is insufficient.
 3. Confirm that the current Views/screen contract and this order guide are approved and present in the selected base. The documentation PR may be reviewed while stacked on the existing documentation work; application work must use the base selected by the team after that review.
 4. Self-assign the issue using your own GitHub account and identify your existing contributor label, **User F / User G / User J**. Choose a different teammate to review. Do not guess another member's handle or transfer their task.
-5. Record an actual work period and verification plan. The periods below are dependency-based planning windows, not invented calendar promises. Keep the current course milestone in view.
+5. Inspect open/merged PRs, branches and handoffs for an existing claim or overlapping components. Record the active branch, related PR, affected files/components, bounded deliverable, current status and remaining work. Resume or explicitly transfer existing work rather than starting a competing implementation.
+6. Record an actual work period and verification plan. The periods below are dependency-based planning windows, not invented calendar promises. Keep the current course milestone in view.
 
 **If a gate fails:** report `BLOCKED`, name the missing prerequisite/evidence, and choose another ready issue if one exists. Reading, reviewing, investigating, and drafting a plan can happen before the gate passes. Do not implement a blocked issue by silently substituting mocks, weakening the dependency, or completing its prerequisite inside an unrelated PR. A maintainer may explicitly split or change a dependency; record the changed scope and contract first.
 
@@ -22,8 +31,8 @@ The table lists direct prerequisites. Shared upstream dependencies also apply. I
 
 | Window | Issue and deliverable | Blocked by — required before implementation | Owner / period |
 |---|---|---|---|
-| 0 | [#25](https://github.com/theguardianofthebed/Time-Capsule/issues/25) — adopt and verify Views/XML + ViewBinding starter | Approved Views documentation in the selected base; clean-file comparison and local package verification | Unassigned; self-select F/G/J. First application task. |
-| 1 | [#9](https://github.com/theguardianofthebed/Time-Capsule/issues/9) — shared Android/Firebase configuration, interfaces, and test seams | #25 | Unassigned; after starter verification, before feature integration. |
+| 0 | [#25](https://github.com/theguardianofthebed/Time-Capsule/issues/25) — adopt and verify Views/XML + ViewBinding starter | Approved Views documentation in the selected base; clean-file comparison and local package verification | User G; starter work recorded 7–8 November. User J contributed the recorded theme correction. DONE for the starter only. |
+| 1 | [#9](https://github.com/theguardianofthebed/Time-Capsule/issues/9) — shared Android/Firebase configuration, interfaces, and test seams | #25 | User J; #29 merged 10 November, 8–9 November implementation recorded. Verification follow-up period must be recorded. |
 | 2 | [#10](https://github.com/theguardianofthebed/Time-Capsule/issues/10) — accounts, profile repair, and exact recipient confirmation | #9 | Unassigned; first feature session after shared interfaces/configuration. |
 | 3 | [#11](https://github.com/theguardianofthebed/Time-Capsule/issues/11) — capsule schema and matching access rules | #9, #10 | Unassigned; may run alongside #12 after the same gates. |
 | 3 | [#12](https://github.com/theguardianofthebed/Time-Capsule/issues/12) — S-04 → S-05 → S-06 draft and review flow | #9, #10 | Unassigned; may run alongside #11 after the same gates. |
@@ -89,6 +98,10 @@ Copy this compact record into a task handoff or issue update when claiming work:
 Issue:
 Owner (User F/G/J) and self-assigned GitHub account:
 Different human reviewer:
+Active branch and related PR:
+Components/files and bounded deliverable:
+Current status and remaining work:
+Overlap check (issues, branches, PRs, handoffs):
 Scope: MVP
 Work period:
 Selected base branch and commit:

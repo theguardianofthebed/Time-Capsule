@@ -16,13 +16,30 @@ assignees: ""
 - **Blocked by (hard implementation prerequisites):** [Exact Issue numbers, or explicitly none; follow docs/agent-tools/IMPLEMENTATION_ORDER.md.]
 - **Readiness:** [READY / BLOCKED after checking the current base and every prerequisite.]
 
+## What works when this Issue is done
+
+[State the capability available after this bounded work is implemented, merged, and verified. Distinguish internal components from a complete user flow.]
+
+**Still owned by later Issues:** [Explicit Issue numbers and unfinished functionality.]
+
 ## Prerequisite evidence
 
+- [ ] The eight gates in `docs/agent-tools/READINESS.md` passed with current evidence and validator output.
+- [ ] Issues, branches, open PRs, and handoffs were inspected for competing claims; scope/transfer agreements are recorded.
+- [ ] No unresolved blocking failure remains.
 - [ ] The approved contract is present in the selected base.
 - [ ] Each prerequisite implementation is merged into that base and has relevant verification evidence; record Issue → PR/merge commit → check evidence. A closed Issue alone is insufficient.
 - [ ] The owner self-assigned using their own account and identified User F/G/J; a different human reviewer and actual work period are recorded.
 
 [If blocked, name the missing gate. Reading/review/planning may continue; implementation waits unless a maintainer explicitly records a scope/dependency change.]
+
+## Active work record
+
+- **Explicitly confirmed owner / branch / PR:** [Do not infer owner from GitHub identity.]
+- **Components/files / deliverable:** [Bounded implementation.]
+- **Period / status / remaining work:** [Actual values.]
+- **Claim inspection / shared work or transfer:** [Timestamp, references, and agreement where needed.]
+- **Handoff / owner log:** [Real links, updated before each interruption.]
 
 ## References
 
