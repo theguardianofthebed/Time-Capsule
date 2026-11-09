@@ -70,6 +70,7 @@ object FirebaseConfig {
      * Safely connects Auth, Firestore, and Storage to local emulators ONLY in Debug builds.
      * Initializes a demo [FirebaseApp] if google-services.json is missing in debug/test environments.
      * Returns true only if initialization and emulator binding both succeed successfully.
+     * Fails closed if memory-only Firestore initialization fails.
      */
     fun setupDebugEmulatorConnection(context: Context, isDebug: Boolean): Boolean {
         if (!isDebug) {
@@ -93,7 +94,7 @@ object FirebaseConfig {
             }
 
             val auth = FirebaseAuth.getInstance()
-            val firestore = getMemoryOnlyFirestore(appContext) ?: FirebaseFirestore.getInstance()
+            val firestore = getMemoryOnlyFirestore(appContext) ?: return false
             val storage = FirebaseStorage.getInstance()
 
             useEmulators(auth, firestore, storage, EMULATOR_HOST)
@@ -132,6 +133,18 @@ object FirebaseConfig {
         auth.useEmulator(host, AUTH_PORT)
         firestore.useEmulator(host, FIRESTORE_PORT)
         isEmulatorMode = true
+    }
+
+    /**
+     * Verifies that emulator mode is active; throws [IllegalStateException] if disabled or disconnected
+     * to prevent silent fallback to production backend services.
+     */
+    fun verifyEmulatorOrFail(isEmulatorConnected: Boolean) {
+        if (!isEmulatorMode || !isEmulatorConnected) {
+            throw IllegalStateException(
+                "Emulator safety failure: emulator mode is inactive or disconnected. Silent fallback to production is prohibited."
+            )
+        }
     }
 
     /** Resets emulator mode flag for testing isolated helper states. */

@@ -160,7 +160,7 @@ Needed assistance in diagnosing the Android 17 (API 37) `ACCESS_LOCAL_NETWORK` l
 
 ## Task: Issue #10 Final Critical Fixes Before Merge
 
-- **Task and purpose:** Completed final critical Issue #10 defects: restored authenticated session state on app restart, implemented recoverable profile creation and Profile Repair without duplicate Auth account creation, established exact recipient lookup with explicit confirmation boundary, fail-closed initialization for Debug/Release environments, disabled duplicate UI submissions during in-flight operations, and added unit test coverage.
+- **Task and purpose:** Completed final critical Issue #10 defects: restored authenticated session state on every Activity/container recreation, integrated `SessionGuard` into real async AccountSessionManager operations to reject stale callbacks across account changes, removed unsafe Firestore fallback in `FirebaseConfig.kt`, completed recoverable profile creation and Profile Repair without duplicate Auth account creation, established exact recipient lookup with explicit confirmation boundary, fail-closed initialization for Debug/Release environments, disabled duplicate UI submissions during in-flight operations, and added unit test coverage.
 - **Session date(s):** 10 November 2026.
 - **Issue and PR:** Issue #10 (https://github.com/theguardianofthebed/Time-Capsule/issues/10), Draft PR #33 (https://github.com/theguardianofthebed/Time-Capsule/pull/33) on `feature/10-accounts-recipient`.
 - **Requirement/design references:** DD-03, DD-11, DD-19, DD-20, AC-01, AC-12, FR-01, FR-03.
@@ -169,17 +169,18 @@ Needed assistance in diagnosing the Android 17 (API 37) `ACCESS_LOCAL_NETWORK` l
 
 ### Purpose of agent use
 
-Needed assistance in implementing session restoration in `AccountSessionManager` and `MainActivity`, recoverable profile creation logic, recipient lookup and confirmation state, fail-closed Release/Debug initialization, duplicate UI submission prevention, and writing comprehensive unit tests (`SessionRestorationTest`, `ProfileRepairTest`, `RecipientConfirmationTest`, `StaleSessionCallbackTest`).
+Needed assistance in implementing session restoration on Activity recreation in `MainActivity`, integrating `SessionGuard` into `AccountSessionManager`, removing unsafe Firestore fallback in `FirebaseConfig`, enforcing non-blank profile name validation, establishing recipient lookup/confirmation state for Issue #12, and writing comprehensive unit tests (`SessionRestorationTest`, `ProfileRepairTest`, `RecipientConfirmationTest`, `StaleSessionCallbackTest`).
 
 ### Key prompts
 
-- "Issue #10 — Final Critical Fixes Before Merge ... Fix only the critical remaining Issue #10 defects so the team can safely merge PR #33 ..."
+- "Review the latest feature/10-accounts-recipient HEAD (9e10d06) in PR #33 ... Please perform one final minimal merge-blocker correction ..."
 
 ### What the agent changed and verified
 
 - **Changes:**
-  - `app/src/main/java/com/example/timecapsule/MainActivity.kt`: Called `restoreSessionIfAuthenticated()` on startup and applied Debug/Release fail-closed config checks.
-  - `app/src/main/java/com/example/timecapsule/data/AccountSessionManager.kt`: Added `restoreSessionIfAuthenticated()`, `lookupRecipient()`, `confirmRecipient()`, empty display name validation, and profile repair handling.
+  - `app/src/main/java/com/example/timecapsule/MainActivity.kt`: Called `restoreSessionIfAuthenticated()` unconditionally on every Activity/container recreation.
+  - `app/src/main/java/com/example/timecapsule/config/FirebaseConfig.kt`: Removed unsafe `?: FirebaseFirestore.getInstance()` fallback in `setupDebugEmulatorConnection` to fail closed if memory-only initialization fails.
+  - `app/src/main/java/com/example/timecapsule/data/AccountSessionManager.kt`: Integrated `SessionGuard` across async operations, added `restoreSessionIfAuthenticated()`, `lookupRecipient()`, `confirmRecipient()`, blank name validation, password length validation, and recoverable profile repair.
   - `app/src/main/java/com/example/timecapsule/data/DefaultCapsuleRepository.kt`: Updated `lists(uid)` to return `OperationResult.Unavailable` instead of fake empty list success.
   - `app/src/main/java/com/example/timecapsule/domain/model/RecipientProfile.kt`: Added `RecipientConfirmation` data class.
   - `app/src/main/java/com/example/timecapsule/ui/s01/S01SignInFragment.kt` & `ui/s02/S02RegisterFragment.kt`: Disabled submit buttons while in-flight to prevent duplicate requests.
@@ -191,6 +192,7 @@ Needed assistance in implementing session restoration in `AccountSessionManager`
   - `:app:testDebugUnitTest`: PASS (41 unit tests passed)
   - `:app:lintDebug`: PASS
   - `:app:connectedDebugAndroidTest`: PASS (9 instrumentation tests passed on `emulator-5554` API 37)
+  - `git diff --check`: PASS (clean formatting)
 - **Remaining checks:**
   - Full capsule publication, unlocking, and media storage (deferred to Issues #11, #12, #14).
 

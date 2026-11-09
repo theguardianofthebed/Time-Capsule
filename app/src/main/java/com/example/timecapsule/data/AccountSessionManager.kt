@@ -2,6 +2,7 @@ package com.example.timecapsule.data
 
 import com.example.timecapsule.data.adapter.AuthAdapter
 import com.example.timecapsule.data.adapter.FirestoreAdapter
+import com.example.timecapsule.data.session.SessionGuard
 import com.example.timecapsule.data.session.SessionTracker
 import com.example.timecapsule.domain.model.RecipientConfirmation
 import com.example.timecapsule.domain.model.RecipientProfile
@@ -9,16 +10,17 @@ import com.example.timecapsule.domain.result.OperationResult
 
 /**
  * Orchestrates authentication, SessionTracker updates, profile creation/repair, and recipient confirmation boundaries.
- * Enforces single session generation updates and authenticated profile repair boundaries.
+ * Enforces single session generation updates, stale callback invalidation, and authenticated profile repair boundaries.
  */
 class AccountSessionManager(
     private val authAdapter: AuthAdapter,
     private val firestoreAdapter: FirestoreAdapter,
-    private val sessionTracker: SessionTracker
+    private val sessionTracker: SessionTracker,
+    private val sessionGuard: SessionGuard = SessionGuard(sessionTracker)
 ) {
 
     /**
-     * Restores active user session from [authAdapter] on application restart.
+     * Restores active user session from [authAdapter] on application restart or container recreation.
      * Updates [sessionTracker] with active UID if authenticated, or clears session if unauthenticated.
      */
     fun restoreSessionIfAuthenticated(): String? {
@@ -34,9 +36,17 @@ class AccountSessionManager(
 
     /** Performs user sign in and updates SessionTracker exactly once on success. */
     suspend fun signIn(email: String, password: String): OperationResult<String> {
+        val capturedSession = sessionTracker.currentSession()
         val result = authAdapter.signIn(email, password)
         if (result is OperationResult.Success) {
-            sessionTracker.startSession(result.data)
+            // Verify session did not switch to a different account during the async sign-in call
+            if (sessionTracker.currentSession().sessionGeneration == capturedSession.sessionGeneration ||
+                !sessionTracker.currentSession().isAuthenticated
+            ) {
+                sessionTracker.startSession(result.data)
+            } else {
+                return OperationResult.Denied("Stale session invalidation: session changed during sign-in")
+            }
         }
         return result
     }
@@ -47,26 +57,43 @@ class AccountSessionManager(
         password: String,
         displayName: String
     ): OperationResult<String> {
+        val trimmedEmail = email.trim()
         val trimmedName = displayName.trim()
         if (trimmedName.isBlank()) {
             return OperationResult.Invalid("Display name must not be blank.")
         }
+        if (trimmedEmail.isBlank() || password.isBlank()) {
+            return OperationResult.Invalid("Email and password must not be blank.")
+        }
+        if (password.length < 6) {
+            return OperationResult.Invalid("Password must be at least 6 characters.")
+        }
+
+        val capturedSession = sessionTracker.currentSession()
 
         // If user is already authenticated in Auth, attempt profile repair directly without duplicate Auth creation
         val activeUid = authAdapter.activeUid()
         if (!activeUid.isNullOrBlank()) {
-            val repairRes = repairProfile(trimmedName)
+            val repairRes = repairProfileInternal(activeUid, trimmedName)
             return if (repairRes is OperationResult.Success) {
                 OperationResult.Success(activeUid)
             } else {
-                OperationResult.Unavailable("Account exists, but recipient profile setup failed. Please perform Profile Repair.")
+                OperationResult.Unavailable("Account exists, but recipient profile setup failed. Please update profile to complete setup.")
             }
         }
 
-        val authResult = authAdapter.signUp(email, password, trimmedName)
+        val authResult = authAdapter.signUp(trimmedEmail, password, trimmedName)
         if (authResult is OperationResult.Success) {
             val uid = authResult.data
-            sessionTracker.startSession(uid)
+            // Verify session was not cleared/switched during the async signup call before updating tracker
+            if (sessionTracker.currentSession().sessionGeneration == capturedSession.sessionGeneration ||
+                !sessionTracker.currentSession().isAuthenticated
+            ) {
+                sessionTracker.startSession(uid)
+            } else {
+                return OperationResult.Denied("Stale session invalidation: session changed during sign-up")
+            }
+
             val profile = RecipientProfile(uid = uid, displayName = trimmedName)
             val profileResult = firestoreAdapter.saveRecipientProfile(profile)
             if (profileResult !is OperationResult.Success) {
@@ -95,13 +122,16 @@ class AccountSessionManager(
             return OperationResult.Invalid("Display name must not be blank for profile repair.")
         }
 
-        // 1. Update Auth display name
+        return sessionGuard.runGuarded(session) {
+            repairProfileInternal(activeUid, trimmedName)
+        }
+    }
+
+    private suspend fun repairProfileInternal(activeUid: String, trimmedName: String): OperationResult<Unit> {
         val authUpdateRes = authAdapter.updateDisplayName(trimmedName)
         if (authUpdateRes !is OperationResult.Success) {
             return authUpdateRes
         }
-
-        // 2. Repair Firestore recipientDirectory document for the authenticated UID
         val profile = RecipientProfile(uid = activeUid, displayName = trimmedName)
         return firestoreAdapter.saveRecipientProfile(profile)
     }
@@ -116,12 +146,15 @@ class AccountSessionManager(
             return OperationResult.Invalid("Recipient UID must not be blank.")
         }
 
-        return when (val res = firestoreAdapter.getRecipientProfile(cleanUid)) {
-            is OperationResult.Success -> OperationResult.Success(RecipientConfirmation(profile = res.data, isConfirmed = false))
-            is OperationResult.Invalid -> OperationResult.Invalid(res.message)
-            is OperationResult.Denied -> OperationResult.Denied(res.message)
-            is OperationResult.Unavailable -> OperationResult.Unavailable(res.message)
-            is OperationResult.OutcomeUnknown -> OperationResult.Unavailable(res.message)
+        val capturedSession = sessionTracker.currentSession()
+        return sessionGuard.runGuarded(capturedSession) {
+            when (val res = firestoreAdapter.getRecipientProfile(cleanUid)) {
+                is OperationResult.Success -> OperationResult.Success(RecipientConfirmation(profile = res.data, isConfirmed = false))
+                is OperationResult.Invalid -> OperationResult.Invalid(res.message)
+                is OperationResult.Denied -> OperationResult.Denied(res.message)
+                is OperationResult.Unavailable -> OperationResult.Unavailable(res.message)
+                is OperationResult.OutcomeUnknown -> OperationResult.Unavailable(res.message)
+            }
         }
     }
 

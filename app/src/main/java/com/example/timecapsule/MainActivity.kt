@@ -82,8 +82,10 @@ class MainActivity : AppCompatActivity() {
             accountSessionManager = accountSessionManager
         )
 
+        // Unconditionally restore session into SessionTracker on every Activity/container creation
+        val activeUid = container.accountSessionManager.restoreSessionIfAuthenticated()
+
         if (savedInstanceState == null) {
-            val activeUid = container.accountSessionManager.restoreSessionIfAuthenticated()
             if (activeUid.isNullOrBlank()) {
                 navigateToSignIn()
             } else {
