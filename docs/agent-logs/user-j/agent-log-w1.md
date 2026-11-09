@@ -11,7 +11,7 @@ Follow [the shared workflow](../../agent-tools/WORKFLOW.md) and [AGENTS.md](../.
 - **Issue and PR:** Issue #25, PR #27 (https://github.com/theguardianofthebed/Time-Capsule/pull/27).
 - **Requirement/design references:** DD-01, DD-07, DD-11, instructions v3.
 - **Agent environment:** Android Studio Agent Mode.
-- **Model used:** Gemini-3.6-flash (Android Studio Agent Mode).
+- **Model used:** Gemini Flash 3.6 (Android Studio Agent Mode).
 
 ### Purpose of agent use
 
@@ -49,35 +49,55 @@ Needed assistance in identifying the AppCompat theme incompatibility, applying t
 
 ---
 
-## Feature or task 2
+## Task: Issue #9 Shared Android/Firebase Foundation
 
-- **Task and purpose:** [What you worked on and why.]
-- **Session date(s):** [Actual dates.]
-- **Issue and PR:** [Real links, or the publication blocker.]
-- **Requirement/design references:** [Relevant IDs or paths, if applicable.]
-- **Agent environment:** [Actual environment; project coding must use Android Studio Agent Mode.]
-- **Model used:** [Exact displayed model name, including any switch during the task.]
+- **Task and purpose:** Established shared Android/Firebase foundation architecture, typed OperationResult hierarchy, session generation protection against stale account callbacks, replaceable adapter seams, memory-only Firestore cache configuration, and safe local Firebase emulator setup.
+- **Session date(s):** 8 & 9 November 2026.
+- **Issue and PR:** Issue #9 (https://github.com/theguardianofthebed/Time-Capsule/issues/9); implementation Draft PR #29 (https://github.com/theguardianofthebed/Time-Capsule/pull/29) from `feature/9-reviewable`. PR #28 was the separate rollback of the accidental direct-to-main commit.
+- **Requirement/design references:** ARC-01, DD-10, DD-11, DD-20, NFR-01, NFR-06, FR-01, FR-02, FR-03, FR-09, AC-01, AC-03, AC-07, AC-09, AC-11, AC-12, AC-13, AC-14, T-02, T-10, T-32, T-33, T-40, T-43, T-44, T-45.
+- **Agent environment:** Android Studio Agent Mode.
+- **Model used:** Gemini Flash 3.6 (Android Studio Agent Mode).
 
 ### Purpose of agent use
 
-[What help did you need? What did you decide or do yourself?]
+Needed assistance in pinning Firebase/Maps/DataStore dependencies, defining typed result boundaries (`OperationResult`), implementing session generation tracking (`DefaultSessionTracker`), creating adapter interfaces, configuring memory-only Firestore cache, setting up local Firebase emulator scaffolding with deny-all security baselines, and writing unit tests for repository seams, delayed operation stale callback rejection, memory cache settings, release build safety, and security rules baseline.
 
 ### Key prompts
 
-[Include the important prompts and corrections. Mark redacted or paraphrased text.]
+- "TimeCapsule — Issue #9: Shared Android/Firebase Foundation ... Complete the bounded foundation, verify it, present the changes to me..."
+- "TimeCapsule Issue #9 — Safely Resume Interrupted Work ... Continue from the verified recovery checkpoint. Preserve all existing work, complete only the remaining Issue #9 tests and minimal corrections..."
 
 ### What the agent changed and verified
 
-- **Changes:** [Relevant files or behavior.]
-- **Checks and results:** [Actual commands or actions, environment, observed result, and evidence.]
-- **Remaining checks:** [Anything not run, failed, or blocked, and why.]
+- **Changes:**
+  - `gradle/libs.versions.toml`: Pinned Firebase BoM 34.4.0, Auth, Firestore, Storage, Google Services 4.4.4, Maps 19.2.0, Location 21.3.0, DataStore 1.1.7, ViewModel 2.9.4, Desugaring 2.1.5.
+  - `build.gradle.kts` & `app/build.gradle.kts`: Applied plugin, desugaring, and dependencies with conditional google-services application for credential-free local builds and explicit Release build missing-configuration failure check.
+  - `firebase.json`, `firestore.rules`, `firestore.indexes.json`, `storage.rules`: Initialized versioned emulator & deny-all security rules.
+  - `app/src/main/java/com/example/timecapsule/`: Created `OperationResult` sealed result hierarchy, `SessionSnapshot`, `SessionProvider`, `RecipientProfile`, `CapsuleListsSnapshot`, updated `CapsuleRepository`, implemented `DefaultSessionTracker`, `FirestoreCachePolicy` (memory-only cache), `AuthAdapter`, `FirestoreAdapter`, `StorageAdapter`, `LocationAdapter`, `LocalRetentionAdapter`, `AppDependencyContainer`, and `FirebaseConfig`.
+  - `app/src/test/java/com/example/timecapsule/`: Created unit tests `OperationResultTest`, `SessionProtectionTest` (with delayed operation boundary tests), `MemoryCacheConfigTest` (verifying `MemoryCacheSettings`), `RepositorySeamsTest`, and `FirebaseConfigTest` (verifying emulator ports/host, `isEmulatorMode`, and initial deny-all rules).
+- **Checks and results:**
+  - `gradle_sync`: PASS
+  - `:app:assembleDebug`: PASS
+  - `:app:testDebugUnitTest`: PASS (25 passed unit tests)
+  - `:app:lintDebug`: PASS
+  - `:app:assembleRelease`: PASS (failed intentionally as expected with `GradleException` due to missing `google-services.json`)
+  - `git diff --check`: PASS (clean)
+- **Remaining checks:**
+  - Cloud Firebase deployment & live authentication (deferred to downstream feature issues #10-#23).
 
 ### Errors and manual fixes
 
-[Describe any error and how it was corrected. Separate the agent's correction from your own manual work. Say that no fix was needed only if that is true.]
+- Resolved compiler warnings for missing trailing commas, parentheses, and catch parameter signatures.
+- Fixed `FirebaseConfigTest` rules file location check when running under module root (`app/`). All unit tests passed cleanly.
 
 ### My review and understanding
 
-- **What I reviewed:** [The changes you inspected before accepting them.]
-- **What I can explain:** [A mechanism, data flow, or failure case you understand.]
-- **Feedback and next step:** [Reviewer feedback, unresolved questions, and the next owner/action.]
+- **What I reviewed:** 
+  -  I reviewed Gemini's implementation of the shared Android/Firebase foundation for Issue #9, focusing on the repository interfaces, and Firebase emulator setup.
+  -  I also examined the automated test coverage and identified which tests verify actual behavior versus only checking that components exist.
+- **What I can explain:**
+  -  I can explain why the application uses a Repository layer to separate UI logic from Firebase operations, and how typed results distinguish successful operations from failures or uncertain outcomes. I understand how session generation helps prevent delayed responses from a previous account session from being accepted after logout or account switching. 
+  -  I can also explain why Firestore's memory-only cache must be configured before first use, and why Firebase emulator testing should remain isolated from production services.
+- **Feedback and next step:**
+  - The initial foundation provides reusable interfaces and testable components for subsequent features. I requested additional automated verification for asynchronous session isolation, Firestore initialization, and Firebase configuration safety before performing manual testing. 
+  - The next plan is to review the final test results, reproduce the relevant checks in Android Studio, and address any remaining issues in PR #29 before teammate review and merging.
