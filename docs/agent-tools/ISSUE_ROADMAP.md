@@ -1,6 +1,6 @@
 # TimeCapsule implementation roadmap
 
-This roadmap answers what each issue builds, what its completion enables, and why work is blocked. The snapshot was checked on **10 November 2026 (Asia/Seoul)** against Atlas **r55**, live issue bodies and main `c60d866cdc9794af97db129c946b66711270f6b9`. Recheck before implementation.
+This roadmap answers what each issue builds, what its completion enables, and why work is blocked. The diagrams are exported from the approved contract in merged [PR #30](https://github.com/theguardianofthebed/Time-Capsule/pull/30), main `6ec6215786447882d9aca2e9e9c18d5d0fd8eda0`. PR #30 adopted the governance documents; it did not verify downstream application features. The snapshot was checked on **10 November 2026 (Asia/Seoul)** against Atlas **r55**, live issue bodies and main `c60d866cdc9794af97db129c946b66711270f6b9`. Recheck before implementation.
 
 **Current position after 00:56 KST on 10 November:** #25 is implemented, merged and verified for its starter boundary. #9 is **MERGED / VERIFICATION PENDING** after the external merge of PR #29. Review applicability of recorded bounded foundation checks and classify the unspecified follow-up. Actual emulator connectivity/rules execution is unrecorded, but full account/capsule rules acceptance remains downstream, not a new #9 gate. #10 remains blocked pending fresh bounded-evidence and owner/reviewer preflight; #11–#23 additionally need unfinished predecessor implementations. No failed application test is inferred from missing evidence.
 
