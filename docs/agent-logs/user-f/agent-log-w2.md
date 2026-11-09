@@ -1,4 +1,8 @@
-# User F agent log week 2
+# Agent Log – Week 2 (MM/DD – MM/DD)
+
+- Name / Student ID:
+- Model(s) used:
+- My changes to the team's Agent Tools this week:
 
 The planned submission date is **20 November 2026**; follow any later professor announcement. Add one feature/task section for each piece of work. Describe your own contribution and use real prompts, results, and examples. If you did not use an agent this week, say so honestly.
 
@@ -13,13 +17,16 @@ Follow [the shared workflow](../../agent-tools/WORKFLOW.md) and [AGENTS.md](../.
 - **Agent environment:** [Actual environment; project coding must use Android Studio Agent Mode.]
 - **Model used:** [Exact displayed model name, including any switch during the task.]
 
-### Purpose of agent use
+**Goal**
 
 [What help did you need? What did you decide or do yourself?]
 
-### Key prompts
+**Requests and prompts**
 
-[Include the important prompts and corrections. Mark redacted or paraphrased text.]
+| # | Request summary | Actual prompt (key part) | Why it worked (or didn't) |
+|---|-----------------|--------------------------|---------------------------|
+| 1 | | | |
+| 2 | | | |
 
 ### What the agent changed and verified
 
