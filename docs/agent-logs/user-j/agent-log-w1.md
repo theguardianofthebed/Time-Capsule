@@ -143,6 +143,15 @@ Needed assistance in diagnosing the Android 17 (API 37) `ACCESS_LOCAL_NETWORK` l
 
 ### My review and understanding
 
-- **What I reviewed:** [Awaiting student review]
-- **What I can explain:** [Awaiting student response]
-- **Feedback and next step:** [Awaiting student confirmation and PR review]
+- **What I reviewed:** 
+  - I investigated the Firebase Emulator connectivity failure on Android 17 (API 37) by checking the emulator connection, installed application permissions, and ADB network logs.
+  - I confirmed that Firebase Emulator services were accessible, but the application did not initially request ACCESS_LOCAL_NETWORK.
+  - After the Debug-only permission fix, I reran the previously failing test and the complete instrumentation test suite. All 9 instrumentation tests passed.
+- **What I can explain:** 
+  - I can explain the difference between the Android Emulator and Firebase Emulators, and why Android uses 10.0.2.2 to access services running on the development computer.
+  - I understand why Android 17 requires local-network permission, how a missing permission can cause network timeouts, and why the emulator-specific permission should remain Debug-only.
+  - I understand that automated permission setup helps other team members reproduce tests without manually granting permissions every time.
+- **Feedback and next step:** 
+  - The debugging process showed that successful builds do not guarantee working emulator connectivity. Checking the actual installed permissions and network logs was useful for identifying the cause.
+  - The corrected test environment passed all 9 instrumentation tests. However, passing tests does not mean every Issue #10 requirement is complete.
+  - Next, I will review the remaining account/session and profile-repair issues with the teammate, verify any corrections, and complete the PR review before merging. Once Issue #10 is merged and verified, the team can proceed with Issues #11 and #12 concurrently.
