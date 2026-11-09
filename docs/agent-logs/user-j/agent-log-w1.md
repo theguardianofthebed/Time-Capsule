@@ -1,4 +1,8 @@
-# User J agent log week 1
+# Agent Log – Week 1 (MM/DD – MM/DD)
+
+- Name / Student ID:
+- Model(s) used:
+- My changes to the team's Agent Tools this week:
 
 The planned submission date is **13 November 2026**; follow any later professor announcement. Add one feature/task section for each piece of work. Describe your own contribution and use real prompts, results, and examples. If you did not use an agent this week, say so honestly.
 
@@ -13,13 +17,15 @@ Follow [the shared workflow](../../agent-tools/WORKFLOW.md) and [AGENTS.md](../.
 - **Agent environment:** Android Studio Agent Mode.
 - **Model used:** Gemini Flash 3.6 (Android Studio Agent Mode).
 
-### Purpose of agent use
+**Goal**
 
 Needed assistance in identifying the AppCompat theme incompatibility, applying the Material 3 theme fix, adding an instrumented regression test, running Gradle/Android test suites, and performing live emulator runtime verification.
 
-### Key prompts
+**Requests and prompts**
 
-- "TimeCapsule — Fix PR #27 AppCompat Theme Compatibility ... Change Theme.TimeCapsule parent to Theme.Material3.DayNight.NoActionBar ..."
+| # | Request summary | Actual prompt (key part) | Why it worked (or didn't) |
+|---|-----------------|--------------------------|---------------------------|
+| 1 |  | "TimeCapsule — Fix PR #27 AppCompat Theme Compatibility ... Change Theme.TimeCapsule parent to Theme.Material3.DayNight.NoActionBar ..." | |
 
 ### What the agent changed and verified
 
@@ -58,14 +64,16 @@ Needed assistance in identifying the AppCompat theme incompatibility, applying t
 - **Agent environment:** Android Studio Agent Mode.
 - **Model used:** Gemini Flash 3.6 (Android Studio Agent Mode).
 
-### Purpose of agent use
+**Goal**
 
 Needed assistance in pinning Firebase/Maps/DataStore dependencies, defining typed result boundaries (`OperationResult`), implementing session generation tracking (`DefaultSessionTracker`), creating adapter interfaces, configuring memory-only Firestore cache, setting up local Firebase emulator scaffolding with deny-all security baselines, and writing unit tests for repository seams, delayed operation stale callback rejection, memory cache settings, release build safety, and security rules baseline.
 
-### Key prompts
+**Requests and prompts**
 
-- "TimeCapsule — Issue #9: Shared Android/Firebase Foundation ... Complete the bounded foundation, verify it, present the changes to me..."
-- "TimeCapsule Issue #9 — Safely Resume Interrupted Work ... Continue from the verified recovery checkpoint. Preserve all existing work, complete only the remaining Issue #9 tests and minimal corrections..."
+| # | Request summary | Actual prompt (key part) | Why it worked (or didn't) |
+|---|-----------------|--------------------------|---------------------------|
+| 1 |  | "TimeCapsule — Issue #9: Shared Android/Firebase Foundation ... Complete the bounded foundation, verify it, present the changes to me..." | |
+| 2 |  | "TimeCapsule Issue #9 — Safely Resume Interrupted Work ... Continue from the verified recovery checkpoint. Preserve all existing work, complete only the remaining Issue #9 tests and minimal corrections..." | |
 
 ### What the agent changed and verified
 
@@ -102,8 +110,6 @@ Needed assistance in pinning Firebase/Maps/DataStore dependencies, defining type
   - The initial foundation provides reusable interfaces and testable components for subsequent features. I requested additional automated verification for asynchronous session isolation, Firestore initialization, and Firebase configuration safety before performing manual testing. 
   - The next plan is to review the final test results, reproduce the relevant checks in Android Studio, and address any remaining issues in PR #29 before teammate review and merging.
 
----
-
 ## Task: Issue #10 Android 17 Firebase Emulator Test Connectivity Fix
 
 - **Task and purpose:** Fixed Android 17 (API 37) local network permission enforcement (`android.permission.ACCESS_LOCAL_NETWORK`) for Firebase Auth & Firestore Emulator test connectivity, ensuring instrumentation tests execute and pass cleanly on API 37 AVDs without TCP timeout errors.
@@ -113,13 +119,16 @@ Needed assistance in pinning Firebase/Maps/DataStore dependencies, defining type
 - **Agent environment:** Android Studio Agent Mode.
 - **Model used:** Gemini Flash 3.6 (Android Studio Agent Mode).
 
-### Purpose of agent use
+**Goal**
 
 Needed assistance in diagnosing the Android 17 (API 37) `ACCESS_LOCAL_NETWORK` local network permission requirement, declaring it in the Debug-only manifest, adding `GrantPermissionRule` and `UiAutomation` permission grants before test execution, improving negative Firestore rule assertions to verify exact `PERMISSION_DENIED` exceptions, and verifying instrumented test suite execution.
 
-### Key prompts
+**Requests and prompts**
 
-- "Issue #10 — Fix Android 17 Firebase Emulator Test Connectivity ... On Android 17 (API 37), the application cannot connect to the Firebase Authentication Emulator at 10.0.2.2:9099 ..."
+| # | Request summary | Actual prompt (key part) | Why it worked (or didn't) |
+|---|-----------------|--------------------------|---------------------------|
+| 1 | Diagnose local emulator connectivity | Recorded excerpt: "Issue #10 — Fix Android 17 Firebase Emulator Test Connectivity ... On Android 17 (API 37), the application cannot connect to the Firebase Authentication Emulator at 10.0.2.2:9099 ..." | See documented checks and errors below. |
+
 
 ### What the agent changed and verified
 
@@ -158,6 +167,8 @@ Needed assistance in diagnosing the Android 17 (API 37) `ACCESS_LOCAL_NETWORK` l
 
 ---
 
+---
+
 ## Task: Issue #10 Final Critical Fixes Before Merge
 
 - **Task and purpose:** Completed final critical Issue #10 defects: restored authenticated session state on every Activity/container recreation, integrated `SessionGuard` into real async AccountSessionManager operations to reject stale callbacks across account changes, removed unsafe Firestore fallback in `FirebaseConfig.kt`, completed recoverable profile creation and Profile Repair without duplicate Auth account creation, established exact recipient lookup with explicit confirmation boundary, fail-closed initialization for Debug/Release environments, disabled duplicate UI submissions during in-flight operations, and added unit test coverage.
@@ -167,13 +178,16 @@ Needed assistance in diagnosing the Android 17 (API 37) `ACCESS_LOCAL_NETWORK` l
 - **Agent environment:** Android Studio Agent Mode.
 - **Model used:** Gemini Flash 3.6 (Android Studio Agent Mode).
 
-### Purpose of agent use
+**Goal**
 
 Needed assistance in implementing session restoration on Activity recreation in `MainActivity`, integrating `SessionGuard` into `AccountSessionManager`, removing unsafe Firestore fallback in `FirebaseConfig`, enforcing non-blank profile name validation, establishing recipient lookup/confirmation state for Issue #12, and writing comprehensive unit tests (`SessionRestorationTest`, `ProfileRepairTest`, `RecipientConfirmationTest`, `StaleSessionCallbackTest`).
 
-### Key prompts
+**Requests and prompts**
 
-- "Review the latest feature/10-accounts-recipient HEAD (9e10d06) in PR #33 ... Please perform one final minimal merge-blocker correction ..."
+| # | Request summary | Actual prompt (key part) | Why it worked (or didn't) |
+|---|-----------------|--------------------------|---------------------------|
+| 1 | Review final account and session corrections | Recorded excerpt: "Review the latest feature/10-accounts-recipient HEAD (9e10d06) in PR #33 ... Please perform one final minimal merge-blocker correction ..." | See documented checks and errors below. |
+
 
 ### What the agent changed and verified
 

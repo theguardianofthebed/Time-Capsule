@@ -1,4 +1,8 @@
-# User G agent log week 1
+# Agent Log – Week 1 (MM/DD – MM/DD)
+
+- Name / Student ID:
+- Model(s) used:
+- My changes to the team's Agent Tools this week:
 
 The planned submission date is **13 November 2026**; follow any later professor announcement. Add one feature/task section for each piece of work. Describe your own contribution and use real prompts, results, and examples. If you did not use an agent this week, say so honestly.
 
@@ -10,21 +14,23 @@ Follow [the shared workflow](../../agent-tools/WORKFLOW.md) and [AGENTS.md](../.
 - **Session date(s):** 7 November 2026.
 - **Issue and PR:** Issue #7; https://github.com/theguardianofthebed/Time-Capsule/pull/8
 - **Requirement/design references:** Professor's `Term_Project_Agent_Usage_Supplement.docx`; `AGENTS.md`; `CURRENT_CONTRACT.md`; `WORKFLOW.md`; `CODING_AND_COMMENTS.md`.
-- **Agent environment:** Codex desktop app, used for repository documentation only. No Android application code was changed in this task.
+- **Agent environment:** Desktop documentation assistant, used for repository documentation only. No Android application code was changed in this task.
 - **Model used:** Exact displayed model name was not recorded. Gemini 3.6 Flash was discussed but was not used for this documentation session.
 
-### Purpose of agent use
+**Goal**
 
 I used the agent to inspect the existing Rules, Skills, individual weekly logs, retrospectives, ignore settings, and MCP example, then compare their structure with the professor's supplement. I decided that the weekly log should be prepared automatically after each task, that the mandatory workflow should have four core documents, and that the existing KDoc rule should remain.
 
-### Key prompts
+**Requests and prompts**
 
-- Check whether `AGENTS.md`, Rules, Skills, three students' weekly logs, and retrospectives are already structured.
-- Explain the existing `AGENTS.md` and identify strengths, gaps, and differences from the professor's requirements.
-- Make the agent prepare the weekly log automatically, while asking before recording personal review, manual fixes, understanding, or learning.
-- Reduce the mandatory document structure to `AGENTS.md`, `CURRENT_CONTRACT.md`, `WORKFLOW.md`, and `CODING_AND_COMMENTS.md`.
-- Keep the KDoc requirement.
-- Keep real MCP settings private and retain only the professor-required token-free example in the repository.
+| # | Request summary | Actual prompt (key part) | Why it worked (or didn't) |
+|---|-----------------|--------------------------|---------------------------|
+| 1 | Check whether `AGENTS.md`, Rules, Skills, three students' weekly logs, and retrospectives are already structured. |  | |
+| 2 | Explain the existing `AGENTS.md` and identify strengths, gaps, and differences from the professor's requirements. |  | |
+| 3 | Make the agent prepare the weekly log automatically, while asking before recording personal review, manual fixes, understanding, or learning. |  | |
+| 4 | Reduce the mandatory document structure to `AGENTS.md`, `CURRENT_CONTRACT.md`, `WORKFLOW.md`, and `CODING_AND_COMMENTS.md`. |  | |
+| 5 | Keep the KDoc requirement. |  | |
+| 6 | Keep real MCP settings private and retain only the professor-required token-free example in the repository. |  | |
 
 ### What the agent changed and verified
 
@@ -51,20 +57,22 @@ The first attempted whole-file replacement of `AGENTS.md` was rejected because i
 - **Agent environment:** Android Studio Agent Mode.
 - **Model used:** Gemini 3.6 Flash.
 
-### Purpose of agent use
+**Goal**
 
 I used the agent to remove obsolete Compose dependencies and files, configure AGP 9.3.0 compatibility, enable ViewBinding, generate XML layout placeholders for S-01 through S-08 screens, verify Gradle Sync and Debug APK builds, execute unit tests, and test deployment on an emulator.
 
-### Key prompts
+**Requests and prompts**
 
-- Fetch remote branches and create `feature/25-views-skeleton` based on `origin/docs/25-views-screen-contract`.
-- Remove Compose dependencies (`kotlin-compose` plugin, Compose BOM, UI/Material3/Navigation) and enable `buildFeatures.viewBinding`.
-- Delete obsolete Compose screen/theme files in `app/src/main/java/com/example/timecapsule/ui`.
-- Create `activity_main.xml` and S-01 to S-08 XML placeholder layouts in `res/layout/`.
-- Update `MainActivity.kt` to use `AppCompatActivity` and ViewBinding (`ActivityMainBinding`).
-- Fix XML inspection errors/warnings and extract hardcoded strings into `strings.xml`.
-- Perform Gradle Sync, Debug APK assemble (`:app:assembleDebug`), unit tests (`:app:testDebugUnitTest`), deploy to emulator, and clean-rebuild after a build artifact error.
-- Pause before Agent Log updates and Git operations so the user could review the changes and add the onCreate KDoc manually.
+| # | Request summary | Actual prompt (key part) | Why it worked (or didn't) |
+|---|-----------------|--------------------------|---------------------------|
+| 1 | Fetch remote branches and create `feature/25-views-skeleton` based on `origin/docs/25-views-screen-contract`. |  | |
+| 2 | Remove Compose dependencies (`kotlin-compose` plugin, Compose BOM, UI/Material3/Navigation) and enable `buildFeatures.viewBinding`. |  | |
+| 3 | Delete obsolete Compose screen/theme files in `app/src/main/java/com/example/timecapsule/ui`. |  | |
+| 4 | Create `activity_main.xml` and S-01 to S-08 XML placeholder layouts in `res/layout/`. |  | |
+| 5 | Update `MainActivity.kt` to use `AppCompatActivity` and ViewBinding (`ActivityMainBinding`). |  | |
+| 6 | Fix XML inspection errors/warnings and extract hardcoded strings into `strings.xml`. |  | |
+| 7 | Perform Gradle Sync, Debug APK assemble (`:app:assembleDebug`), unit tests (`:app:testDebugUnitTest`), deploy to emulator, and clean-rebuild after a build artifact error. |  | |
+| 8 | Pause before Agent Log updates and Git operations so the user could review the changes and add the onCreate KDoc manually. |  | |
 
 ### What the agent changed and verified
 
@@ -101,18 +109,21 @@ I used the agent to remove obsolete Compose dependencies and files, configure AG
 - **Agent environment:** Android Studio Agent Mode.
 - **Model used:** Gemini 3.6 Flash.
 
-### Purpose of agent use
+**Goal**
 
 I used the agent to implement DefaultAuthAdapter, DefaultFirestoreAdapter, AccountSessionManager, S-01/S-02/S-08 ViewModels and Fragments, update firestore.rules, ensure safe debug emulator initialization, and verify 33 passing unit tests and 9 passing Firebase Emulator integration tests.
 
-### Key prompts
+**Requests and prompts**
 
-- Create `feature/10-accounts-recipient` branch from `origin/feature/9-reviewable`.
-- Implement `DefaultAuthAdapter` with fine-grained Firebase exception mappings.
-- Implement `DefaultFirestoreAdapter` enforcing exact single `get` and owner-only `create`/`update` rules in `firestore.rules`.
-- Implement `AccountSessionManager` for atomic `SessionTracker` updates and authenticated Profile Repair.
-- Refactor S-01, S-02, S-08 Fragments and ViewModels using `ViewModelFactory`.
-- Run unit tests (`:app:testDebugUnitTest`), Debug APK build (`:app:assembleDebug`), and Firebase Emulator Instrumentation tests (`:app:connectedDebugAndroidTest`).
+| # | Request summary | Actual prompt (key part) | Why it worked (or didn't) |
+|---|-----------------|--------------------------|---------------------------|
+| 1 | Branch setup | Paraphrased from prior record: Create `feature/10-accounts-recipient` branch from `origin/feature/9-reviewable`. | See documented checks and errors below. |
+| 2 | Authentication exception mapping | Paraphrased from prior record: Implement `DefaultAuthAdapter` with fine-grained Firebase exception mappings. | See documented checks and errors below. |
+| 3 | Recipient directory lookup and rules | Paraphrased from prior record: Implement `DefaultFirestoreAdapter` enforcing exact single `get` and owner-only `create`/`update` rules in `firestore.rules`. | See documented checks and errors below. |
+| 4 | Session and profile repair | Paraphrased from prior record: Implement `AccountSessionManager` for atomic `SessionTracker` updates and authenticated Profile Repair. | See documented checks and errors below. |
+| 5 | Account screen and ViewModel setup | Paraphrased from prior record: Refactor S-01, S-02, S-08 Fragments and ViewModels using `ViewModelFactory`. | See documented checks and errors below. |
+| 6 | Build and emulator verification | Paraphrased from prior record: Run unit tests (`:app:testDebugUnitTest`), Debug APK build (`:app:assembleDebug`), and Firebase Emulator Instrumentation tests (`:app:connectedDebugAndroidTest`). | See documented checks and errors below. |
+
 
 ### What the agent changed and verified
 
