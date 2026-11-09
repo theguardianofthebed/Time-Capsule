@@ -79,6 +79,7 @@ class FakeAuthAdapter(private val tracker: DefaultSessionTracker) : AuthAdapter 
 
 class FakeFirestoreAdapter : FirestoreAdapter {
     override fun isAvailable(): Boolean = true
+    override fun firestoreInstance(): com.google.firebase.firestore.FirebaseFirestore? = null
 }
 
 class FakeStorageAdapter : StorageAdapter {

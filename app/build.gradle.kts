@@ -5,22 +5,37 @@ plugins {
 
 // Apply google-services plugin conditionally.
 // Debug foundation builds succeed without google-services.json for credential-free local development.
-// Release builds strictly require google-services.json to prevent releasing misconfigured production artifacts.
-val hasGoogleServices = file("google-services.json").exists() ||
-    file("src/debug/google-services.json").exists() ||
-    file("src/release/google-services.json").exists()
+// Apply google-services plugin conditionally.
+// Debug builds allow credential-free local development when no google-services.json is provided.
+// Release builds strictly require root (app/google-services.json) or Release (app/src/release/google-services.json) config.
+// Debug-only configuration (app/src/debug/google-services.json) does NOT qualify for Release builds.
+val hasRootGoogleServices = file("google-services.json").exists()
+val hasDebugGoogleServices = file("src/debug/google-services.json").exists()
+val hasReleaseGoogleServices = file("src/release/google-services.json").exists()
 
 val isReleaseBuildRequested = gradle.startParameter.taskNames.any { name ->
     name.contains("Release", ignoreCase = true)
 }
 
-if (hasGoogleServices) {
+val hasValidReleaseConfig = hasRootGoogleServices || hasReleaseGoogleServices
+val hasValidDebugConfig = hasRootGoogleServices || hasDebugGoogleServices
+
+if (isReleaseBuildRequested) {
+    if (hasValidReleaseConfig) {
+        apply(plugin = "com.google.gms.google-services")
+    } else {
+        val causeMsg = if (hasDebugGoogleServices) {
+            "Debug-only configuration (app/src/debug/google-services.json) is not permitted for Release builds."
+        } else {
+            "No Release Firebase configuration found."
+        }
+        throw GradleException(
+            "Release build requires google-services.json in app/ or app/src/release/. $causeMsg " +
+            "Provide production Firebase configuration before building Release artifacts."
+        )
+    }
+} else if (hasValidDebugConfig) {
     apply(plugin = "com.google.gms.google-services")
-} else if (isReleaseBuildRequested) {
-    throw GradleException(
-        "Release build requires google-services.json in app/ or app/src/release/. " +
-        "Provide production Firebase configuration before building Release artifacts."
-    )
 }
 
 android {

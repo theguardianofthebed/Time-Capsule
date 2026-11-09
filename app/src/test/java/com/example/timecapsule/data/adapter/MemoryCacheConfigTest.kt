@@ -1,8 +1,10 @@
 package com.example.timecapsule.data.adapter
 
+import com.example.timecapsule.config.FirebaseConfig
 import com.google.firebase.firestore.MemoryCacheSettings
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -30,5 +32,27 @@ class MemoryCacheConfigTest {
     @Test
     fun firestoreCachePolicyObjectIsAccessible() {
         assertNotNull(FirestoreCachePolicy)
+    }
+
+    @Test
+    fun defaultFirestoreAdapterSafelyHandlesUninitializedFirebase() {
+        val adapter = DefaultFirestoreAdapter(contextSupplier = { null })
+
+        assertFalse("Adapter must report unavailable when Context/Firebase is absent", adapter.isAvailable())
+        assertNull("Adapter must return null instance when Context/Firebase is absent", adapter.firestoreInstance())
+    }
+
+    @Test
+    fun getMemoryOnlyFirestoreFailsSafelyWhenUninitialized() {
+        FirebaseConfig.resetEmulatorModeForTesting()
+        val instance = FirebaseConfig.getMemoryOnlyFirestore(context = null)
+
+        // Without initialized FirebaseApp in pure unit test, instance creation fails safely or returns null.
+        if (instance != null) {
+            assertTrue(
+                "Memory-only cache settings must be applied before first use",
+                instance.firestoreSettings.cacheSettings is MemoryCacheSettings
+            )
+        }
     }
 }

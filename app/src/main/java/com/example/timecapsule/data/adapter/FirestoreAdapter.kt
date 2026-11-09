@@ -1,5 +1,7 @@
 package com.example.timecapsule.data.adapter
 
+import android.content.Context
+import com.example.timecapsule.config.FirebaseConfig
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreSettings
 import com.google.firebase.firestore.MemoryCacheSettings
@@ -31,4 +33,25 @@ object FirestoreCachePolicy {
 interface FirestoreAdapter {
     /** True if Firestore adapter is configured and ready. */
     fun isAvailable(): Boolean
+
+    /** Returns the configured memory-only [FirebaseFirestore] instance or null if unavailable. */
+    fun firestoreInstance(): FirebaseFirestore?
+}
+
+/**
+ * Production implementation of [FirestoreAdapter] bound to [FirebaseConfig.getMemoryOnlyFirestore].
+ * Enforces memory-only cache configuration before returning the Firestore SDK instance.
+ */
+class DefaultFirestoreAdapter(
+    private val contextSupplier: () -> Context? = { null }
+) : FirestoreAdapter {
+
+    override fun isAvailable(): Boolean {
+        val ctx = contextSupplier()
+        return ctx != null && FirebaseConfig.isFirebaseAvailable(ctx)
+    }
+
+    override fun firestoreInstance(): FirebaseFirestore? {
+        return FirebaseConfig.getMemoryOnlyFirestore(contextSupplier())
+    }
 }
