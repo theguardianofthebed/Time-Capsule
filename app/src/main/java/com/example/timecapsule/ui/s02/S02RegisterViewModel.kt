@@ -28,6 +28,23 @@ class S02RegisterViewModel(
         }
     }
 
+    /**
+     * Performs profile repair for an existing authenticated session.
+     */
+    fun repairProfile(displayName: String) {
+        viewModelScope.launch {
+            val result = accountSessionManager.repairProfile(displayName)
+            val mapped = when (result) {
+                is OperationResult.Success -> OperationResult.Success("Profile repaired successfully!")
+                is OperationResult.Invalid -> OperationResult.Invalid(result.message)
+                is OperationResult.Denied -> OperationResult.Denied(result.message)
+                is OperationResult.Unavailable -> OperationResult.Unavailable(result.message)
+                is OperationResult.OutcomeUnknown -> OperationResult.Unavailable(result.message)
+            }
+            _registerState.postValue(mapped)
+        }
+    }
+
     /** Clears active registration state notification. */
     fun clearState() {
         _registerState.value = null

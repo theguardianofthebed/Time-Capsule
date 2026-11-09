@@ -38,15 +38,17 @@ class AccountSessionManager(
     suspend fun signIn(email: String, password: String): OperationResult<String> {
         val capturedSession = sessionTracker.currentSession()
         val result = authAdapter.signIn(email, password)
-        if (result is OperationResult.Success) {
-            // Verify session did not switch to a different account during the async sign-in call
-            if (sessionTracker.currentSession().sessionGeneration == capturedSession.sessionGeneration ||
-                !sessionTracker.currentSession().isAuthenticated
-            ) {
-                sessionTracker.startSession(result.data)
-            } else {
-                return OperationResult.Denied("Stale session invalidation: session changed during sign-in")
+
+        val currentSession = sessionTracker.currentSession()
+        if (currentSession.sessionGeneration != capturedSession.sessionGeneration) {
+            if (authAdapter.activeUid() != null && currentSession.uid != authAdapter.activeUid()) {
+                authAdapter.signOut()
             }
+            return OperationResult.Denied("Stale session invalidation: session changed during sign-in")
+        }
+
+        if (result is OperationResult.Success) {
+            sessionTracker.startSession(result.data)
         }
         return result
     }
@@ -83,22 +85,24 @@ class AccountSessionManager(
         }
 
         val authResult = authAdapter.signUp(trimmedEmail, password, trimmedName)
+
+        val currentSession = sessionTracker.currentSession()
+        if (currentSession.sessionGeneration != capturedSession.sessionGeneration) {
+            if (authAdapter.activeUid() != null && currentSession.uid != authAdapter.activeUid()) {
+                authAdapter.signOut()
+            }
+            return OperationResult.Denied("Stale session invalidation: session changed during sign-up")
+        }
+
         if (authResult is OperationResult.Success) {
             val uid = authResult.data
-            // Verify session was not cleared/switched during the async signup call before updating tracker
-            if (sessionTracker.currentSession().sessionGeneration == capturedSession.sessionGeneration ||
-                !sessionTracker.currentSession().isAuthenticated
-            ) {
-                sessionTracker.startSession(uid)
-            } else {
-                return OperationResult.Denied("Stale session invalidation: session changed during sign-up")
-            }
+            sessionTracker.startSession(uid)
 
             val profile = RecipientProfile(uid = uid, displayName = trimmedName)
             val profileResult = firestoreAdapter.saveRecipientProfile(profile)
             if (profileResult !is OperationResult.Success) {
                 return OperationResult.Unavailable(
-                    "Account registered, but recipient profile setup failed. Please click 'Update Profile' to complete setup."
+                    "Account registered, but recipient profile setup failed. Please click 'Register / Repair' to complete setup."
                 )
             }
         }

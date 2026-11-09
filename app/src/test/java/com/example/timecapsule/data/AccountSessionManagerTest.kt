@@ -5,6 +5,9 @@ import com.example.timecapsule.data.adapter.FirestoreAdapter
 import com.example.timecapsule.data.session.DefaultSessionTracker
 import com.example.timecapsule.domain.model.RecipientProfile
 import com.example.timecapsule.domain.result.OperationResult
+import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -13,8 +16,8 @@ import org.junit.Before
 import org.junit.Test
 
 /**
- * Unit tests for 2nd stage: [AccountSessionManager], session generation single updates,
- * authenticated Profile Repair boundaries, and exception mappings.
+ * Unit tests for [AccountSessionManager], session generation single updates,
+ * delayed authentication stale callback rejection, and Profile Repair.
  */
 class AccountSessionManagerTest {
 
@@ -78,7 +81,7 @@ class AccountSessionManagerTest {
         val directory = mutableMapOf<String, RecipientProfile>()
 
         override fun isAvailable(): Boolean = true
-        override fun firestoreInstance(): com.google.firebase.firestore.FirebaseFirestore? = null
+        override fun firestoreInstance(): FirebaseFirestore? = null
 
         override suspend fun getRecipientProfile(uid: String): OperationResult<RecipientProfile> {
             val profile = directory[uid]
@@ -159,6 +162,29 @@ class AccountSessionManagerTest {
         val profileRes = fakeFirestoreAdapter.getRecipientProfile("user-123")
         assertTrue(profileRes is OperationResult.Success)
         assertEquals("Repaired Name", (profileRes as OperationResult.Success).data.displayName)
+    }
+
+    @Test
+    fun testDelayedSignInIsRejectedIfSessionChangesDuringAuthentication() = runBlocking {
+        sessionTracker.startSession("user-a")
+
+        val job = async {
+            val delayedAuth = object : AuthAdapter by fakeAuthAdapter {
+                override suspend fun signIn(email: String, password: String): OperationResult<String> {
+                    delay(50)
+                    return fakeAuthAdapter.signIn(email, password)
+                }
+            }
+            val delayedManager = AccountSessionManager(delayedAuth, fakeFirestoreAdapter, sessionTracker)
+            delayedManager.signIn("user@example.com", "validPass")
+        }
+
+        // Session cleared/changed while sign-in was in-flight
+        delay(10)
+        sessionTracker.clearSession()
+
+        val result = job.await()
+        assertTrue("Delayed sign-in must be rejected when session changes during operation", result is OperationResult.Denied)
     }
 
     @Test

@@ -37,8 +37,26 @@ class S02RegisterFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         val mainActivity = requireActivity() as MainActivity
-        val factory = ViewModelFactory(mainActivity.container.accountSessionManager)
+        val appContainer = mainActivity.container
+        val factory = ViewModelFactory(appContainer.accountSessionManager)
         viewModel = ViewModelProvider(this, factory)[S02RegisterViewModel::class.java]
+
+        val activeUid = appContainer.authAdapter.activeUid()
+        val isProfileRepairMode = !activeUid.isNullOrBlank()
+
+        if (isProfileRepairMode) {
+            binding.btnRegister.text = getString(R.string.btn_repair_profile)
+            binding.etEmail.visibility = View.GONE
+            binding.etPassword.visibility = View.GONE
+            binding.etConfirmPassword.visibility = View.GONE
+            val activeName = appContainer.authAdapter.activeDisplayName() ?: ""
+            binding.etDisplayName.setText(activeName)
+        } else {
+            binding.btnRegister.text = getString(R.string.btn_register)
+            binding.etEmail.visibility = View.VISIBLE
+            binding.etPassword.visibility = View.VISIBLE
+            binding.etConfirmPassword.visibility = View.VISIBLE
+        }
 
         viewModel.registerState.observe(viewLifecycleOwner) { result ->
             binding.btnRegister.isEnabled = true
@@ -57,13 +75,26 @@ class S02RegisterFragment : Fragment() {
         }
 
         binding.btnRegister.setOnClickListener {
-            val email = binding.etEmail.text.toString()
-            val password = binding.etPassword.text.toString()
-            val displayName = binding.etDisplayName.text.toString()
+            val displayName = binding.etDisplayName.text.toString().trim()
 
-            binding.btnRegister.isEnabled = false
-            binding.tvStatusMessage.text = getString(R.string.msg_creating_account)
-            viewModel.registerAndCreateProfile(email, password, displayName)
+            if (isProfileRepairMode) {
+                binding.btnRegister.isEnabled = false
+                binding.tvStatusMessage.text = getString(R.string.msg_creating_account)
+                viewModel.repairProfile(displayName)
+            } else {
+                val email = binding.etEmail.text.toString()
+                val password = binding.etPassword.text.toString()
+                val confirmPassword = binding.etConfirmPassword.text.toString()
+
+                if (password != confirmPassword) {
+                    binding.tvStatusMessage.text = getString(R.string.err_password_mismatch)
+                    return@setOnClickListener
+                }
+
+                binding.btnRegister.isEnabled = false
+                binding.tvStatusMessage.text = getString(R.string.msg_creating_account)
+                viewModel.registerAndCreateProfile(email, password, displayName)
+            }
         }
     }
 

@@ -13,12 +13,14 @@
 
     <string name="hint_email">Email address</string>
     <string name="hint_password">Password</string>
+    <string name="hint_confirm_password">Confirm Password</string>
     <string name="hint_display_name">Display Name</string>
     <string name="hint_recipient_uid">Recipient Auth UID</string>
     <string name="label_public_uid">My Public Auth UID:</string>
 
     <string name="btn_sign_in">Sign In</string>
     <string name="btn_register">Create Account</string>
+    <string name="btn_repair_profile">Retry Profile Setup / Repair</string>
     <string name="btn_go_to_register">Don\'t have an account? Register</string>
     <string name="btn_update_profile">Update Display Name</string>
     <string name="btn_copy_uid">Copy Auth UID</string>
@@ -32,4 +34,5 @@
     <string name="msg_signed_out">Signed out successfully.</string>
     <string name="err_adapter_unavailable">Required service adapters unavailable.</string>
     <string name="err_session_unavailable">Session unauthenticated or service unavailable.</string>
+    <string name="err_password_mismatch">Passwords do not match.</string>
 </resources>
