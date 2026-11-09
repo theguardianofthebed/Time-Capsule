@@ -76,3 +76,11 @@ Automatic approval review rejected uploading the full private Atlas r55 snapshot
 - **Work:** Refreshed the 14-slide academic presentation, exported all three diagrams as PNG and editable SVG, and updated their repository SVG sources/provenance. All 16 Issues and 52 direct dependencies were read from PR #30's committed manifest. Governance is adopted; feature verification remains separate. M3 stays a recommended demonstration grouping as the source states.
 - **Checks:** Diagram renders inspected, PNG decode/SVG XML checked, source node/edge totals confirmed, and modified slide renders inspected. No application or dependency change, extra acceptance pass, deployment or live Atlas edit.
 - **Handoff:** A focused documentation follow-up contains the refreshed SVGs and factual delivery record for human review. Personal learning/review and course submission remain unclaimed. Full private r55 public disclosure still awaits explicit approval.
+
+
+### Parallel layout follow-up
+
+- **Owner/period/scope:** User J; 10 November 2026; MVP documentation, dependent on merged PR #30.
+- **Request and change:** Revised only Diagram A to show independent work in parallel columns and shared bottlenecks in one centered lane. #11 and #12 branch after #10; #13 → #14 → #15 runs alongside #16, and both paths join at #17. Existing colors, Issue content, order and PR #30 status snapshot are preserved.
+- **Verification:** The renderer checked the exact 16-node/52-edge graph, identified 17 main-path edges, confirmed that parallel Issues have no dependency path between them, and checked all 52 edge IDs in the SVG. PNG/SVG renders were visually inspected; final diff formatting passed. B/C and application files were unchanged. No current-status audit or Android test is claimed.
+- **Delivery:** Updated PNG and editable SVG in the diagram bundle; revised repository SVG and this log in [PR #31](https://github.com/theguardianofthebed/Time-Capsule/pull/31). Rows do not impose extra synchronization barriers; readiness evidence still controls implementation starts. Different-teammate review and human merge remain pending.
