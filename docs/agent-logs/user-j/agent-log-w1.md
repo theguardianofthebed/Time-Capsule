@@ -101,3 +101,48 @@ Needed assistance in pinning Firebase/Maps/DataStore dependencies, defining type
 - **Feedback and next step:**
   - The initial foundation provides reusable interfaces and testable components for subsequent features. I requested additional automated verification for asynchronous session isolation, Firestore initialization, and Firebase configuration safety before performing manual testing. 
   - The next plan is to review the final test results, reproduce the relevant checks in Android Studio, and address any remaining issues in PR #29 before teammate review and merging.
+
+---
+
+## Task: Issue #10 Android 17 Firebase Emulator Test Connectivity Fix
+
+- **Task and purpose:** Fixed Android 17 (API 37) local network permission enforcement (`android.permission.ACCESS_LOCAL_NETWORK`) for Firebase Auth & Firestore Emulator test connectivity, ensuring instrumentation tests execute and pass cleanly on API 37 AVDs without TCP timeout errors.
+- **Session date(s):** 10 November 2026.
+- **Issue and PR:** Issue #10 (https://github.com/theguardianofthebed/Time-Capsule/issues/10), Draft PR #33 (https://github.com/theguardianofthebed/Time-Capsule/pull/33) on `feature/10-accounts-recipient`.
+- **Requirement/design references:** DD-03, DD-11, DD-19, DD-20, AC-01, AC-12.
+- **Agent environment:** Android Studio Agent Mode.
+- **Model used:** Gemini Flash 3.6 (Android Studio Agent Mode).
+
+### Purpose of agent use
+
+Needed assistance in diagnosing the Android 17 (API 37) `ACCESS_LOCAL_NETWORK` local network permission requirement, declaring it in the Debug-only manifest, adding `GrantPermissionRule` and `UiAutomation` permission grants before test execution, improving negative Firestore rule assertions to verify exact `PERMISSION_DENIED` exceptions, and verifying instrumented test suite execution.
+
+### Key prompts
+
+- "Issue #10 — Fix Android 17 Firebase Emulator Test Connectivity ... On Android 17 (API 37), the application cannot connect to the Firebase Authentication Emulator at 10.0.2.2:9099 ..."
+
+### What the agent changed and verified
+
+- **Changes:**
+  - `app/src/main/AndroidManifest.xml`: Added `<uses-permission android:name="android.permission.INTERNET" />`.
+  - `app/src/debug/AndroidManifest.xml`: Added Debug-only `<uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />` while preserving `usesCleartextTraffic="true"`.
+  - `gradle/libs.versions.toml` & `app/build.gradle.kts`: Added `androidx.test:rules:1.6.1` (`androidTestImplementation(libs.androidx.test.rules)`).
+  - `app/src/androidTest/java/com/example/timecapsule/data/adapter/FirebaseEmulatorIntegrationTest.kt`: Added `@get:Rule GrantPermissionRule` and `uiAutomation.grantRuntimePermission` in `@BeforeClass` for `ACCESS_LOCAL_NETWORK`. Improved negative security rule assertions to check for `FirebaseFirestoreException.Code.PERMISSION_DENIED`.
+- **Checks and results:**
+  - `gradle_sync`: PASS
+  - `:app:assembleDebug`: PASS
+  - `:app:testDebugUnitTest`: PASS (33 passed unit tests)
+  - `:app:lintDebug`: PASS
+  - `:app:connectedDebugAndroidTest`: PASS (9 passed instrumentation tests on `emulator-5554` API 37 with 0 failures, including all `FirebaseEmulatorIntegrationTest` cases).
+- **Remaining checks:**
+  - Live production Firebase authentication (deferred to production deployment after PR review).
+
+### Errors and manual fixes
+
+- Resolved an unused import warning in `FirebaseEmulatorIntegrationTest.kt`. All build, unit, lint, and instrumentation tests passed without manual code edits.
+
+### My review and understanding
+
+- **What I reviewed:** [Awaiting student review]
+- **What I can explain:** [Awaiting student response]
+- **Feedback and next step:** [Awaiting student confirmation and PR review]

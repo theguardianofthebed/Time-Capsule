@@ -2,19 +2,21 @@ package com.example.timecapsule.data.adapter
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.rule.GrantPermissionRule
 import com.example.timecapsule.config.FirebaseConfig
 import com.example.timecapsule.domain.model.RecipientProfile
 import com.example.timecapsule.domain.result.OperationResult
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FirebaseFirestoreException
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.tasks.await
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.BeforeClass
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -26,16 +28,26 @@ import org.junit.runner.RunWith
 class FirebaseEmulatorIntegrationTest {
 
     companion object {
-        private const val EMULATOR_HOST = "10.0.2.2"
-
         @BeforeClass
         @JvmStatic
         fun setupEmulatorConnection() {
             val context = InstrumentationRegistry.getInstrumentation().targetContext
+            try {
+                InstrumentationRegistry.getInstrumentation().uiAutomation.grantRuntimePermission(
+                    context.packageName,
+                    "android.permission.ACCESS_LOCAL_NETWORK",
+                )
+            } catch (_: Exception) {
+                // Ignore runtime permission grant fallback on platforms where not enforced
+            }
             val initialized = FirebaseConfig.setupDebugEmulatorConnection(context, true)
             assertTrue("Firebase debug emulator connection must succeed for tests", initialized)
         }
     }
+
+    @get:Rule
+    val grantLocalNetworkPermissionRule: GrantPermissionRule =
+        GrantPermissionRule.grant("android.permission.ACCESS_LOCAL_NETWORK")
 
     private lateinit var auth: FirebaseAuth
     private lateinit var firestore: FirebaseFirestore
@@ -82,8 +94,10 @@ class FirebaseEmulatorIntegrationTest {
         try {
             firestore.collection("recipientDirectory").get().await()
             fail("List query on recipientDirectory must be denied by firestore.rules")
+        } catch (e: FirebaseFirestoreException) {
+            assertEquals("List query failure must be PERMISSION_DENIED", FirebaseFirestoreException.Code.PERMISSION_DENIED, e.code)
         } catch (e: Exception) {
-            assertNotNull(e.message)
+            fail("List query failure must be FirebaseFirestoreException PERMISSION_DENIED, got: $e")
         }
     }
 
@@ -126,8 +140,10 @@ class FirebaseEmulatorIntegrationTest {
                 .set(mapOf("uid" to uid, "displayName" to "User 6", "role" to "admin"))
                 .await()
             fail("Forbidden fields must be denied")
+        } catch (e: FirebaseFirestoreException) {
+            assertEquals("Forbidden fields set must be PERMISSION_DENIED", FirebaseFirestoreException.Code.PERMISSION_DENIED, e.code)
         } catch (e: Exception) {
-            assertNotNull(e.message)
+            fail("Forbidden fields set must be FirebaseFirestoreException PERMISSION_DENIED, got: $e")
         }
     }
 
@@ -140,8 +156,10 @@ class FirebaseEmulatorIntegrationTest {
                 .set(mapOf("uid" to uid, "displayName" to "User 7"))
                 .await()
             fail("Mismatched path UID and document UID must be denied")
+        } catch (e: FirebaseFirestoreException) {
+            assertEquals("Mismatched path UID set must be PERMISSION_DENIED", FirebaseFirestoreException.Code.PERMISSION_DENIED, e.code)
         } catch (e: Exception) {
-            assertNotNull(e.message)
+            fail("Mismatched path UID set must be FirebaseFirestoreException PERMISSION_DENIED, got: $e")
         }
     }
 }
