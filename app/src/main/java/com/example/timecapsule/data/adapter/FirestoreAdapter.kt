@@ -10,12 +10,18 @@ import com.google.firebase.firestore.MemoryCacheSettings
  */
 object FirestoreCachePolicy {
 
-    /** Applies memory-only cache settings to [firestore] instance before first use. */
-    fun applyMemoryOnlyCache(firestore: FirebaseFirestore) {
-        val settings = FirebaseFirestoreSettings.Builder()
+    /** Creates memory-only cache settings instance without persistent disk caching. */
+    fun createMemoryOnlySettings(): FirebaseFirestoreSettings {
+        return FirebaseFirestoreSettings.Builder()
             .setLocalCacheSettings(MemoryCacheSettings.newBuilder().build())
             .build()
+    }
+
+    /** Applies memory-only cache settings to [firestore] instance before first use. */
+    fun applyMemoryOnlyCache(firestore: FirebaseFirestore): FirebaseFirestoreSettings {
+        val settings = createMemoryOnlySettings()
         firestore.firestoreSettings = settings
+        return settings
     }
 }
 

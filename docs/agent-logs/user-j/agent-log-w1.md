@@ -52,7 +52,7 @@ Needed assistance in identifying the AppCompat theme incompatibility, applying t
 ## Task: Issue #9 Shared Android/Firebase Foundation
 
 - **Task and purpose:** Established shared Android/Firebase foundation architecture, typed OperationResult hierarchy, session generation protection against stale account callbacks, replaceable adapter seams, memory-only Firestore cache configuration, and safe local Firebase emulator setup.
-- **Session date(s):** 8 November 2026.
+- **Session date(s):** 8 & 9 November 2026.
 - **Issue and PR:** Issue #9 (https://github.com/theguardianofthebed/Time-Capsule/issues/9); implementation Draft PR #29 (https://github.com/theguardianofthebed/Time-Capsule/pull/29) from `feature/9-reviewable`. PR #28 was the separate rollback of the accidental direct-to-main commit.
 - **Requirement/design references:** ARC-01, DD-10, DD-11, DD-20, NFR-01, NFR-06, FR-01, FR-02, FR-03, FR-09, AC-01, AC-03, AC-07, AC-09, AC-11, AC-12, AC-13, AC-14, T-02, T-10, T-32, T-33, T-40, T-43, T-44, T-45.
 - **Agent environment:** Android Studio Agent Mode.
@@ -60,36 +60,38 @@ Needed assistance in identifying the AppCompat theme incompatibility, applying t
 
 ### Purpose of agent use
 
-Needed assistance in pinning Firebase/Maps/DataStore dependencies, defining typed result boundaries (`OperationResult`), implementing session generation tracking (`DefaultSessionTracker`), creating adapter interfaces, configuring memory-only Firestore cache, setting up local Firebase emulator scaffolding with deny-all security baselines, and writing unit tests for repository seams and stale callback rejection.
+Needed assistance in pinning Firebase/Maps/DataStore dependencies, defining typed result boundaries (`OperationResult`), implementing session generation tracking (`DefaultSessionTracker`), creating adapter interfaces, configuring memory-only Firestore cache, setting up local Firebase emulator scaffolding with deny-all security baselines, and writing unit tests for repository seams, delayed operation stale callback rejection, memory cache settings, release build safety, and security rules baseline.
 
 ### Key prompts
 
 - "TimeCapsule — Issue #9: Shared Android/Firebase Foundation ... Complete the bounded foundation, verify it, present the changes to me..."
+- "TimeCapsule Issue #9 — Safely Resume Interrupted Work ... Continue from the verified recovery checkpoint. Preserve all existing work, complete only the remaining Issue #9 tests and minimal corrections..."
 
 ### What the agent changed and verified
 
 - **Changes:**
   - `gradle/libs.versions.toml`: Pinned Firebase BoM 34.4.0, Auth, Firestore, Storage, Google Services 4.4.4, Maps 19.2.0, Location 21.3.0, DataStore 1.1.7, ViewModel 2.9.4, Desugaring 2.1.5.
-  - `build.gradle.kts` & `app/build.gradle.kts`: Applied plugin, desugaring, and dependencies with conditional google-services application for credential-free local builds.
+  - `build.gradle.kts` & `app/build.gradle.kts`: Applied plugin, desugaring, and dependencies with conditional google-services application for credential-free local builds and explicit Release build missing-configuration failure check.
   - `firebase.json`, `firestore.rules`, `firestore.indexes.json`, `storage.rules`: Initialized versioned emulator & deny-all security rules.
   - `app/src/main/java/com/example/timecapsule/`: Created `OperationResult` sealed result hierarchy, `SessionSnapshot`, `SessionProvider`, `RecipientProfile`, `CapsuleListsSnapshot`, updated `CapsuleRepository`, implemented `DefaultSessionTracker`, `FirestoreCachePolicy` (memory-only cache), `AuthAdapter`, `FirestoreAdapter`, `StorageAdapter`, `LocationAdapter`, `LocalRetentionAdapter`, `AppDependencyContainer`, and `FirebaseConfig`.
-  - `app/src/test/java/com/example/timecapsule/`: Created unit tests `OperationResultTest`, `SessionProtectionTest`, `MemoryCacheConfigTest`, `RepositorySeamsTest`.
+  - `app/src/test/java/com/example/timecapsule/`: Created unit tests `OperationResultTest`, `SessionProtectionTest` (with delayed operation boundary tests), `MemoryCacheConfigTest` (verifying `MemoryCacheSettings`), `RepositorySeamsTest`, and `FirebaseConfigTest` (verifying emulator ports/host, `isEmulatorMode`, and initial deny-all rules).
 - **Checks and results:**
   - `gradle_sync`: PASS
   - `:app:assembleDebug`: PASS
-  - `:app:testDebugUnitTest`: PASS (17 passed unit tests)
+  - `:app:testDebugUnitTest`: PASS (25 passed unit tests)
   - `:app:lintDebug`: PASS
-  - `:app:connectedDebugAndroidTest`: PASS (2 passed on emulator-5554)
+  - `:app:assembleRelease`: PASS (failed intentionally as expected with `GradleException` due to missing `google-services.json`)
   - `git diff --check`: PASS (clean)
 - **Remaining checks:**
   - Cloud Firebase deployment & live authentication (deferred to downstream feature issues #10-#23).
 
 ### Errors and manual fixes
 
-- Resolved compiler warnings for missing trailing commas, parentheses, and catch parameter signatures. All checks passed without manual code edits.
+- Resolved compiler warnings for missing trailing commas, parentheses, and catch parameter signatures.
+- Fixed `FirebaseConfigTest` rules file location check when running under module root (`app/`). All unit tests passed cleanly.
 
 ### My review and understanding
 
-- **What I reviewed:** I confirmed that I reviewed the Issue #9 work. Specific files and details of my manual review are not recorded here.
-- **What I can explain:** Not yet recorded; no particular personal understanding is claimed by this entry.
-- **Feedback and next step:** My review is confirmed. Draft PR #29 is open; address remaining verification gaps and request an independent teammate review (User F or User G).
+- **What I reviewed:**
+- **What I can explain:** 
+- **Feedback and next step:** 

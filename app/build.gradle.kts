@@ -3,10 +3,24 @@ plugins {
     alias(libs.plugins.google.services) apply false
 }
 
-// Apply google-services plugin only if google-services.json is present locally.
-// This ensures local debug/foundation builds succeed without cloud credentials.
-if (file("google-services.json").exists() || file("src/debug/google-services.json").exists()) {
+// Apply google-services plugin conditionally.
+// Debug foundation builds succeed without google-services.json for credential-free local development.
+// Release builds strictly require google-services.json to prevent releasing misconfigured production artifacts.
+val hasGoogleServices = file("google-services.json").exists() ||
+    file("src/debug/google-services.json").exists() ||
+    file("src/release/google-services.json").exists()
+
+val isReleaseBuildRequested = gradle.startParameter.taskNames.any { name ->
+    name.contains("Release", ignoreCase = true)
+}
+
+if (hasGoogleServices) {
     apply(plugin = "com.google.gms.google-services")
+} else if (isReleaseBuildRequested) {
+    throw GradleException(
+        "Release build requires google-services.json in app/ or app/src/release/. " +
+        "Provide production Firebase configuration before building Release artifacts."
+    )
 }
 
 android {
