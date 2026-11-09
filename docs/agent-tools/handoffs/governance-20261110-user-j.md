@@ -6,8 +6,8 @@
 - **Branch:** `docs/contract-governance-roadmap-20261110`
 - **Initial inspected base:** `59f3a0bf4185daca822efce1db3463f34720cd3f`
 - **Latest main observed by the coordinating agent:** `c60d866cdc9794af97db129c946b66711270f6b9` after PR #29 merged at 00:56 KST on 10 November. Record the actual final task-branch head after integration; do not assume it equals main.
-- **Head/PR:** Coordinating agent records final published commit and actual PR after integration.
-- **State:** AWAITING_REVIEW after local preparation; no merge claimed.
+- **Head/PR:** [PR #30](https://github.com/theguardianofthebed/Time-Capsule/pull/30), initial integration commit `8ebbac2ec0ca5fab0b4a5fe7d0d783aa7f1a0c92`; use the current PR head on resume.
+- **State:** PR #30 was merged externally at 01:14:47 KST. Visual exports and the final delivery log are refreshed against its merged contract; no agent merge was performed.
 - **Related work:** Historical Issue #7, owner-log proposal PR #24, foundation PR #29. This independent governance task does not implement blocked application Issues.
 - **Reviewer:** Different human teammate to be designated. Agent review is advisory.
 
@@ -23,7 +23,7 @@ PR #29 is merged; Issue #9 is still open. PR #29 records build checks and 25 pas
 
 ## Remaining integration and review
 
-The coordinating agent must integrate the live contract snapshot and Issue roadmap, finish Issue publication and presentation, add the actual PR URL/commit and final checks to the owner log, and present the diff for human review. Keep the governance PR for manual merge. Reconcile PR #24 overlap explicitly before any future merge of that proposal. No current application Issue becomes READY because this documentation is merged.
+Integration and publication are complete: 16 Issue bodies were updated and verified, three roadmap views are on the branch, and the 14-slide presentation is saved. Public contract material contains r55 verification metadata; the full private snapshot awaits explicit disclosure approval. PR #30 and the factual owner log are ready for human inspection. PR #30 is now the approved baseline. Any later documentation follow-up still requires human review and manual merge. Reconcile PR #24 overlap explicitly before any future merge of that proposal. No current application Issue becomes READY because this documentation is merged.
 
 ## Resume safely
 
@@ -33,6 +33,6 @@ The validator is a local evidence/ancestry checker; it cannot authenticate decla
 
 ## First next action
 
-Coordinating agent: inspect the final combined diff and finish the authorized governance PR. User J and a different teammate: inspect and review the published change, supply their own coursework review/learning facts, and decide the manual merge.
+User J and a different teammate: inspect the refreshed visual-delivery follow-up and supply their own coursework review/learning facts. Application work still needs current bounded-evidence and ownership preflight.
 
 [Ongoing factual record](../../agent-logs/user-j/agent-log.md)

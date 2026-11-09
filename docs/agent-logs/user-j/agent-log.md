@@ -56,3 +56,23 @@ The coordinating agent observed PR #29 merged at 00:56 KST into main commit `c60
 ### Public snapshot publication limit
 
 Automatic approval review rejected uploading the full private Atlas r55 snapshot to the public repository without explicit public-disclosure consent. The full snapshot was retained privately. The public PR contains revision/count/hash verification metadata, existing public contract summaries and governance changes; it does not contain the full private payload. Publishing that full snapshot remains pending the requester’s explicit approval.
+
+
+### Publication and final verification
+
+- Opened [PR #30](https://github.com/theguardianofthebed/Time-Capsule/pull/30) against main for different-teammate review and manual merge. Initial published commit: `8ebbac2ec0ca5fab0b4a5fe7d0d783aa7f1a0c92`.
+- Updated Issues #9–#23 and #25 (16 total), preserving existing discussion, assignees, titles and state. Each body was checked against its prior content before editing, and the saved response matched the intended body. All include the exact completion-outcome heading and links to the visual roadmap/proposal.
+- Verified all 35 published file blob hashes against the local intended files. Final local checks resolved 197 Markdown links, parsed JSON, preserved all 52 dependency edges and found no application/Gradle edits relative to merged main `c60d866`.
+- Published a separate 14-slide academic presentation. Its current status reflects merged #29 and pending bounded verification, not the earlier draft observation.
+- Full private r55 snapshot saved separately; public upload remains awaiting explicit disclosure approval. No live Atlas write, deployment, paid resource, PR merge or human approval was performed by this task.
+- Next human action: review PR #30 and the owner log, designate a different teammate reviewer, and decide manual merge. For application work, classify #9's announced follow-up and perform #10's fresh bounded-evidence/ownership preflight.
+
+
+## 2026-11-10-pr30-visuals — Presentation and diagrams from the merged contract
+
+- **Owner/period/scope:** User J; 10 November 2026; MVP documentation and presentation.
+- **Request:** Prepare the presentation and diagrams using PR #30 as the final/recent contract, after the requester confirmed its merge.
+- **Source:** PR #30 merged externally at 01:14:47 KST, main `6ec6215786447882d9aca2e9e9c18d5d0fd8eda0`. This task performed no merge. Its earlier publication/log follow-up remains preserved in branch history.
+- **Work:** Refreshed the 14-slide academic presentation, exported all three diagrams as PNG and editable SVG, and updated their repository SVG sources/provenance. All 16 Issues and 52 direct dependencies were read from PR #30's committed manifest. Governance is adopted; feature verification remains separate. M3 stays a recommended demonstration grouping as the source states.
+- **Checks:** Diagram renders inspected, PNG decode/SVG XML checked, source node/edge totals confirmed, and modified slide renders inspected. No application or dependency change, extra acceptance pass, deployment or live Atlas edit.
+- **Handoff:** A focused documentation follow-up contains the refreshed SVGs and factual delivery record for human review. Personal learning/review and course submission remain unclaimed. Full private r55 public disclosure still awaits explicit approval.

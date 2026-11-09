@@ -6,7 +6,7 @@
   <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
    <cc:Work>
     <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
-    <dc:date>2026-11-10T01:03:56.424505</dc:date>
+    <dc:date>2026-11-10T01:18:22.275326</dc:date>
     <dc:format>image/svg+xml</dc:format>
     <dc:creator>
      <cc:Agent>
@@ -21,221 +21,221 @@
  </defs>
  <g id="figure_1">
   <g id="patch_1">
-   <path d="M 0 1368 
-L 1036.8 1368 
-L 1036.8 0 
-L 0 0 
+   <path d="M 0 1368
+L 1036.8 1368
+L 1036.8 0
+L 0 0
 z
 " style="fill: #f8fafc"/>
   </g>
   <g id="axes_1">
    <g id="patch_2">
-    <path d="M 37.44 123.84 
-L 336.96 123.84 
-Q 345.6 123.84 345.6 132.48 
-L 345.6 252 
-Q 345.6 260.64 336.96 260.64 
-L 37.44 260.64 
-Q 28.8 260.64 28.8 252 
-L 28.8 132.48 
-Q 28.8 123.84 37.44 123.84 
+    <path d="M 37.44 131.04
+L 336.96 131.04
+Q 345.6 131.04 345.6 139.68
+L 345.6 259.2
+Q 345.6 267.84 336.96 267.84
+L 37.44 267.84
+Q 28.8 267.84 28.8 259.2
+L 28.8 139.68
+Q 28.8 131.04 37.44 131.04
 z
-" clip-path="url(#pe317d95b90)" style="fill: #dcfce7; stroke: #15803d; stroke-width: 1.3; stroke-linejoin: miter"/>
+" clip-path="url(#pec87c2e2dc)" style="fill: #dcfce7; stroke: #15803d; stroke-width: 1.3; stroke-linejoin: miter"/>
    </g>
    <g id="patch_3">
-    <path d="M 372.24 123.84 
-L 671.76 123.84 
-Q 680.4 123.84 680.4 132.48 
-L 680.4 252 
-Q 680.4 260.64 671.76 260.64 
-L 372.24 260.64 
-Q 363.6 260.64 363.6 252 
-L 363.6 132.48 
-Q 363.6 123.84 372.24 123.84 
+    <path d="M 372.24 131.04
+L 671.76 131.04
+Q 680.4 131.04 680.4 139.68
+L 680.4 259.2
+Q 680.4 267.84 671.76 267.84
+L 372.24 267.84
+Q 363.6 267.84 363.6 259.2
+L 363.6 139.68
+Q 363.6 131.04 372.24 131.04
 z
-" clip-path="url(#pe317d95b90)" style="fill: #fef3c7; stroke: #b45309; stroke-width: 1.3; stroke-linejoin: miter"/>
+" clip-path="url(#pec87c2e2dc)" style="fill: #fef3c7; stroke: #b45309; stroke-width: 1.3; stroke-linejoin: miter"/>
    </g>
    <g id="patch_4">
-    <path d="M 707.04 123.84 
-L 1006.56 123.84 
-Q 1015.2 123.84 1015.2 132.48 
-L 1015.2 252 
-Q 1015.2 260.64 1006.56 260.64 
-L 707.04 260.64 
-Q 698.4 260.64 698.4 252 
-L 698.4 132.48 
-Q 698.4 123.84 707.04 123.84 
+    <path d="M 707.04 131.04
+L 1006.56 131.04
+Q 1015.2 131.04 1015.2 139.68
+L 1015.2 259.2
+Q 1015.2 267.84 1006.56 267.84
+L 707.04 267.84
+Q 698.4 267.84 698.4 259.2
+L 698.4 139.68
+Q 698.4 131.04 707.04 131.04
 z
-" clip-path="url(#pe317d95b90)" style="fill: #fef3c7; stroke: #b45309; stroke-width: 1.3; stroke-linejoin: miter"/>
+" clip-path="url(#pec87c2e2dc)" style="fill: #fef3c7; stroke: #b45309; stroke-width: 1.3; stroke-linejoin: miter"/>
    </g>
    <g id="patch_5">
-    <path d="M 37.44 322.56 
-L 336.96 322.56 
-Q 345.6 322.56 345.6 331.2 
-L 345.6 450.72 
-Q 345.6 459.36 336.96 459.36 
-L 37.44 459.36 
-Q 28.8 459.36 28.8 450.72 
-L 28.8 331.2 
-Q 28.8 322.56 37.44 322.56 
+    <path d="M 37.44 329.76
+L 336.96 329.76
+Q 345.6 329.76 345.6 338.4
+L 345.6 457.92
+Q 345.6 466.56 336.96 466.56
+L 37.44 466.56
+Q 28.8 466.56 28.8 457.92
+L 28.8 338.4
+Q 28.8 329.76 37.44 329.76
 z
-" clip-path="url(#pe317d95b90)" style="fill: #fef3c7; stroke: #b45309; stroke-width: 1.3; stroke-linejoin: miter"/>
+" clip-path="url(#pec87c2e2dc)" style="fill: #fef3c7; stroke: #b45309; stroke-width: 1.3; stroke-linejoin: miter"/>
    </g>
    <g id="patch_6">
-    <path d="M 372.24 322.56 
-L 671.76 322.56 
-Q 680.4 322.56 680.4 331.2 
-L 680.4 450.72 
-Q 680.4 459.36 671.76 459.36 
-L 372.24 459.36 
-Q 363.6 459.36 363.6 450.72 
-L 363.6 331.2 
-Q 363.6 322.56 372.24 322.56 
+    <path d="M 372.24 329.76
+L 671.76 329.76
+Q 680.4 329.76 680.4 338.4
+L 680.4 457.92
+Q 680.4 466.56 671.76 466.56
+L 372.24 466.56
+Q 363.6 466.56 363.6 457.92
+L 363.6 338.4
+Q 363.6 329.76 372.24 329.76
 z
-" clip-path="url(#pe317d95b90)" style="fill: #fef3c7; stroke: #b45309; stroke-width: 1.3; stroke-linejoin: miter"/>
+" clip-path="url(#pec87c2e2dc)" style="fill: #fef3c7; stroke: #b45309; stroke-width: 1.3; stroke-linejoin: miter"/>
    </g>
    <g id="patch_7">
-    <path d="M 707.04 322.56 
-L 1006.56 322.56 
-Q 1015.2 322.56 1015.2 331.2 
-L 1015.2 450.72 
-Q 1015.2 459.36 1006.56 459.36 
-L 707.04 459.36 
-Q 698.4 459.36 698.4 450.72 
-L 698.4 331.2 
-Q 698.4 322.56 707.04 322.56 
+    <path d="M 707.04 329.76
+L 1006.56 329.76
+Q 1015.2 329.76 1015.2 338.4
+L 1015.2 457.92
+Q 1015.2 466.56 1006.56 466.56
+L 707.04 466.56
+Q 698.4 466.56 698.4 457.92
+L 698.4 338.4
+Q 698.4 329.76 707.04 329.76
 z
-" clip-path="url(#pe317d95b90)" style="fill: #fef3c7; stroke: #b45309; stroke-width: 1.3; stroke-linejoin: miter"/>
+" clip-path="url(#pec87c2e2dc)" style="fill: #fef3c7; stroke: #b45309; stroke-width: 1.3; stroke-linejoin: miter"/>
    </g>
    <g id="patch_8">
-    <path d="M 37.44 473.76 
-L 336.96 473.76 
-Q 345.6 473.76 345.6 482.4 
-L 345.6 601.92 
-Q 345.6 610.56 336.96 610.56 
-L 37.44 610.56 
-Q 28.8 610.56 28.8 601.92 
-L 28.8 482.4 
-Q 28.8 473.76 37.44 473.76 
+    <path d="M 37.44 480.96
+L 336.96 480.96
+Q 345.6 480.96 345.6 489.6
+L 345.6 609.12
+Q 345.6 617.76 336.96 617.76
+L 37.44 617.76
+Q 28.8 617.76 28.8 609.12
+L 28.8 489.6
+Q 28.8 480.96 37.44 480.96
 z
-" clip-path="url(#pe317d95b90)" style="fill: #fef3c7; stroke: #b45309; stroke-width: 1.3; stroke-linejoin: miter"/>
+" clip-path="url(#pec87c2e2dc)" style="fill: #fef3c7; stroke: #b45309; stroke-width: 1.3; stroke-linejoin: miter"/>
    </g>
    <g id="patch_9">
-    <path d="M 37.44 672.48 
-L 336.96 672.48 
-Q 345.6 672.48 345.6 681.12 
-L 345.6 800.64 
-Q 345.6 809.28 336.96 809.28 
-L 37.44 809.28 
-Q 28.8 809.28 28.8 800.64 
-L 28.8 681.12 
-Q 28.8 672.48 37.44 672.48 
+    <path d="M 37.44 679.68
+L 336.96 679.68
+Q 345.6 679.68 345.6 688.32
+L 345.6 807.84
+Q 345.6 816.48 336.96 816.48
+L 37.44 816.48
+Q 28.8 816.48 28.8 807.84
+L 28.8 688.32
+Q 28.8 679.68 37.44 679.68
 z
-" clip-path="url(#pe317d95b90)" style="fill: #fef3c7; stroke: #b45309; stroke-width: 1.3; stroke-linejoin: miter"/>
+" clip-path="url(#pec87c2e2dc)" style="fill: #fef3c7; stroke: #b45309; stroke-width: 1.3; stroke-linejoin: miter"/>
    </g>
    <g id="patch_10">
-    <path d="M 372.24 672.48 
-L 671.76 672.48 
-Q 680.4 672.48 680.4 681.12 
-L 680.4 800.64 
-Q 680.4 809.28 671.76 809.28 
-L 372.24 809.28 
-Q 363.6 809.28 363.6 800.64 
-L 363.6 681.12 
-Q 363.6 672.48 372.24 672.48 
+    <path d="M 372.24 679.68
+L 671.76 679.68
+Q 680.4 679.68 680.4 688.32
+L 680.4 807.84
+Q 680.4 816.48 671.76 816.48
+L 372.24 816.48
+Q 363.6 816.48 363.6 807.84
+L 363.6 688.32
+Q 363.6 679.68 372.24 679.68
 z
-" clip-path="url(#pe317d95b90)" style="fill: #fef3c7; stroke: #b45309; stroke-width: 1.3; stroke-linejoin: miter"/>
+" clip-path="url(#pec87c2e2dc)" style="fill: #fef3c7; stroke: #b45309; stroke-width: 1.3; stroke-linejoin: miter"/>
    </g>
    <g id="patch_11">
-    <path d="M 707.04 672.48 
-L 1006.56 672.48 
-Q 1015.2 672.48 1015.2 681.12 
-L 1015.2 800.64 
-Q 1015.2 809.28 1006.56 809.28 
-L 707.04 809.28 
-Q 698.4 809.28 698.4 800.64 
-L 698.4 681.12 
-Q 698.4 672.48 707.04 672.48 
+    <path d="M 707.04 679.68
+L 1006.56 679.68
+Q 1015.2 679.68 1015.2 688.32
+L 1015.2 807.84
+Q 1015.2 816.48 1006.56 816.48
+L 707.04 816.48
+Q 698.4 816.48 698.4 807.84
+L 698.4 688.32
+Q 698.4 679.68 707.04 679.68
 z
-" clip-path="url(#pe317d95b90)" style="fill: #fef3c7; stroke: #b45309; stroke-width: 1.3; stroke-linejoin: miter"/>
+" clip-path="url(#pec87c2e2dc)" style="fill: #fef3c7; stroke: #b45309; stroke-width: 1.3; stroke-linejoin: miter"/>
    </g>
    <g id="patch_12">
-    <path d="M 37.44 823.68 
-L 336.96 823.68 
-Q 345.6 823.68 345.6 832.32 
-L 345.6 951.84 
-Q 345.6 960.48 336.96 960.48 
-L 37.44 960.48 
-Q 28.8 960.48 28.8 951.84 
-L 28.8 832.32 
-Q 28.8 823.68 37.44 823.68 
+    <path d="M 37.44 830.88
+L 336.96 830.88
+Q 345.6 830.88 345.6 839.52
+L 345.6 959.04
+Q 345.6 967.68 336.96 967.68
+L 37.44 967.68
+Q 28.8 967.68 28.8 959.04
+L 28.8 839.52
+Q 28.8 830.88 37.44 830.88
 z
-" clip-path="url(#pe317d95b90)" style="fill: #fef3c7; stroke: #b45309; stroke-width: 1.3; stroke-linejoin: miter"/>
+" clip-path="url(#pec87c2e2dc)" style="fill: #fef3c7; stroke: #b45309; stroke-width: 1.3; stroke-linejoin: miter"/>
    </g>
    <g id="patch_13">
-    <path d="M 372.24 823.68 
-L 671.76 823.68 
-Q 680.4 823.68 680.4 832.32 
-L 680.4 951.84 
-Q 680.4 960.48 671.76 960.48 
-L 372.24 960.48 
-Q 363.6 960.48 363.6 951.84 
-L 363.6 832.32 
-Q 363.6 823.68 372.24 823.68 
+    <path d="M 372.24 830.88
+L 671.76 830.88
+Q 680.4 830.88 680.4 839.52
+L 680.4 959.04
+Q 680.4 967.68 671.76 967.68
+L 372.24 967.68
+Q 363.6 967.68 363.6 959.04
+L 363.6 839.52
+Q 363.6 830.88 372.24 830.88
 z
-" clip-path="url(#pe317d95b90)" style="fill: #fef3c7; stroke: #b45309; stroke-width: 1.3; stroke-linejoin: miter"/>
+" clip-path="url(#pec87c2e2dc)" style="fill: #fef3c7; stroke: #b45309; stroke-width: 1.3; stroke-linejoin: miter"/>
    </g>
    <g id="patch_14">
-    <path d="M 37.44 1022.4 
-L 336.96 1022.4 
-Q 345.6 1022.4 345.6 1031.04 
-L 345.6 1150.56 
-Q 345.6 1159.2 336.96 1159.2 
-L 37.44 1159.2 
-Q 28.8 1159.2 28.8 1150.56 
-L 28.8 1031.04 
-Q 28.8 1022.4 37.44 1022.4 
+    <path d="M 37.44 1029.6
+L 336.96 1029.6
+Q 345.6 1029.6 345.6 1038.24
+L 345.6 1157.76
+Q 345.6 1166.4 336.96 1166.4
+L 37.44 1166.4
+Q 28.8 1166.4 28.8 1157.76
+L 28.8 1038.24
+Q 28.8 1029.6 37.44 1029.6
 z
-" clip-path="url(#pe317d95b90)" style="fill: #fef3c7; stroke: #b45309; stroke-width: 1.3; stroke-linejoin: miter"/>
+" clip-path="url(#pec87c2e2dc)" style="fill: #fef3c7; stroke: #b45309; stroke-width: 1.3; stroke-linejoin: miter"/>
    </g>
    <g id="patch_15">
-    <path d="M 372.24 1022.4 
-L 671.76 1022.4 
-Q 680.4 1022.4 680.4 1031.04 
-L 680.4 1150.56 
-Q 680.4 1159.2 671.76 1159.2 
-L 372.24 1159.2 
-Q 363.6 1159.2 363.6 1150.56 
-L 363.6 1031.04 
-Q 363.6 1022.4 372.24 1022.4 
+    <path d="M 372.24 1029.6
+L 671.76 1029.6
+Q 680.4 1029.6 680.4 1038.24
+L 680.4 1157.76
+Q 680.4 1166.4 671.76 1166.4
+L 372.24 1166.4
+Q 363.6 1166.4 363.6 1157.76
+L 363.6 1038.24
+Q 363.6 1029.6 372.24 1029.6
 z
-" clip-path="url(#pe317d95b90)" style="fill: #fef3c7; stroke: #b45309; stroke-width: 1.3; stroke-linejoin: miter"/>
+" clip-path="url(#pec87c2e2dc)" style="fill: #fef3c7; stroke: #b45309; stroke-width: 1.3; stroke-linejoin: miter"/>
    </g>
    <g id="patch_16">
-    <path d="M 707.04 1022.4 
-L 1006.56 1022.4 
-Q 1015.2 1022.4 1015.2 1031.04 
-L 1015.2 1150.56 
-Q 1015.2 1159.2 1006.56 1159.2 
-L 707.04 1159.2 
-Q 698.4 1159.2 698.4 1150.56 
-L 698.4 1031.04 
-Q 698.4 1022.4 707.04 1022.4 
+    <path d="M 707.04 1029.6
+L 1006.56 1029.6
+Q 1015.2 1029.6 1015.2 1038.24
+L 1015.2 1157.76
+Q 1015.2 1166.4 1006.56 1166.4
+L 707.04 1166.4
+Q 698.4 1166.4 698.4 1157.76
+L 698.4 1038.24
+Q 698.4 1029.6 707.04 1029.6
 z
-" clip-path="url(#pe317d95b90)" style="fill: #fef3c7; stroke: #b45309; stroke-width: 1.3; stroke-linejoin: miter"/>
+" clip-path="url(#pec87c2e2dc)" style="fill: #fef3c7; stroke: #b45309; stroke-width: 1.3; stroke-linejoin: miter"/>
    </g>
    <g id="patch_17">
-    <path d="M 37.44 1173.6 
-L 336.96 1173.6 
-Q 345.6 1173.6 345.6 1182.24 
-L 345.6 1301.76 
-Q 345.6 1310.4 336.96 1310.4 
-L 37.44 1310.4 
-Q 28.8 1310.4 28.8 1301.76 
-L 28.8 1182.24 
-Q 28.8 1173.6 37.44 1173.6 
+    <path d="M 37.44 1180.8
+L 336.96 1180.8
+Q 345.6 1180.8 345.6 1189.44
+L 345.6 1308.96
+Q 345.6 1317.6 336.96 1317.6
+L 37.44 1317.6
+Q 28.8 1317.6 28.8 1308.96
+L 28.8 1189.44
+Q 28.8 1180.8 37.44 1180.8
 z
-" clip-path="url(#pe317d95b90)" style="fill: #fef3c7; stroke: #b45309; stroke-width: 1.3; stroke-linejoin: miter"/>
+" clip-path="url(#pec87c2e2dc)" style="fill: #fef3c7; stroke: #b45309; stroke-width: 1.3; stroke-linejoin: miter"/>
    </g>
    <g id="text_1">
     <text style="font-weight: 700; font-size: 28px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #0f172a" x="28.8" y="42.875625" transform="rotate(-0 28.8 42.875625)">B  What each completed issue enables</text>
@@ -244,243 +244,246 @@ z
     <text style="font-size: 14px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #475569" x="28.8" y="66.797813" transform="rotate(-0 28.8 66.797813)">Capabilities below become available only after merge and bounded verification. This is a capability map, not extra dependency edges.</text>
    </g>
    <g id="text_3">
-    <text style="font-weight: 700; font-size: 21px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #0f172a" x="28.8" y="109.556719" transform="rotate(-0 28.8 109.556719)">1. Foundation and accounts</text>
+    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #475569" x="28.8" y="83.998125" transform="rotate(-0 28.8 83.998125)">Approved contract: PR30 · main 6ec6215 · 10 Nov 2026 KST</text>
    </g>
    <g id="text_4">
-    <text style="font-weight: 700; font-size: 15px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #0f172a" x="40.32" y="143.877656" transform="rotate(-0 40.32 143.877656)">#25  Views starter</text>
+    <text style="font-weight: 700; font-size: 21px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #0f172a" x="28.8" y="116.756719" transform="rotate(-0 28.8 116.756719)">1. Foundation and accounts</text>
    </g>
    <g id="text_5">
-    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(40.32 165.358125)">Android starter launches with eight screen</text>
-    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(40.32 180.163219)">structures.</text>
+    <text style="font-weight: 700; font-size: 15px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #0f172a" x="40.32" y="151.077656" transform="rotate(-0 40.32 151.077656)">#25  Views starter</text>
    </g>
    <g id="text_6">
-    <text style="font-size: 11px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #475569" x="40.32" y="232.278281" transform="rotate(-0 40.32 232.278281)">Structure only</text>
+    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(40.32 172.558125)">Android starter launches with eight screen</text>
+    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(40.32 187.363219)">structures.</text>
    </g>
    <g id="text_7">
-    <text style="font-weight: 700; font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #15803d" x="40.32" y="253.118438" transform="rotate(-0 40.32 253.118438)">DONE</text>
+    <text style="font-size: 11px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #475569" x="40.32" y="239.478281" transform="rotate(-0 40.32 239.478281)">Structure only</text>
    </g>
    <g id="text_8">
-    <text style="font-weight: 700; font-size: 15px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #0f172a" x="375.12" y="143.877656" transform="rotate(-0 375.12 143.877656)">#9  Shared foundation</text>
+    <text style="font-weight: 700; font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #15803d" x="40.32" y="260.318438" transform="rotate(-0 40.32 260.318438)">DONE</text>
    </g>
    <g id="text_9">
-    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(375.12 165.358125)">Feature teams can use consistent</text>
-    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(375.12 180.163219)">dependencies, typed results, session</text>
-    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(375.12 194.968312)">boundaries and replaceable test adapters.</text>
+    <text style="font-weight: 700; font-size: 15px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #0f172a" x="375.12" y="151.077656" transform="rotate(-0 375.12 151.077656)">#9  Shared foundation</text>
    </g>
    <g id="text_10">
-    <text style="font-size: 11px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #475569" x="375.12" y="232.278281" transform="rotate(-0 375.12 232.278281)">Internal foundation</text>
+    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(375.12 172.558125)">Feature teams can use consistent</text>
+    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(375.12 187.363219)">dependencies, typed results, session</text>
+    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(375.12 202.168312)">boundaries and replaceable test adapters.</text>
    </g>
    <g id="text_11">
-    <text style="font-weight: 700; font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #b45309" x="375.12" y="253.118438" transform="rotate(-0 375.12 253.118438)">MERGED / VERIFY PENDING</text>
+    <text style="font-size: 11px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #475569" x="375.12" y="239.478281" transform="rotate(-0 375.12 239.478281)">Internal foundation</text>
    </g>
    <g id="text_12">
-    <text style="font-weight: 700; font-size: 15px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #0f172a" x="709.92" y="143.877656" transform="rotate(-0 709.92 143.877656)">#10  Accounts and recipients</text>
+    <text style="font-weight: 700; font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #b45309" x="375.12" y="260.318438" transform="rotate(-0 375.12 260.318438)">MERGED / VERIFY PENDING</text>
    </g>
    <g id="text_13">
-    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(709.92 165.358125)">A user can register, sign in/out, view/copy</text>
-    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(709.92 180.163219)">their UID and confirm another registered</text>
-    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(709.92 194.968312)">account.</text>
+    <text style="font-weight: 700; font-size: 15px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #0f172a" x="709.92" y="151.077656" transform="rotate(-0 709.92 151.077656)">#10  Accounts and recipients</text>
    </g>
    <g id="text_14">
-    <text style="font-size: 11px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #475569" x="709.92" y="232.278281" transform="rotate(-0 709.92 232.278281)">First account flow</text>
+    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(709.92 172.558125)">A user can register, sign in/out, view/copy</text>
+    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(709.92 187.363219)">their UID and confirm another registered</text>
+    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(709.92 202.168312)">account.</text>
    </g>
    <g id="text_15">
-    <text style="font-weight: 700; font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #b45309" x="709.92" y="253.118438" transform="rotate(-0 709.92 253.118438)">BLOCKED</text>
+    <text style="font-size: 11px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #475569" x="709.92" y="239.478281" transform="rotate(-0 709.92 239.478281)">First account flow</text>
    </g>
    <g id="text_16">
-    <text style="font-weight: 700; font-size: 21px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #0f172a" x="28.8" y="308.276719" transform="rotate(-0 28.8 308.276719)">2. Capsule creation and delivery</text>
+    <text style="font-weight: 700; font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #b45309" x="709.92" y="260.318438" transform="rotate(-0 709.92 260.318438)">BLOCKED</text>
    </g>
    <g id="text_17">
-    <text style="font-weight: 700; font-size: 15px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #0f172a" x="40.32" y="342.597656" transform="rotate(-0 40.32 342.597656)">#11  Capsule records and rules</text>
+    <text style="font-weight: 700; font-size: 21px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #0f172a" x="28.8" y="315.476719" transform="rotate(-0 28.8 315.476719)">2. Capsule creation and delivery</text>
    </g>
    <g id="text_18">
-    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(40.32 364.078125)">Backend fixtures can store valid capsule</text>
-    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(40.32 378.883219)">records and reject unauthorized text/photo</text>
-    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(40.32 393.688313)">access or mutations.</text>
+    <text style="font-weight: 700; font-size: 15px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #0f172a" x="40.32" y="349.797656" transform="rotate(-0 40.32 349.797656)">#11  Capsule records and rules</text>
    </g>
    <g id="text_19">
-    <text style="font-size: 11px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #475569" x="40.32" y="430.998281" transform="rotate(-0 40.32 430.998281)">Backend fixture capability</text>
+    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(40.32 371.278125)">Backend fixtures can store valid capsule</text>
+    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(40.32 386.083219)">records and reject unauthorized text/photo</text>
+    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(40.32 400.888312)">access or mutations.</text>
    </g>
    <g id="text_20">
-    <text style="font-weight: 700; font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #b45309" x="40.32" y="451.838438" transform="rotate(-0 40.32 451.838438)">BLOCKED</text>
+    <text style="font-size: 11px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #475569" x="40.32" y="438.198281" transform="rotate(-0 40.32 438.198281)">Backend fixture capability</text>
    </g>
    <g id="text_21">
-    <text style="font-weight: 700; font-size: 15px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #0f172a" x="375.12" y="342.597656" transform="rotate(-0 375.12 342.597656)">#12  Draft and review screens</text>
+    <text style="font-weight: 700; font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #b45309" x="40.32" y="459.038438" transform="rotate(-0 40.32 459.038438)">BLOCKED</text>
    </g>
    <g id="text_22">
-    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(375.12 364.078125)">Users can compose and validate a draft</text>
-    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(375.12 378.883219)">through the three Views screens and see a</text>
-    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(375.12 393.688313)">send review.</text>
+    <text style="font-weight: 700; font-size: 15px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #0f172a" x="375.12" y="349.797656" transform="rotate(-0 375.12 349.797656)">#12  Draft and review screens</text>
    </g>
    <g id="text_23">
-    <text style="font-size: 11px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #475569" x="375.12" y="430.998281" transform="rotate(-0 375.12 430.998281)">Draft UI; real send pending</text>
+    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(375.12 371.278125)">Users can compose and validate a draft</text>
+    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(375.12 386.083219)">through the three Views screens and see a</text>
+    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(375.12 400.888312)">send review.</text>
    </g>
    <g id="text_24">
-    <text style="font-weight: 700; font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #b45309" x="375.12" y="451.838438" transform="rotate(-0 375.12 451.838438)">BLOCKED</text>
+    <text style="font-size: 11px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #475569" x="375.12" y="438.198281" transform="rotate(-0 375.12 438.198281)">Draft UI; real send pending</text>
    </g>
    <g id="text_25">
-    <text style="font-weight: 700; font-size: 15px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #0f172a" x="709.92" y="342.597656" transform="rotate(-0 709.92 342.597656)">#13  Original photo support</text>
+    <text style="font-weight: 700; font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #b45309" x="375.12" y="459.038438" transform="rotate(-0 375.12 459.038438)">BLOCKED</text>
    </g>
    <g id="text_26">
-    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(709.92 364.078125)">The app can obtain one valid original</text>
-    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(709.92 378.883219)">JPEG/PNG, keep a stable retry copy and</text>
-    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(709.92 393.688313)">confirm authenticated upload.</text>
+    <text style="font-weight: 700; font-size: 15px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #0f172a" x="709.92" y="349.797656" transform="rotate(-0 709.92 349.797656)">#13  Original photo support</text>
    </g>
    <g id="text_27">
-    <text style="font-size: 11px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #475569" x="709.92" y="430.998281" transform="rotate(-0 709.92 430.998281)">Media adapter; publication pending</text>
+    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(709.92 371.278125)">The app can obtain one valid original</text>
+    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(709.92 386.083219)">JPEG/PNG, keep a stable retry copy and</text>
+    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(709.92 400.888312)">confirm authenticated upload.</text>
    </g>
    <g id="text_28">
-    <text style="font-weight: 700; font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #b45309" x="709.92" y="451.838438" transform="rotate(-0 709.92 451.838438)">BLOCKED</text>
+    <text style="font-size: 11px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #475569" x="709.92" y="438.198281" transform="rotate(-0 709.92 438.198281)">Media adapter; publication pending</text>
    </g>
    <g id="text_29">
-    <text style="font-weight: 700; font-size: 15px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #0f172a" x="40.32" y="493.797656" transform="rotate(-0 40.32 493.797656)">#14  Immutable publication</text>
+    <text style="font-weight: 700; font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #b45309" x="709.92" y="459.038438" transform="rotate(-0 709.92 459.038438)">BLOCKED</text>
    </g>
    <g id="text_30">
-    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(40.32 515.278125)">The repository can send one immutable</text>
-    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(40.32 530.083219)">capsule and safely recover an uncertain</text>
-    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(40.32 544.888312)">result using its original ID.</text>
+    <text style="font-weight: 700; font-size: 15px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #0f172a" x="40.32" y="500.997656" transform="rotate(-0 40.32 500.997656)">#14  Immutable publication</text>
    </g>
    <g id="text_31">
-    <text style="font-size: 11px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #475569" x="40.32" y="582.198281" transform="rotate(-0 40.32 582.198281)">Repository pipeline; browsing pending</text>
+    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(40.32 522.478125)">The repository can send one immutable</text>
+    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(40.32 537.283219)">capsule and safely recover an uncertain</text>
+    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(40.32 552.088313)">result using its original ID.</text>
    </g>
    <g id="text_32">
-    <text style="font-weight: 700; font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #b45309" x="40.32" y="603.038437" transform="rotate(-0 40.32 603.038437)">BLOCKED</text>
+    <text style="font-size: 11px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #475569" x="40.32" y="589.398281" transform="rotate(-0 40.32 589.398281)">Repository pipeline; browsing pending</text>
    </g>
    <g id="text_33">
-    <text style="font-weight: 700; font-size: 21px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #0f172a" x="28.8" y="658.196719" transform="rotate(-0 28.8 658.196719)">3. Lock conditions and recovery</text>
+    <text style="font-weight: 700; font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #b45309" x="40.32" y="610.238438" transform="rotate(-0 40.32 610.238438)">BLOCKED</text>
    </g>
    <g id="text_34">
-    <text style="font-weight: 700; font-size: 15px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #0f172a" x="40.32" y="692.517656" transform="rotate(-0 40.32 692.517656)">#15  Time unlock</text>
+    <text style="font-weight: 700; font-size: 21px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #0f172a" x="28.8" y="665.396719" transform="rotate(-0 28.8 665.396719)">3. Lock conditions and recovery</text>
    </g>
    <g id="text_35">
-    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(40.32 713.998125)">The merged backend/application path can</text>
-    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(40.32 728.803219)">authorize time-only unlocking after the</text>
-    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(40.32 743.608313)">server deadline.</text>
+    <text style="font-weight: 700; font-size: 15px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #0f172a" x="40.32" y="699.717656" transform="rotate(-0 40.32 699.717656)">#15  Time unlock</text>
    </g>
    <g id="text_36">
-    <text style="font-size: 11px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #475569" x="40.32" y="780.918281" transform="rotate(-0 40.32 780.918281)">Time path; final detail UI pending</text>
+    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(40.32 721.198125)">The merged backend/application path can</text>
+    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(40.32 736.003219)">authorize time-only unlocking after the</text>
+    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(40.32 750.808312)">server deadline.</text>
    </g>
    <g id="text_37">
-    <text style="font-weight: 700; font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #b45309" x="40.32" y="801.758438" transform="rotate(-0 40.32 801.758438)">BLOCKED</text>
+    <text style="font-size: 11px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #475569" x="40.32" y="788.118281" transform="rotate(-0 40.32 788.118281)">Time path; final detail UI pending</text>
    </g>
    <g id="text_38">
-    <text style="font-weight: 700; font-size: 15px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #0f172a" x="375.12" y="692.517656" transform="rotate(-0 375.12 692.517656)">#16  Map and fresh location</text>
+    <text style="font-weight: 700; font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #b45309" x="40.32" y="808.958438" transform="rotate(-0 40.32 808.958438)">BLOCKED</text>
    </g>
    <g id="text_39">
-    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(375.12 713.998125)">The app can select coordinates and return a</text>
-    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(375.12 728.803219)">fresh, accurate foreground location result.</text>
+    <text style="font-weight: 700; font-size: 15px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #0f172a" x="375.12" y="699.717656" transform="rotate(-0 375.12 699.717656)">#16  Map and fresh location</text>
    </g>
    <g id="text_40">
-    <text style="font-size: 11px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #475569" x="375.12" y="780.918281" transform="rotate(-0 375.12 780.918281)">Location input; unlock pending</text>
+    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(375.12 721.198125)">The app can select coordinates and return a</text>
+    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(375.12 736.003219)">fresh, accurate foreground location result.</text>
    </g>
    <g id="text_41">
-    <text style="font-weight: 700; font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #b45309" x="375.12" y="801.758438" transform="rotate(-0 375.12 801.758438)">BLOCKED</text>
+    <text style="font-size: 11px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #475569" x="375.12" y="788.118281" transform="rotate(-0 375.12 788.118281)">Location input; unlock pending</text>
    </g>
    <g id="text_42">
-    <text style="font-weight: 700; font-size: 15px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #0f172a" x="709.92" y="692.517656" transform="rotate(-0 709.92 692.517656)">#17  Current combined unlock</text>
+    <text style="font-weight: 700; font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #b45309" x="375.12" y="808.958438" transform="rotate(-0 375.12 808.958438)">BLOCKED</text>
    </g>
    <g id="text_43">
-    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(709.92 713.998125)">Location and time-plus-location unlock work</text>
-    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(709.92 728.803219)">through the authorized path, without</text>
-    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(709.92 743.608313)">latching a past visit.</text>
+    <text style="font-weight: 700; font-size: 15px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #0f172a" x="709.92" y="699.717656" transform="rotate(-0 709.92 699.717656)">#17  Current combined unlock</text>
    </g>
    <g id="text_44">
-    <text style="font-size: 11px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #475569" x="709.92" y="780.918281" transform="rotate(-0 709.92 780.918281)">Authorization; recovery/UI pending</text>
+    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(709.92 721.198125)">Location and time-plus-location unlock work</text>
+    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(709.92 736.003219)">through the authorized path, without</text>
+    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(709.92 750.808312)">latching a past visit.</text>
    </g>
    <g id="text_45">
-    <text style="font-weight: 700; font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #b45309" x="709.92" y="801.758438" transform="rotate(-0 709.92 801.758438)">BLOCKED</text>
+    <text style="font-size: 11px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #475569" x="709.92" y="788.118281" transform="rotate(-0 709.92 788.118281)">Authorization; recovery/UI pending</text>
    </g>
    <g id="text_46">
-    <text style="font-weight: 700; font-size: 15px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #0f172a" x="40.32" y="843.717656" transform="rotate(-0 40.32 843.717656)">#18  Foreground recovery</text>
+    <text style="font-weight: 700; font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #b45309" x="709.92" y="808.958438" transform="rotate(-0 709.92 808.958438)">BLOCKED</text>
    </g>
    <g id="text_47">
-    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(40.32 865.198125)">Supported foreground actions can recover</text>
-    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(40.32 880.003219)">pending verification and uncertain sends</text>
-    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(40.32 894.808312)">using one consistent path.</text>
+    <text style="font-weight: 700; font-size: 15px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #0f172a" x="40.32" y="850.917656" transform="rotate(-0 40.32 850.917656)">#18  Foreground recovery</text>
    </g>
    <g id="text_48">
-    <text style="font-size: 11px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #475569" x="40.32" y="932.118281" transform="rotate(-0 40.32 932.118281)">Recovery; final view integration pending</text>
+    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(40.32 872.398125)">Supported foreground actions can recover</text>
+    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(40.32 887.203219)">pending verification and uncertain sends</text>
+    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(40.32 902.008312)">using one consistent path.</text>
    </g>
    <g id="text_49">
-    <text style="font-weight: 700; font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #b45309" x="40.32" y="952.958437" transform="rotate(-0 40.32 952.958437)">BLOCKED</text>
+    <text style="font-size: 11px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #475569" x="40.32" y="939.318281" transform="rotate(-0 40.32 939.318281)">Recovery; final view integration pending</text>
    </g>
    <g id="text_50">
-    <text style="font-weight: 700; font-size: 15px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #0f172a" x="375.12" y="843.717656" transform="rotate(-0 375.12 843.717656)">#19  Unlock notifications</text>
+    <text style="font-weight: 700; font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #b45309" x="40.32" y="960.158437" transform="rotate(-0 40.32 960.158437)">BLOCKED</text>
    </g>
    <g id="text_51">
-    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(375.12 865.198125)">A supported check can attempt an account-</text>
-    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(375.12 880.003219)">safe notification and revalidate a tap.</text>
+    <text style="font-weight: 700; font-size: 15px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #0f172a" x="375.12" y="850.917656" transform="rotate(-0 375.12 850.917656)">#19  Unlock notifications</text>
    </g>
    <g id="text_52">
-    <text style="font-size: 11px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #475569" x="375.12" y="932.118281" transform="rotate(-0 375.12 932.118281)">Alert attempt; delivery not guaranteed</text>
+    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(375.12 872.398125)">A supported check can attempt an account-</text>
+    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(375.12 887.203219)">safe notification and revalidate a tap.</text>
    </g>
    <g id="text_53">
-    <text style="font-weight: 700; font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #b45309" x="375.12" y="952.958437" transform="rotate(-0 375.12 952.958437)">BLOCKED</text>
+    <text style="font-size: 11px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #475569" x="375.12" y="939.318281" transform="rotate(-0 375.12 939.318281)">Alert attempt; delivery not guaranteed</text>
    </g>
    <g id="text_54">
-    <text style="font-weight: 700; font-size: 21px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #0f172a" x="28.8" y="1008.116719" transform="rotate(-0 28.8 1008.116719)">4. Lists, integration and verification</text>
+    <text style="font-weight: 700; font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #b45309" x="375.12" y="960.158437" transform="rotate(-0 375.12 960.158437)">BLOCKED</text>
    </g>
    <g id="text_55">
-    <text style="font-weight: 700; font-size: 15px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #0f172a" x="40.32" y="1042.437656" transform="rotate(-0 40.32 1042.437656)">#20  Retained content protection</text>
+    <text style="font-weight: 700; font-size: 21px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #0f172a" x="28.8" y="1015.316719" transform="rotate(-0 28.8 1015.316719)">4. Lists, integration and verification</text>
    </g>
    <g id="text_56">
-    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(40.32 1063.918125)">Authorized downloaded content stays private</text>
-    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(40.32 1078.723219)">to its account; logout/switch clears</text>
-    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(40.32 1093.528313)">protected data and rejects late callbacks.</text>
+    <text style="font-weight: 700; font-size: 15px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #0f172a" x="40.32" y="1049.637656" transform="rotate(-0 40.32 1049.637656)">#20  Retained content protection</text>
    </g>
    <g id="text_57">
-    <text style="font-size: 11px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #475569" x="40.32" y="1130.838281" transform="rotate(-0 40.32 1130.838281)">Protection; browsing UI pending</text>
+    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(40.32 1071.118125)">Authorized downloaded content stays private</text>
+    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(40.32 1085.923219)">to its account; logout/switch clears</text>
+    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(40.32 1100.728312)">protected data and rejects late callbacks.</text>
    </g>
    <g id="text_58">
-    <text style="font-weight: 700; font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #b45309" x="40.32" y="1151.678437" transform="rotate(-0 40.32 1151.678437)">BLOCKED</text>
+    <text style="font-size: 11px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #475569" x="40.32" y="1138.038281" transform="rotate(-0 40.32 1138.038281)">Protection; browsing UI pending</text>
    </g>
    <g id="text_59">
-    <text style="font-weight: 700; font-size: 15px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #0f172a" x="375.12" y="1042.437656" transform="rotate(-0 375.12 1042.437656)">#21  Lists and protected detail</text>
+    <text style="font-weight: 700; font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #b45309" x="40.32" y="1158.878438" transform="rotate(-0 40.32 1158.878438)">BLOCKED</text>
    </g>
    <g id="text_60">
-    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(375.12 1063.918125)">Users can browse their Sent/Received</text>
-    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(375.12 1078.723219)">capsules, see locked metadata and view</text>
-    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(375.12 1093.528313)">authorized content, including verified</text>
-    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(375.12 1108.333406)">permanent re-view.</text>
+    <text style="font-weight: 700; font-size: 15px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #0f172a" x="375.12" y="1049.637656" transform="rotate(-0 375.12 1049.637656)">#21  Lists and protected detail</text>
    </g>
    <g id="text_61">
-    <text style="font-size: 11px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #475569" x="375.12" y="1130.838281" transform="rotate(-0 375.12 1130.838281)">Real browsing + authorized detail</text>
+    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(375.12 1071.118125)">Users can browse their Sent/Received</text>
+    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(375.12 1085.923219)">capsules, see locked metadata and view</text>
+    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(375.12 1100.728312)">authorized content, including verified</text>
+    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(375.12 1115.533406)">permanent re-view.</text>
    </g>
    <g id="text_62">
-    <text style="font-weight: 700; font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #b45309" x="375.12" y="1151.678437" transform="rotate(-0 375.12 1151.678437)">BLOCKED</text>
+    <text style="font-size: 11px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #475569" x="375.12" y="1138.038281" transform="rotate(-0 375.12 1138.038281)">Real browsing + authorized detail</text>
    </g>
    <g id="text_63">
-    <text style="font-weight: 700; font-size: 15px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #0f172a" x="709.92" y="1042.437656" transform="rotate(-0 709.92 1042.437656)">#22  Screen consistency</text>
+    <text style="font-weight: 700; font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #b45309" x="375.12" y="1158.878438" transform="rotate(-0 375.12 1158.878438)">BLOCKED</text>
    </g>
    <g id="text_64">
-    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(709.92 1063.918125)">All eight implemented screens have</text>
-    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(709.92 1078.723219)">consistent navigation, readable states and</text>
-    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(709.92 1093.528313)">actionable recovery.</text>
+    <text style="font-weight: 700; font-size: 15px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #0f172a" x="709.92" y="1049.637656" transform="rotate(-0 709.92 1049.637656)">#22  Screen consistency</text>
    </g>
    <g id="text_65">
-    <text style="font-size: 11px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #475569" x="709.92" y="1130.838281" transform="rotate(-0 709.92 1130.838281)">Cross-screen consistency</text>
+    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(709.92 1071.118125)">All eight implemented screens have</text>
+    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(709.92 1085.923219)">consistent navigation, readable states and</text>
+    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(709.92 1100.728312)">actionable recovery.</text>
    </g>
    <g id="text_66">
-    <text style="font-weight: 700; font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #b45309" x="709.92" y="1151.678437" transform="rotate(-0 709.92 1151.678437)">BLOCKED</text>
+    <text style="font-size: 11px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #475569" x="709.92" y="1138.038281" transform="rotate(-0 709.92 1138.038281)">Cross-screen consistency</text>
    </g>
    <g id="text_67">
-    <text style="font-weight: 700; font-size: 15px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #0f172a" x="40.32" y="1193.637656" transform="rotate(-0 40.32 1193.637656)">#23  Integrated acceptance</text>
+    <text style="font-weight: 700; font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #b45309" x="709.92" y="1158.878438" transform="rotate(-0 709.92 1158.878438)">BLOCKED</text>
    </g>
    <g id="text_68">
-    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(40.32 1215.118125)">The team can demonstrate the integrated MVP</text>
-    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(40.32 1229.923219)">and support acceptance claims with recorded</text>
-    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(40.32 1244.728312)">results.</text>
+    <text style="font-weight: 700; font-size: 15px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #0f172a" x="40.32" y="1200.837656" transform="rotate(-0 40.32 1200.837656)">#23  Integrated acceptance</text>
    </g>
    <g id="text_69">
-    <text style="font-size: 11px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #475569" x="40.32" y="1282.038281" transform="rotate(-0 40.32 1282.038281)">Full acceptance only with passing evidence</text>
+    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(40.32 1222.318125)">The team can demonstrate the integrated MVP</text>
+    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(40.32 1237.123219)">and support acceptance claims with recorded</text>
+    <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; fill: #0f172a" transform="translate(40.32 1251.928312)">results.</text>
    </g>
    <g id="text_70">
-    <text style="font-weight: 700; font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #b45309" x="40.32" y="1302.878438" transform="rotate(-0 40.32 1302.878438)">BLOCKED</text>
+    <text style="font-size: 11px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #475569" x="40.32" y="1289.238281" transform="rotate(-0 40.32 1289.238281)">Full acceptance only with passing evidence</text>
+   </g>
+   <g id="text_71">
+    <text style="font-weight: 700; font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #b45309" x="40.32" y="1310.078438" transform="rotate(-0 40.32 1310.078438)">BLOCKED</text>
    </g>
   </g>
  </g>
  <defs>
-  <clipPath id="pe317d95b90">
+  <clipPath id="pec87c2e2dc">
    <rect x="0" y="0" width="1036.8" height="1368"/>
   </clipPath>
  </defs>
