@@ -28,6 +28,8 @@ Follow [the shared workflow](../../agent-tools/WORKFLOW.md) and [AGENTS.md](../.
 | 1 | | | |
 | 2 | | | |
 
+[Include the important prompts and corrections. Mark redacted or paraphrased text.]
+
 ### What the agent changed and verified
 
 - **Changes:** [Relevant files or behavior.]
