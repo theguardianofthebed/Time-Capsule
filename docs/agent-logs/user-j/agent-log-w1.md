@@ -192,18 +192,18 @@ Needed assistance in implementing session restoration on Activity recreation in 
 ### What the agent changed and verified
 
 - **Changes:**
-  - `app/src/main/java/com/example/timecapsule/MainActivity.kt`: Called `restoreSessionIfAuthenticated()` unconditionally on every Activity/container recreation.
+  - `app/src/main/java/com/example/timecapsule/MainActivity.kt`: Registered `addFragmentOnAttachListener` and attached navigation callbacks to restored Fragments on Activity recreation/rotation.
   - `app/src/main/java/com/example/timecapsule/config/FirebaseConfig.kt`: Removed unsafe `?: FirebaseFirestore.getInstance()` fallback in `setupDebugEmulatorConnection` to fail closed if memory-only initialization fails.
-  - `app/src/main/java/com/example/timecapsule/data/AccountSessionManager.kt`: Integrated `SessionGuard` across async operations, added `restoreSessionIfAuthenticated()`, `lookupRecipient()`, `confirmRecipient()`, blank name validation, password length validation, and recoverable profile repair.
+  - `app/src/main/java/com/example/timecapsule/data/AccountSessionManager.kt`: Integrated `SessionGuard` across async operations, added `restoreSessionIfAuthenticated()`, `checkProfile()`, `lookupRecipient()`, `confirmRecipient()`, blank name validation, password length validation, and recoverable profile repair. Refined stale callback invalidation so stale callbacks do not accidentally sign out a active valid account.
   - `app/src/main/java/com/example/timecapsule/data/DefaultCapsuleRepository.kt`: Updated `lists(uid)` to return `OperationResult.Unavailable` instead of fake empty list success.
   - `app/src/main/java/com/example/timecapsule/domain/model/RecipientProfile.kt`: Added `RecipientConfirmation` data class.
-  - `app/src/main/java/com/example/timecapsule/ui/s01/S01SignInFragment.kt` & `ui/s02/S02RegisterFragment.kt`: Disabled submit buttons while in-flight to prevent duplicate requests.
-  - `firestore.rules`: Updated `create, update` rules to enforce `displayName.size() > 0`.
-  - `app/src/test/java/com/example/timecapsule/`: Added unit tests `SessionRestorationTest`, `ProfileRepairTest`, `RecipientConfirmationTest`, `StaleSessionCallbackTest`.
+  - `app/src/main/java/com/example/timecapsule/ui/s08/S08AccountSettingsFragment.kt` & `S08AccountSettingsViewModel.kt`: Added missing profile detection and status message display (`R.string.msg_recipient_profile_missing`).
+  - `app/src/main/res/values/strings.xml`: Added `msg_recipient_profile_missing` resource string.
+  - `app/src/test/java/com/example/timecapsule/`: Added unit tests `SessionRestorationTest`, `ProfileRepairTest`, `RecipientConfirmationTest`, `StaleSessionCallbackTest`, `AccountSessionManagerTest`.
 - **Checks and results:**
   - `gradle_sync`: PASS
   - `:app:assembleDebug`: PASS
-  - `:app:testDebugUnitTest`: PASS (41 unit tests passed)
+  - `:app:testDebugUnitTest`: PASS (43 unit tests passed)
   - `:app:lintDebug`: PASS
   - `:app:connectedDebugAndroidTest`: PASS (9 instrumentation tests passed on `emulator-5554` API 37)
   - `git diff --check`: PASS (clean formatting)

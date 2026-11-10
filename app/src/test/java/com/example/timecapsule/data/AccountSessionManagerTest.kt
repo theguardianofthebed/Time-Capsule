@@ -188,6 +188,33 @@ class AccountSessionManagerTest {
     }
 
     @Test
+    fun testStaleCallbackFromUserADoesNotSignOutValidUserB() = runBlocking {
+        val delayedAuth = object : AuthAdapter by fakeAuthAdapter {
+            override suspend fun signIn(email: String, password: String): OperationResult<String> {
+                delay(50)
+                return OperationResult.Success("user-a")
+            }
+        }
+        val manager = AccountSessionManager(delayedAuth, fakeFirestoreAdapter, sessionTracker)
+
+        // User A starts sign in
+        val jobA = async { manager.signIn("userA@example.com", "passA") }
+
+        // User B signs in immediately after, updating sessionTracker to user-b
+        delay(10)
+        sessionTracker.startSession("user-b")
+        fakeAuthAdapter.uid = "user-b"
+
+        // Delayed sign in for User A finishes
+        val resultA = jobA.await()
+
+        assertTrue("User A's delayed sign in must be denied as stale", resultA is OperationResult.Denied)
+        assertTrue("User B's session must remain valid", sessionTracker.currentSession().isAuthenticated)
+        assertEquals("user-b", sessionTracker.currentSession().uid)
+        assertEquals("user-b", fakeAuthAdapter.activeUid())
+    }
+
+    @Test
     fun testSignOutClearsSessionTrackerWithoutDuplicateCalls() {
         runBlocking {
             accountSessionManager.signIn("user@example.com", "pass123")

@@ -51,6 +51,31 @@ class S08AccountSettingsFragment : Fragment() {
         binding.tvUserUid.text = activeUid ?: "Unauthenticated"
         binding.etDisplayName.setText(activeName)
 
+        if (!activeUid.isNullOrBlank()) {
+            viewModel.checkProfile(activeUid)
+        }
+
+        viewModel.profileCheckState.observe(viewLifecycleOwner) { result ->
+            when (result) {
+                is OperationResult.Success -> {
+                    if (result.data.displayName.isNotBlank()) {
+                        binding.etDisplayName.setText(result.data.displayName)
+                    }
+                }
+                is OperationResult.Invalid -> {
+                    binding.tvStatusMessage.text = getString(R.string.msg_recipient_profile_missing)
+                }
+                is OperationResult.Unavailable -> {
+                    binding.tvStatusMessage.text = result.message
+                }
+                is OperationResult.Denied -> {
+                    binding.tvStatusMessage.text = result.message
+                }
+                null -> {}
+                else -> {}
+            }
+        }
+
         viewModel.updateState.observe(viewLifecycleOwner) { result ->
             when (result) {
                 is OperationResult.Success -> {

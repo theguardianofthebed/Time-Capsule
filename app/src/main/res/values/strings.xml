@@ -32,6 +32,7 @@
     <string name="msg_account_created">Account &amp; profile created successfully!</string>
     <string name="msg_profile_updated">Profile display name updated successfully!</string>
     <string name="msg_signed_out">Signed out successfully.</string>
+    <string name="msg_recipient_profile_missing">Recipient profile missing. Click Update Profile to complete setup.</string>
     <string name="err_adapter_unavailable">Required service adapters unavailable.</string>
     <string name="err_session_unavailable">Session unauthenticated or service unavailable.</string>
     <string name="err_password_mismatch">Passwords do not match.</string>

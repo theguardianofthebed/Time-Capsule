@@ -7,6 +7,7 @@ import com.example.timecapsule.data.session.SessionTracker
 import com.example.timecapsule.domain.model.RecipientConfirmation
 import com.example.timecapsule.domain.model.RecipientProfile
 import com.example.timecapsule.domain.result.OperationResult
+import com.example.timecapsule.domain.session.SessionSnapshot
 
 /**
  * Orchestrates authentication, SessionTracker updates, profile creation/repair, and recipient confirmation boundaries.
@@ -39,11 +40,7 @@ class AccountSessionManager(
         val capturedSession = sessionTracker.currentSession()
         val result = authAdapter.signIn(email, password)
 
-        val currentSession = sessionTracker.currentSession()
-        if (currentSession.sessionGeneration != capturedSession.sessionGeneration) {
-            if (authAdapter.activeUid() != null && currentSession.uid != authAdapter.activeUid()) {
-                authAdapter.signOut()
-            }
+        if (checkAndHandleStaleCallback(capturedSession)) {
             return OperationResult.Denied("Stale session invalidation: session changed during sign-in")
         }
 
@@ -86,20 +83,19 @@ class AccountSessionManager(
 
         val authResult = authAdapter.signUp(trimmedEmail, password, trimmedName)
 
-        val currentSession = sessionTracker.currentSession()
-        if (currentSession.sessionGeneration != capturedSession.sessionGeneration) {
-            if (authAdapter.activeUid() != null && currentSession.uid != authAdapter.activeUid()) {
-                authAdapter.signOut()
-            }
+        if (checkAndHandleStaleCallback(capturedSession)) {
             return OperationResult.Denied("Stale session invalidation: session changed during sign-up")
         }
 
         if (authResult is OperationResult.Success) {
             val uid = authResult.data
             sessionTracker.startSession(uid)
+            val postAuthSession = sessionTracker.currentSession()
 
             val profile = RecipientProfile(uid = uid, displayName = trimmedName)
-            val profileResult = firestoreAdapter.saveRecipientProfile(profile)
+            val profileResult = sessionGuard.runGuarded(postAuthSession) {
+                firestoreAdapter.saveRecipientProfile(profile)
+            }
             if (profileResult !is OperationResult.Success) {
                 return OperationResult.Unavailable(
                     "Account registered, but recipient profile setup failed. Please click 'Register / Repair' to complete setup."
@@ -128,6 +124,25 @@ class AccountSessionManager(
 
         return sessionGuard.runGuarded(session) {
             repairProfileInternal(activeUid, trimmedName)
+        }
+    }
+
+    /**
+     * Verifies whether [uid] has a valid, existing `recipientDirectory/{uid}` profile.
+     * Distinguishes a genuinely missing profile ([OperationResult.Invalid]) from network ([OperationResult.Unavailable])
+     * or permission ([OperationResult.Denied]) failures.
+     */
+    suspend fun checkProfile(uid: String): OperationResult<RecipientProfile> {
+        val cleanUid = uid.trim()
+        if (cleanUid.isBlank()) {
+            return OperationResult.Invalid("UID must not be blank for profile check.")
+        }
+        val session = sessionTracker.currentSession()
+        if (!session.isAuthenticated || session.uid != cleanUid) {
+            return OperationResult.Denied("Profile check requires an active authenticated session for $cleanUid.")
+        }
+        return sessionGuard.runGuarded(session) {
+            firestoreAdapter.getRecipientProfile(cleanUid)
         }
     }
 
@@ -173,5 +188,20 @@ class AccountSessionManager(
     fun signOut() {
         authAdapter.signOut()
         sessionTracker.clearSession()
+    }
+
+    private fun checkAndHandleStaleCallback(capturedSession: SessionSnapshot): Boolean {
+        val currentSession = sessionTracker.currentSession()
+        if (currentSession.sessionGeneration != capturedSession.sessionGeneration) {
+            val activeUid = authAdapter.activeUid()
+            if (activeUid != null && activeUid != currentSession.uid) {
+                authAdapter.signOut()
+                if (currentSession.isAuthenticated) {
+                    sessionTracker.clearSession()
+                }
+            }
+            return true
+        }
+        return false
     }
 }

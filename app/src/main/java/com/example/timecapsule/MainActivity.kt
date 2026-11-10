@@ -85,11 +85,36 @@ class MainActivity : AppCompatActivity() {
         // Unconditionally restore session into SessionTracker on every Activity/container creation
         val activeUid = container.accountSessionManager.restoreSessionIfAuthenticated()
 
+        // Register Fragment attach listener to re-wire navigation callbacks on Activity recreation/rotation
+        supportFragmentManager.addFragmentOnAttachListener { _, fragment ->
+            attachFragmentListeners(fragment)
+        }
+
+        // Re-wire callbacks for fragments restored prior to listener registration
+        supportFragmentManager.fragments.forEach { fragment ->
+            attachFragmentListeners(fragment)
+        }
+
         if (savedInstanceState == null) {
             if (activeUid.isNullOrBlank()) {
                 navigateToSignIn()
             } else {
                 navigateToAccountSettings()
+            }
+        }
+    }
+
+    private fun attachFragmentListeners(fragment: Fragment) {
+        when (fragment) {
+            is S01SignInFragment -> {
+                fragment.onGoToRegisterListener = { navigateToRegister() }
+                fragment.onSignInSuccessListener = { navigateToAccountSettings() }
+            }
+            is S02RegisterFragment -> {
+                fragment.onRegisterSuccessListener = { navigateToAccountSettings() }
+            }
+            is S08AccountSettingsFragment -> {
+                fragment.onSignOutSuccessListener = { navigateToSignIn() }
             }
         }
     }
