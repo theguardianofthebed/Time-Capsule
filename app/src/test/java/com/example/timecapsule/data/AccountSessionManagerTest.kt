@@ -11,6 +11,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -42,10 +43,11 @@ class AccountSessionManagerTest {
             if (password == "wrong") {
                 return OperationResult.Invalid("Invalid credentials provided.")
             }
-            uid = "user-123"
+            val newUid = if (email.contains("userB")) "user-b" else "user-123"
+            uid = newUid
             this.email = email
-            this.displayName = "Test User"
-            return OperationResult.Success("user-123")
+            this.displayName = "User $newUid"
+            return OperationResult.Success(newUid)
         }
 
         override suspend fun signUp(
@@ -56,10 +58,11 @@ class AccountSessionManagerTest {
             if (email.isBlank() || password.isBlank()) {
                 return OperationResult.Invalid("Email and password must not be blank.")
             }
-            uid = "user-123"
+            val newUid = "user-123"
+            uid = newUid
             this.email = email
             this.displayName = displayName
-            return OperationResult.Success("user-123")
+            return OperationResult.Success(newUid)
         }
 
         override suspend fun updateDisplayName(displayName: String): OperationResult<Unit> {
@@ -212,6 +215,88 @@ class AccountSessionManagerTest {
         assertTrue("User B's session must remain valid", sessionTracker.currentSession().isAuthenticated)
         assertEquals("user-b", sessionTracker.currentSession().uid)
         assertEquals("user-b", fakeAuthAdapter.activeUid())
+    }
+
+    @Test
+    fun testDelayedAccountASignInWithSdkSideEffectCleansUpInconsistentState() = runBlocking {
+        val delayedAuth = object : AuthAdapter by fakeAuthAdapter {
+            override suspend fun signIn(email: String, password: String): OperationResult<String> {
+                delay(50)
+                fakeAuthAdapter.uid = "user-a" // Mimic SDK side effect mutating active UID to user-a
+                return OperationResult.Success("user-a")
+            }
+        }
+        val manager = AccountSessionManager(delayedAuth, fakeFirestoreAdapter, sessionTracker)
+
+        // User A starts delayed sign-in
+        val jobA = async { manager.signIn("userA@example.com", "passA") }
+
+        // While User A is in-flight, SessionTracker is invalidated by a sign-out
+        delay(10)
+        sessionTracker.clearSession()
+
+        val resultA = jobA.await()
+
+        assertTrue("Stale User A sign-in must be denied", resultA is OperationResult.Denied)
+        assertNull("Stale SDK active UID must be signed out from Auth", fakeAuthAdapter.activeUid())
+        assertFalse("SessionTracker must remain unauthenticated", sessionTracker.currentSession().isAuthenticated)
+    }
+
+    @Test
+    fun testLogoutOccursWhileSignInIsInProgress() = runBlocking {
+        val delayedAuth = object : AuthAdapter by fakeAuthAdapter {
+            override suspend fun signIn(email: String, password: String): OperationResult<String> {
+                delay(50)
+                fakeAuthAdapter.uid = "user-in-flight"
+                return OperationResult.Success("user-in-flight")
+            }
+        }
+        val manager = AccountSessionManager(delayedAuth, fakeFirestoreAdapter, sessionTracker)
+
+        val job = async { manager.signIn("user@example.com", "pass123") }
+
+        delay(10)
+        manager.signOut()
+
+        val result = job.await()
+        assertTrue("Sign-in must be denied when sign-out occurs during execution", result is OperationResult.Denied)
+        assertNull("Auth must be signed out", fakeAuthAdapter.activeUid())
+        assertFalse("SessionTracker must be unauthenticated", sessionTracker.currentSession().isAuthenticated)
+    }
+
+    @Test
+    fun testSignUpFinishesAfterOriginalSessionInvalidated() = runBlocking {
+        val delayedAuth = object : AuthAdapter by fakeAuthAdapter {
+            override suspend fun signUp(email: String, password: String, displayName: String): OperationResult<String> {
+                delay(50)
+                fakeAuthAdapter.uid = "user-signup-stale"
+                return OperationResult.Success("user-signup-stale")
+            }
+        }
+        val manager = AccountSessionManager(delayedAuth, fakeFirestoreAdapter, sessionTracker)
+
+        val job = async { manager.signUpAndCreateProfile("signup@example.com", "pass123", "New User") }
+
+        delay(10)
+        sessionTracker.clearSession()
+
+        val result = job.await()
+        assertTrue("Stale sign-up must be denied", result is OperationResult.Denied)
+        assertNull("Auth must be signed out for stale sign-up", fakeAuthAdapter.activeUid())
+        assertFalse("SessionTracker must remain unauthenticated", sessionTracker.currentSession().isAuthenticated)
+    }
+
+    @Test
+    fun testCurrentAccountRemainsConsistentBetweenAuthAndSessionTracker() = runBlocking {
+        val res = accountSessionManager.signIn("user@example.com", "validPass")
+        assertTrue(res is OperationResult.Success)
+
+        assertEquals(fakeAuthAdapter.activeUid(), sessionTracker.currentSession().uid)
+        assertTrue(sessionTracker.currentSession().isAuthenticated)
+
+        accountSessionManager.signOut()
+        assertEquals(fakeAuthAdapter.activeUid(), sessionTracker.currentSession().uid)
+        assertFalse(sessionTracker.currentSession().isAuthenticated)
     }
 
     @Test

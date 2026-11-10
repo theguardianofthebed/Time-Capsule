@@ -8,6 +8,8 @@ import com.example.timecapsule.domain.model.RecipientConfirmation
 import com.example.timecapsule.domain.model.RecipientProfile
 import com.example.timecapsule.domain.result.OperationResult
 import com.example.timecapsule.domain.session.SessionSnapshot
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Orchestrates authentication, SessionTracker updates, profile creation/repair, and recipient confirmation boundaries.
@@ -19,6 +21,8 @@ class AccountSessionManager(
     private val sessionTracker: SessionTracker,
     private val sessionGuard: SessionGuard = SessionGuard(sessionTracker)
 ) {
+
+    private val authMutex = Mutex()
 
     /**
      * Restores active user session from [authAdapter] on application restart or container recreation.
@@ -36,18 +40,18 @@ class AccountSessionManager(
     }
 
     /** Performs user sign in and updates SessionTracker exactly once on success. */
-    suspend fun signIn(email: String, password: String): OperationResult<String> {
+    suspend fun signIn(email: String, password: String): OperationResult<String> = authMutex.withLock {
         val capturedSession = sessionTracker.currentSession()
         val result = authAdapter.signIn(email, password)
 
         if (checkAndHandleStaleCallback(capturedSession)) {
-            return OperationResult.Denied("Stale session invalidation: session changed during sign-in")
+            return@withLock OperationResult.Denied("Stale session invalidation: session changed during sign-in")
         }
 
         if (result is OperationResult.Success) {
             sessionTracker.startSession(result.data)
         }
-        return result
+        return@withLock result
     }
 
     /** Performs user sign up, starts session, and creates `recipientDirectory/{uid}` profile. */
@@ -55,17 +59,17 @@ class AccountSessionManager(
         email: String,
         password: String,
         displayName: String
-    ): OperationResult<String> {
+    ): OperationResult<String> = authMutex.withLock {
         val trimmedEmail = email.trim()
         val trimmedName = displayName.trim()
         if (trimmedName.isBlank()) {
-            return OperationResult.Invalid("Display name must not be blank.")
+            return@withLock OperationResult.Invalid("Display name must not be blank.")
         }
         if (trimmedEmail.isBlank() || password.isBlank()) {
-            return OperationResult.Invalid("Email and password must not be blank.")
+            return@withLock OperationResult.Invalid("Email and password must not be blank.")
         }
         if (password.length < 6) {
-            return OperationResult.Invalid("Password must be at least 6 characters.")
+            return@withLock OperationResult.Invalid("Password must be at least 6 characters.")
         }
 
         val capturedSession = sessionTracker.currentSession()
@@ -74,7 +78,7 @@ class AccountSessionManager(
         val activeUid = authAdapter.activeUid()
         if (!activeUid.isNullOrBlank()) {
             val repairRes = repairProfileInternal(activeUid, trimmedName)
-            return if (repairRes is OperationResult.Success) {
+            return@withLock if (repairRes is OperationResult.Success) {
                 OperationResult.Success(activeUid)
             } else {
                 OperationResult.Unavailable("Account exists, but recipient profile setup failed. Please update profile to complete setup.")
@@ -84,7 +88,7 @@ class AccountSessionManager(
         val authResult = authAdapter.signUp(trimmedEmail, password, trimmedName)
 
         if (checkAndHandleStaleCallback(capturedSession)) {
-            return OperationResult.Denied("Stale session invalidation: session changed during sign-up")
+            return@withLock OperationResult.Denied("Stale session invalidation: session changed during sign-up")
         }
 
         if (authResult is OperationResult.Success) {
@@ -97,12 +101,12 @@ class AccountSessionManager(
                 firestoreAdapter.saveRecipientProfile(profile)
             }
             if (profileResult !is OperationResult.Success) {
-                return OperationResult.Unavailable(
+                return@withLock OperationResult.Unavailable(
                     "Account registered, but recipient profile setup failed. Please click 'Register / Repair' to complete setup."
                 )
             }
         }
-        return authResult
+        return@withLock authResult
     }
 
     /**
