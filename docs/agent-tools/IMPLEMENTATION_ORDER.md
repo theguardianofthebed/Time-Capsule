@@ -52,7 +52,7 @@ Issue #16 no longer waits for #15: selecting a target and obtaining a fresh samp
 
 ## Screen ownership by issue
 
-**Team-approved allocation (10 November 2026):** #10 provides only the recipient lookup/confirmation interface; #12 owns the S-05 interaction. This keeps the full identity-confirmation requirement while avoiding duplicate UI work. No prerequisite or MVP requirement is removed. [Handoff](handoffs/issue-10-recipient-interface-20261110.md).
+**Requester-directed allocation (10 November 2026):** #10 provides only the recipient lookup/confirmation interface; #12 owns the S-05 interaction. This keeps the full identity-confirmation requirement while avoiding duplicate UI work. No prerequisite or MVP requirement is removed. [Handoff](handoffs/issue-10-recipient-interface-20261110.md).
 
 This table defines implementation boundaries, not permanent student assignments. Every screen uses XML layouts and ViewBinding.
 

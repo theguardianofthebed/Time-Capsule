@@ -1,6 +1,6 @@
 # Issue #10 → Issue #12 recipient confirmation boundary — 10 November 2026
 
-- **Decision status:** Explicitly approved implementation-ownership split, not a change to the MVP or Atlas requirement text
+- **Decision status:** Explicit requester-directed implementation-ownership allocation for the #10/#12 handoff; not a claim of full-team formal sign-off, and not a change to the MVP or Atlas requirement text
 - **Scope:** MVP; self-send and direct account-to-account delivery remain in the MVP
 - **Existing PR:** [#33](https://github.com/theguardianofthebed/Time-Capsule/pull/33) on `feature/10-accounts-recipient` (Draft; not merged at inspection)
 - **Base:** `main` at `d60187503e45f665004dcc99c59cf71c108e6502`; **inspected pre-handoff head:** `194574a9e5cfd4be6c37b216e1637491f144b64c` (read the current branch SHA on resume)
@@ -42,4 +42,4 @@ Existing source interface, subject to final review:
 
 **Issue #12:** A team member must explicitly claim ownership and a different reviewer. After #10 is merged and its bounded evidence is verified, implement S-05 recipient confirmation UI using the interface above, then test UID change/lookup failure/account switch before integrating S-06. This work is MVP, not an optional enhancement.
 
-This document records a team-directed implementation boundary only. It neither edits the live Atlas nor waives any course or product acceptance requirement.
+This document records a requester-directed implementation boundary only; independent teammate review remains required. It neither edits the live Atlas nor waives any course or product acceptance requirement.
