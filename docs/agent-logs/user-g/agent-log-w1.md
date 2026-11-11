@@ -14,7 +14,7 @@ Follow [the shared workflow](../../agent-tools/WORKFLOW.md) and [AGENTS.md](../.
 - **Session date(s):** 7 November 2026.
 - **Issue and PR:** Issue #7; https://github.com/theguardianofthebed/Time-Capsule/pull/8
 - **Requirement/design references:** Professor's `Term_Project_Agent_Usage_Supplement.docx`; `AGENTS.md`; `CURRENT_CONTRACT.md`; `WORKFLOW.md`; `CODING_AND_COMMENTS.md`.
-- **Agent environment:** Codex desktop app, used for repository documentation only. No Android application code was changed in this task.
+- **Agent environment:** Desktop documentation assistant, used for repository documentation only. No Android application code was changed in this task.
 - **Model used:** Exact displayed model name was not recorded. Gemini 3.6 Flash was discussed but was not used for this documentation session.
 
 **Goal**
@@ -98,4 +98,53 @@ I used the agent to remove obsolete Compose dependencies and files, configure AG
 - **What I reviewed:** I reviewed the removal of Compose configurations and dependencies, the setup of Views/XML with ViewBinding, the adoption of `ActivityMainBinding` in `MainActivity.kt`, the S-01 to S-08 XML placeholders, and the final build results.
 - **What I changed manually:** I manually added a plain English KDoc comment explaining the purpose of `onCreate` in `MainActivity.kt`.
 - **What I can explain:** I can explain the motivation for switching from Compose to Views/XML + ViewBinding, how binding classes are generated automatically from XML layouts, how `MainActivity` uses `binding` to inflate and access views, and that the 8 XML files are baseline placeholders rather than completed feature screens.
+- **What remains unclear:** The concrete implementation details for wiring Fragments and Navigation in downstream feature issues have not been reviewed yet.
+
+## Implement accounts, profile repair, and exact recipient confirmation for Issue #10
+
+- **Task and purpose:** Implement Firebase Auth, Firestore recipientDirectory matching rules, AccountSessionManager, and S-01, S-02, S-08 views/ViewModels for Issue #10.
+- **Session date(s):** 7–10 November 2026.
+- **Issue and PR:** [Issue #10](https://github.com/theguardianofthebed/Time-Capsule/issues/10); [PR #33](https://github.com/theguardianofthebed/Time-Capsule/pull/33) (Branch `feature/10-accounts-recipient`; still in review).
+- **Requirement/design references:** `FR-01`, `FR-03`, `DD-03`, `DD-19`, `DD-26`, `ARC-01`, `ARC-06`, `DD-18`.
+- **Agent environment:** Android Studio Agent Mode.
+- **Model used:** Gemini 3.6 Flash.
+
+**Goal**
+
+I used the agent to implement DefaultAuthAdapter, DefaultFirestoreAdapter, AccountSessionManager, S-01/S-02/S-08 ViewModels and Fragments, update firestore.rules, ensure safe debug emulator initialization, and verify 33 passing unit tests and 9 passing Firebase Emulator integration tests.
+
+**Requests and prompts**
+
+| # | Request summary | Actual prompt (key part) | Why it worked (or didn't) |
+|---|-----------------|--------------------------|---------------------------|
+| 1 | Branch setup | Paraphrased from prior record: Create `feature/10-accounts-recipient` branch from `origin/feature/9-reviewable`. | See documented checks and errors below. |
+| 2 | Authentication exception mapping | Paraphrased from prior record: Implement `DefaultAuthAdapter` with fine-grained Firebase exception mappings. | See documented checks and errors below. |
+| 3 | Recipient directory lookup and rules | Paraphrased from prior record: Implement `DefaultFirestoreAdapter` enforcing exact single `get` and owner-only `create`/`update` rules in `firestore.rules`. | See documented checks and errors below. |
+| 4 | Session and profile repair | Paraphrased from prior record: Implement `AccountSessionManager` for atomic `SessionTracker` updates and authenticated Profile Repair. | See documented checks and errors below. |
+| 5 | Account screen and ViewModel setup | Paraphrased from prior record: Refactor S-01, S-02, S-08 Fragments and ViewModels using `ViewModelFactory`. | See documented checks and errors below. |
+| 6 | Build and emulator verification | Paraphrased from prior record: Run unit tests (`:app:testDebugUnitTest`), Debug APK build (`:app:assembleDebug`), and Firebase Emulator Instrumentation tests (`:app:connectedDebugAndroidTest`). | See documented checks and errors below. |
+
+
+### What the agent changed and verified
+
+- **Changes:** Added `DefaultAuthAdapter`, `DefaultFirestoreAdapter`, `AccountSessionManager`, `S01SignInViewModel/Fragment`, `S02RegisterViewModel/Fragment`, `S08AccountSettingsViewModel/Fragment`, `ViewModelFactory`, `AuthAndRecipientTest`, `FirebaseEmulatorIntegrationTest`, and debug manifest for cleartext traffic (`app/src/debug/AndroidManifest.xml`). Updated `firestore.rules`, `FirebaseConfig`, and `MainActivity`.
+- **Checks and results:**
+  - JVM Unit/Seam Tests (`:app:testDebugUnitTest`): PASS (**33 passed, 0 failed**).
+  - Debug APK Build (`:app:assembleDebug`): PASS (`Build finished successfully`).
+  - Instrumentation Integration Tests (`:app:connectedDebugAndroidTest`): PASS (**9 passed, 0 failed** against live Auth & Firestore Emulators).
+  - Code Formatting (`git diff --check`): PASS (0 whitespace errors).
+- **Remaining checks:** Teammate PR review and merge; downstream feature implementation (Issue #11, #12, etc.).
+
+### Errors and manual fixes
+
+- **Errors:**
+  1. Initial build failed due to missing `appcompat` and `material` dependencies when converting `MainActivity` to `AppCompatActivity`. Resolved by adding `androidx.appcompat:appcompat` and `com.google.android.material:material` to `libs.versions.toml` and `app/build.gradle.kts`.
+  2. An intermediate build failed because a duplicate resource copy (`ic_launcher_background 2.xml`) was generated inside `app/build/`. Confirmed that original source files were untouched, performed `:app:clean` and re-ran `:app:assembleDebug` successfully.
+  3. Instrumentation test network restriction (`Cleartext HTTP traffic not permitted`). Resolved by moving `usesCleartextTraffic` to `app/src/debug/AndroidManifest.xml`.
+- **Manual fixes:** User reviewed architecture design and provided explicit guidance on emulator safety and session coordination boundaries.
+
+### My review and understanding
+
+- **What I reviewed:** I reviewed the implementation of Firebase Auth & Firestore recipientDirectory adapters, AccountSessionManager, Profile Repair, S-01/S-02/S-08 ViewModels, debug manifest separation, and passing instrumentation tests.
+- **What I can explain:** I can explain how AccountSessionManager coordinates SessionTracker updates exactly once, how Firestore rules enforce exact lookup and owner-only profile creation, and how ViewModelFactory safely injects dependencies across fragment recreation.
 - **What remains unclear:** The concrete implementation details for wiring Fragments and Navigation in downstream feature issues have not been reviewed yet.

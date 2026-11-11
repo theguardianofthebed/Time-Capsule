@@ -6,13 +6,52 @@
     android:orientation="vertical"
     android:padding="16dp">
 
-    <!-- S-01 Sign in screen placeholder -->
+    <!-- S-01 Sign in screen layout -->
     <TextView
         android:id="@+id/tvS01Title"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="@string/title_s01_sign_in"
-        android:textSize="18sp"
+        android:textSize="20sp"
         android:textStyle="bold" />
+
+    <EditText
+        android:id="@+id/etEmail"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:hint="@string/hint_email"
+        android:inputType="textEmailAddress" />
+
+    <EditText
+        android:id="@+id/etPassword"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:hint="@string/hint_password"
+        android:inputType="textPassword" />
+
+    <Button
+        android:id="@+id/btnSignIn"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="@string/btn_sign_in" />
+
+    <Button
+        android:id="@+id/btnGoToRegister"
+        style="?attr/materialButtonOutlinedStyle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="@string/btn_go_to_register" />
+
+    <TextView
+        android:id="@+id/tvStatusMessage"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:textColor="@android:color/holo_red_dark"
+        android:textSize="14sp" />
 
 </LinearLayout>

@@ -1,5 +1,6 @@
 package com.example.timecapsule.data.di
 
+import com.example.timecapsule.data.AccountSessionManager
 import com.example.timecapsule.data.CapsuleRepository
 import com.example.timecapsule.data.adapter.AuthAdapter
 import com.example.timecapsule.data.adapter.FirestoreAdapter
@@ -18,5 +19,6 @@ class AppDependencyContainer(
     val storageAdapter: StorageAdapter,
     val locationAdapter: LocationAdapter,
     val retentionAdapter: LocalRetentionAdapter,
-    val repository: CapsuleRepository
+    val repository: CapsuleRepository,
+    val accountSessionManager: AccountSessionManager
 )

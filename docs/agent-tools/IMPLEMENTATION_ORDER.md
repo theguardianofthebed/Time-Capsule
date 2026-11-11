@@ -4,7 +4,11 @@ Choose work by its **prerequisites**, then self-assign it. All implementation is
 
 The [Views and eight-screen decision](UI_VIEWS_UPDATE_2026-11-07.md) and [DESIGN.md](../../DESIGN.md) govern the UI. [#25](https://github.com/theguardianofthebed/Time-Capsule/issues/25) adopts the tested starter. Its bounded starter implementation is now merged through PR #27/#26 with recorded build/binding/launch evidence. This does not complete downstream screen behavior or backend acceptance.
 
-## Current readiness snapshot
+## Dated readiness snapshots
+
+**11 November 2026 update (before the authorized merge):** Issue #9 is closed and its foundation PR #29 is merged. PR #33 contains the bounded Issue #10 account/profile/lookup interface; its implementation code at `16c8038` is followed by a student-review-only documentation update at `8285840`. The latest User J weekly log reports Debug build/lint, **47 unit tests**, and **9 Android 17 instrumentation tests** passing; the requester separately reports 9/9 on the new laptop after resolving an AVD issue. The requester also reports peer approval and authorizes merge; no submitted GitHub review appeared at inspection. Check the actual PR merge result/commit before declaring #10 merged, then perform #11/#12's independent prerequisite and evidence checks. Their exact-UID UI split and dependency graph are unchanged.
+
+**Historical 10 November snapshot (preserved for provenance):**
 
 Checked after the external merge at **00:56 KST on 10 November 2026**: #25 is **DONE** for the starter boundary; #9 is **MERGED / VERIFICATION PENDING**. PR #29 merged as `c60d866cdc9794af97db129c946b66711270f6b9` and is present in main. Its newer log records 25 unit tests and cache/configuration corrections, while its description remains stale. Actual emulator connectivity/rules execution is unrecorded; review the applicability of the recorded bounded unit/configuration checks and classify the unspecified follow-up. Full account/capsule rules acceptance remains downstream, not a new #9 gate. #10 stays **BLOCKED** pending a fresh bounded-evidence and owner/reviewer preflight, rather than on an unmerged PR. #11–#23 additionally require unfinished predecessor features.
 
@@ -33,9 +37,9 @@ The table lists direct prerequisites. Shared upstream dependencies also apply. I
 |---|---|---|---|
 | 0 | [#25](https://github.com/theguardianofthebed/Time-Capsule/issues/25) — adopt and verify Views/XML + ViewBinding starter | Approved Views documentation in the selected base; clean-file comparison and local package verification | User G; starter work recorded 7–8 November. User J contributed the recorded theme correction. DONE for the starter only. |
 | 1 | [#9](https://github.com/theguardianofthebed/Time-Capsule/issues/9) — shared Android/Firebase configuration, interfaces, and test seams | #25 | User J; #29 merged 10 November, 8–9 November implementation recorded. Verification follow-up period must be recorded. |
-| 2 | [#10](https://github.com/theguardianofthebed/Time-Capsule/issues/10) — accounts, profile repair, and exact recipient confirmation | #9 | Unassigned; first feature session after shared interfaces/configuration. |
+| 2 | [#10](https://github.com/theguardianofthebed/Time-Capsule/issues/10) — accounts, profile repair, and **exact recipient lookup/confirmation interface only** (no S-05 UI) | #9 | User G's recorded implementation on [PR #33](https://github.com/theguardianofthebed/Time-Capsule/pull/33), 7–10 Nov; User J's stabilization/verification, including 47 unit tests and a new-laptop 9/9 instrumentation report. Peers' go-ahead is requester-reported; see PR for actual merge/review state. |
 | 3 | [#11](https://github.com/theguardianofthebed/Time-Capsule/issues/11) — capsule schema and matching access rules | #9, #10 | Unassigned; may run alongside #12 after the same gates. |
-| 3 | [#12](https://github.com/theguardianofthebed/Time-Capsule/issues/12) — S-04 → S-05 → S-06 draft and review flow | #9, #10 | Unassigned; may run alongside #11 after the same gates. |
+| 3 | [#12](https://github.com/theguardianofthebed/Time-Capsule/issues/12) — S-04 → S-05 **recipient confirmation UI** → S-06 draft and review flow, consuming #10's interface | #9, #10 | Unassigned; may run alongside #11 after the same gates, once #10 is merged and verified. |
 | 4 | [#13](https://github.com/theguardianofthebed/Time-Capsule/issues/13) — one original photo, validation, and retry copy | #9, #11, #12 | Unassigned; after schema and composition, before publication. |
 | 4 | [#16](https://github.com/theguardianofthebed/Time-Capsule/issues/16) — map target and fresh foreground location adapter | #9, #12 | Unassigned; may run alongside the photo/publication path. |
 | 5 | [#14](https://github.com/theguardianofthebed/Time-Capsule/issues/14) — immutable publication and uncertain-result recovery | #10, #11, #12, #13 | Unassigned; after recipient/schema/draft/media integration. |
@@ -52,6 +56,8 @@ Issue #16 no longer waits for #15: selecting a target and obtaining a fresh samp
 
 ## Screen ownership by issue
 
+**Requester-directed allocation (10 November 2026):** #10 provides only the recipient lookup/confirmation interface; #12 owns the S-05 interaction. This keeps the full identity-confirmation requirement while avoiding duplicate UI work. No prerequisite or MVP requirement is removed. [Handoff](handoffs/issue-10-recipient-interface-20261110.md).
+
 This table defines implementation boundaries, not permanent student assignments. Every screen uses XML layouts and ViewBinding.
 
 | Screen | Primary implementation issue | Shared work |
@@ -60,7 +66,7 @@ This table defines implementation boundaries, not permanent student assignments.
 | S-02 Register / profile-repair variant | #10 | #11 preserves the directory rules; #22 consistency |
 | S-03 Capsule lists | #21 | #18 refresh/recovery; #22 consistency |
 | S-04 Content | #12 | #13 photo validation/retention; #22 consistency |
-| S-05 Recipient and locks | #12 | #10 identity confirmation; #15 time; #16 map/location; #17 current AND |
+| S-05 Recipient and locks | #12 (including the user-facing confirmation controls) | #10 supplies exact UID lookup + confirmation interface/state only; #15 time; #16 map/location; #17 current AND |
 | S-06 Confirm send and outcome variants | #12 | #13 media; #14 frozen publication/reconciliation; #22 consistency |
 | S-07 Capsule detail and access variants | #21 | #15/#17 unlock; #18 recovery; #20 authorized retention; #19 notification entry |
 | S-08 Account and permissions | #10 | #16 location guidance; #19 notification permission; #20 cleanup; #22 consistency |
@@ -73,9 +79,9 @@ A prerequisite closes only when its **own bounded deliverable** is implemented a
 
 | Issue | Deliverable that can unblock its successors | Later integration still required |
 |---|---|---|
-| #10 | Auth, profile repair, exact lookup/confirmation, and the minimal `recipientDirectory` rules/emulator checks these functions need. | #11 extends the same rules for capsules/content/Storage and preserves directory tests; #20/#23 check full protected account cleanup. |
+| #10 | Auth, profile repair, exact-UID lookup and confirmation **interface/state contract**, plus minimal `recipientDirectory` rules and bounded emulator/unit tests. No S-05 confirmation UI is delivered by #10. | #12 implements and tests the actual S-05 lookup/display/confirm/reset interaction. #11 preserves directory rules; #20/#23 verify wider account cleanup and integrated behavior. |
 | #11 | Capsule/content/Storage rules verified with synthetic emulator fixtures. | #14/#15/#17 supply the real publication/unlock clients. Rules fixtures do not claim those clients exist. |
-| #12 | XML/ViewBinding draft forms, three-screen navigation, validation and typed handoffs. | #13 photo, #14 publication, #15 time, #16 map/location. Normal app actions stay unavailable until their real adapter exists; tests may inject controlled outcomes without claiming live success. |
+| #12 | XML/ViewBinding draft forms and navigation, including S-05 self/exact UID lookup, visible name/code, **explicit confirmation**, confirmation reset on every UID/account change, and typed handoff to S-06 using #10's interface. | #13 photo, #14 publication, #15 time, #16 map/location. Normal app actions stay unavailable until their real adapter exists; tests may inject controlled outcomes without claiming live success. |
 | #13 | Actual photo acquisition, original private copy and authenticated upload adapter verified against the agreed frozen-operation interface. | #14/#23 exercise complete ambiguous publication and operation-dependent cleanup. |
 | #14 | One-ID atomic publication/reconciliation verified using backend-valid frozen fixtures and failure injection. | #15/#16 supply the complete date/map input behavior; #21 finishes list/detail navigation. |
 | #15 | UTC/time-only transaction and denial/monotonic behavior verified against the merged rules/publication. | LOCATION/BOTH remain fail-closed until #17 integrates qualified location input. |

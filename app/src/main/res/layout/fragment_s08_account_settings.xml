@@ -6,13 +6,68 @@
     android:orientation="vertical"
     android:padding="16dp">
 
-    <!-- S-08 Account & settings screen placeholder -->
+    <!-- S-08 Account & settings layout -->
     <TextView
         android:id="@+id/tvS08Title"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="@string/title_s08_account_settings"
-        android:textSize="18sp"
+        android:textSize="20sp"
         android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/tvUidLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="@string/label_public_uid"
+        android:textSize="12sp" />
+
+    <TextView
+        android:id="@+id/tvUserUid"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:textIsSelectable="true"
+        android:textSize="14sp"
+        android:textStyle="bold" />
+
+    <Button
+        android:id="@+id/btnCopyUid"
+        style="?attr/materialButtonOutlinedStyle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="@string/btn_copy_uid" />
+
+    <EditText
+        android:id="@+id/etDisplayName"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:hint="@string/hint_display_name"
+        android:inputType="textPersonName" />
+
+    <Button
+        android:id="@+id/btnUpdateProfile"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="@string/btn_update_profile" />
+
+    <Button
+        android:id="@+id/btnSignOut"
+        style="?attr/materialButtonOutlinedStyle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:text="@string/btn_sign_out" />
+
+    <TextView
+        android:id="@+id/tvStatusMessage"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:textSize="14sp" />
 
 </LinearLayout>

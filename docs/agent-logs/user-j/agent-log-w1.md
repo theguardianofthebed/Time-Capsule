@@ -109,3 +109,119 @@ Needed assistance in pinning Firebase/Maps/DataStore dependencies, defining type
 - **Feedback and next step:**
   - The initial foundation provides reusable interfaces and testable components for subsequent features. I requested additional automated verification for asynchronous session isolation, Firestore initialization, and Firebase configuration safety before performing manual testing. 
   - The next plan is to review the final test results, reproduce the relevant checks in Android Studio, and address any remaining issues in PR #29 before teammate review and merging.
+
+## Task: Issue #10 Android 17 Firebase Emulator Test Connectivity Fix
+
+- **Task and purpose:** Fixed Android 17 (API 37) local network permission enforcement (`android.permission.ACCESS_LOCAL_NETWORK`) for Firebase Auth & Firestore Emulator test connectivity, ensuring instrumentation tests execute and pass cleanly on API 37 AVDs without TCP timeout errors.
+- **Session date(s):** 10 November 2026.
+- **Issue and PR:** Issue #10 (https://github.com/theguardianofthebed/Time-Capsule/issues/10), Draft PR #33 (https://github.com/theguardianofthebed/Time-Capsule/pull/33) on `feature/10-accounts-recipient`.
+- **Requirement/design references:** DD-03, DD-11, DD-19, DD-20, AC-01, AC-12.
+- **Agent environment:** Android Studio Agent Mode.
+- **Model used:** Gemini Flash 3.6 (Android Studio Agent Mode).
+
+**Goal**
+
+Needed assistance in diagnosing the Android 17 (API 37) `ACCESS_LOCAL_NETWORK` local network permission requirement, declaring it in the Debug-only manifest, adding `GrantPermissionRule` and `UiAutomation` permission grants before test execution, improving negative Firestore rule assertions to verify exact `PERMISSION_DENIED` exceptions, and verifying instrumented test suite execution.
+
+**Requests and prompts**
+
+| # | Request summary | Actual prompt (key part) | Why it worked (or didn't) |
+|---|-----------------|--------------------------|---------------------------|
+| 1 | Diagnose local emulator connectivity | Recorded excerpt: "Issue #10 — Fix Android 17 Firebase Emulator Test Connectivity ... On Android 17 (API 37), the application cannot connect to the Firebase Authentication Emulator at 10.0.2.2:9099 ..." | See documented checks and errors below. |
+
+
+### What the agent changed and verified
+
+- **Changes:**
+  - `app/src/main/AndroidManifest.xml`: Added `<uses-permission android:name="android.permission.INTERNET" />`.
+  - `app/src/debug/AndroidManifest.xml`: Added Debug-only `<uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />` while preserving `usesCleartextTraffic="true"`.
+  - `gradle/libs.versions.toml` & `app/build.gradle.kts`: Added `androidx.test:rules:1.6.1` (`androidTestImplementation(libs.androidx.test.rules)`).
+  - `app/src/androidTest/java/com/example/timecapsule/data/adapter/FirebaseEmulatorIntegrationTest.kt`: Added `@get:Rule GrantPermissionRule` and `uiAutomation.grantRuntimePermission` in `@BeforeClass` for `ACCESS_LOCAL_NETWORK`. Improved negative security rule assertions to check for `FirebaseFirestoreException.Code.PERMISSION_DENIED`.
+- **Checks and results:**
+  - `gradle_sync`: PASS
+  - `:app:assembleDebug`: PASS
+  - `:app:testDebugUnitTest`: PASS (33 passed unit tests)
+  - `:app:lintDebug`: PASS
+  - `:app:connectedDebugAndroidTest`: PASS (9 passed instrumentation tests on `emulator-5554` API 37 with 0 failures, including all `FirebaseEmulatorIntegrationTest` cases).
+- **Remaining checks:**
+  - Live production Firebase authentication (deferred to production deployment after PR review).
+
+### Errors and manual fixes
+
+- Resolved an unused import warning in `FirebaseEmulatorIntegrationTest.kt`. All build, unit, lint, and instrumentation tests passed without manual code edits.
+
+### My review and understanding
+
+- **What I reviewed:** 
+  - I investigated the Firebase Emulator connectivity failure on Android 17 (API 37) by checking the emulator connection, installed application permissions, and ADB network logs.
+  - I confirmed that Firebase Emulator services were accessible, but the application did not initially request ACCESS_LOCAL_NETWORK.
+  - After the Debug-only permission fix, I reran the previously failing test and the complete instrumentation test suite. All 9 instrumentation tests passed.
+- **What I can explain:** 
+  - I can explain the difference between the Android Emulator and Firebase Emulators, and why Android uses 10.0.2.2 to access services running on the development computer.
+  - I understand why Android 17 requires local-network permission, how a missing permission can cause network timeouts, and why the emulator-specific permission should remain Debug-only.
+  - I understand that automated permission setup helps other team members reproduce tests without manually granting permissions every time.
+- **Feedback and next step:** 
+  - The debugging process showed that successful builds do not guarantee working emulator connectivity. Checking the actual installed permissions and network logs was useful for identifying the cause.
+  - The corrected test environment passed all 9 instrumentation tests. However, passing tests does not mean every Issue #10 requirement is complete.
+  - Next, I will review the remaining account/session and profile-repair issues with the teammate, verify any corrections, and complete the PR review before merging. Once Issue #10 is merged and verified, the team can proceed with Issues #11 and #12 concurrently.
+
+---
+
+---
+
+## Task: Issue #10 Final Critical Fixes Before Merge
+
+- **Task and purpose:** Completed final critical Issue #10 defects: restored authenticated session state on every Activity/container recreation, integrated `SessionGuard` into real async AccountSessionManager operations to reject stale callbacks across account changes, removed unsafe Firestore fallback in `FirebaseConfig.kt`, completed recoverable profile creation and Profile Repair without duplicate Auth account creation, established exact recipient lookup with explicit confirmation boundary, fail-closed initialization for Debug/Release environments, disabled duplicate UI submissions during in-flight operations, and added unit test coverage.
+- **Session date(s):** 10 November 2026.
+- **Issue and PR:** Issue #10 (https://github.com/theguardianofthebed/Time-Capsule/issues/10), Draft PR #33 (https://github.com/theguardianofthebed/Time-Capsule/pull/33) on `feature/10-accounts-recipient`.
+- **Requirement/design references:** DD-03, DD-11, DD-19, DD-20, AC-01, AC-12, FR-01, FR-03.
+- **Agent environment:** Android Studio Agent Mode.
+- **Model used:** Gemini Flash 3.6 (Android Studio Agent Mode).
+
+**Goal**
+
+Needed assistance in implementing session restoration on Activity recreation in `MainActivity`, integrating `SessionGuard` into `AccountSessionManager`, removing unsafe Firestore fallback in `FirebaseConfig`, enforcing non-blank profile name validation, establishing recipient lookup/confirmation state for Issue #12, and writing comprehensive unit tests (`SessionRestorationTest`, `ProfileRepairTest`, `RecipientConfirmationTest`, `StaleSessionCallbackTest`).
+
+**Requests and prompts**
+
+| # | Request summary | Actual prompt (key part) | Why it worked (or didn't) |
+|---|-----------------|--------------------------|---------------------------|
+| 1 | Review final account and session corrections | Recorded excerpt: "Review the latest feature/10-accounts-recipient HEAD (9e10d06) in PR #33 ... Please perform one final minimal merge-blocker correction ..." | See documented checks and errors below. |
+
+
+### What the agent changed and verified
+
+- **Changes:**
+  - `app/src/main/java/com/example/timecapsule/MainActivity.kt`: Registered `addFragmentOnAttachListener` and attached navigation callbacks to restored Fragments on Activity recreation/rotation.
+  - `app/src/main/java/com/example/timecapsule/config/FirebaseConfig.kt`: Removed unsafe `?: FirebaseFirestore.getInstance()` fallback in `setupDebugEmulatorConnection` to fail closed if memory-only initialization fails.
+  - `app/src/main/java/com/example/timecapsule/data/AccountSessionManager.kt`: Serialized async state-mutating auth operations via `Mutex`, integrated `SessionGuard`, added `restoreSessionIfAuthenticated()`, `checkProfile()`, `lookupRecipient()`, `confirmRecipient()`, blank name validation, password length validation, and recoverable profile repair. Refined stale callback invalidation so stale callbacks do not accidentally sign out an active valid account.
+  - `app/src/main/java/com/example/timecapsule/data/DefaultCapsuleRepository.kt`: Updated `lists(uid)` to return `OperationResult.Unavailable` instead of fake empty list success.
+  - `app/src/main/java/com/example/timecapsule/domain/model/RecipientProfile.kt`: Added `RecipientConfirmation` data class.
+  - `app/src/main/java/com/example/timecapsule/ui/s08/S08AccountSettingsFragment.kt` & `S08AccountSettingsViewModel.kt`: Added missing profile detection and status message display (`R.string.msg_recipient_profile_missing`).
+  - `app/src/main/res/values/strings.xml`: Added `msg_recipient_profile_missing` resource string.
+  - `app/src/test/java/com/example/timecapsule/`: Added unit tests `SessionRestorationTest`, `ProfileRepairTest`, `RecipientConfirmationTest`, `StaleSessionCallbackTest`, `AccountSessionManagerTest` (verifying 47 passing unit tests and Auth race serialization).
+- **Checks and results:**
+  - `gradle_sync`: PASS
+  - `:app:assembleDebug`: PASS
+  - `:app:testDebugUnitTest`: PASS (47 unit tests passed)
+  - `:app:lintDebug`: PASS
+  - `:app:connectedDebugAndroidTest`: PASS (9 instrumentation tests passed on `emulator-5554` API 37)
+  - `git diff --check`: PASS (clean formatting)
+- **Remaining checks:**
+  - Full capsule publication, unlocking, and media storage (deferred to Issues #11, #12, #14).
+
+### Errors and manual fixes
+
+- Resolved minor compiler warnings for unused functions and lambda parameter positioning. All tests passed without manual code fixes.
+
+### My review and understanding
+
+- **What I reviewed:**
+  - I reviewed the Issue #10 implementation and test results, focusing on Firebase authentication, session handling, and Android Emulator connectivity. 
+  - I independently reproduced and resolved the emulator testing issue, confirming that all 9 instrumentation tests passed.
+- **What I can explain:** 
+  - I can explain how Firebase Auth manages user accounts, how Firestore stores user profiles, and how UIDs identify recipients. 
+  - I also understand the purpose of session tracking and why real-device integration tests are necessary beyond unit tests.
+- **Feedback and next step:** 
+  - The implementation provides a working account foundation, and the emulator tests now pass on my new laptop. 
+  - The next step is to finalize teammate review, merge PR #33 after approval, and proceed with Issues #11 and #12.

@@ -48,6 +48,8 @@ flowchart TD
 
 ### Create a capsule
 
+**Implementation ownership (explicit requester instruction, 10 November 2026):** Issue #10 supplies exact recipient UID lookup and the confirmation state/interface only. Issue #12 implements the S-05 recipient lookup presentation, explicit user confirmation and confirmation invalidation on UID/account change, alongside lock choices. The design requirement to confirm the displayed UID/name before sending is unchanged; no #10 S-05 UI is claimed.
+
 Creation uses **three screens: S-04 → S-05 → S-06**. Keep the four logical checks—content, recipient, lock, and review—within this flow. Recipient and lock are two sections of S-05, not separate main screens. Use a three-position progress indicator matching those screens and preserve editable input on Back/Next.
 
 | Screen / section | Required behavior | Contract |

@@ -30,8 +30,7 @@ class DefaultSessionTracker : SessionTracker {
 
     override fun isSessionValid(capturedSnapshot: SessionSnapshot): Boolean {
         val current = currentSession()
-        return (current.isAuthenticated &&
-                current.uid == capturedSnapshot.uid &&
+        return (current.uid == capturedSnapshot.uid &&
                 current.sessionGeneration == capturedSnapshot.sessionGeneration)
     }
 }

@@ -74,12 +74,42 @@ class FakeCapsuleRepository(
  */
 class FakeAuthAdapter(private val tracker: DefaultSessionTracker) : AuthAdapter {
     override fun activeUid(): String? = tracker.currentSession().uid
+    override fun activeEmail(): String? = "test@example.com"
+    override fun activeDisplayName(): String? = "Test User"
+
+    override suspend fun signIn(email: String, password: String): OperationResult<String> {
+        tracker.startSession("fake-uid-123")
+        return OperationResult.Success("fake-uid-123")
+    }
+
+    override suspend fun signUp(
+        email: String,
+        password: String,
+        displayName: String
+    ): OperationResult<String> {
+        tracker.startSession("fake-uid-123")
+        return OperationResult.Success("fake-uid-123")
+    }
+
+    override suspend fun updateDisplayName(displayName: String): OperationResult<Unit> {
+        return OperationResult.Success(Unit)
+    }
+
     override fun signOut() = tracker.clearSession()
 }
 
 class FakeFirestoreAdapter : FirestoreAdapter {
     override fun isAvailable(): Boolean = true
     override fun firestoreInstance(): com.google.firebase.firestore.FirebaseFirestore? = null
+
+    override suspend fun getRecipientProfile(uid: String): OperationResult<RecipientProfile> {
+        if (uid == "nonexistent") return OperationResult.Invalid("Recipient not found")
+        return OperationResult.Success(RecipientProfile(uid, "User $uid"))
+    }
+
+    override suspend fun saveRecipientProfile(profile: RecipientProfile): OperationResult<Unit> {
+        return OperationResult.Success(Unit)
+    }
 }
 
 class FakeStorageAdapter : StorageAdapter {
@@ -101,15 +131,19 @@ class RepositorySeamsTest {
 
     private val sessionTracker = DefaultSessionTracker()
     private val repository = FakeCapsuleRepository(sessionTracker)
+    private val authAdapter = FakeAuthAdapter(sessionTracker)
+    private val firestoreAdapter = FakeFirestoreAdapter()
+    private val accountSessionManager = AccountSessionManager(authAdapter, firestoreAdapter, sessionTracker)
 
     private val container = AppDependencyContainer(
         sessionTracker = sessionTracker,
-        authAdapter = FakeAuthAdapter(sessionTracker),
-        firestoreAdapter = FakeFirestoreAdapter(),
+        authAdapter = authAdapter,
+        firestoreAdapter = firestoreAdapter,
         storageAdapter = FakeStorageAdapter(),
         locationAdapter = FakeLocationAdapter(),
         retentionAdapter = FakeLocalRetentionAdapter(),
-        repository = repository
+        repository = repository,
+        accountSessionManager = accountSessionManager
     )
 
     @Test
