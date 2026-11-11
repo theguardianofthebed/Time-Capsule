@@ -2,9 +2,9 @@
 
 - **Decision status:** Explicit requester-directed implementation-ownership allocation for the #10/#12 handoff; not a claim of full-team formal sign-off, and not a change to the MVP or Atlas requirement text
 - **Scope:** MVP; self-send and direct account-to-account delivery remain in the MVP
-- **Existing PR:** [#33](https://github.com/theguardianofthebed/Time-Capsule/pull/33) on `feature/10-accounts-recipient` (Draft; not merged at inspection)
-- **Base:** `main` at `d60187503e45f665004dcc99c59cf71c108e6502`; **inspected pre-handoff head:** `194574a9e5cfd4be6c37b216e1637491f144b64c` (read the current branch SHA on resume)
-- **Implementation contributions:** User G's Issue #10 work and User J's emulator/stabilization contributions are recorded in their weekly logs. Formal Issue assignee and different-teammate reviewer must be independently checked. Issue #12 acting owner and reviewer are not yet established here.
+- **Existing PR:** [#33](https://github.com/theguardianofthebed/Time-Capsule/pull/33) on `feature/10-accounts-recipient` (Ready for review at 11 November pre-merge inspection; check PR for the actual merged SHA)
+- **Base:** `main` at `d60187503e45f665004dcc99c59cf71c108e6502`; **latest code head inspected:** `16c8038615500b96ae9590611b1e32973f58b574` and **student review documentation head:** `82858400a8f0e6ba44be6606543c7e572eb8fef1` (read the current branch SHA on resume)
+- **Implementation contributions:** User G's Issue #10 work and User J's emulator/stabilization contributions are recorded in their weekly logs. The requester reports a different peer has reviewed and approved in conversation; no submitted GitHub review was present at inspection. Do not claim a named or formal GitHub approval. Issue #12 acting owner and reviewer are not yet established here.
 - **Prerequisites:** Issue #9 foundation merged through PR #29 at `c60d866cdc9794af97db129c946b66711270f6b9`. Issue #12 still depends on #9 and the **merged, verified bounded #10**. #11 and #12 may proceed concurrently only after their respective readiness checks. No dependency edge is changed.
 - **Traceability:** FR-01, FR-02, FR-03; DD-03, DD-19, DD-26, DD-27; ARC-01, ARC-06; AC-01, AC-03; T-01, T-03, T-39. Shared AC/test requirements are not considered fully passed by this split.
 - **Workspace:** Remote branch inspected; local worktree and uncommitted files were not inspected. Do not overwrite other contributors' local work.
@@ -30,15 +30,15 @@ Existing source interface, subject to final review:
 
 ## Current evidence and known limitations
 
-- At inspected PR #33 head `194574a9e5cfd4be6c37b216e1637491f144b64c`, the account/recipient interface and S-01/S-02/S-08 work exist; the S-05 screen remains a placeholder. This is intentional under the newly approved ownership split.
-- Existing User J weekly log reports local Debug build, lint, **43 JVM unit tests** and **9 Android 17 Firebase Emulator instrumentation tests** passing. This handoff did **not** rerun them, and GitHub CI/reviewer approval was not observed at that checkpoint.
-- **Outstanding review risk (not resolved by this documentation change):** `AccountSessionManager.checkAndHandleStaleCallback()` can call `authAdapter.signOut()` and clear the active session if an older Firebase sign-in has changed the underlying active UID after a newer user became authenticated. Existing mock regression does not reproduce the FirebaseAuth user swap. This requires a focused fix/test in PR #33 before merge; do not report it as fixed.
+- At inspected implementation head `16c8038615500b96ae9590611b1e32973f58b574`, the account/recipient interface and S-01/S-02/S-08 work exist; the S-05 screen remains a placeholder. This is intentional under the newly approved ownership split.
+- The User J weekly log reports local Debug build, lint, **47 JVM unit tests** and **9 Android 17 Firebase Emulator instrumentation tests** passing. On **11 November 2026**, the requester additionally reported a passing **9/9** instrumentation run on the new Windows laptop after resolving an Android 17 AVD UWB-service issue. The exact local SHA was not printed; use the source commit SHA and report as distinct evidence. These documentation edits did **not** rerun Android tests, and no GitHub CI run or formal GitHub review was observed at inspection.
+- **Updated concurrency assessment:** PR #33 implementation commit `16c8038` serializes state-mutating sign-in/sign-up operations through a coroutine `Mutex` and adds delayed Auth/SDK-side-effect and logout-in-flight unit tests. This mitigates the previously identified overlapping sign-in race in the same `AccountSessionManager`. `signOut()`, profile repair and manager recreation are not covered by the same mutex; the passing bounded tests do not prove all multi-manager concurrency cases. Reviewer should treat any reproducible account-isolation failure as a blocker and document narrower residual concerns as follow-up; no such new failing regression was supplied for this merge.
 - The #10 recipient API existing as code does not constitute passing the entire end-to-end T-03/AC-03: S-05 explicit confirmation UI is owned and verified with #12, full send/integration with #14/#23.
-- Keep PR #33 Draft until its final correction, accurate local verification record, different-teammate review and authorized human merge.
+- **Review and merge checkpoint:** PR #33 was marked Ready for review; peers' go-ahead and the explicit merge instruction were reported by the requester. This is not a formal recorded GitHub approval. Actual merged SHA must be retrieved from the live PR and reflected in Issue #10 after merging.
 
 ## Next action
 
-**Issue #10:** User G as recorded implementation contributor (with User J coordination support), next PR review/fix session before the team merges #33; dependencies are a reproducible account-switch regression and different-teammate review. No fixed calendar deadline beyond the current course milestone is newly agreed.
+**Issue #10:** User G's bounded account implementation with User J's stabilization evidence is ready for the requester-authorized PR #33 merge, conditional on GitHub's merge checks. Record the actual merge SHA and close the issue only after the bounded result is verified; do not fabricate GitHub approval or broader MVP acceptance. Work period: current 11 November handoff/merge checkpoint, not a newly promised deadline.
 
 **Issue #12:** A team member must explicitly claim ownership and a different reviewer. After #10 is merged and its bounded evidence is verified, implement S-05 recipient confirmation UI using the interface above, then test UID change/lookup failure/account switch before integrating S-06. This work is MVP, not an optional enhancement.
 
