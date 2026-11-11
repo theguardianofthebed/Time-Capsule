@@ -16,6 +16,9 @@ import com.example.timecapsule.data.session.DefaultSessionTracker
 import com.example.timecapsule.databinding.ActivityMainBinding
 import com.example.timecapsule.ui.s01.S01SignInFragment
 import com.example.timecapsule.ui.s02.S02RegisterFragment
+import com.example.timecapsule.ui.s04.S04ContentDraftFragment
+import com.example.timecapsule.ui.s05.S05RecipientLockFragment
+import com.example.timecapsule.ui.s06.S06ConfirmSendFragment
 import com.example.timecapsule.ui.s08.S08AccountSettingsFragment
 
 /**
@@ -113,6 +116,22 @@ class MainActivity : AppCompatActivity() {
             is S02RegisterFragment -> {
                 fragment.onRegisterSuccessListener = { navigateToAccountSettings() }
             }
+            is S04ContentDraftFragment -> {
+                fragment.onNextToRecipientLockListener = { navigateToRecipientLock() }
+                fragment.onNavigateToMomentsListener = { navigateToSignIn() }
+                fragment.onNavigateToAccountListener = { navigateToAccountSettings() }
+            }
+            is S05RecipientLockFragment -> {
+                fragment.onBackToContentDraftListener = { navigateToContentDraft() }
+                fragment.onNextToConfirmSendListener = { navigateToConfirmSend() }
+                fragment.onNavigateToMomentsListener = { navigateToSignIn() }
+                fragment.onNavigateToAccountListener = { navigateToAccountSettings() }
+            }
+            is S06ConfirmSendFragment -> {
+                fragment.onBackToRecipientLockListener = { navigateToRecipientLock() }
+                fragment.onNavigateToMomentsListener = { navigateToSignIn() }
+                fragment.onNavigateToAccountListener = { navigateToAccountSettings() }
+            }
             is S08AccountSettingsFragment -> {
                 fragment.onSignOutSuccessListener = { navigateToSignIn() }
             }
@@ -140,6 +159,37 @@ class MainActivity : AppCompatActivity() {
     fun navigateToAccountSettings() {
         val fragment = S08AccountSettingsFragment().apply {
             onSignOutSuccessListener = { navigateToSignIn() }
+        }
+        replaceFragment(fragment)
+    }
+
+    /** Navigates to S-04 Content Creation Draft screen. */
+    fun navigateToContentDraft() {
+        val fragment = S04ContentDraftFragment().apply {
+            onNextToRecipientLockListener = { navigateToRecipientLock() }
+            onNavigateToMomentsListener = { navigateToSignIn() }
+            onNavigateToAccountListener = { navigateToAccountSettings() }
+        }
+        replaceFragment(fragment)
+    }
+
+    /** Navigates to S-05 Recipient & Lock Selection screen. */
+    fun navigateToRecipientLock() {
+        val fragment = S05RecipientLockFragment().apply {
+            onBackToContentDraftListener = { navigateToContentDraft() }
+            onNextToConfirmSendListener = { navigateToConfirmSend() }
+            onNavigateToMomentsListener = { navigateToSignIn() }
+            onNavigateToAccountListener = { navigateToAccountSettings() }
+        }
+        replaceFragment(fragment)
+    }
+
+    /** Navigates to S-06 Confirm Send Review screen. */
+    fun navigateToConfirmSend() {
+        val fragment = S06ConfirmSendFragment().apply {
+            onBackToRecipientLockListener = { navigateToRecipientLock() }
+            onNavigateToMomentsListener = { navigateToSignIn() }
+            onNavigateToAccountListener = { navigateToAccountSettings() }
         }
         replaceFragment(fragment)
     }

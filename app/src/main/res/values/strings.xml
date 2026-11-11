@@ -36,4 +36,58 @@
     <string name="err_adapter_unavailable">Required service adapters unavailable.</string>
     <string name="err_session_unavailable">Session unauthenticated or service unavailable.</string>
     <string name="err_password_mismatch">Passwords do not match.</string>
+
+    <!-- S-04 strings -->
+    <string name="s04_header_title">Seal your moment</string>
+    <string name="s04_step_01">01 · Write</string>
+    <string name="s04_step_02">02 · Seal</string>
+    <string name="s04_step_03">03 · Send</string>
+    <string name="s04_headline">What’s on your mind?</string>
+    <string name="s04_subtitle">A letter, a little reminder, a feeling worth keeping.</string>
+    <string name="s04_label_title">Capsule title (optional)</string>
+    <string name="s04_hint_title">e.g., A note for graduation day...</string>
+    <string name="s04_title_disclosure">Visible to the recipient while locked — keep sensitive words inside your letter.</string>
+    <string name="s04_label_body">Your little moment</string>
+    <string name="s04_hint_body">Dear future me,\n\nHere’s something I don’t want to forget...</string>
+    <string name="s04_label_photo">A photograph optional</string>
+    <string name="s04_btn_add_photo">Add a little visual memory</string>
+    <string name="s04_subtext_photo">One JPEG or PNG · up to 5 MiB</string>
+    <string name="s04_btn_continue">Give it a time and place</string>
+    <string name="s04_btn_discard">Discard this draft</string>
+    <string name="s04_note_draft_saved">Your draft is saved on this device while you compose.</string>
+
+    <!-- S-05 strings -->
+    <string name="s05_headline">For someone. For someday.</string>
+    <string name="s05_subtitle">Choose who finds this moment, and when.</string>
+    <string name="s05_label_recipient_section">Who is it for?</string>
+    <string name="s05_mode_future_me">Future me</string>
+    <string name="s05_mode_someone_else">Someone else</string>
+    <string name="s05_label_exact_uid">Exact account UID</string>
+    <string name="s05_hint_exact_uid">TC-JAMIE1ff</string>
+    <string name="s05_btn_lookup">Find recipient</string>
+    <string name="s05_btn_confirm_recipient">Confirm recipient</string>
+    <string name="s05_note_confirm">Tap confirm to seal this capsule for recipient.</string>
+    <string name="s05_label_when">When should it open?</string>
+    <string name="s05_lock_time">Time</string>
+    <string name="s05_lock_place">Place</string>
+    <string name="s05_lock_both">Both</string>
+    <string name="s05_label_date_time">A future date &amp; time</string>
+    <string name="s05_label_place">A meaningful place</string>
+    <string name="s05_notice_both">Both conditions must be met. A fresh location check is required after the time arrives.</string>
+    <string name="s05_btn_review">Review your capsule</string>
+    <string name="s05_btn_review_disabled">Confirm recipient to review</string>
+
+    <!-- S-06 strings -->
+    <string name="s06_header_title">Confirm delivery</string>
+    <string name="s06_eyebrow">ONE LAST LITTLE LOOK</string>
+    <string name="s06_headline">Ready for a future moment?</string>
+    <string name="s06_subtitle">Once sent, this little moment can\'t be edited.</string>
+    <string name="s06_btn_send">Seal &amp; send capsule</string>
+    <string name="s06_disclaimer">(Issue #14 Publication Downstream — Draft preserved on device)</string>
+    <string name="s06_unlock_rule_notice">Unlock Rule: Both Time and Place conditions must be satisfied simultaneously during a live online check to unlock.</string>
+
+    <!-- Bottom Nav -->
+    <string name="nav_moments">Moments</string>
+    <string name="nav_create">Create</string>
+    <string name="nav_account">Account</string>
 </resources>

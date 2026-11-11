@@ -98,6 +98,32 @@ Automatic approval review rejected uploading the full private Atlas r55 snapshot
 
 - **Owner / period / scope:** User J, 10 November 2026 (KST); MVP documentation/handoff only, on existing Draft PR #33. User G's existing Issue #10 implementation and authorship are retained.
 - **Requester-directed implementation allocation:** Issue #10 provides the exact UID lookup and recipient-confirmation interface/state; Issue #12 owns the actual S-05 user-facing recipient selection/confirmation UI. This is an implementation allocation, **not** removal of recipient confirmation from the MVP.
+
+## 2026-11-11-issue12-draft-review-flow — S-04, S-05, and S-06 Stitch Design Integration and Drafting Flow
+
+- **Owner / period / scope:** User J; 11 November 2026; MVP Issue #12 implementation.
+- **Environment/model:** Gemini Flash 3.8 / Android Studio Agent Mode.
+- **Branch / PR:** Branch `feature/12-draft-review-flow`, PR targeting `main`.
+- **Requested work:** Implement GitHub Issue #12 delivering the S-04 → S-05 → S-06 content creation, recipient confirmation, lock selection, and review flow based on the pre-made designs in the Stitch project `TimeCapsule Android UI Design`.
+- **Stitch Project & Screen IDs:**
+  - Project ID: `projects/15276828764661611137` (`TimeCapsule Android UI Design`)
+  - S-04 Content creation: Screen `projects/15276828764661611137/screens/107630f968bd46bc84cdc75a2b2830b9`
+  - S-05 Recipient and locks: Screen `projects/15276828764661611137/screens/fe93d8abf5534ff0a443d55ffdfcfaad`
+  - S-06 Confirm send: Screen `projects/15276828764661611137/screens/b343b7b4940d4020baa12610db6019bc`
+- **Work performed:**
+  - Completed eight-gate readiness preflight with `check_readiness.py` (`PREFLIGHT_RECORD_VALID`).
+  - Extended `CapsuleDraft` domain model and built `CapsuleDraftViewModel` handling shared draft state across S-04, S-05, and S-06.
+  - Implemented `S04ContentDraftFragment` and `fragment_s04_content_draft.xml` (optional title, title pre-unlock disclosure note, multiline body, 5 MiB photo boundary validation, discard draft).
+  - Implemented `S05RecipientLockFragment` and `fragment_s05_recipient_lock.xml` (Future Me vs Someone Else exact UID lookup, explicit recipient confirmation, confirmation reset on UID text edit/lookup error/session change, rejection of stale async lookup callbacks, LockMode TIME/LOCATION/TIME_AND_LOCATION, future date/time picker, 150m place selector, disabled review CTA until recipient confirmed).
+  - Implemented `S06ConfirmSendFragment` and `fragment_s06_confirm_send.xml` (complete review summary of optional title, recipient name & UID, lock conditions, content summary, downstream Issue #14 send notice, back to edit draft).
+  - Wired navigation and listener callbacks in `MainActivity`.
+  - Added comprehensive unit tests in `CapsuleDraftViewModelTest`.
+- **Checks and results:**
+  - `python tools/check_readiness.py --issue 12 --evidence docs/agent-tools/readiness-evidence-issue12.json`: PASS (`PREFLIGHT_RECORD_VALID`)
+  - `gradle_build("app:testDebugUnitTest")`: PASS (67 unit tests passed across project, 0 failed)
+  - `gradle_build("app:assembleDebug")`: PASS
+  - `gradle_build("app:lintDebug")`: PASS (0 errors)
+
 - **Documentation changes:** Updated the #10/#12 issue boundaries, PR #33, implementation contract, implementation order, roadmap, design guide, and a dedicated #10→#12 task handoff. Kept the original dependency graph unchanged; no app code or rules were edited.
 - **Verification:** Documentation changes and live Issue/PR readback checked; code tests, emulator tests and manual user-flow checks **NOT RUN** for this documentation-only update. Existing PR log reports earlier local test evidence, not a new test execution. Reviewer approval and PR merge remain pending.
 - **Next action:** User G and a different teammate review the remaining asynchronous account-switch race in PR #33; assign an Issue #12 implementer/reviewer and begin S-05 UI only after #10 satisfies its merge/preflight gates. No additional coursework learning or human review is claimed by this entry.

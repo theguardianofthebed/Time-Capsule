@@ -18,6 +18,7 @@ keystore.properties
 # OS files
 .DS_Store
 Thumbs.db
+*.log
 
 # Local environment
 .env
