@@ -194,6 +194,41 @@ class CapsuleDraftViewModelTest {
     }
 
     @Test
+    fun `staleAsyncLookupCallbackIsRejected_whenUidChangedAndChangedBack`() {
+        mockFirestoreAdapter.profiles["uid-a"] = RecipientProfile("uid-a", "User A")
+
+        viewModel.setRecipientMode(RecipientMode.SOMEONE_ELSE)
+        viewModel.updateRecipientUidInput("uid-a")
+        viewModel.performRecipientLookup() // Token 1
+
+        viewModel.updateRecipientUidInput("uid-b") // Token 2
+        viewModel.updateRecipientUidInput("uid-a") // Token 3
+
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        // Token 1 result was rejected because activeLookupToken moved to 3
+        assertEquals("uid-a", state.recipientUidInput)
+        assertNull(state.resolvedProfile)
+        assertFalse(state.isRecipientConfirmed)
+    }
+
+    @Test
+    fun `lookup_distinctErrorResult_handledForNetworkAndDenied`() {
+        mockFirestoreAdapter.nextError = OperationResult.Unavailable("Network connection lost")
+
+        viewModel.setRecipientMode(RecipientMode.SOMEONE_ELSE)
+        viewModel.updateRecipientUidInput("uid-offline")
+        viewModel.performRecipientLookup()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(RecipientLookupStatus.ERROR, state.lookupStatus)
+        assertTrue(state.lookupErrorMessage!!.contains("Network"))
+        assertFalse(state.isRecipientConfirmed)
+    }
+
+    @Test
     fun `sessionChange - clears draft and recipient confirmation on user switch`() {
         viewModel.selectFutureMe("sender-uid")
         assertTrue(viewModel.uiState.value.isRecipientConfirmed)
@@ -348,11 +383,17 @@ private class FakeAuthAdapter(initialUid: String?) : AuthAdapter {
 
 private class FakeFirestoreAdapter : FirestoreAdapter {
     val profiles = mutableMapOf<String, RecipientProfile>()
+    var nextError: OperationResult<RecipientProfile>? = null
 
     override fun isAvailable(): Boolean = true
     override fun firestoreInstance(): FirebaseFirestore? = null
 
     override suspend fun getRecipientProfile(uid: String): OperationResult<RecipientProfile> {
+        val err = nextError
+        if (err != null) {
+            nextError = null
+            return err
+        }
         val profile = profiles[uid]
         return if (profile != null) {
             OperationResult.Success(profile)

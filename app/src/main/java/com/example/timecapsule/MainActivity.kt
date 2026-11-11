@@ -1,6 +1,7 @@
 package com.example.timecapsule
 
 import android.os.Bundle
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
 import com.example.timecapsule.config.FirebaseConfig
@@ -102,7 +103,7 @@ class MainActivity : AppCompatActivity() {
             if (activeUid.isNullOrBlank()) {
                 navigateToSignIn()
             } else {
-                navigateToAccountSettings()
+                navigateToContentDraft()
             }
         }
     }
@@ -111,30 +112,44 @@ class MainActivity : AppCompatActivity() {
         when (fragment) {
             is S01SignInFragment -> {
                 fragment.onGoToRegisterListener = { navigateToRegister() }
-                fragment.onSignInSuccessListener = { navigateToAccountSettings() }
+                fragment.onSignInSuccessListener = { navigateToContentDraft() }
             }
             is S02RegisterFragment -> {
-                fragment.onRegisterSuccessListener = { navigateToAccountSettings() }
+                fragment.onRegisterSuccessListener = { navigateToContentDraft() }
             }
             is S04ContentDraftFragment -> {
                 fragment.onNextToRecipientLockListener = { navigateToRecipientLock() }
-                fragment.onNavigateToMomentsListener = { navigateToSignIn() }
+                fragment.onNavigateToMomentsListener = { handleMomentsClick() }
                 fragment.onNavigateToAccountListener = { navigateToAccountSettings() }
             }
             is S05RecipientLockFragment -> {
                 fragment.onBackToContentDraftListener = { navigateToContentDraft() }
                 fragment.onNextToConfirmSendListener = { navigateToConfirmSend() }
-                fragment.onNavigateToMomentsListener = { navigateToSignIn() }
+                fragment.onNavigateToMomentsListener = { handleMomentsClick() }
                 fragment.onNavigateToAccountListener = { navigateToAccountSettings() }
             }
             is S06ConfirmSendFragment -> {
                 fragment.onBackToRecipientLockListener = { navigateToRecipientLock() }
-                fragment.onNavigateToMomentsListener = { navigateToSignIn() }
+                fragment.onNavigateToMomentsListener = { handleMomentsClick() }
                 fragment.onNavigateToAccountListener = { navigateToAccountSettings() }
             }
             is S08AccountSettingsFragment -> {
                 fragment.onSignOutSuccessListener = { navigateToSignIn() }
+                fragment.onCreateCapsuleListener = { navigateToContentDraft() }
             }
+        }
+    }
+
+    private fun handleMomentsClick() {
+        val activeUid = container.accountSessionManager.restoreSessionIfAuthenticated()
+        if (activeUid.isNullOrBlank()) {
+            navigateToSignIn()
+        } else {
+            Toast.makeText(
+                this,
+                "Moments list is unavailable until Issue #21 (Lists and protected detail).",
+                Toast.LENGTH_SHORT
+            ).show()
         }
     }
 
@@ -142,7 +157,7 @@ class MainActivity : AppCompatActivity() {
     fun navigateToSignIn() {
         val fragment = S01SignInFragment().apply {
             onGoToRegisterListener = { navigateToRegister() }
-            onSignInSuccessListener = { navigateToAccountSettings() }
+            onSignInSuccessListener = { navigateToContentDraft() }
         }
         replaceFragment(fragment)
     }
@@ -150,7 +165,7 @@ class MainActivity : AppCompatActivity() {
     /** Navigates to S-02 Register / Profile Repair screen. */
     fun navigateToRegister() {
         val fragment = S02RegisterFragment().apply {
-            onRegisterSuccessListener = { navigateToAccountSettings() }
+            onRegisterSuccessListener = { navigateToContentDraft() }
         }
         replaceFragment(fragment)
     }

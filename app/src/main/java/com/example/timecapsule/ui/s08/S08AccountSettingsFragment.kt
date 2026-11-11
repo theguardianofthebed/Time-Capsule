@@ -27,6 +27,7 @@ class S08AccountSettingsFragment : Fragment() {
     private lateinit var viewModel: S08AccountSettingsViewModel
 
     var onSignOutSuccessListener: (() -> Unit)? = null
+    var onCreateCapsuleListener: (() -> Unit)? = null
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -109,6 +110,11 @@ class S08AccountSettingsFragment : Fragment() {
                 return@setOnClickListener
             }
             viewModel.repairProfile(newName)
+        }
+
+        // Navigate to S-04 Content Draft
+        binding.btnCreateCapsule.setOnClickListener {
+            onCreateCapsuleListener?.invoke()
         }
 
         // Sign out and clear session

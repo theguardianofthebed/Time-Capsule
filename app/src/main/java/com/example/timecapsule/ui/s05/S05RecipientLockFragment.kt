@@ -114,27 +114,21 @@ class S05RecipientLockFragment : Fragment() {
 
         binding.btnLockTime.setOnClickListener {
             viewModel.updateLockMode(LockMode.TIME)
+            binding.tvS05Error.visibility = View.GONE
         }
 
         binding.btnLockPlace.setOnClickListener {
             viewModel.updateLockMode(LockMode.LOCATION)
-            // Default sample location target if none set
-            if (viewModel.uiState.value.locationTarget == null) {
-                viewModel.updateLocation(
-                    LocationTarget(37.5665, 126.9780, 150.0),
-                    "University garden"
-                )
-            }
+            viewModel.updateLocation(null, null)
+            binding.tvS05Error.text = "Location lock selection is unavailable until Issue #16 (Map and fresh location). Please select Time lock for Issue #12 testing."
+            binding.tvS05Error.visibility = View.VISIBLE
         }
 
         binding.btnLockBoth.setOnClickListener {
             viewModel.updateLockMode(LockMode.TIME_AND_LOCATION)
-            if (viewModel.uiState.value.locationTarget == null) {
-                viewModel.updateLocation(
-                    LocationTarget(37.5665, 126.9780, 150.0),
-                    "University garden"
-                )
-            }
+            viewModel.updateLocation(null, null)
+            binding.tvS05Error.text = "Location lock selection is unavailable until Issue #16 (Map and fresh location). Please select Time lock for Issue #12 testing."
+            binding.tvS05Error.visibility = View.VISIBLE
         }
 
         binding.btnSelectDateTime.setOnClickListener {
@@ -142,10 +136,8 @@ class S05RecipientLockFragment : Fragment() {
         }
 
         binding.btnSelectPlace.setOnClickListener {
-            viewModel.updateLocation(
-                LocationTarget(37.5665, 126.9780, 150.0),
-                "University garden"
-            )
+            binding.tvS05Error.text = "Location picker is unavailable until Issue #16 (Map and fresh location)."
+            binding.tvS05Error.visibility = View.VISIBLE
         }
 
         binding.btnReviewCapsule.setOnClickListener {

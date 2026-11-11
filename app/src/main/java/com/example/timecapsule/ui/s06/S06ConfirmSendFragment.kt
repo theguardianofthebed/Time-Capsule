@@ -102,16 +102,19 @@ class S06ConfirmSendFragment : Fragment() {
                     binding.tvReviewRecipientName.text = recipientName
                     binding.tvReviewRecipientUid.text = "UID: $recipientUid"
 
-                    // Content Summary
-                    val hasText = state.text.isNotBlank()
-                    val hasPhoto = !state.localPhotoUri.isNullOrBlank()
-                    val contentSummary = when {
-                        hasText && hasPhoto -> "Message text + 1 photo attached"
-                        hasText -> "Message text"
-                        hasPhoto -> "1 photo attached"
-                        else -> "No content"
+                    // Message Text & Photo Content
+                    if (state.text.isNotBlank()) {
+                        binding.tvReviewMessageBody.text = state.text
+                    } else {
+                        binding.tvReviewMessageBody.text = "(No message body entered)"
                     }
-                    binding.tvReviewContentInfo.text = contentSummary
+
+                    if (!state.localPhotoUri.isNullOrBlank()) {
+                        binding.tvReviewPhotoInfo.text = "Attached photo: ${state.photoName ?: "photo"}"
+                        binding.tvReviewPhotoInfo.visibility = View.VISIBLE
+                    } else {
+                        binding.tvReviewPhotoInfo.visibility = View.GONE
+                    }
 
                     // Unlock Time
                     if (state.unlockAt != null) {

@@ -179,14 +179,33 @@
                     android:layout_marginVertical="10dp"
                     android:background="#F2EEE7" />
 
-                <!-- Content Summary Block -->
+                <!-- Content Message Review Block -->
                 <TextView
-                    android:id="@+id/tvReviewContentInfo"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Message Content (Protected until unlock)"
+                    android:textColor="#A67C59"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvReviewMessageBody"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Message body set"
-                    android:textColor="#3D3933"
-                    android:textSize="13sp" />
+                    android:layout_marginTop="2dp"
+                    android:text="(No message body entered)"
+                    android:textColor="#2B2723"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:id="@+id/tvReviewPhotoInfo"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="Attached photo: None"
+                    android:textColor="#8C857B"
+                    android:textSize="12sp"
+                    android:visibility="gone" />
 
                 <View
                     android:layout_width="match_parent"

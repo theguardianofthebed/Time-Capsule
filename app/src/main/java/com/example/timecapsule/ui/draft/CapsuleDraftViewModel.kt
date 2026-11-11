@@ -86,6 +86,7 @@ class CapsuleDraftViewModel(
     fun syncSessionState() {
         val activeUid = accountSessionManager.restoreSessionIfAuthenticated()
         if (activeUid != _uiState.value.activeSessionUid) {
+            activeLookupToken++
             _uiState.value = CapsuleDraftUiState(activeSessionUid = activeUid)
             if (!activeUid.isNullOrBlank()) {
                 selectFutureMe(activeUid)
@@ -133,6 +134,7 @@ class CapsuleDraftViewModel(
 
     /** Selects recipient mode: Future Me or Someone Else. */
     fun setRecipientMode(mode: RecipientMode) {
+        activeLookupToken++
         _uiState.update {
             it.copy(
                 recipientMode = mode,
@@ -173,12 +175,16 @@ class CapsuleDraftViewModel(
 
     /**
      * Updates UID input field.
-     * CRITICAL: Resets confirmation and clears resolved profile if the input text changes.
+     * CRITICAL: Resets confirmation, clears resolved profile, and increments lookup token if input text changes.
      */
     fun updateRecipientUidInput(newUidText: String) {
         val trimmed = newUidText.trim()
         val previousInput = _uiState.value.recipientUidInput.trim()
         val textChanged = trimmed != previousInput
+
+        if (textChanged) {
+            activeLookupToken++
+        }
 
         _uiState.update {
             it.copy(

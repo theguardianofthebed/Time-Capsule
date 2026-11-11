@@ -112,7 +112,8 @@ class S04ContentDraftFragment : Fragment() {
 
     private fun setupClickListeners() {
         binding.btnAttachPhoto.setOnClickListener {
-            photoPickerLauncher.launch("image/*")
+            binding.tvS04Error.text = "Photo attachment is unavailable until Issue #13 (Original photo support). Please use text message for Issue #12 testing."
+            binding.tvS04Error.visibility = View.VISIBLE
         }
 
         binding.btnRemovePhoto.setOnClickListener {

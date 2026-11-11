@@ -417,10 +417,11 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="6dp"
                     android:background="#FFFFFF"
+                    android:enabled="false"
                     android:gravity="start|center_vertical"
                     android:padding="12dp"
-                    android:text="University garden (150 m radius)"
-                    android:textColor="#3D3933"
+                    android:text="Location picker (Unavailable until Issue #16)"
+                    android:textColor="#8C857B"
                     android:textSize="14sp" />
 
                 <TextView
@@ -428,7 +429,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
-                    android:text="Opens within 150 m radius of selected place."
+                    android:text="Location lock selection is unavailable until Issue #16."
                     android:textColor="#8C857B"
                     android:textSize="12sp" />
             </LinearLayout>
