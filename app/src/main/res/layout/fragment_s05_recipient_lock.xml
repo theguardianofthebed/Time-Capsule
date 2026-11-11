@@ -429,7 +429,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
-                    android:text="Location lock selection is unavailable until Issue #16."
+                    android:text="@string/s05_location_notice"
                     android:textColor="#8C857B"
                     android:textSize="12sp" />
             </LinearLayout>

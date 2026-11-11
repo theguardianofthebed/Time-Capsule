@@ -51,7 +51,8 @@
     <string name="s04_hint_body">Dear future me,\n\nHere’s something I don’t want to forget...</string>
     <string name="s04_label_photo">A photograph optional</string>
     <string name="s04_btn_add_photo">Add a little visual memory</string>
-    <string name="s04_subtext_photo">One JPEG or PNG · up to 5 MiB</string>
+    <string name="s04_subtext_photo">Photo attachments aren\'t available yet</string>
+    <string name="s04_photo_notice">Photo attachments aren\'t available yet. Please write a message for your time capsule.</string>
     <string name="s04_btn_continue">Give it a time and place</string>
     <string name="s04_btn_discard">Discard this draft</string>
     <string name="s04_note_draft_saved">Your draft is saved on this device while you compose.</string>
@@ -74,6 +75,7 @@
     <string name="s05_label_date_time">A future date &amp; time</string>
     <string name="s05_label_place">A meaningful place</string>
     <string name="s05_notice_both">Both conditions must be met. A fresh location check is required after the time arrives.</string>
+    <string name="s05_location_notice">Location selection isn\'t available yet. You can create a time-locked draft instead.</string>
     <string name="s05_btn_review">Review your capsule</string>
     <string name="s05_btn_review_disabled">Confirm recipient to review</string>
 
@@ -83,7 +85,8 @@
     <string name="s06_headline">Ready for a future moment?</string>
     <string name="s06_subtitle">Once sent, this little moment can\'t be edited.</string>
     <string name="s06_btn_send">Seal &amp; send capsule</string>
-    <string name="s06_disclaimer">(Issue #14 Publication Downstream — Draft preserved on device)</string>
+    <string name="s06_disclaimer">(Sending isn\'t available yet — draft saved on device)</string>
+    <string name="s06_send_notice">Sending isn\'t available yet. Your draft has been saved safely on this device.</string>
     <string name="s06_unlock_rule_notice">Unlock Rule: Both Time and Place conditions must be satisfied simultaneously during a live online check to unlock.</string>
 
     <!-- Bottom Nav -->

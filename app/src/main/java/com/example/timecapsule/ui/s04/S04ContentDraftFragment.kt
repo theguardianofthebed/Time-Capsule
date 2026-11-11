@@ -13,6 +13,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.example.timecapsule.MainActivity
+import com.example.timecapsule.R
 import com.example.timecapsule.databinding.FragmentS04ContentDraftBinding
 import com.example.timecapsule.domain.result.OperationResult
 import com.example.timecapsule.ui.ViewModelFactory
@@ -112,7 +113,7 @@ class S04ContentDraftFragment : Fragment() {
 
     private fun setupClickListeners() {
         binding.btnAttachPhoto.setOnClickListener {
-            binding.tvS04Error.text = "Photo attachment is unavailable until Issue #13 (Original photo support). Please use text message for Issue #12 testing."
+            binding.tvS04Error.text = getString(R.string.s04_photo_notice)
             binding.tvS04Error.visibility = View.VISIBLE
         }
 

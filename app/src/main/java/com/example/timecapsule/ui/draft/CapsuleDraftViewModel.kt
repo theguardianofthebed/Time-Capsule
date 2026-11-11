@@ -397,7 +397,7 @@ class CapsuleDraftViewModel(
     /** Triggers a clear notice that publication belongs to downstream Issue #14. */
     fun triggerSendNotice() {
         _uiState.update {
-            it.copy(sendNotice = "Publication belongs to downstream Issue #14. Draft preserved safely on device.")
+            it.copy(sendNotice = "Sending isn't available yet. Your draft has been saved safely on this device.")
         }
     }
 

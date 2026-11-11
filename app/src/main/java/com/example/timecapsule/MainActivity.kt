@@ -1,6 +1,7 @@
 package com.example.timecapsule
 
 import android.os.Bundle
+import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
@@ -40,19 +41,19 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        binding.tvMainTitle.text = getString(R.string.app_name)
-
         // Connect debug emulator endpoints in DEBUG builds; verify config availability in RELEASE builds
         val isDebug = BuildConfig.DEBUG
         if (isDebug) {
             val emulatorInitialized = FirebaseConfig.setupDebugEmulatorConnection(applicationContext, true)
             if (!emulatorInitialized) {
-                binding.tvMainSubtitle.text = "Firebase Initialization Failed (Fail-Closed)"
+                binding.tvInitError.text = "Firebase Initialization Failed (Fail-Closed)"
+                binding.tvInitError.visibility = View.VISIBLE
                 return
             }
         } else {
             if (!FirebaseConfig.isFirebaseAvailable(applicationContext)) {
-                binding.tvMainSubtitle.text = "Firebase Configuration Missing (Fail-Closed)"
+                binding.tvInitError.text = "Firebase Configuration Missing (Fail-Closed)"
+                binding.tvInitError.visibility = View.VISIBLE
                 return
             }
         }
@@ -147,7 +148,7 @@ class MainActivity : AppCompatActivity() {
         } else {
             Toast.makeText(
                 this,
-                "Moments list is unavailable until Issue #21 (Lists and protected detail).",
+                "Your capsule list isn't available yet.",
                 Toast.LENGTH_SHORT
             ).show()
         }

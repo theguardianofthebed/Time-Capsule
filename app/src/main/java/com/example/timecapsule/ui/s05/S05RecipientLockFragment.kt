@@ -120,14 +120,14 @@ class S05RecipientLockFragment : Fragment() {
         binding.btnLockPlace.setOnClickListener {
             viewModel.updateLockMode(LockMode.LOCATION)
             viewModel.updateLocation(null, null)
-            binding.tvS05Error.text = "Location lock selection is unavailable until Issue #16 (Map and fresh location). Please select Time lock for Issue #12 testing."
+            binding.tvS05Error.text = getString(R.string.s05_location_notice)
             binding.tvS05Error.visibility = View.VISIBLE
         }
 
         binding.btnLockBoth.setOnClickListener {
             viewModel.updateLockMode(LockMode.TIME_AND_LOCATION)
             viewModel.updateLocation(null, null)
-            binding.tvS05Error.text = "Location lock selection is unavailable until Issue #16 (Map and fresh location). Please select Time lock for Issue #12 testing."
+            binding.tvS05Error.text = getString(R.string.s05_location_notice)
             binding.tvS05Error.visibility = View.VISIBLE
         }
 
@@ -136,7 +136,7 @@ class S05RecipientLockFragment : Fragment() {
         }
 
         binding.btnSelectPlace.setOnClickListener {
-            binding.tvS05Error.text = "Location picker is unavailable until Issue #16 (Map and fresh location)."
+            binding.tvS05Error.text = getString(R.string.s05_location_notice)
             binding.tvS05Error.visibility = View.VISIBLE
         }
 

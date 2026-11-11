@@ -326,12 +326,12 @@ class CapsuleDraftViewModelTest {
     }
 
     @Test
-    fun `triggerSendNotice - sets notice that publication belongs to downstream Issue 14`() {
+    fun `triggerSendNotice - sets user-facing notice that sending is unavailable`() {
         viewModel.triggerSendNotice()
 
         val notice = viewModel.uiState.value.sendNotice
         assertNotNull(notice)
-        assertTrue(notice!!.contains("Issue #14"))
+        assertTrue(notice!!.contains("Sending isn't available yet"))
     }
 
     @Test
