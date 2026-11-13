@@ -1,25 +1,259 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Recipient directory rules for Issue #10
+    // --------------------------------------------------
+    // Helper functions
+    // --------------------------------------------------
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isParticipant(data) {
+      return signedIn()
+        && (
+          request.auth.uid == data.senderUid
+          || request.auth.uid == data.recipientUid
+        );
+    }
+
+    function capsulePath(capsuleId) {
+      return /databases/$(database)/documents/capsules/$(capsuleId);
+    }
+
+    function contentPath(capsuleId) {
+      return /databases/$(database)/documents/protectedContent/$(capsuleId);
+    }
+
+    function validLocation(location) {
+      return location is map
+        && location.keys().hasAll([
+          'latitude',
+          'longitude',
+          'radiusMeters'
+        ])
+        && location.keys().hasOnly([
+          'latitude',
+          'longitude',
+          'radiusMeters'
+        ])
+        && location.latitude is number
+        && location.latitude >= -90
+        && location.latitude <= 90
+        && location.longitude is number
+        && location.longitude >= -180
+        && location.longitude <= 180
+        && location.radiusMeters is number
+        && location.radiusMeters > 0;
+    }
+
+    function validLock(data) {
+      return (
+        data.lockMode == 'TIME'
+        && data.unlockAt is timestamp
+        && data.location == null
+      ) || (
+        data.lockMode == 'LOCATION'
+        && data.unlockAt == null
+        && validLocation(data.location)
+      ) || (
+        data.lockMode == 'BOTH'
+        && data.unlockAt is timestamp
+        && validLocation(data.location)
+      );
+    }
+
+    function validMetadata(capsuleId, data) {
+      return data.keys().hasAll([
+          'capsuleId',
+          'senderUid',
+          'recipientUid',
+          'lockMode',
+          'unlockAt',
+          'location',
+          'hasPhoto',
+          'photoPath',
+          'createdAt',
+          'unlocked'
+        ])
+        && data.keys().hasOnly([
+          'capsuleId',
+          'senderUid',
+          'recipientUid',
+          'title',
+          'lockMode',
+          'unlockAt',
+          'location',
+          'hasPhoto',
+          'photoPath',
+          'createdAt',
+          'unlocked'
+        ])
+        && data.capsuleId == capsuleId
+        && data.senderUid is string
+        && data.senderUid.size() > 0
+        && data.recipientUid is string
+        && data.recipientUid.size() > 0
+        && (!data.keys().hasAny(['title'])
+            || data.title == null
+            || data.title is string)
+        && validLock(data)
+        && data.hasPhoto is bool
+        && (
+          (
+            data.hasPhoto == true
+            && data.photoPath is string
+            && data.photoPath ==
+              'capsuleMedia/' + data.senderUid + '/' + capsuleId + '/original'
+          )
+          ||
+          (
+            data.hasPhoto == false
+            && data.photoPath == null
+          )
+        )
+        && data.createdAt is timestamp
+        && data.unlocked == false;
+    }
+
+    function validContent(capsuleId, data) {
+      return data.keys().hasAll([
+          'capsuleId',
+          'text',
+          'photoObjectPath'
+        ])
+        && data.keys().hasOnly([
+          'capsuleId',
+          'text',
+          'photoObjectPath'
+        ])
+        && data.capsuleId == capsuleId
+        && (
+          data.text == null
+          || data.text is string
+        )
+        && (
+          data.photoObjectPath == null
+          || data.photoObjectPath is string
+        )
+        && (
+          (data.text != null && data.text.size() > 0)
+          || data.photoObjectPath != null
+        );
+    }
+
+    function matchingContentAfterCreate(capsuleId, metadata) {
+      return existsAfter(contentPath(capsuleId))
+        && getAfter(contentPath(capsuleId)).data.capsuleId == capsuleId
+        && getAfter(contentPath(capsuleId)).data.photoObjectPath
+          == metadata.photoPath;
+    }
+
+    function matchingMetadataAfterCreate(capsuleId, content) {
+      return existsAfter(capsulePath(capsuleId))
+        && getAfter(capsulePath(capsuleId)).data.capsuleId == capsuleId
+        && getAfter(capsulePath(capsuleId)).data.photoPath
+          == content.photoObjectPath;
+    }
+
+    function canReadProtectedContent(data) {
+      return signedIn()
+        && (
+          (
+            data.senderUid == request.auth.uid
+            && data.senderUid != data.recipientUid
+          )
+          ||
+          (
+            data.recipientUid == request.auth.uid
+            && data.unlocked == true
+          )
+        );
+    }
+
+    // --------------------------------------------------
+    // Existing recipient directory (Issue #10)
+    // --------------------------------------------------
+
     match /recipientDirectory/{uid} {
-      // Allow exact single-document get for authenticated users. Deny list queries.
-      allow get: if request.auth != null;
+      allow get: if signedIn();
       allow list: if false;
 
-      // Allow owner to create or update their own profile document with non-empty displayName
-      allow create, update: if request.auth != null
+      allow create, update: if signedIn()
         && request.auth.uid == uid
         && request.resource.data.uid == uid
-        && request.resource.data.keys().hasOnly(['uid', 'displayName'])
+        && request.resource.data.keys().hasOnly([
+          'uid',
+          'displayName'
+        ])
         && request.resource.data.displayName is string
         && request.resource.data.displayName.size() > 0;
 
       allow delete: if false;
     }
 
-    // Default deny all other paths
+    // --------------------------------------------------
+    // Capsule metadata
+    // --------------------------------------------------
+
+    match /capsules/{capsuleId} {
+
+      allow get, list: if isParticipant(resource.data);
+
+      allow create: if signedIn()
+        && validMetadata(capsuleId, request.resource.data)
+        && request.resource.data.senderUid == request.auth.uid
+        && exists(
+          /databases/$(database)/documents/recipientDirectory/$(request.resource.data.recipientUid)
+        )
+        && matchingContentAfterCreate(
+          capsuleId,
+          request.resource.data
+        )
+        && validContent(
+          capsuleId,
+          getAfter(contentPath(capsuleId)).data
+        );
+
+      // Only trusted backend logic can perform the unlock transition.
+      allow update: if false;
+
+      allow delete: if false;
+    }
+
+    // --------------------------------------------------
+    // Protected capsule content
+    // --------------------------------------------------
+
+    match /protectedContent/{capsuleId} {
+
+      allow get, list: if canReadProtectedContent(
+        get(capsulePath(capsuleId)).data
+      );
+
+      allow create: if signedIn()
+        && validContent(capsuleId, request.resource.data)
+        && existsAfter(capsulePath(capsuleId))
+        && getAfter(capsulePath(capsuleId)).data.senderUid
+          == request.auth.uid
+        && matchingMetadataAfterCreate(
+          capsuleId,
+          request.resource.data
+        )
+        && validMetadata(
+          capsuleId,
+          getAfter(capsulePath(capsuleId)).data
+        );
+
+      allow update, delete: if false;
+    }
+
+    // --------------------------------------------------
+    // Default deny
+    // --------------------------------------------------
+
     match /{document=**} {
       allow read, write: if false;
     }

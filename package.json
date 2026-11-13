@@ -1,0 +1,30 @@
+{
+  "name": "time-capsule",
+  "version": "1.0.0",
+  "description": "TimeCapsule is an Android app for sending a text/photo capsule to yourself or another registered user. A capsule opens when its time, location, or combined condition is met.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/theguardianofthebed/Time-Capsule.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/theguardianofthebed/Time-Capsule/issues"
+  },
+  "homepage": "https://github.com/theguardianofthebed/Time-Capsule#readme",
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.2",
+    "firebase": "^12.19.0",
+    "vitest": "^5.1.0"
+  }
+}

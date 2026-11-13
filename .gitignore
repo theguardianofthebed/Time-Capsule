@@ -116,3 +116,7 @@ google-services.json
 private/
 test-credentials/
 agent-session-private/
+
+
+node_modules/
+firestore-debug.log
