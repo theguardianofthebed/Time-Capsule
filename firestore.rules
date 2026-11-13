@@ -217,13 +217,8 @@ service cloud.firestore {
           getAfter(contentPath(capsuleId)).data
         );
 
-      // Only the recipient can perform the one-way unlock transition.
-      allow update: if signedIn()
-        && request.auth.uid == resource.data.recipientUid
-        && resource.data.unlocked == false
-        && request.resource.data.unlocked == true
-        && request.resource.data.diff(resource.data)
-          .affectedKeys().hasOnly(['unlocked']);
+      // Only trusted backend logic can perform the unlock transition.
+      allow update: if false;
 
       allow delete: if false;
     }
