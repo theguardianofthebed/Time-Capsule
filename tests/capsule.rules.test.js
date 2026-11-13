@@ -23,6 +23,12 @@ import {
   writeBatch,
 } from "firebase/firestore";
 
+import {
+  ref,
+  uploadBytes,
+  getBytes,
+} from "firebase/storage";
+
 let testEnv;
 
 const capsuleId = "test-capsule-001";
@@ -94,6 +100,30 @@ async function seedCapsule({
       capsuleId: id,
       text: "Test capsule content",
       photoObjectPath: null,
+    });
+  });
+}
+
+async function seedPhotoCapsule({
+  id = capsuleId,
+  sender = senderUid,
+  recipient = recipientUid,
+  unlocked = false,
+} = {}) {
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore();
+
+    await setDoc(doc(db, "capsules", id), {
+      capsuleId: id,
+      senderUid: sender,
+      recipientUid: recipient,
+      lockMode: "TIME",
+      unlockAt: Timestamp.fromMillis(Date.now() + 60 * 60 * 1000),
+      location: null,
+      hasPhoto: true,
+      photoPath: `capsuleMedia/${sender}/${id}/original`,
+      createdAt: Timestamp.now(),
+      unlocked,
     });
   });
 }
@@ -201,6 +231,146 @@ describe("Capsule Firestore security rules", () => {
       updateDoc(doc(recipientDb, "capsules", capsuleId), {
         unlocked: true,
       })
+    );
+  });
+});
+
+describe("Capsule Storage security rules", () => {
+  function photoPathFor(id) {
+    return `capsuleMedia/${senderUid}/${id}/original`;
+  }
+
+  const imageData = new Uint8Array([255, 216, 255, 224]);
+
+  it("allows the sender to upload a photo", async () => {
+    const id = "storage-upload-test";
+    await seedPhotoCapsule({ id });
+
+    const senderStorage = testEnv
+      .authenticatedContext(senderUid)
+      .storage();
+
+    await assertSucceeds(
+      uploadBytes(
+        ref(senderStorage, photoPathFor(id)),
+        imageData,
+        { contentType: "image/jpeg" }
+      )
+    );
+  });
+
+  it("denies photo uploads from unrelated users", async () => {
+    const id = "storage-outsider-test";
+    await seedPhotoCapsule({ id });
+
+    const outsiderStorage = testEnv
+      .authenticatedContext("outsider-c")
+      .storage();
+
+    await assertFails(
+      uploadBytes(
+        ref(outsiderStorage, photoPathFor(id)),
+        imageData,
+        { contentType: "image/jpeg" }
+      )
+    );
+  });
+
+  it("denies overwriting an existing photo", async () => {
+    const id = "storage-overwrite-test";
+    await seedPhotoCapsule({ id });
+
+    const senderStorage = testEnv
+      .authenticatedContext(senderUid)
+      .storage();
+
+    const photoRef = ref(senderStorage, photoPathFor(id));
+
+    await assertSucceeds(
+      uploadBytes(photoRef, imageData, {
+        contentType: "image/jpeg",
+      })
+    );
+
+    await assertFails(
+      uploadBytes(photoRef, imageData, {
+        contentType: "image/jpeg",
+      })
+    );
+  });
+
+  it("denies the recipient from downloading a locked photo", async () => {
+    const id = "storage-locked-test";
+    await seedPhotoCapsule({ id });
+
+    const senderStorage = testEnv
+      .authenticatedContext(senderUid)
+      .storage();
+
+    const recipientStorage = testEnv
+      .authenticatedContext(recipientUid)
+      .storage();
+
+    await assertSucceeds(
+      uploadBytes(
+        ref(senderStorage, photoPathFor(id)),
+        imageData,
+        { contentType: "image/jpeg" }
+      )
+    );
+
+    await assertFails(
+      getBytes(ref(recipientStorage, photoPathFor(id)))
+    );
+  });
+
+  it("allows the recipient to download an unlocked photo", async () => {
+    const id = "storage-unlocked-test";
+    await seedPhotoCapsule({ id, unlocked: true });
+
+    const senderStorage = testEnv
+      .authenticatedContext(senderUid)
+      .storage();
+
+    const recipientStorage = testEnv
+      .authenticatedContext(recipientUid)
+      .storage();
+
+    await assertSucceeds(
+      uploadBytes(
+        ref(senderStorage, photoPathFor(id)),
+        imageData,
+        { contentType: "image/jpeg" }
+      )
+    );
+
+    await assertSucceeds(
+      getBytes(ref(recipientStorage, photoPathFor(id)))
+    );
+  });
+
+  it("denies unrelated users from downloading photos", async () => {
+    const id = "storage-download-outsider-test";
+    await seedPhotoCapsule({ id, unlocked: true });
+
+    const senderStorage = testEnv
+      .authenticatedContext(senderUid)
+      .storage();
+
+    const outsiderStorage = testEnv
+      .authenticatedContext("outsider-c")
+      .storage();
+
+    await assertSucceeds(
+      uploadBytes(
+        ref(senderStorage, photoPathFor(id)),
+        imageData,
+        { contentType: "image/jpeg" }
+      )
+    );
+
+    await assertFails(
+      getBytes(ref(outsiderStorage, photoPathFor(id)))
     );
   });
 });

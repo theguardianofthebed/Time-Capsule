@@ -54,24 +54,25 @@ service firebase.storage {
 
     match /capsuleMedia/{senderUid}/{capsuleId}/original {
 
-      // Sender can upload a photo only for their own capsule.
-      allow create: if signedIn()
+    // Sender can upload a photo only once for their own capsule.
+    allow create: if signedIn()
+        && resource == null
         && request.auth.uid == senderUid
         && capsuleExists(capsuleId)
         && capsuleData(capsuleId).senderUid == senderUid
         && capsuleData(capsuleId).hasPhoto == true
         && capsuleData(capsuleId).photoPath ==
-          'capsuleMedia/' + senderUid + '/' + capsuleId + '/original'
+        'capsuleMedia/' + senderUid + '/' + capsuleId + '/original'
         && validImageUpload();
 
-      // Protected read access follows the Firestore capsule rules.
-      allow read: if signedIn()
+    // Protected read access follows the Firestore capsule rules.
+    allow read: if signedIn()
         && capsuleExists(capsuleId)
         && capsuleData(capsuleId).senderUid == senderUid
         && canReadCapsule(capsuleData(capsuleId));
 
-      // Finalized photos cannot be replaced or deleted.
-      allow update, delete: if false;
+    // Finalized photos cannot be replaced or deleted.
+    allow update, delete: if false;
     }
 
     // --------------------------------------------------
