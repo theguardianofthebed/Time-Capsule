@@ -373,4 +373,44 @@ describe("Capsule Storage security rules", () => {
       getBytes(ref(outsiderStorage, photoPathFor(id)))
     );
   });
+
+
+
+    it("denies uploads with unsupported file types", async () => {
+      const id = "storage-invalid-type-test";
+      await seedPhotoCapsule({ id });
+
+      const senderStorage = testEnv
+        .authenticatedContext(senderUid)
+        .storage();
+
+      await assertFails(
+        uploadBytes(
+          ref(senderStorage, photoPathFor(id)),
+          imageData,
+          { contentType: "application/pdf" }
+        )
+      );
+    });
+
+    it("denies photos larger than 10 MB", async () => {
+      const id = "storage-oversized-test";
+      await seedPhotoCapsule({ id });
+
+      const senderStorage = testEnv
+        .authenticatedContext(senderUid)
+        .storage();
+
+      const oversizedImage = new Uint8Array(
+        10 * 1024 * 1024 + 1
+      );
+
+      await assertFails(
+        uploadBytes(
+          ref(senderStorage, photoPathFor(id)),
+          oversizedImage,
+          { contentType: "image/jpeg" }
+        )
+      );
+    });
 });
