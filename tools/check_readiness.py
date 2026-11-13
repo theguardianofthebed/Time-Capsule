@@ -197,14 +197,14 @@ def main():
     parser.add_argument("--evidence")
     args = parser.parse_args()
     try:
-        manifest = json.loads(Path(args.manifest).read_text())
+        manifest = json.loads(Path(args.manifest).read_text(encoding="utf-8"))
         if args.validate_manifest:
             errors = graph_errors(manifest)
             status = "MANIFEST_VALID" if not errors else "BLOCKED"
         else:
             if not args.issue or not args.evidence:
                 raise ValueError("--issue and --evidence are required")
-            evidence = json.loads(Path(args.evidence).read_text())
+            evidence = json.loads(Path(args.evidence).read_text(encoding="utf-8"))
             if not isinstance(evidence, dict):
                 raise ValueError("evidence must be an object")
             errors = evaluate(manifest, args.issue, evidence, Path.cwd())

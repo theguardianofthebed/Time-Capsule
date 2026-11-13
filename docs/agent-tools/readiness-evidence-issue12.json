@@ -1,0 +1,81 @@
+{
+  "issue": 12,
+  "checked_at": "2026-11-13T23:06:50Z",
+  "selected_base": "74aa763076801944a33897b2f67c36d3afb27aa9",
+  "owner": "User J",
+  "owner_confirmation": "Confirmed User J as implementation owner for Issue 12 per team allocation and task prompt",
+  "branch": "feature/12-draft-review-flow",
+  "period": "11 November 2026",
+  "scope": "MVP",
+  "reviewer": "User F",
+  "components": [
+    "app/src/main/java/com/example/timecapsule/ui/s04/S04ContentDraftFragment.kt",
+    "app/src/main/java/com/example/timecapsule/ui/s05/S05RecipientLockFragment.kt",
+    "app/src/main/java/com/example/timecapsule/ui/s06/S06ConfirmSendFragment.kt",
+    "app/src/main/java/com/example/timecapsule/ui/draft/CapsuleDraftViewModel.kt"
+  ],
+  "deliverable": "S-04 -> S-05 -> S-06 content creation, recipient confirmation, lock configuration and review flow",
+  "contract_approval": "Atlas r55 / Instructions v3 / 7 Nov Views update / Issue 10->12 handoff contract",
+  "blocking_failures": [],
+  "inventory": {
+    "issues": "Issue #12 implementation in progress",
+    "branches": "feature/12-draft-review-flow based on main at 74aa763",
+    "prs": "PR #33 merged for Issue 10",
+    "handoffs": "issue-10-recipient-interface-20261110.md",
+    "compatible": true,
+    "compatibility_evidence": "No active competing claims or overlapping file modifications for S-04/S-05/S-06 drafting UI",
+    "active_claims": [
+      {
+        "issue": 12,
+        "owner": "User J",
+        "branch": "feature/12-draft-review-flow",
+        "overlaps": false,
+        "agreement": "Explicit requester instruction allocating Issue #12 implementation to User J"
+      }
+    ]
+  },
+  "dependencies": [
+    {
+      "issue": 9,
+      "pr": "https://github.com/theguardianofthebed/Time-Capsule/pull/29",
+      "merged": true,
+      "merge_commit": "c60d866cdc9794af97db129c946b66711270f6b9",
+      "implementation_inspection": "PR #29 merged into main, contains CapsuleRepository, adapters, and session interfaces",
+      "paths": [
+        "app/src/main/java/com/example/timecapsule/data/CapsuleRepository.kt"
+      ],
+      "checks": [
+        {
+          "result": "PASS",
+          "procedure": "JVM unit tests and debug build",
+          "expected_actual": "25 unit tests passed",
+          "commit": "c60d866cdc9794af97db129c946b66711270f6b9",
+          "environment": "Android Studio Agent Mode, Nov 10 2026",
+          "evidence": "PR #29 verification record"
+        }
+      ],
+      "blocking_failures": []
+    },
+    {
+      "issue": 10,
+      "pr": "https://github.com/theguardianofthebed/Time-Capsule/pull/33",
+      "merged": true,
+      "merge_commit": "74aa763076801944a33897b2f67c36d3afb27aa9",
+      "implementation_inspection": "PR #33 merged into main, contains AccountSessionManager, lookupRecipient, confirmRecipient, RecipientConfirmation",
+      "paths": [
+        "app/src/main/java/com/example/timecapsule/data/AccountSessionManager.kt"
+      ],
+      "checks": [
+        {
+          "result": "PASS",
+          "procedure": "JVM unit tests and Android 17 emulator tests",
+          "expected_actual": "47 JVM unit tests and 9 instrumentation tests passed",
+          "commit": "74aa763076801944a33897b2f67c36d3afb27aa9",
+          "environment": "Android Studio Agent Mode / Android 17 emulator, Nov 11 2026",
+          "evidence": "PR #33 merge commit 74aa763"
+        }
+      ],
+      "blocking_failures": []
+    }
+  ]
+}
