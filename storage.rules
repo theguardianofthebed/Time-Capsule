@@ -1,7 +1,83 @@
+
 rules_version = '2';
+
 service firebase.storage {
   match /b/{bucket}/o {
-    // Initial security rules baseline: deny all access until specific issue security rules are reviewed.
+
+    // --------------------------------------------------
+    // Helper functions
+    // --------------------------------------------------
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function capsulePath(capsuleId) {
+      return /databases/(default)/documents/capsules/$(capsuleId);
+    }
+
+    function capsuleExists(capsuleId) {
+      return firestore.exists(capsulePath(capsuleId));
+    }
+
+    function capsuleData(capsuleId) {
+      return firestore.get(capsulePath(capsuleId)).data;
+    }
+
+    function canReadCapsule(data) {
+      return signedIn()
+        && (
+          (
+            data.senderUid == request.auth.uid
+            && data.senderUid != data.recipientUid
+          )
+          ||
+          (
+            data.recipientUid == request.auth.uid
+            && data.unlocked == true
+          )
+        );
+    }
+
+    function validImageUpload() {
+      return request.resource.size <= 10 * 1024 * 1024
+        && request.resource.contentType in [
+          'image/jpeg',
+          'image/png',
+          'image/webp'
+        ];
+    }
+
+    // --------------------------------------------------
+    // Capsule photos
+    // --------------------------------------------------
+
+    match /capsuleMedia/{senderUid}/{capsuleId}/original {
+
+      // Sender can upload a photo only for their own capsule.
+      allow create: if signedIn()
+        && request.auth.uid == senderUid
+        && capsuleExists(capsuleId)
+        && capsuleData(capsuleId).senderUid == senderUid
+        && capsuleData(capsuleId).hasPhoto == true
+        && capsuleData(capsuleId).photoPath ==
+          'capsuleMedia/' + senderUid + '/' + capsuleId + '/original'
+        && validImageUpload();
+
+      // Protected read access follows the Firestore capsule rules.
+      allow read: if signedIn()
+        && capsuleExists(capsuleId)
+        && capsuleData(capsuleId).senderUid == senderUid
+        && canReadCapsule(capsuleData(capsuleId));
+
+      // Finalized photos cannot be replaced or deleted.
+      allow update, delete: if false;
+    }
+
+    // --------------------------------------------------
+    // Default deny
+    // --------------------------------------------------
+
     match /{allPaths=**} {
       allow read, write: if false;
     }
