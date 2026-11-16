@@ -4,10 +4,6 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
 
-    // --------------------------------------------------
-    // Helper functions
-    // --------------------------------------------------
-
     function signedIn() {
       return request.auth != null;
     }
@@ -24,61 +20,54 @@ service firebase.storage {
       return firestore.get(capsulePath(capsuleId)).data;
     }
 
-    function canReadCapsule(data) {
-      return signedIn()
+    // A photo is readable only when its published capsule
+    // exists and the requester is an authorized participant.
+    function canReadCapsule(senderUid, capsuleId) {
+      return capsuleExists(capsuleId)
+        && capsuleData(capsuleId).hasPhoto == true
+        && capsuleData(capsuleId).photoPath
+          == 'capsuleMedia/' + senderUid + '/' + capsuleId + '/original'
         && (
           (
-            data.senderUid == request.auth.uid
-            && data.senderUid != data.recipientUid
+            capsuleData(capsuleId).senderId == request.auth.uid
+            && capsuleData(capsuleId).senderId
+              != capsuleData(capsuleId).recipientId
           )
           ||
           (
-            data.recipientUid == request.auth.uid
-            && data.unlocked == true
+            capsuleData(capsuleId).recipientId == request.auth.uid
+            && capsuleData(capsuleId).unlocked == true
           )
         );
     }
 
     function validImageUpload() {
-      return request.resource.size <= 10 * 1024 * 1024
+      return request.resource.size <= 5 * 1024 * 1024
         && request.resource.contentType in [
           'image/jpeg',
-          'image/png',
-          'image/webp'
+          'image/png'
         ];
     }
 
-    // --------------------------------------------------
-    // Capsule photos
-    // --------------------------------------------------
-
     match /capsuleMedia/{senderUid}/{capsuleId}/original {
 
-    // Sender can upload a photo only once for their own capsule.
-    allow create: if signedIn()
-        && resource == null
+      // Upload is allowed before Firestore publication.
+      // The sender can only create a photo under their own UID.
+      allow create: if signedIn()
         && request.auth.uid == senderUid
-        && capsuleExists(capsuleId)
-        && capsuleData(capsuleId).senderUid == senderUid
-        && capsuleData(capsuleId).hasPhoto == true
-        && capsuleData(capsuleId).photoPath ==
-        'capsuleMedia/' + senderUid + '/' + capsuleId + '/original'
+        && resource == null
         && validImageUpload();
 
-    // Protected read access follows the Firestore capsule rules.
-    allow read: if signedIn()
-        && capsuleExists(capsuleId)
-        && capsuleData(capsuleId).senderUid == senderUid
-        && canReadCapsule(capsuleData(capsuleId));
+      // Reading requires a published capsule and the same
+      // authorization as its protected text content.
+      allow read: if signedIn()
+        && canReadCapsule(senderUid, capsuleId);
 
-    // Finalized photos cannot be replaced or deleted.
-    allow update, delete: if false;
+      // Published photos cannot be replaced or deleted by clients.
+      allow update, delete: if false;
     }
 
-    // --------------------------------------------------
-    // Default deny
-    // --------------------------------------------------
-
+    // Everything else is denied by default.
     match /{allPaths=**} {
       allow read, write: if false;
     }

@@ -115,8 +115,8 @@ async function seedPhotoCapsule({
 
     await setDoc(doc(db, "capsules", id), {
       capsuleId: id,
-      senderUid: sender,
-      recipientUid: recipient,
+      senderId: sender,
+      recipientId: recipient,
       lockMode: "TIME",
       unlockAt: Timestamp.fromMillis(Date.now() + 60 * 60 * 1000),
       location: null,
@@ -393,7 +393,7 @@ describe("Capsule Storage security rules", () => {
       );
     });
 
-    it("denies photos larger than 10 MB", async () => {
+    it("denies photos larger than 5 MB", async () => {
       const id = "storage-oversized-test";
       await seedPhotoCapsule({ id });
 
@@ -402,7 +402,7 @@ describe("Capsule Storage security rules", () => {
         .storage();
 
       const oversizedImage = new Uint8Array(
-        10 * 1024 * 1024 + 1
+        5 * 1024 * 1024 + 1
       );
 
       await assertFails(
@@ -413,4 +413,56 @@ describe("Capsule Storage security rules", () => {
         )
       );
     });
+
+    it('allows sender to upload a photo before capsule publication', async () => {
+      const senderStorage = testEnv
+        .authenticatedContext('senderA')
+        .storage();
+
+      const photoRef = ref(
+        senderStorage,
+        'capsuleMedia/senderA/capsule-before-publication/original'
+      );
+
+      const photoBytes = new Uint8Array([0xFF, 0xD8, 0xFF]);
+
+      await assertSucceeds(
+        uploadBytes(photoRef, photoBytes, {
+          contentType: 'image/jpeg',
+        })
+      );
+    });
+
+    it('denies uploading a photo under another users UID', async () => {
+      const userBStorage = testEnv
+        .authenticatedContext('senderB')
+        .storage();
+
+      const photoRef = ref(
+        userBStorage,
+        'capsuleMedia/senderA/capsule-unauthorized/original'
+      );
+
+      await assertFails(
+        uploadBytes(photoRef, new Uint8Array([0xFF, 0xD8, 0xFF]), {
+          contentType: 'image/jpeg',
+        })
+      );
+    });
+
+    it('denies photo uploads when signed out', async () => {
+      const signedOutStorage = testEnv.unauthenticatedContext().storage();
+
+      const photoRef = ref(
+        signedOutStorage,
+        'capsuleMedia/senderA/capsule-signed-out/original'
+      );
+
+      await assertFails(
+        uploadBytes(photoRef, new Uint8Array([0xFF, 0xD8, 0xFF]), {
+          contentType: 'image/jpeg',
+        })
+      );
+    });
+
 });
