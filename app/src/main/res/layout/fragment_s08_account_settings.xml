@@ -56,11 +56,22 @@
         android:text="@string/btn_update_profile" />
 
     <Button
+        android:id="@+id/btnCreateCapsule"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:backgroundTint="#865B4B"
+        android:text="Create Time Capsule (S-04)"
+        android:textColor="#FFFDF9"
+        android:textSize="15sp"
+        android:textStyle="bold" />
+
+    <Button
         android:id="@+id/btnSignOut"
         style="?attr/materialButtonOutlinedStyle"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
+        android:layout_marginTop="16dp"
         android:text="@string/btn_sign_out" />
 
     <TextView

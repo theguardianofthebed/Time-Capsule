@@ -1,6 +1,8 @@
 package com.example.timecapsule
 
 import android.os.Bundle
+import android.view.View
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
 import com.example.timecapsule.config.FirebaseConfig
@@ -16,6 +18,9 @@ import com.example.timecapsule.data.session.DefaultSessionTracker
 import com.example.timecapsule.databinding.ActivityMainBinding
 import com.example.timecapsule.ui.s01.S01SignInFragment
 import com.example.timecapsule.ui.s02.S02RegisterFragment
+import com.example.timecapsule.ui.s04.S04ContentDraftFragment
+import com.example.timecapsule.ui.s05.S05RecipientLockFragment
+import com.example.timecapsule.ui.s06.S06ConfirmSendFragment
 import com.example.timecapsule.ui.s08.S08AccountSettingsFragment
 
 /**
@@ -36,19 +41,19 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        binding.tvMainTitle.text = getString(R.string.app_name)
-
         // Connect debug emulator endpoints in DEBUG builds; verify config availability in RELEASE builds
         val isDebug = BuildConfig.DEBUG
         if (isDebug) {
             val emulatorInitialized = FirebaseConfig.setupDebugEmulatorConnection(applicationContext, true)
             if (!emulatorInitialized) {
-                binding.tvMainSubtitle.text = "Firebase Initialization Failed (Fail-Closed)"
+                binding.tvInitError.text = "Firebase Initialization Failed (Fail-Closed)"
+                binding.tvInitError.visibility = View.VISIBLE
                 return
             }
         } else {
             if (!FirebaseConfig.isFirebaseAvailable(applicationContext)) {
-                binding.tvMainSubtitle.text = "Firebase Configuration Missing (Fail-Closed)"
+                binding.tvInitError.text = "Firebase Configuration Missing (Fail-Closed)"
+                binding.tvInitError.visibility = View.VISIBLE
                 return
             }
         }
@@ -99,7 +104,7 @@ class MainActivity : AppCompatActivity() {
             if (activeUid.isNullOrBlank()) {
                 navigateToSignIn()
             } else {
-                navigateToAccountSettings()
+                navigateToContentDraft()
             }
         }
     }
@@ -108,14 +113,44 @@ class MainActivity : AppCompatActivity() {
         when (fragment) {
             is S01SignInFragment -> {
                 fragment.onGoToRegisterListener = { navigateToRegister() }
-                fragment.onSignInSuccessListener = { navigateToAccountSettings() }
+                fragment.onSignInSuccessListener = { navigateToContentDraft() }
             }
             is S02RegisterFragment -> {
-                fragment.onRegisterSuccessListener = { navigateToAccountSettings() }
+                fragment.onRegisterSuccessListener = { navigateToContentDraft() }
+            }
+            is S04ContentDraftFragment -> {
+                fragment.onNextToRecipientLockListener = { navigateToRecipientLock() }
+                fragment.onNavigateToMomentsListener = { handleMomentsClick() }
+                fragment.onNavigateToAccountListener = { navigateToAccountSettings() }
+            }
+            is S05RecipientLockFragment -> {
+                fragment.onBackToContentDraftListener = { navigateToContentDraft() }
+                fragment.onNextToConfirmSendListener = { navigateToConfirmSend() }
+                fragment.onNavigateToMomentsListener = { handleMomentsClick() }
+                fragment.onNavigateToAccountListener = { navigateToAccountSettings() }
+            }
+            is S06ConfirmSendFragment -> {
+                fragment.onBackToRecipientLockListener = { navigateToRecipientLock() }
+                fragment.onNavigateToMomentsListener = { handleMomentsClick() }
+                fragment.onNavigateToAccountListener = { navigateToAccountSettings() }
             }
             is S08AccountSettingsFragment -> {
                 fragment.onSignOutSuccessListener = { navigateToSignIn() }
+                fragment.onCreateCapsuleListener = { navigateToContentDraft() }
             }
+        }
+    }
+
+    private fun handleMomentsClick() {
+        val activeUid = container.accountSessionManager.restoreSessionIfAuthenticated()
+        if (activeUid.isNullOrBlank()) {
+            navigateToSignIn()
+        } else {
+            Toast.makeText(
+                this,
+                "Your capsule list isn't available yet.",
+                Toast.LENGTH_SHORT
+            ).show()
         }
     }
 
@@ -123,7 +158,7 @@ class MainActivity : AppCompatActivity() {
     fun navigateToSignIn() {
         val fragment = S01SignInFragment().apply {
             onGoToRegisterListener = { navigateToRegister() }
-            onSignInSuccessListener = { navigateToAccountSettings() }
+            onSignInSuccessListener = { navigateToContentDraft() }
         }
         replaceFragment(fragment)
     }
@@ -131,7 +166,7 @@ class MainActivity : AppCompatActivity() {
     /** Navigates to S-02 Register / Profile Repair screen. */
     fun navigateToRegister() {
         val fragment = S02RegisterFragment().apply {
-            onRegisterSuccessListener = { navigateToAccountSettings() }
+            onRegisterSuccessListener = { navigateToContentDraft() }
         }
         replaceFragment(fragment)
     }
@@ -140,6 +175,37 @@ class MainActivity : AppCompatActivity() {
     fun navigateToAccountSettings() {
         val fragment = S08AccountSettingsFragment().apply {
             onSignOutSuccessListener = { navigateToSignIn() }
+        }
+        replaceFragment(fragment)
+    }
+
+    /** Navigates to S-04 Content Creation Draft screen. */
+    fun navigateToContentDraft() {
+        val fragment = S04ContentDraftFragment().apply {
+            onNextToRecipientLockListener = { navigateToRecipientLock() }
+            onNavigateToMomentsListener = { navigateToSignIn() }
+            onNavigateToAccountListener = { navigateToAccountSettings() }
+        }
+        replaceFragment(fragment)
+    }
+
+    /** Navigates to S-05 Recipient & Lock Selection screen. */
+    fun navigateToRecipientLock() {
+        val fragment = S05RecipientLockFragment().apply {
+            onBackToContentDraftListener = { navigateToContentDraft() }
+            onNextToConfirmSendListener = { navigateToConfirmSend() }
+            onNavigateToMomentsListener = { navigateToSignIn() }
+            onNavigateToAccountListener = { navigateToAccountSettings() }
+        }
+        replaceFragment(fragment)
+    }
+
+    /** Navigates to S-06 Confirm Send Review screen. */
+    fun navigateToConfirmSend() {
+        val fragment = S06ConfirmSendFragment().apply {
+            onBackToRecipientLockListener = { navigateToRecipientLock() }
+            onNavigateToMomentsListener = { navigateToSignIn() }
+            onNavigateToAccountListener = { navigateToAccountSettings() }
         }
         replaceFragment(fragment)
     }
