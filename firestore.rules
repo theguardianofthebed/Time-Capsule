@@ -1,22 +1,11 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --------------------------------------------------
-    // Helper functions
-    // --------------------------------------------------
-
     function signedIn() {
       return request.auth != null;
-    }
-
-    function isParticipant(data) {
-      return signedIn()
-        && (
-          request.auth.uid == data.senderUid
-          || request.auth.uid == data.recipientUid
-        );
     }
 
     function capsulePath(capsuleId) {
@@ -27,17 +16,25 @@ service cloud.firestore {
       return /databases/$(database)/documents/protectedContent/$(capsuleId);
     }
 
+    function isParticipant(data) {
+      return signedIn()
+        && (
+          data.senderId == request.auth.uid
+          || data.recipientId == request.auth.uid
+        );
+    }
+
     function validLocation(location) {
       return location is map
-        && location.keys().hasAll([
-          'latitude',
-          'longitude',
-          'radiusMeters'
-        ])
         && location.keys().hasOnly([
           'latitude',
           'longitude',
-          'radiusMeters'
+          'radiusM'
+        ])
+        && location.keys().hasAll([
+          'latitude',
+          'longitude',
+          'radiusM'
         ])
         && location.latitude is number
         && location.latitude >= -90
@@ -45,14 +42,14 @@ service cloud.firestore {
         && location.longitude is number
         && location.longitude >= -180
         && location.longitude <= 180
-        && location.radiusMeters is number
-        && location.radiusMeters > 0;
+        && location.radiusM == 150;
     }
 
     function validLock(data) {
       return (
         data.lockMode == 'TIME'
         && data.unlockAt is timestamp
+        && data.unlockAt > request.time
         && data.location == null
       ) || (
         data.lockMode == 'LOCATION'
@@ -61,27 +58,16 @@ service cloud.firestore {
       ) || (
         data.lockMode == 'BOTH'
         && data.unlockAt is timestamp
+        && data.unlockAt > request.time
         && validLocation(data.location)
       );
     }
 
-    function validMetadata(capsuleId, data) {
-      return data.keys().hasAll([
+    function validMetadata(data, capsuleId) {
+      return data.keys().hasOnly([
           'capsuleId',
-          'senderUid',
-          'recipientUid',
-          'lockMode',
-          'unlockAt',
-          'location',
-          'hasPhoto',
-          'photoPath',
-          'createdAt',
-          'unlocked'
-        ])
-        && data.keys().hasOnly([
-          'capsuleId',
-          'senderUid',
-          'recipientUid',
+          'senderId',
+          'recipientId',
           'title',
           'lockMode',
           'unlockAt',
@@ -89,170 +75,163 @@ service cloud.firestore {
           'hasPhoto',
           'photoPath',
           'createdAt',
+          'creationZone',
+          'snapshotDigest',
+          'unlocked'
+        ])
+        && data.keys().hasAll([
+          'capsuleId',
+          'senderId',
+          'recipientId',
+          'lockMode',
+          'unlockAt',
+          'location',
+          'hasPhoto',
+          'photoPath',
+          'createdAt',
+          'creationZone',
+          'snapshotDigest',
           'unlocked'
         ])
         && data.capsuleId == capsuleId
-        && data.senderUid is string
-        && data.senderUid.size() > 0
-        && data.recipientUid is string
-        && data.recipientUid.size() > 0
-        && (!data.keys().hasAny(['title'])
-            || data.title == null
-            || data.title is string)
+        && data.senderId is string
+        && data.senderId.size() > 0
+        && data.recipientId is string
+        && data.recipientId.size() > 0
+        && (!('title' in data) || data.title is string)
         && validLock(data)
         && data.hasPhoto is bool
         && (
-          (
+          (data.hasPhoto == false && data.photoPath == null)
+          || (
             data.hasPhoto == true
             && data.photoPath is string
-            && data.photoPath ==
-              'capsuleMedia/' + data.senderUid + '/' + capsuleId + '/original'
-          )
-          ||
-          (
-            data.hasPhoto == false
-            && data.photoPath == null
+            && data.photoPath
+              == 'capsuleMedia/' + data.senderId + '/' + capsuleId + '/original'
           )
         )
-        && data.createdAt is timestamp
+        && data.createdAt == request.time
+        && data.creationZone is string
+        && data.creationZone.size() > 0
+        && data.snapshotDigest is string
+        && data.snapshotDigest.size() > 0
         && data.unlocked == false;
     }
 
-    function validContent(capsuleId, data) {
-      return data.keys().hasAll([
+    function validContent(data, capsuleId) {
+      return data.keys().hasOnly([
           'capsuleId',
           'text',
-          'photoObjectPath'
+          'photoObjectPath',
+          'snapshotDigest'
         ])
-        && data.keys().hasOnly([
+        && data.keys().hasAll([
           'capsuleId',
           'text',
-          'photoObjectPath'
+          'photoObjectPath',
+          'snapshotDigest'
         ])
         && data.capsuleId == capsuleId
-        && (
-          data.text == null
-          || data.text is string
-        )
+        && data.text is string
         && (
           data.photoObjectPath == null
           || data.photoObjectPath is string
         )
         && (
-          (data.text != null && data.text.size() > 0)
+          data.text.size() > 0
           || data.photoObjectPath != null
-        );
+        )
+        && data.snapshotDigest is string
+        && data.snapshotDigest.size() > 0;
     }
 
     function matchingContentAfterCreate(capsuleId, metadata) {
+      let content = getAfter(contentPath(capsuleId)).data;
+
       return existsAfter(contentPath(capsuleId))
-        && getAfter(contentPath(capsuleId)).data.capsuleId == capsuleId
-        && getAfter(contentPath(capsuleId)).data.photoObjectPath
-          == metadata.photoPath;
+        && validContent(content, capsuleId)
+        && content.capsuleId == metadata.capsuleId
+        && content.snapshotDigest == metadata.snapshotDigest
+        && content.photoObjectPath == metadata.photoPath;
     }
 
     function matchingMetadataAfterCreate(capsuleId, content) {
+      let metadata = getAfter(capsulePath(capsuleId)).data;
+
       return existsAfter(capsulePath(capsuleId))
-        && getAfter(capsulePath(capsuleId)).data.capsuleId == capsuleId
-        && getAfter(capsulePath(capsuleId)).data.photoPath
-          == content.photoObjectPath;
+        && validMetadata(metadata, capsuleId)
+        && metadata.snapshotDigest == content.snapshotDigest
+        && metadata.photoPath == content.photoObjectPath;
     }
 
-    function canReadProtectedContent(data) {
+    function canReadProtectedContent(capsuleId) {
+      let metadata = get(capsulePath(capsuleId)).data;
+
       return signedIn()
         && (
           (
-            data.senderUid == request.auth.uid
-            && data.senderUid != data.recipientUid
+            metadata.senderId == request.auth.uid
+            && metadata.senderId != metadata.recipientId
           )
-          ||
-          (
-            data.recipientUid == request.auth.uid
-            && data.unlocked == true
+          || (
+            metadata.recipientId == request.auth.uid
+            && metadata.unlocked == true
           )
         );
     }
 
-    // --------------------------------------------------
-    // Existing recipient directory (Issue #10)
-    // --------------------------------------------------
+    function canRecipientUnlock() {
+      return signedIn()
+        && resource.data.recipientId == request.auth.uid
+        && resource.data.unlocked == false
+        && request.resource.data.unlocked == true
+        && resource.data.lockMode == 'TIME'
+        && resource.data.unlockAt is timestamp
+        && request.time >= resource.data.unlockAt
+        && request.resource.data.diff(resource.data)
+          .affectedKeys().hasOnly(['unlocked']);
+    }
 
     match /recipientDirectory/{uid} {
-      allow get: if signedIn();
+      allow get: if signedIn() && request.auth.uid == uid;
       allow list: if false;
 
       allow create, update: if signedIn()
         && request.auth.uid == uid
         && request.resource.data.uid == uid
-        && request.resource.data.keys().hasOnly([
-          'uid',
-          'displayName'
-        ])
+        && request.resource.data.keys().hasOnly(['uid', 'displayName'])
         && request.resource.data.displayName is string
         && request.resource.data.displayName.size() > 0;
 
       allow delete: if false;
     }
 
-    // --------------------------------------------------
-    // Capsule metadata
-    // --------------------------------------------------
-
     match /capsules/{capsuleId} {
-
       allow get, list: if isParticipant(resource.data);
 
       allow create: if signedIn()
-        && validMetadata(capsuleId, request.resource.data)
-        && request.resource.data.senderUid == request.auth.uid
+        && validMetadata(request.resource.data, capsuleId)
+        && request.resource.data.senderId == request.auth.uid
         && exists(
-          /databases/$(database)/documents/recipientDirectory/$(request.resource.data.recipientUid)
+          /databases/$(database)/documents/recipientDirectory/$(request.resource.data.recipientId)
         )
-        && matchingContentAfterCreate(
-          capsuleId,
-          request.resource.data
-        )
-        && validContent(
-          capsuleId,
-          getAfter(contentPath(capsuleId)).data
-        );
+        && matchingContentAfterCreate(capsuleId, request.resource.data);
 
-      // Only trusted backend logic can perform the unlock transition.
-      allow update: if false;
+      allow update: if canRecipientUnlock();
 
       allow delete: if false;
     }
 
-    // --------------------------------------------------
-    // Protected capsule content
-    // --------------------------------------------------
-
     match /protectedContent/{capsuleId} {
-
-      allow get, list: if canReadProtectedContent(
-        get(capsulePath(capsuleId)).data
-      );
+      allow get, list: if canReadProtectedContent(capsuleId);
 
       allow create: if signedIn()
-        && validContent(capsuleId, request.resource.data)
-        && existsAfter(capsulePath(capsuleId))
-        && getAfter(capsulePath(capsuleId)).data.senderUid
-          == request.auth.uid
-        && matchingMetadataAfterCreate(
-          capsuleId,
-          request.resource.data
-        )
-        && validMetadata(
-          capsuleId,
-          getAfter(capsulePath(capsuleId)).data
-        );
+        && validContent(request.resource.data, capsuleId)
+        && matchingMetadataAfterCreate(capsuleId, request.resource.data)
+        && getAfter(capsulePath(capsuleId)).data.senderId == request.auth.uid;
 
       allow update, delete: if false;
     }
-
-    // --------------------------------------------------
-    // Default deny
-    // --------------------------------------------------
 
     match /{document=**} {
       allow read, write: if false;
