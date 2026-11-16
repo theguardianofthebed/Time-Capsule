@@ -1,65 +1,359 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/s02RootView"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="16dp">
+    android:background="@color/capsule_bg"
+    android:fillViewport="true">
 
-    <!-- S-02 Register & profile repair layout -->
-    <TextView
-        android:id="@+id/tvS02Title"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/title_s02_register"
-        android:textSize="20sp"
-        android:textStyle="bold" />
-
-    <EditText
-        android:id="@+id/etEmail"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:hint="@string/hint_email"
-        android:inputType="textEmailAddress" />
+        android:orientation="vertical"
+        android:paddingHorizontal="24dp"
+        android:paddingTop="20dp"
+        android:paddingBottom="32dp">
 
-    <EditText
-        android:id="@+id/etPassword"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:hint="@string/hint_password"
-        android:inputType="textPassword" />
+        <!-- Top Navigation Header -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
 
-    <EditText
-        android:id="@+id/etConfirmPassword"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:hint="@string/hint_confirm_password"
-        android:inputType="textPassword" />
+            <ImageView
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_capsule_logo" />
 
-    <EditText
-        android:id="@+id/etDisplayName"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:hint="@string/hint_display_name"
-        android:inputType="textPersonName" />
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:layout_weight="1"
+                android:fontFamily="sans-serif-medium"
+                android:text="@string/s01_brand"
+                android:textColor="@color/capsule_text_dark"
+                android:textSize="15sp" />
 
-    <Button
-        android:id="@+id/btnRegister"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:text="@string/btn_register" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-medium"
+                android:letterSpacing="0.15"
+                android:text="@string/s01_tagline"
+                android:textColor="@color/capsule_text_muted"
+                android:textSize="11sp" />
+        </LinearLayout>
 
-    <TextView
-        android:id="@+id/tvStatusMessage"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:textColor="@android:color/holo_blue_dark"
-        android:textSize="14sp" />
+        <!-- Hero Badge & Title Section -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:gravity="center_horizontal"
+            android:orientation="vertical">
 
-</LinearLayout>
+            <!-- Circular Leaf Badge -->
+            <FrameLayout
+                android:layout_width="56dp"
+                android:layout_height="56dp"
+                android:background="@drawable/bg_circle_badge">
+
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_leaf" />
+            </FrameLayout>
+
+            <TextView
+                android:id="@+id/tvS02Eyebrow"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:fontFamily="sans-serif-medium"
+                android:letterSpacing="0.18"
+                android:text="@string/s02_eyebrow"
+                android:textColor="@color/capsule_text_muted"
+                android:textSize="11sp" />
+
+            <TextView
+                android:id="@+id/tvS02Title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:fontFamily="sans-serif-medium"
+                android:gravity="center"
+                android:text="@string/s02_headline"
+                android:textColor="@color/capsule_text_dark"
+                android:textSize="26sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvS02Subtitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:gravity="center"
+                android:text="@string/s02_subtitle"
+                android:textColor="@color/capsule_text_muted"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <!-- Form Section -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:orientation="vertical">
+
+            <!-- Your Name Label & Field -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="6dp"
+                android:fontFamily="sans-serif-medium"
+                android:text="@string/s02_label_name"
+                android:textColor="@color/capsule_text_dark"
+                android:textSize="12sp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:background="@drawable/bg_button_outlined"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingHorizontal="12dp">
+
+                <EditText
+                    android:id="@+id/etDisplayName"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="@null"
+                    android:hint="@string/s02_hint_name"
+                    android:inputType="textPersonName"
+                    android:textColor="@color/capsule_text_dark"
+                    android:textColorHint="@color/capsule_text_subtle"
+                    android:textSize="14sp" />
+            </LinearLayout>
+
+            <!-- Email Container (hidden during profile repair) -->
+            <LinearLayout
+                android:id="@+id/layoutEmailContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="6dp"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="@string/s02_label_email"
+                    android:textColor="@color/capsule_text_dark"
+                    android:textSize="12sp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:background="@drawable/bg_button_outlined"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="12dp">
+
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_mail" />
+
+                    <EditText
+                        android:id="@+id/etEmail"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="10dp"
+                        android:background="@null"
+                        android:hint="@string/hint_email"
+                        android:inputType="textEmailAddress"
+                        android:textColor="@color/capsule_text_dark"
+                        android:textColorHint="@color/capsule_text_subtle"
+                        android:textSize="14sp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Password Container (hidden during profile repair) -->
+            <LinearLayout
+                android:id="@+id/layoutPasswordContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="6dp"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="@string/s02_label_password"
+                    android:textColor="@color/capsule_text_dark"
+                    android:textSize="12sp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:background="@drawable/bg_button_outlined"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="12dp">
+
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_lock" />
+
+                    <EditText
+                        android:id="@+id/etPassword"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="10dp"
+                        android:layout_weight="1"
+                        android:background="@null"
+                        android:hint="@string/hint_password"
+                        android:inputType="textPassword"
+                        android:textColor="@color/capsule_text_dark"
+                        android:textColorHint="@color/capsule_text_subtle"
+                        android:textSize="14sp" />
+
+                    <ImageButton
+                        android:id="@+id/btnTogglePassword"
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="@string/hint_password"
+                        android:src="@drawable/ic_visibility" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Confirm Password Container (hidden during profile repair) -->
+            <LinearLayout
+                android:id="@+id/layoutConfirmPasswordContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="6dp"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="@string/s02_label_confirm_password"
+                    android:textColor="@color/capsule_text_dark"
+                    android:textSize="12sp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:background="@drawable/bg_button_outlined"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="12dp">
+
+                    <EditText
+                        android:id="@+id/etConfirmPassword"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:background="@null"
+                        android:hint="@string/s02_hint_confirm_password"
+                        android:inputType="textPassword"
+                        android:textColor="@color/capsule_text_dark"
+                        android:textColorHint="@color/capsule_text_subtle"
+                        android:textSize="14sp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Submit Button -->
+            <Button
+                android:id="@+id/btnRegister"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_marginTop="20dp"
+                android:background="@drawable/bg_button_primary"
+                android:drawableEnd="@drawable/ic_arrow_right"
+                android:fontFamily="sans-serif-medium"
+                android:paddingHorizontal="20dp"
+                android:text="@string/s02_btn_submit"
+                android:textAllCaps="false"
+                android:textColor="@color/white"
+                android:textSize="15sp"
+                app:backgroundTint="@null" />
+
+            <!-- Status Message -->
+            <TextView
+                android:id="@+id/tvStatusMessage"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:gravity="center"
+                android:textColor="@color/capsule_error_text"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <!-- Sign In Link -->
+        <LinearLayout
+            android:id="@+id/layoutSignInLink"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:gravity="center"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/s02_already_have_account"
+                android:textColor="@color/capsule_text_muted"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/tvGoToSignIn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:background="?attr/selectableItemBackground"
+                android:clickable="true"
+                android:focusable="true"
+                android:fontFamily="sans-serif-medium"
+                android:padding="4dp"
+                android:text="@string/s02_link_sign_in"
+                android:textColor="@color/capsule_text_dark"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+        <!-- Footer Security Note -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="24dp"
+            android:drawablePadding="6dp"
+            android:gravity="center"
+            android:text="@string/s02_footer_notice"
+            android:textColor="@color/capsule_text_subtle"
+            android:textSize="11sp"
+            app:drawableStartCompat="@drawable/ic_lock" />
+
+    </LinearLayout>
+</ScrollView>

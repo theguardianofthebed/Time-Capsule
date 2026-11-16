@@ -117,6 +117,7 @@ class MainActivity : AppCompatActivity() {
             }
             is S02RegisterFragment -> {
                 fragment.onRegisterSuccessListener = { navigateToContentDraft() }
+                fragment.onGoToSignInListener = { navigateToSignIn() }
             }
             is S04ContentDraftFragment -> {
                 fragment.onNextToRecipientLockListener = { navigateToRecipientLock() }
@@ -167,6 +168,7 @@ class MainActivity : AppCompatActivity() {
     fun navigateToRegister() {
         val fragment = S02RegisterFragment().apply {
             onRegisterSuccessListener = { navigateToContentDraft() }
+            onGoToSignInListener = { navigateToSignIn() }
         }
         replaceFragment(fragment)
     }

@@ -1,6 +1,8 @@
 package com.example.timecapsule.ui.s02
 
 import android.os.Bundle
+import android.text.method.HideReturnsTransformationMethod
+import android.text.method.PasswordTransformationMethod
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -13,7 +15,9 @@ import com.example.timecapsule.domain.result.OperationResult
 import com.example.timecapsule.ui.ViewModelFactory
 
 /**
- * Fragment UI implementation for S-02 Register & Profile Repair screen observing [S02RegisterViewModel].
+ * Fragment implementation for S-02 Register & Profile Repair screen matching the Stitch UI design.
+ * Handles new Firebase email/password account creation with display name, as well as the
+ * missing-profile repair variant mode when an authenticated session lacks a valid Firestore profile.
  */
 class S02RegisterFragment : Fragment() {
 
@@ -21,8 +25,10 @@ class S02RegisterFragment : Fragment() {
     private val binding get() = _binding!!
 
     private lateinit var viewModel: S02RegisterViewModel
+    private var isPasswordVisible = false
 
     var onRegisterSuccessListener: ((String) -> Unit)? = null
+    var onGoToSignInListener: (() -> Unit)? = null
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -44,20 +50,39 @@ class S02RegisterFragment : Fragment() {
         val activeUid = appContainer.authAdapter.activeUid()
         val isProfileRepairMode = !activeUid.isNullOrBlank()
 
+        // Configure layout and field visibility depending on whether profile repair mode is active
         if (isProfileRepairMode) {
+            binding.tvS02Title.text = getString(R.string.s02_headline_repair)
+            binding.tvS02Subtitle.text = getString(R.string.s02_subtitle_repair)
             binding.btnRegister.text = getString(R.string.btn_repair_profile)
-            binding.etEmail.visibility = View.GONE
-            binding.etPassword.visibility = View.GONE
-            binding.etConfirmPassword.visibility = View.GONE
+            binding.layoutEmailContainer.visibility = View.GONE
+            binding.layoutPasswordContainer.visibility = View.GONE
+            binding.layoutConfirmPasswordContainer.visibility = View.GONE
+            binding.layoutSignInLink.visibility = View.GONE
             val activeName = appContainer.authAdapter.activeDisplayName() ?: ""
             binding.etDisplayName.setText(activeName)
         } else {
-            binding.btnRegister.text = getString(R.string.btn_register)
-            binding.etEmail.visibility = View.VISIBLE
-            binding.etPassword.visibility = View.VISIBLE
-            binding.etConfirmPassword.visibility = View.VISIBLE
+            binding.tvS02Title.text = getString(R.string.s02_headline)
+            binding.tvS02Subtitle.text = getString(R.string.s02_subtitle)
+            binding.btnRegister.text = getString(R.string.s02_btn_submit)
+            binding.layoutEmailContainer.visibility = View.VISIBLE
+            binding.layoutPasswordContainer.visibility = View.VISIBLE
+            binding.layoutConfirmPasswordContainer.visibility = View.VISIBLE
+            binding.layoutSignInLink.visibility = View.VISIBLE
         }
 
+        // Password visibility toggle action
+        binding.btnTogglePassword.setOnClickListener {
+            isPasswordVisible = !isPasswordVisible
+            if (isPasswordVisible) {
+                binding.etPassword.transformationMethod = HideReturnsTransformationMethod.getInstance()
+            } else {
+                binding.etPassword.transformationMethod = PasswordTransformationMethod.getInstance()
+            }
+            binding.etPassword.setSelection(binding.etPassword.text?.length ?: 0)
+        }
+
+        // Observe registration and profile repair ViewModel state
         viewModel.registerState.observe(viewLifecycleOwner) { result ->
             binding.btnRegister.isEnabled = true
             when (result) {
@@ -74,17 +99,27 @@ class S02RegisterFragment : Fragment() {
             }
         }
 
+        // Submit button action (Registration or Profile Repair)
         binding.btnRegister.setOnClickListener {
             val displayName = binding.etDisplayName.text.toString().trim()
 
             if (isProfileRepairMode) {
+                if (displayName.isBlank()) {
+                    binding.tvStatusMessage.text = getString(R.string.err_session_unavailable)
+                    return@setOnClickListener
+                }
                 binding.btnRegister.isEnabled = false
                 binding.tvStatusMessage.text = getString(R.string.msg_creating_account)
                 viewModel.repairProfile(displayName)
             } else {
-                val email = binding.etEmail.text.toString()
+                val email = binding.etEmail.text.toString().trim()
                 val password = binding.etPassword.text.toString()
                 val confirmPassword = binding.etConfirmPassword.text.toString()
+
+                if (email.isBlank() || password.isBlank() || displayName.isBlank()) {
+                    binding.tvStatusMessage.text = getString(R.string.err_session_unavailable)
+                    return@setOnClickListener
+                }
 
                 if (password != confirmPassword) {
                     binding.tvStatusMessage.text = getString(R.string.err_password_mismatch)
@@ -95,6 +130,11 @@ class S02RegisterFragment : Fragment() {
                 binding.tvStatusMessage.text = getString(R.string.msg_creating_account)
                 viewModel.registerAndCreateProfile(email, password, displayName)
             }
+        }
+
+        // Navigation back to S-01 Sign in
+        binding.tvGoToSignIn.setOnClickListener {
+            onGoToSignInListener?.invoke()
         }
     }
 

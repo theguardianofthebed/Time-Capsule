@@ -1,6 +1,8 @@
 package com.example.timecapsule.ui.s01
 
 import android.os.Bundle
+import android.text.method.HideReturnsTransformationMethod
+import android.text.method.PasswordTransformationMethod
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -13,7 +15,9 @@ import com.example.timecapsule.domain.result.OperationResult
 import com.example.timecapsule.ui.ViewModelFactory
 
 /**
- * Fragment UI implementation for S-01 Sign in screen observing [S01SignInViewModel].
+ * Fragment implementation for S-01 Sign in screen matching the Stitch UI design.
+ * Collects user credentials, handles password visibility toggling, and authenticates
+ * via [S01SignInViewModel] while displaying detailed error/loading states.
  */
 class S01SignInFragment : Fragment() {
 
@@ -21,6 +25,7 @@ class S01SignInFragment : Fragment() {
     private val binding get() = _binding!!
 
     private lateinit var viewModel: S01SignInViewModel
+    private var isPasswordVisible = false
 
     var onGoToRegisterListener: (() -> Unit)? = null
     var onSignInSuccessListener: ((String) -> Unit)? = null
@@ -41,6 +46,20 @@ class S01SignInFragment : Fragment() {
         val factory = ViewModelFactory(mainActivity.container.accountSessionManager)
         viewModel = ViewModelProvider(this, factory)[S01SignInViewModel::class.java]
 
+        // Password visibility toggle action
+        binding.btnTogglePassword.setOnClickListener {
+            isPasswordVisible = !isPasswordVisible
+            if (isPasswordVisible) {
+                binding.etPassword.transformationMethod = HideReturnsTransformationMethod.getInstance()
+                binding.btnTogglePassword.setImageResource(R.drawable.ic_visibility)
+            } else {
+                binding.etPassword.transformationMethod = PasswordTransformationMethod.getInstance()
+                binding.btnTogglePassword.setImageResource(R.drawable.ic_visibility)
+            }
+            binding.etPassword.setSelection(binding.etPassword.text?.length ?: 0)
+        }
+
+        // Observe ViewModel sign-in state mutations
         viewModel.signInState.observe(viewLifecycleOwner) { result ->
             binding.btnSignIn.isEnabled = true
             when (result) {
@@ -57,14 +76,22 @@ class S01SignInFragment : Fragment() {
             }
         }
 
+        // Sign in CTA execution
         binding.btnSignIn.setOnClickListener {
-            val email = binding.etEmail.text.toString()
+            val email = binding.etEmail.text.toString().trim()
             val password = binding.etPassword.text.toString()
+
+            if (email.isBlank() || password.isBlank()) {
+                binding.tvStatusMessage.text = getString(R.string.err_session_unavailable)
+                return@setOnClickListener
+            }
+
             binding.btnSignIn.isEnabled = false
             binding.tvStatusMessage.text = getString(R.string.msg_signing_in)
             viewModel.signIn(email, password)
         }
 
+        // Navigate to S-02 Register screen
         binding.btnGoToRegister.setOnClickListener {
             onGoToRegisterListener?.invoke()
         }
