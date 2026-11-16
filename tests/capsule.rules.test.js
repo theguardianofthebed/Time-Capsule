@@ -21,10 +21,12 @@ import {
     doc,
     getDoc,
     getDocs,
+    query,
     setDoc,
     Timestamp,
     serverTimestamp,
     updateDoc,
+    where,
     writeBatch,
 } from "firebase/firestore";
 
@@ -300,6 +302,51 @@ describe("Capsule Firestore security rules", () => {
 
         await assertFails(
             getDocs(collection(outsiderDb, "capsules"))
+        );
+    });
+
+    // Test: Sender can list their own capsules.
+    it("allows the sender to list their own capsules", async () => {
+        await seedCapsule();
+
+        const senderDb = testEnv
+            .authenticatedContext(senderUid)
+            .firestore();
+
+        const senderQuery = query(
+            collection(senderDb, "capsules"),
+            where("senderId", "==", senderUid)
+        );
+
+        await assertSucceeds(getDocs(senderQuery));
+    });
+
+    // Test: Recipient can list capsules addressed to them.
+    it("allows the recipient to list capsules addressed to them", async () => {
+        await seedCapsule();
+
+        const recipientDb = testEnv
+            .authenticatedContext(recipientUid)
+            .firestore();
+
+        const recipientQuery = query(
+            collection(recipientDb, "capsules"),
+            where("recipientId", "==", recipientUid)
+        );
+
+        await assertSucceeds(getDocs(recipientQuery));
+    });
+
+    // Test: Users cannot run unrestricted capsule queries.
+    it("denies unrestricted capsule queries", async () => {
+        await seedCapsule();
+
+        const senderDb = testEnv
+            .authenticatedContext(senderUid)
+            .firestore();
+
+        await assertFails(
+            getDocs(collection(senderDb, "capsules"))
         );
     });
 
