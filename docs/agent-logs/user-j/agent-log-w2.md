@@ -73,7 +73,7 @@ Needed assistance in translating the pre-made Stitch UI designs (`TimeCapsule An
 - **Issue and PR:** Issue #37 (https://github.com/theguardianofthebed/Time-Capsule/issues/37); implementation branch `feature/37-ui-design-correction`.
 - **Requirement/design references:** FR-01, FR-10; ARC-01, ARC-06; DD-01, DD-03, DD-07, DD-19, DD-24, DD-26; AC-01, AC-10.
 - **Agent environment:** Android Studio Agent Mode.
-- **Model used:** Gemini Flash 3.8 (Android Studio Agent Mode).
+- **Model used:** Gemini Flash 3.6 (Android Studio Agent Mode).
 
 **Goal**
 
