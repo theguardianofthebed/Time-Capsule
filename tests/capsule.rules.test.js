@@ -3,33 +3,35 @@
 
 import { readFileSync } from "node:fs";
 import {
-  afterAll,
-  beforeAll,
-  beforeEach,
-  describe,
-  it,
+    afterAll,
+    beforeAll,
+    beforeEach,
+    describe,
+    it,
 } from "vitest";
 
 import {
-  initializeTestEnvironment,
-  assertSucceeds,
-  assertFails,
+    initializeTestEnvironment,
+    assertSucceeds,
+    assertFails,
 } from "@firebase/rules-unit-testing";
 
 import {
-  doc,
-  getDoc,
-  setDoc,
-  Timestamp,
-  serverTimestamp,
-  updateDoc,
-  writeBatch,
+    collection,
+    doc,
+    getDoc,
+    getDocs,
+    setDoc,
+    Timestamp,
+    serverTimestamp,
+    updateDoc,
+    writeBatch,
 } from "firebase/firestore";
 
 import {
-  ref,
-  uploadBytes,
-  getBytes,
+    ref,
+    uploadBytes,
+    getBytes,
 } from "firebase/storage";
 
 
@@ -47,42 +49,42 @@ const senderUid = "sender-a";
 const recipientUid = "recipient-b";
 
 beforeAll(async () => {
-  testEnv = await initializeTestEnvironment({
-    projectId: "demo-timecapsule",
+    testEnv = await initializeTestEnvironment({
+        projectId: "demo-timecapsule",
 
-    firestore: {
-      host: "127.0.0.1",
-      port: 8080,
-      rules: readFileSync("firestore.rules", "utf8"),
-    },
+        firestore: {
+            host: "127.0.0.1",
+            port: 8080,
+            rules: readFileSync("firestore.rules", "utf8"),
+        },
 
-    storage: {
-      host: "127.0.0.1",
-      port: 9199,
-      rules: readFileSync("storage.rules", "utf8"),
-    },
-  });
+        storage: {
+            host: "127.0.0.1",
+            port: 9199,
+            rules: readFileSync("storage.rules", "utf8"),
+        },
+    });
 });
 
 afterAll(async () => {
-  await testEnv.cleanup();
+    await testEnv.cleanup();
 });
 
 beforeEach(async () => {
-  await testEnv.clearFirestore();
-  await testEnv.clearStorage();
+    await testEnv.clearFirestore();
+    await testEnv.clearStorage();
 
-  // Create the recipient directory entry for our test.
-  // Security rules are disabled only while preparing test data.
-  await testEnv.withSecurityRulesDisabled(async (context) => {
-    await setDoc(
-      doc(context.firestore(), "recipientDirectory", recipientUid),
-      {
-        uid: recipientUid,
-        displayName: "Recipient B",
-      }
-    );
-  });
+    // Create the recipient directory entry for our test.
+    // Security rules are disabled only while preparing test data.
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+        await setDoc(
+            doc(context.firestore(), "recipientDirectory", recipientUid),
+            {
+                uid: recipientUid,
+                displayName: "Recipient B",
+            }
+        );
+    });
 });
 
 const snapshotDigest = "a".repeat(64);
@@ -92,63 +94,63 @@ const snapshotDigest = "a".repeat(64);
 // 4. seedCapsule() and seedPhotoCapsule()
 
 async function seedCapsule({
-  id = capsuleId,
-  sender = senderUid,
-  recipient = recipientUid,
-  unlocked = false,
-  unlockAtMillis = Date.now() + 60 * 60 * 1000,
+    id = capsuleId,
+    sender = senderUid,
+    recipient = recipientUid,
+    unlocked = false,
+    unlockAtMillis = Date.now() + 60 * 60 * 1000,
 } = {}) {
-  await testEnv.withSecurityRulesDisabled(async (context) => {
-    const db = context.firestore();
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+        const db = context.firestore();
 
-    await setDoc(doc(db, "capsules", id), {
-      capsuleId: id,
-      senderId: sender,
-      recipientId: recipient,
-      lockMode: "TIME",
-      unlockAt: Timestamp.fromMillis(unlockAtMillis),
-      location: null,
-      hasPhoto: false,
-      photoPath: null,
-      createdAt: Timestamp.now(),
-      creationZone: "Asia/Seoul",
-      snapshotDigest,
-      unlocked,
-    });
+        await setDoc(doc(db, "capsules", id), {
+            capsuleId: id,
+            senderId: sender,
+            recipientId: recipient,
+            lockMode: "TIME",
+            unlockAt: Timestamp.fromMillis(unlockAtMillis),
+            location: null,
+            hasPhoto: false,
+            photoPath: null,
+            createdAt: Timestamp.now(),
+            creationZone: "Asia/Seoul",
+            snapshotDigest,
+            unlocked,
+        });
 
-    await setDoc(doc(db, "protectedContent", id), {
-      capsuleId: id,
-      text: "Test capsule content",
-      photoObjectPath: null,
-      snapshotDigest,
+        await setDoc(doc(db, "protectedContent", id), {
+            capsuleId: id,
+            text: "Test capsule content",
+            photoObjectPath: null,
+            snapshotDigest,
+        });
     });
-  });
 }
 
 async function seedPhotoCapsule({
-  id = capsuleId,
-  sender = senderUid,
-  recipient = recipientUid,
-  unlocked = false,
+    id = capsuleId,
+    sender = senderUid,
+    recipient = recipientUid,
+    unlocked = false,
 } = {}) {
-  await testEnv.withSecurityRulesDisabled(async (context) => {
-    const db = context.firestore();
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+        const db = context.firestore();
 
-    await setDoc(doc(db, "capsules", id), {
-      capsuleId: id,
-      senderId: sender,
-      recipientId: recipient,
-      lockMode: "TIME",
-      unlockAt: Timestamp.fromMillis(Date.now() + 60 * 60 * 1000),
-      location: null,
-      hasPhoto: true,
-      photoPath: `capsuleMedia/${sender}/${id}/original`,
-      createdAt: Timestamp.now(),
-      creationZone: "Asia/Seoul",
-      snapshotDigest,
-      unlocked,
+        await setDoc(doc(db, "capsules", id), {
+            capsuleId: id,
+            senderId: sender,
+            recipientId: recipient,
+            lockMode: "TIME",
+            unlockAt: Timestamp.fromMillis(Date.now() + 60 * 60 * 1000),
+            location: null,
+            hasPhoto: true,
+            photoPath: `capsuleMedia/${sender}/${id}/original`,
+            createdAt: Timestamp.now(),
+            creationZone: "Asia/Seoul",
+            snapshotDigest,
+            unlocked,
+        });
     });
-  });
 }
 
 
@@ -288,6 +290,19 @@ describe("Capsule Firestore security rules", () => {
         );
     });
 
+    // Test: Unrelated users cannot list capsules.
+    it("denies capsule listing to unrelated users", async () => {
+        await seedCapsule();
+
+        const outsiderDb = testEnv
+            .authenticatedContext("outsider-c")
+            .firestore();
+
+        await assertFails(
+            getDocs(collection(outsiderDb, "capsules"))
+        );
+    });
+
     // Test: Recipient can read content after unlocking.
     it("allows the recipient to read content after unlocking", async () => {
         await seedCapsule({ unlocked: true });
@@ -404,6 +419,17 @@ describe("Capsule Firestore security rules", () => {
                 unlocked: true,
                 title: "Changed title",
             })
+        );
+    });
+
+    // Test: Users cannot list the recipient directory.
+    it("denies listing the recipient directory", async () => {
+        const db = testEnv
+            .authenticatedContext(senderUid)
+            .firestore();
+
+        await assertFails(
+            getDocs(collection(db, "recipientDirectory"))
         );
     });
 });
