@@ -1,15 +1,206 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Recipient directory rules for Issue #10
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function capsulePath(capsuleId) {
+      return /databases/$(database)/documents/capsules/$(capsuleId);
+    }
+
+    function contentPath(capsuleId) {
+      return /databases/$(database)/documents/protectedContent/$(capsuleId);
+    }
+
+    function isParticipant(data) {
+      return signedIn()
+        && (
+          data.senderId == request.auth.uid
+          || data.recipientId == request.auth.uid
+        );
+    }
+
+    function validLocation(location) {
+      return location is map
+        && location.keys().hasOnly([
+          'latitude',
+          'longitude',
+          'radiusM'
+        ])
+        && location.keys().hasAll([
+          'latitude',
+          'longitude',
+          'radiusM'
+        ])
+        && location.latitude is number
+        && location.latitude >= -90
+        && location.latitude <= 90
+        && location.longitude is number
+        && location.longitude >= -180
+        && location.longitude <= 180
+        && location.radiusM == 150;
+    }
+
+    function validLock(data) {
+      return (
+        data.lockMode == 'TIME'
+        && data.unlockAt is timestamp
+        && data.unlockAt > request.time
+        && data.location == null
+      ) || (
+        data.lockMode == 'LOCATION'
+        && data.unlockAt == null
+        && validLocation(data.location)
+      ) || (
+        data.lockMode == 'BOTH'
+        && data.unlockAt is timestamp
+        && data.unlockAt > request.time
+        && validLocation(data.location)
+      );
+    }
+
+    function validMetadata(data, capsuleId) {
+      return data.keys().hasOnly([
+          'capsuleId',
+          'senderId',
+          'recipientId',
+          'title',
+          'lockMode',
+          'unlockAt',
+          'location',
+          'hasPhoto',
+          'photoPath',
+          'createdAt',
+          'creationZone',
+          'snapshotDigest',
+          'unlocked',
+          'unlockedAt'
+        ])
+        && data.keys().hasAll([
+          'capsuleId',
+          'senderId',
+          'recipientId',
+          'lockMode',
+          'unlockAt',
+          'location',
+          'hasPhoto',
+          'photoPath',
+          'createdAt',
+          'creationZone',
+          'snapshotDigest',
+          'unlocked'
+        ])
+        && data.capsuleId == capsuleId
+        && data.senderId is string
+        && data.senderId.size() > 0
+        && data.recipientId is string
+        && data.recipientId.size() > 0
+        && (!('title' in data) || data.title is string)
+        && validLock(data)
+        && data.hasPhoto is bool
+        && (
+          (data.hasPhoto == false && data.photoPath == null)
+          || (
+            data.hasPhoto == true
+            && data.photoPath is string
+            && data.photoPath
+              == 'capsuleMedia/' + data.senderId + '/' + capsuleId + '/original'
+          )
+        )
+        && data.createdAt == request.time
+        && data.creationZone is string
+        && data.creationZone.size() > 0
+        && data.snapshotDigest is string
+        && data.snapshotDigest.size() > 0
+        && data.unlocked == false
+        && (!('unlockedAt' in data) || data.unlockedAt == null);
+    }
+
+    function validContent(data, capsuleId) {
+      return data.keys().hasOnly([
+          'capsuleId',
+          'text',
+          'photoObjectPath',
+          'snapshotDigest'
+        ])
+        && data.keys().hasAll([
+          'capsuleId',
+          'text',
+          'photoObjectPath',
+          'snapshotDigest'
+        ])
+        && data.capsuleId == capsuleId
+        && data.text is string
+        && (
+          data.photoObjectPath == null
+          || data.photoObjectPath is string
+        )
+        && (
+          data.text.size() > 0
+          || data.photoObjectPath != null
+        )
+        && data.snapshotDigest is string
+        && data.snapshotDigest.size() > 0;
+    }
+
+    function matchingContentAfterCreate(capsuleId, metadata) {
+      let content = getAfter(contentPath(capsuleId)).data;
+
+      return existsAfter(contentPath(capsuleId))
+        && validContent(content, capsuleId)
+        && content.capsuleId == metadata.capsuleId
+        && content.snapshotDigest == metadata.snapshotDigest
+        && content.photoObjectPath == metadata.photoPath;
+    }
+
+    function matchingMetadataAfterCreate(capsuleId, content) {
+      let metadata = getAfter(capsulePath(capsuleId)).data;
+
+      return existsAfter(capsulePath(capsuleId))
+        && validMetadata(metadata, capsuleId)
+        && metadata.snapshotDigest == content.snapshotDigest
+        && metadata.photoPath == content.photoObjectPath;
+    }
+
+    function canReadProtectedContent(capsuleId) {
+      let metadata = get(capsulePath(capsuleId)).data;
+
+      return signedIn()
+        && (
+          (
+            metadata.senderId == request.auth.uid
+            && metadata.senderId != metadata.recipientId
+          )
+          || (
+            metadata.recipientId == request.auth.uid
+            && metadata.unlocked == true
+          )
+        );
+    }
+
+    function canRecipientUnlock() {
+      return signedIn()
+        && resource.data.recipientId == request.auth.uid
+        && resource.data.unlocked == false
+        && request.resource.data.unlocked == true
+        && request.resource.data.unlockedAt == request.time
+        && (
+          (resource.data.lockMode == 'TIME' && resource.data.unlockAt is timestamp && request.time >= resource.data.unlockAt)
+          || (resource.data.lockMode == 'LOCATION')
+          || (resource.data.lockMode == 'BOTH' && resource.data.unlockAt is timestamp && request.time >= resource.data.unlockAt)
+        )
+        && request.resource.data.diff(resource.data)
+          .affectedKeys().hasOnly(['unlocked', 'unlockedAt']);
+    }
+
     match /recipientDirectory/{uid} {
-      // Allow exact single-document get for authenticated users. Deny list queries.
-      allow get: if request.auth != null;
+      allow get: if signedIn();
       allow list: if false;
 
-      // Allow owner to create or update their own profile document with non-empty displayName
-      allow create, update: if request.auth != null
+      allow create, update: if signedIn()
         && request.auth.uid == uid
         && request.resource.data.uid == uid
         && request.resource.data.keys().hasOnly(['uid', 'displayName'])
@@ -19,7 +210,33 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // Default deny all other paths
+    match /capsules/{capsuleId} {
+      allow get, list: if isParticipant(resource.data);
+
+      allow create: if signedIn()
+        && validMetadata(request.resource.data, capsuleId)
+        && request.resource.data.senderId == request.auth.uid
+        && exists(
+          /databases/$(database)/documents/recipientDirectory/$(request.resource.data.recipientId)
+        )
+        && matchingContentAfterCreate(capsuleId, request.resource.data);
+
+      allow update: if canRecipientUnlock();
+
+      allow delete: if false;
+    }
+
+    match /protectedContent/{capsuleId} {
+      allow get, list: if canReadProtectedContent(capsuleId);
+
+      allow create: if signedIn()
+        && validContent(request.resource.data, capsuleId)
+        && matchingMetadataAfterCreate(capsuleId, request.resource.data)
+        && getAfter(capsulePath(capsuleId)).data.senderId == request.auth.uid;
+
+      allow update, delete: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

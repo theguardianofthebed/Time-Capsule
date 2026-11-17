@@ -129,3 +129,59 @@ Translate the pre-made Stitch UI designs for S-01, S-02, and S-08 into native An
   - The changes pass build, 76 unit tests, lint, and emulator walkthrough.
   - I will submit the PR for teammate review by User G.
 
+## Task: Issue #11 Capsule Records and Security Rules (Takeover Completion)
+
+- **Task and purpose:** Completed GitHub Issue #11 security rules implementation takeover and verification. Restored authenticated exact-UID recipient lookup while denying directory listing, aligned Firestore unlock rules with the one-way `unlockedAt` server-timestamp contract, supported prepublication photo upload/retry/read while preserving post-publication photo immutability, and extended Firebase emulator security tests to 36 passing cases.
+- **Session date(s):** 17 November 2026.
+- **Issue and PR:** Issue #11 (https://github.com/theguardianofthebed/Time-Capsule/issues/11); PR #35 (https://github.com/theguardianofthebed/Time-Capsule/pull/35); branch `feature/11-capsule-rules`.
+- **Requirement/design references:** FR-08, NFR-04; ARC-02, ARC-03, ARC-04, ARC-05; DD-16, DD-17, DD-23; AC-12; T-07, T-21, T-22, T-23, T-33, T-43.
+- **Agent environment:** Android Studio Agent Mode.
+- **Model used:** Gemini Flash 3.8 (Android Studio Agent Mode).
+
+**Goal**
+
+Complete Issue #11 security rules implementation takeover on `feature/11-capsule-rules` and PR #35 without rebuilding existing work or losing User F's original authored commits. Reconcile `main` (`2524ae5070477a320e30257a94f23d100e332e98`), run eight-gate readiness preflight, restore signed-in exact UID recipient lookup in `firestore.rules`, align unlock rules with `request.resource.data.unlockedAt == request.time`, support prepublication photo reconciliation in `storage.rules`, and extend Firebase emulator security tests in `tests/capsule.rules.test.js`.
+
+**Requests and prompts**
+
+| # | Request summary | Actual prompt (key part) | Why it worked (or didn't) |
+|---|-----------------|--------------------------|---------------------------|
+| 1 | Reconcile main & readiness preflight | "Continue TimeCapsule Issue #11 using existing feature/11-capsule-rules branch and PR #35 ... Reconcile main ... run eight-gate readiness preflight ..." | Successfully merged `main` into `feature/11-capsule-rules` and validated readiness with `PREFLIGHT_RECORD_VALID`. |
+| 2 | Firestore & Storage security rules alignment | "Restore authenticated exact-UID recipient lookup ... align Firestore unlock rules with agreed one-way unlockedAt server-timestamp contract ... review prepublication photo rules ..." | Updated `firestore.rules` and `storage.rules` to enforce exact lookup, server-timestamp unlock, and photo prepublication retry / post-publication immutability. |
+| 3 | Security rules emulator verification | "Extend and run the relevant Firebase emulator security tests, including regression cases ..." | Extended `tests/capsule.rules.test.js` to 36 test cases; all 36 passed under `firebase emulators:exec`. |
+
+### What the agent changed and verified
+
+- **Changes:**
+  - `firestore.rules`: Updated `match /recipientDirectory/{uid}` to `allow get: if signedIn();` while retaining `allow list: if false;` and owner-only `create, update`. Updated `canRecipientUnlock()` to require `request.resource.data.unlockedAt == request.time` and restricted affected fields during unlock strictly to `['unlocked', 'unlockedAt']`. Updated `validMetadata()` to allow `unlockedAt` field (must be null/absent at creation).
+  - `storage.rules`: Updated `match /capsuleMedia/{senderUid}/{capsuleId}/original` to `allow create, update: if signedIn() && request.auth.uid == senderUid && !capsuleExists(capsuleId) && validImageUpload();` to allow prepublication upload and retry. Updated `allow read` to permit prepublication sender access or published authorized reading (`canReadCapsule`). Retained `allow delete: if false;` and denied post-publication overwrites.
+  - `tests/capsule.rules.test.js`: Extended security test suite from 29 to 36 tests. Added tests for exact-UID directory get, directory list denial, signed-out directory access denial, foreign profile write denial, unlock with `unlockedAt` server timestamp, missing/invalid timestamp unlock denial, relock denial, re-unlock denial, prepublication photo upload/retry/read, and post-publication photo immutability.
+  - `docs/agent-tools/readiness-evidence-issue11.json`: Recorded eight-gate preflight evidence against selected base `2524ae5070477a320e30257a94f23d100e332e98` and merged dependencies #9 and #10.
+  - `docs/agent-tools/handoffs/issue-11-user-j-takeover-20261117.md`: Updated handoff document with actual execution results and test evidence.
+- **Checks and results:**
+  - `py tools/check_readiness.py --validate-manifest`: PASS (`MANIFEST_VALID`)
+  - `py tools/check_readiness.py --issue 11 --evidence docs/agent-tools/readiness-evidence-issue11.json`: PASS (`PREFLIGHT_RECORD_VALID`)
+  - `npx firebase emulators:exec --project demo-timecapsule "npm test"`: PASS (36 tests passed, 0 failed, 100% pass rate)
+  - `./gradlew app:testDebugUnitTest`: PASS (76 Android JVM unit tests passed across project)
+
+### Errors and manual fixes
+
+- Adjusted `tests/capsule.rules.test.js` photo storage test fixtures so that prepublication uploads run before `seedPhotoCapsule` creates the Firestore document, matching actual production upload-ACK-before-Firestore-batch semantics (ARC-04, DD-16, DD-25).
+- Handled Windows PowerShell script execution policy for `npm` by invoking via `cmd /c npx firebase emulators:exec --project demo-timecapsule "npm test"`.
+
+### My review and understanding
+
+- **What I reviewed:**
+  - I reviewed the updated `firestore.rules`, `storage.rules`, and `tests/capsule.rules.test.js`.
+  - I verified that authenticated users can look up recipient profiles by exact UID without listing the directory.
+  - I verified that unlocking a capsule requires setting `unlockedAt: serverTimestamp()` and `unlocked: true`, and that relocking or altering other metadata is strictly denied.
+  - I verified that photo uploads can be retried before Firestore publication, but become 100% immutable once published.
+- **What I can explain:**
+  - I understand why `recipientDirectory` rules must allow `get: if signedIn()` so senders can verify a recipient's public UID before creating a capsule, while denying `list` to prevent directory harvesting.
+  - I can explain how `request.resource.data.unlockedAt == request.time` in Firestore rules guarantees that unlock timestamps are set atomically by the server clock, preventing client clock manipulation.
+  - I understand how checking `!capsuleExists(capsuleId)` in Storage rules enables prepublication upload retries while enforcing post-publication immutability.
+- **Feedback and next step:**
+  - The implementation passes all 36 security rules emulator tests, readiness preflight, and Android unit tests.
+  - I will update the PR #35 description, keep PR #35 in Draft state, and request independent teammate review from User G or User F before merge.
+
+
