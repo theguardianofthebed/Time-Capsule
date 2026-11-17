@@ -16,8 +16,9 @@ import com.example.timecapsule.ui.ViewModelFactory
 
 /**
  * Fragment implementation for S-01 Sign in screen matching the Stitch UI design.
- * Collects user credentials, handles password visibility toggling, and authenticates
- * via [S01SignInViewModel] while displaying detailed error/loading states.
+ * Collects user credentials, handles password visibility toggling with dynamic accessibility
+ * content descriptions, and authenticates via [S01SignInViewModel] while displaying detailed,
+ * field-specific error and loading states.
  */
 class S01SignInFragment : Fragment() {
 
@@ -46,15 +47,18 @@ class S01SignInFragment : Fragment() {
         val factory = ViewModelFactory(mainActivity.container.accountSessionManager)
         viewModel = ViewModelProvider(this, factory)[S01SignInViewModel::class.java]
 
+        // Initialize password visibility accessibility content description
+        binding.btnTogglePassword.contentDescription = getString(R.string.cd_show_password)
+
         // Password visibility toggle action
         binding.btnTogglePassword.setOnClickListener {
             isPasswordVisible = !isPasswordVisible
             if (isPasswordVisible) {
                 binding.etPassword.transformationMethod = HideReturnsTransformationMethod.getInstance()
-                binding.btnTogglePassword.setImageResource(R.drawable.ic_visibility)
+                binding.btnTogglePassword.contentDescription = getString(R.string.cd_hide_password)
             } else {
                 binding.etPassword.transformationMethod = PasswordTransformationMethod.getInstance()
-                binding.btnTogglePassword.setImageResource(R.drawable.ic_visibility)
+                binding.btnTogglePassword.contentDescription = getString(R.string.cd_show_password)
             }
             binding.etPassword.setSelection(binding.etPassword.text?.length ?: 0)
         }
@@ -76,13 +80,13 @@ class S01SignInFragment : Fragment() {
             }
         }
 
-        // Sign in CTA execution
+        // Sign in CTA execution with field-specific validation
         binding.btnSignIn.setOnClickListener {
             val email = binding.etEmail.text.toString().trim()
             val password = binding.etPassword.text.toString()
 
             if (email.isBlank() || password.isBlank()) {
-                binding.tvStatusMessage.text = getString(R.string.err_session_unavailable)
+                binding.tvStatusMessage.text = getString(R.string.err_email_password_required)
                 return@setOnClickListener
             }
 

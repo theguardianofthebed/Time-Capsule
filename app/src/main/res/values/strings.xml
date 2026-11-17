@@ -36,6 +36,13 @@
     <string name="err_adapter_unavailable">Required service adapters unavailable.</string>
     <string name="err_session_unavailable">Session unauthenticated or service unavailable.</string>
     <string name="err_password_mismatch">Passwords do not match.</string>
+    <string name="err_email_password_required">Please enter both email address and password.</string>
+    <string name="err_required_field">Please fill in all required fields.</string>
+    <string name="err_name_required">Please enter a valid display name.</string>
+
+    <!-- Accessibility content descriptions -->
+    <string name="cd_show_password">Show password</string>
+    <string name="cd_hide_password">Hide password</string>
 
     <!-- S-01 Stitch UI Strings -->
     <string name="s01_brand">timecapsule</string>
@@ -64,7 +71,7 @@
     <string name="s02_btn_submit">Create your account</string>
     <string name="s02_already_have_account">Already have an account?</string>
     <string name="s02_link_sign_in">Sign in</string>
-    <string name="s02_footer_notice">A simulated space for meaningful moments.</string>
+    <string name="s02_footer_notice">A time capsule for your meaningful moments.</string>
 
     <!-- S-08 Stitch UI Strings -->
     <string name="s08_header_title">Your account</string>
@@ -75,11 +82,12 @@
     <string name="s08_permission_title">A little permission</string>
     <string name="s08_permission_subtitle">Reflects Android OS settings</string>
     <string name="s08_perm_location_title">Location</string>
-    <string name="s08_perm_location_desc">For geotagged moments and nearby capsule discovery</string>
+    <string name="s08_perm_location_desc">For verifying location lock conditions when unlocking</string>
     <string name="s08_perm_notifications_title">Notifications</string>
     <string name="s08_perm_notifications_desc">For reminders when a sealed capsule unlocks</string>
     <string name="s08_badge_allowed">Allowed in Android</string>
     <string name="s08_badge_denied">Not granted</string>
+    <string name="s08_badge_not_configured">Not configured</string>
     <string name="s08_link_open_settings">Open system settings →</string>
     <string name="s08_notice_banner">Android OS permissions are managed in system settings — tap \'Open system settings\' to review or adjust device-level grants.</string>
     <string name="s08_btn_create_capsule">Seal a new moment (S-04)</string>

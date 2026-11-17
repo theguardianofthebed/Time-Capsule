@@ -7,13 +7,13 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
@@ -121,7 +121,7 @@ class S08AccountSettingsFragment : Fragment() {
             }
         }
 
-        // Update profile display name handler
+        // Update profile display name handler with field-specific validation
         binding.btnUpdateProfile.setOnClickListener {
             val newName = binding.etDisplayName.text.toString().trim()
             if (activeUid.isNullOrBlank()) {
@@ -129,7 +129,7 @@ class S08AccountSettingsFragment : Fragment() {
                 return@setOnClickListener
             }
             if (newName.isBlank()) {
-                binding.tvStatusMessage.text = getString(R.string.err_session_unavailable)
+                binding.tvStatusMessage.text = getString(R.string.err_name_required)
                 return@setOnClickListener
             }
             viewModel.repairProfile(newName)
@@ -162,6 +162,9 @@ class S08AccountSettingsFragment : Fragment() {
         checkAndroidPermissionsStatus()
     }
 
+    /**
+     * Updates header avatar initial and greeting text formatted with [displayName] and [email].
+     */
     private fun updateHeaderProfileDisplay(displayName: String, email: String) {
         val nameToShow = if (displayName.isNotBlank()) displayName else "User"
         binding.tvGreetingName.text = getString(R.string.s08_greeting, nameToShow)
@@ -176,9 +179,15 @@ class S08AccountSettingsFragment : Fragment() {
         binding.tvAvatarInitial.text = initialChar
     }
 
+    /**
+     * Inspects current Android OS permission and notification status truthfully.
+     * Uses [NotificationManagerCompat.areNotificationsEnabled] for notification grants across API levels,
+     * and displays a neutral non-configured state for location permissions not yet declared in manifest.
+     */
     private fun checkAndroidPermissionsStatus() {
         val context = context ?: return
 
+        // Location permission check
         val locationGranted = ContextCompat.checkSelfPermission(
             context,
             Manifest.permission.ACCESS_FINE_LOCATION
@@ -192,21 +201,15 @@ class S08AccountSettingsFragment : Fragment() {
             binding.tvLocationStatusBadge.setBackgroundResource(R.drawable.bg_badge_success)
             binding.tvLocationStatusBadge.setTextColor(ContextCompat.getColor(context, R.color.capsule_success_text))
         } else {
-            binding.tvLocationStatusBadge.text = getString(R.string.s08_badge_denied)
+            binding.tvLocationStatusBadge.text = getString(R.string.s08_badge_not_configured)
             binding.tvLocationStatusBadge.setBackgroundResource(R.drawable.bg_badge_neutral)
             binding.tvLocationStatusBadge.setTextColor(ContextCompat.getColor(context, R.color.capsule_text_muted))
         }
 
-        val notificationGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.POST_NOTIFICATIONS
-            ) == PackageManager.PERMISSION_GRANTED
-        } else {
-            true
-        }
+        // Notification permission & system settings check across all Android versions
+        val notificationsEnabled = NotificationManagerCompat.from(context).areNotificationsEnabled()
 
-        if (notificationGranted) {
+        if (notificationsEnabled) {
             binding.tvNotificationStatusBadge.text = getString(R.string.s08_badge_allowed)
             binding.tvNotificationStatusBadge.setBackgroundResource(R.drawable.bg_badge_success)
             binding.tvNotificationStatusBadge.setTextColor(ContextCompat.getColor(context, R.color.capsule_success_text))
@@ -217,6 +220,7 @@ class S08AccountSettingsFragment : Fragment() {
         }
     }
 
+    /** Launches system application details settings page for permission management. */
     private fun openSystemAppSettings() {
         val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
             data = Uri.fromParts("package", requireContext().packageName, null)

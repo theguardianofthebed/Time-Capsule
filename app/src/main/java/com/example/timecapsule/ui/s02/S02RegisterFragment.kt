@@ -71,13 +71,18 @@ class S02RegisterFragment : Fragment() {
             binding.layoutSignInLink.visibility = View.VISIBLE
         }
 
+        // Initialize password visibility accessibility content description
+        binding.btnTogglePassword.contentDescription = getString(R.string.cd_show_password)
+
         // Password visibility toggle action
         binding.btnTogglePassword.setOnClickListener {
             isPasswordVisible = !isPasswordVisible
             if (isPasswordVisible) {
                 binding.etPassword.transformationMethod = HideReturnsTransformationMethod.getInstance()
+                binding.btnTogglePassword.contentDescription = getString(R.string.cd_hide_password)
             } else {
                 binding.etPassword.transformationMethod = PasswordTransformationMethod.getInstance()
+                binding.btnTogglePassword.contentDescription = getString(R.string.cd_show_password)
             }
             binding.etPassword.setSelection(binding.etPassword.text?.length ?: 0)
         }
@@ -99,13 +104,13 @@ class S02RegisterFragment : Fragment() {
             }
         }
 
-        // Submit button action (Registration or Profile Repair)
+        // Submit button action (Registration or Profile Repair) with field-specific validation
         binding.btnRegister.setOnClickListener {
             val displayName = binding.etDisplayName.text.toString().trim()
 
             if (isProfileRepairMode) {
                 if (displayName.isBlank()) {
-                    binding.tvStatusMessage.text = getString(R.string.err_session_unavailable)
+                    binding.tvStatusMessage.text = getString(R.string.err_name_required)
                     return@setOnClickListener
                 }
                 binding.btnRegister.isEnabled = false
@@ -117,7 +122,7 @@ class S02RegisterFragment : Fragment() {
                 val confirmPassword = binding.etConfirmPassword.text.toString()
 
                 if (email.isBlank() || password.isBlank() || displayName.isBlank()) {
-                    binding.tvStatusMessage.text = getString(R.string.err_session_unavailable)
+                    binding.tvStatusMessage.text = getString(R.string.err_required_field)
                     return@setOnClickListener
                 }
 

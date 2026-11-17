@@ -97,28 +97,31 @@ Translate the pre-made Stitch UI designs for S-01, S-02, and S-08 into native An
   - `app/src/main/res/layout/fragment_s02_register.xml`: Redesigned S-02 Register layout with circular leaf badge, "YOUR NEXT CHAPTER" eyebrow, "Make room for memories." headline, name/email/password inputs, terracotta CTA button ("Create your account"), "Sign in" link, and profile repair variant mode support.
   - `app/src/main/res/layout/fragment_s08_account_settings.xml`: Redesigned S-08 Account settings layout with "Your account" header, initial avatar + greeting, monospace UID card with copy button, display name update card, Location & Notifications permission status card with badges and system settings link, info banner, "Seal a new moment (S-04)" button, and "Sign out of this session" button.
   - `app/src/main/java/com/example/timecapsule/ui/s01/S01SignInFragment.kt`: Added password visibility toggle and wired email/password authentication observers.
-  - `app/src/main/java/com/example/timecapsule/ui/s02/S02RegisterFragment.kt`: Added `onGoToSignInListener`, password visibility toggle, and adapted profile repair layout visibility.
-  - `app/src/main/java/com/example/timecapsule/ui/s08/S08AccountSettingsFragment.kt`: Added avatar initial calculation, email display, clipboard copy Toast, system permission status checks (`ACCESS_FINE_LOCATION`, `POST_NOTIFICATIONS`), and system settings intent launcher.
+  - `app/src/main/java/com/example/timecapsule/ui/s01/S01SignInFragment.kt`: Added password visibility toggle with dynamic accessibility content descriptions (`cd_show_password` / `cd_hide_password`), field-specific validation error message (`err_email_password_required`), and wired email/password authentication observers.
+  - `app/src/main/java/com/example/timecapsule/ui/s02/S02RegisterFragment.kt`: Added `onGoToSignInListener`, password visibility toggle with dynamic accessibility descriptions, field-specific validation error messages (`err_required_field`, `err_name_required`), adapted profile repair layout visibility, and updated footer text.
+  - `app/src/main/java/com/example/timecapsule/ui/s08/S08AccountSettingsFragment.kt`: Added avatar initial calculation, email display, clipboard copy Toast, field-specific validation error message (`err_name_required`), truthful system permission status checks (`NotificationManagerCompat.areNotificationsEnabled()` for notifications, neutral `Not configured` badge for un-declared location permissions), updated location description, and system settings intent launcher.
   - `app/src/main/java/com/example/timecapsule/MainActivity.kt`: Wired `onGoToSignInListener` for `S02RegisterFragment`.
 - **Checks and results:**
   - `:app:assembleDebug`: PASS (`BUILD SUCCESSFUL`)
   - `:app:testDebugUnitTest`: PASS (69 unit tests passed, 0 failed)
   - `:app:lintDebug`: PASS (0 errors)
-  - Emulator runtime walkthrough: Deployed app to `emulator-5554`, verified S-01, S-02, and S-08 visual alignment with Stitch wireframes, tested error handling, clipboard copy, and navigation flow.
+  - Emulator runtime walkthrough: Deployed app to `emulator-5554`, verified S-01, S-02, and S-08 visual alignment with Stitch wireframes, tested field-specific validation errors, password show/hide content descriptions, clipboard copy, and navigation flow.
 
 ### Errors and manual fixes
 
 - Adjusted button background tinting (`app:backgroundTint="@null"`) so Material 3 theme does not override custom terracotta background drawables.
-- Fixed string formatting warning by using `%1$s` placeholder in `strings.xml`.
+- Replaced generic `err_session_unavailable` on blank field inputs with field-specific validation messages (`err_email_password_required`, `err_required_field`, `err_name_required`).
+- Fixed Android notification permission check on API <33 by using `NotificationManagerCompat.from(context).areNotificationsEnabled()`.
+- Updated touch targets to 48×48dp minimum for password show/hide buttons, UID copy button, and navigation text links.
 
 ### My review and understanding
 
 - **What I reviewed:**
   - I reviewed the implemented S-01, S-02, and S-08 screens on the Android emulator and compared them with the Stitch wireframes in `TimeCapsule Android UI Design`.
-  - I verified that sign-in, registration, profile repair, UID display/copy, profile display name editing, sign-out, and navigation between screens work properly.
+  - I verified that sign-in, registration, profile repair, UID display/copy, profile display name editing, sign-out, and navigation between screens work properly with field-specific validation errors and 48dp accessibility touch targets.
 - **What I can explain:**
   - I understand how native Views XML layouts with custom shape drawables and `app:backgroundTint="@null"` achieve Material 3 design system alignment without introducing Compose or third-party UI libraries.
-  - I can explain how `S08AccountSettingsFragment` inspects system permissions using `ContextCompat.checkSelfPermission` for `ACCESS_FINE_LOCATION` and `POST_NOTIFICATIONS` and opens `Settings.ACTION_APPLICATION_DETAILS_SETTINGS`.
+  - I can explain how `S08AccountSettingsFragment` inspects system permissions using `NotificationManagerCompat.areNotificationsEnabled()` across Android versions and opens `Settings.ACTION_APPLICATION_DETAILS_SETTINGS`.
   - I understand how `S02RegisterFragment` adapts its layout for missing-profile repair mode by hiding credentials fields while reusing the same `AccountSessionManager` workflow.
 - **Feedback and next step:**
   - The changes pass build, 69 unit tests, lint, and emulator walkthrough.
