@@ -15,6 +15,7 @@ import android.view.ViewGroup
 import android.widget.Toast
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.core.widget.doOnTextChanged
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
 import com.example.timecapsule.MainActivity
@@ -35,6 +36,7 @@ class S08AccountSettingsFragment : Fragment() {
     private val binding get() = _binding!!
 
     private lateinit var viewModel: S08AccountSettingsViewModel
+    private var isUserEditingName = false
 
     var onSignOutSuccessListener: (() -> Unit)? = null
     var onCreateCapsuleListener: (() -> Unit)? = null
@@ -67,16 +69,26 @@ class S08AccountSettingsFragment : Fragment() {
         updateHeaderProfileDisplay(activeName, activeEmail)
         checkAndroidPermissionsStatus()
 
+        // Track user edits on display name field to prevent race condition on late profile checks
+        binding.etDisplayName.doOnTextChanged { _, _, _, _ ->
+            if (binding.etDisplayName.hasFocus()) {
+                isUserEditingName = true
+            }
+        }
+
         if (!activeUid.isNullOrBlank()) {
             viewModel.checkProfile(activeUid)
         }
 
+        // Profile check observer: updates header and populates field if user is not actively editing
         viewModel.profileCheckState.observe(viewLifecycleOwner) { result ->
             when (result) {
                 is OperationResult.Success -> {
                     val name = result.data.displayName
                     if (name.isNotBlank()) {
-                        binding.etDisplayName.setText(name)
+                        if (!isUserEditingName && !binding.etDisplayName.hasFocus()) {
+                            binding.etDisplayName.setText(name)
+                        }
                         updateHeaderProfileDisplay(name, activeEmail)
                     }
                 }
@@ -94,12 +106,18 @@ class S08AccountSettingsFragment : Fragment() {
             }
         }
 
+        // Profile update observer: re-enables button and updates header using confirmed submitted name
         viewModel.updateState.observe(viewLifecycleOwner) { result ->
+            if (result != null) {
+                binding.btnUpdateProfile.isEnabled = true
+            }
             when (result) {
                 is OperationResult.Success -> {
                     binding.tvStatusMessage.text = getString(R.string.msg_profile_updated)
-                    val updatedName = binding.etDisplayName.text.toString().trim()
-                    updateHeaderProfileDisplay(updatedName, activeEmail)
+                    val savedName = viewModel.lastSubmittedName ?: binding.etDisplayName.text.toString().trim()
+                    updateHeaderProfileDisplay(savedName, activeEmail)
+                    isUserEditingName = false
+                    binding.etDisplayName.clearFocus()
                     viewModel.clearState()
                 }
                 is OperationResult.Invalid -> binding.tvStatusMessage.text = result.message
@@ -121,7 +139,7 @@ class S08AccountSettingsFragment : Fragment() {
             }
         }
 
-        // Update profile display name handler with field-specific validation
+        // Update profile display name handler with field-specific validation and duplicate submission prevention
         binding.btnUpdateProfile.setOnClickListener {
             val newName = binding.etDisplayName.text.toString().trim()
             if (activeUid.isNullOrBlank()) {
@@ -132,6 +150,7 @@ class S08AccountSettingsFragment : Fragment() {
                 binding.tvStatusMessage.text = getString(R.string.err_name_required)
                 return@setOnClickListener
             }
+            binding.btnUpdateProfile.isEnabled = false
             viewModel.repairProfile(newName)
         }
 
