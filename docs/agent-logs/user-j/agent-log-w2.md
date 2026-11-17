@@ -66,3 +66,66 @@ Needed assistance in translating the pre-made Stitch UI designs (`TimeCapsule An
   - The implementation passes all 69 unit tests, debug build, and lint checks.
   - I will perform the complete manual testing walkthrough using the step-by-step checklist before requesting teammate PR review and human merge.
 
+## Task: Issue #37 S-01, S-02, and S-08 UI Design Correction (Stitch Integration)
+
+- **Task and purpose:** Implemented GitHub Issue #37 to correct the UI of S-01 (Sign In), S-02 (Register & Profile Repair), and S-08 (Account & Settings) to match the connected Stitch wireframes (`TimeCapsule Android UI Design`, project ID `15276828764661611137`) using Kotlin + native Android Views/XML + ViewBinding while preserving account authentication, profile creation/repair, UID display/copy, logout, and session state.
+- **Session date(s):** 13 November 2026.
+- **Issue and PR:** Issue #37 (https://github.com/theguardianofthebed/Time-Capsule/issues/37); implementation branch `feature/37-ui-design-correction`.
+- **Requirement/design references:** FR-01, FR-10; ARC-01, ARC-06; DD-01, DD-03, DD-07, DD-19, DD-24, DD-26; AC-01, AC-10.
+- **Agent environment:** Android Studio Agent Mode.
+- **Model used:** Gemini Flash 3.6 (Android Studio Agent Mode).
+
+**Goal**
+
+Translate the pre-made Stitch UI designs for S-01, S-02, and S-08 into native Android Views XML + ViewBinding with high visual fidelity, matching the color palette (`#865B4B` terracotta, `#FAF9F5` warm cream, `#FFFDF9` card surface, `#E8E3DA` border), typography, vector iconography, rounded input fields, hero illustrations, permission status badges, and buttons, while preserving all existing account authentication, registration, missing-profile repair variant, UID copy, profile updates, and sign-out capabilities.
+
+**Requests and prompts**
+
+| # | Request summary | Actual prompt (key part) | Why it worked (or didn't) |
+|---|-----------------|--------------------------|---------------------------|
+| 1 | Stitch Wireframe Download & Comparison | Download S-01, S-02, and S-08 HTML files from Stitch project `TimeCapsule Android UI Design` (`15276828764661611137`) and compare against existing layouts. | Successfully downloaded Stitch HTML specifications, extracted colors, typography, shapes, and iconography. |
+| 2 | UI Implementation & Fragment Wiring | Implement S-01, S-02, and S-08 XML layouts, drawables, strings, colors, and Fragment bindings with password visibility toggle, UID copy, system permission checks, and navigation listeners. | Successfully created all XML layouts, drawables, strings, colors, updated Fragments and `MainActivity.kt`, and passed 69 unit tests and lint. |
+| 3 | Emulator Deployment & Verification | Deploy debug build to emulator, verify rendering of all 3 screens, test password visibility toggle, error handling, clipboard copy, and navigation. | Successfully deployed to emulator, inspected `ui_state`, captured screenshots, verified S-01, S-02, and S-08 visual alignment with Stitch. |
+
+### What the agent changed and verified
+
+- **Changes:**
+  - `app/src/main/res/values/colors.xml`: Added Stitch design system color tokens (`capsule_bg`, `capsule_card_surface`, `capsule_border`, `capsule_primary` `#865B4B`, `capsule_badge_bg`, `capsule_banner_bg`, `capsule_avatar_bg`, etc.).
+  - `app/src/main/res/values/strings.xml`: Added string resources for S-01, S-02, and S-08 headers, titles, hints, subtexts, badges, toasts, and greetings.
+  - `app/src/main/res/drawable/`: Created shape drawables (`bg_card_surface.xml`, `bg_button_primary.xml`, `bg_button_outlined.xml`, `bg_badge_success.xml`, `bg_badge_neutral.xml`, `bg_banner_info.xml`, `bg_circle_badge.xml`, `bg_circle_avatar.xml`) and vector icons (`ic_capsule_logo`, `ic_hero_envelope`, `ic_mail`, `ic_lock`, `ic_visibility`, `ic_arrow_right`, `ic_leaf`, `ic_copy`, `ic_location`, `ic_bell`, `ic_logout`, `ic_edit`, `ic_info`).
+  - `app/src/main/res/layout/fragment_s01_sign_in.xml`: Redesigned S-01 Sign in layout with brand header, handcrafted envelope illustration, "Hello, again." headline, outlined mail/lock inputs, password visibility toggle button, terracotta CTA button ("Come on in"), and "Create an account" link.
+  - `app/src/main/res/layout/fragment_s02_register.xml`: Redesigned S-02 Register layout with circular leaf badge, "YOUR NEXT CHAPTER" eyebrow, "Make room for memories." headline, name/email/password inputs, terracotta CTA button ("Create your account"), "Sign in" link, and profile repair variant mode support.
+  - `app/src/main/res/layout/fragment_s08_account_settings.xml`: Redesigned S-08 Account settings layout with "Your account" header, initial avatar + greeting, monospace UID card with copy button, display name update card, Location & Notifications permission status card with badges and system settings link, info banner, "Seal a new moment (S-04)" button, and "Sign out of this session" button.
+  - `app/src/main/java/com/example/timecapsule/ui/s01/S01SignInFragment.kt`: Added password visibility toggle and wired email/password authentication observers.
+  - `app/src/main/java/com/example/timecapsule/ui/s01/S01SignInFragment.kt`: Added password visibility toggle with dynamic accessibility content descriptions (`cd_show_password` / `cd_hide_password`), field-specific validation error message (`err_email_password_required`), and wired email/password authentication observers.
+  - `app/src/main/java/com/example/timecapsule/ui/s02/S02RegisterFragment.kt`: Added `onGoToSignInListener`, password visibility toggle with dynamic accessibility descriptions, field-specific validation error messages (`err_required_field`, `err_name_required`), adapted profile repair layout visibility, and updated footer text.
+  - `app/src/main/java/com/example/timecapsule/ui/s08/S08AccountSettingsViewModel.kt` & `S08AccountSettingsFragment.kt`: Resolved profile-editing race conditions by guarding `checkProfile()` callback when `etDisplayName` has focus or active user edits, invalidating delayed profile lookups via `activeProfileCheckToken` when a newer update starts, tracking `lastSubmittedName` to update header display with confirmed submitted text on update success, and disabling `btnUpdateProfile` while update operations are in flight.
+  - `app/src/test/java/com/example/timecapsule/ui/s08/S08AccountSettingsViewModelTest.kt`: Added 7 unit tests covering profile check, profile repair, duplicate submission prevention, delayed lookup invalidation, submitted name retention, state clearing, and sign-out.
+  - `app/src/main/java/com/example/timecapsule/MainActivity.kt`: Wired `onGoToSignInListener` for `S02RegisterFragment`.
+- **Checks and results:**
+  - `:app:assembleDebug`: PASS (`BUILD SUCCESSFUL`)
+  - `:app:testDebugUnitTest`: PASS (76 unit tests passed across project, 0 failed)
+  - `:app:lintDebug`: PASS (0 errors)
+  - Emulator runtime walkthrough: Deployed app to `emulator-5554`, verified S-01, S-02, and S-08 visual alignment with Stitch wireframes, tested field-specific validation errors, password show/hide content descriptions, clipboard copy, navigation flow, and profile update race prevention.
+
+### Errors and manual fixes
+
+- Adjusted button background tinting (`app:backgroundTint="@null"`) so Material 3 theme does not override custom terracotta background drawables.
+- Replaced generic `err_session_unavailable` on blank field inputs with field-specific validation messages (`err_email_password_required`, `err_required_field`, `err_name_required`).
+- Fixed Android notification permission check on API <33 by using `NotificationManagerCompat.from(context).areNotificationsEnabled()`.
+- Updated touch targets to 48×48dp minimum for password show/hide buttons, UID copy button, and navigation text links.
+- Fixed S-08 profile-editing race condition by tracking submitted name, invalidating delayed in-flight profile checks (`activeProfileCheckToken`), and preventing late profile checks from overwriting in-progress user input.
+
+### My review and understanding
+
+- **What I reviewed:**
+  - I reviewed the implemented S-01, S-02, and S-08 screens on the Android emulator and compared them with the Stitch wireframes in `TimeCapsule Android UI Design`.
+  - I verified that sign-in, registration, profile repair, UID display/copy, profile display name editing, sign-out, and navigation between screens work properly with field-specific validation errors and 48dp accessibility touch targets.
+- **What I can explain:**
+  - I understand how native Views XML layouts with custom shape drawables and `app:backgroundTint="@null"` achieve Material 3 design system alignment without introducing Compose or third-party UI libraries.
+  - I can explain how `S08AccountSettingsFragment` inspects system permissions using `NotificationManagerCompat.areNotificationsEnabled()` across Android versions and opens `Settings.ACTION_APPLICATION_DETAILS_SETTINGS`.
+  - I understand how `S02RegisterFragment` adapts its layout for missing-profile repair mode by hiding credentials fields while reusing the same `AccountSessionManager` workflow.
+- **Feedback and next step:**
+  - The changes pass build, 76 unit tests, lint, and emulator walkthrough.
+  - I will submit the PR for teammate review by User G.
+

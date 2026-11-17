@@ -36,6 +36,63 @@
     <string name="err_adapter_unavailable">Required service adapters unavailable.</string>
     <string name="err_session_unavailable">Session unauthenticated or service unavailable.</string>
     <string name="err_password_mismatch">Passwords do not match.</string>
+    <string name="err_email_password_required">Please enter both email address and password.</string>
+    <string name="err_required_field">Please fill in all required fields.</string>
+    <string name="err_name_required">Please enter a valid display name.</string>
+
+    <!-- Accessibility content descriptions -->
+    <string name="cd_show_password">Show password</string>
+    <string name="cd_hide_password">Hide password</string>
+
+    <!-- S-01 Stitch UI Strings -->
+    <string name="s01_brand">timecapsule</string>
+    <string name="s01_tagline">A MOMENT, KEPT.</string>
+    <string name="s01_headline">Hello, again.</string>
+    <string name="s01_subtitle">A little today, saved for tomorrow.</string>
+    <string name="s01_label_email">Email address</string>
+    <string name="s01_label_password">Password</string>
+    <string name="s01_hint_password">Your secret, kept safe</string>
+    <string name="s01_btn_submit">Come on in</string>
+    <string name="s01_new_here">New around here?</string>
+    <string name="s01_link_create_account">Create an account</string>
+
+    <!-- S-02 Stitch UI Strings -->
+    <string name="s02_eyebrow">YOUR NEXT CHAPTER</string>
+    <string name="s02_headline">Make room for memories.</string>
+    <string name="s02_subtitle">Let’s start with a little about you.</string>
+    <string name="s02_headline_repair">Complete your profile</string>
+    <string name="s02_subtitle_repair">Set your display name to start sending and receiving moments.</string>
+    <string name="s02_label_name">Your name</string>
+    <string name="s02_hint_name">What should we call you?</string>
+    <string name="s02_label_email">Email address</string>
+    <string name="s02_label_password">Password</string>
+    <string name="s02_label_confirm_password">Confirm password</string>
+    <string name="s02_hint_confirm_password">One more time</string>
+    <string name="s02_btn_submit">Create your account</string>
+    <string name="s02_already_have_account">Already have an account?</string>
+    <string name="s02_link_sign_in">Sign in</string>
+    <string name="s02_footer_notice">A time capsule for your meaningful moments.</string>
+
+    <!-- S-08 Stitch UI Strings -->
+    <string name="s08_header_title">Your account</string>
+    <string name="s08_greeting">Hello, %1$s.</string>
+    <string name="s08_btn_edit_name">Edit name</string>
+    <string name="s08_eyebrow_uid">YOUR ACCOUNT UID</string>
+    <string name="s08_uid_subtext">A little address for your moments. Share it with a friend.</string>
+    <string name="s08_permission_title">A little permission</string>
+    <string name="s08_permission_subtitle">Reflects Android OS settings</string>
+    <string name="s08_perm_location_title">Location</string>
+    <string name="s08_perm_location_desc">For verifying location lock conditions when unlocking</string>
+    <string name="s08_perm_notifications_title">Notifications</string>
+    <string name="s08_perm_notifications_desc">For reminders when a sealed capsule unlocks</string>
+    <string name="s08_badge_allowed">Allowed in Android</string>
+    <string name="s08_badge_denied">Not granted</string>
+    <string name="s08_badge_not_configured">Not configured</string>
+    <string name="s08_link_open_settings">Open system settings →</string>
+    <string name="s08_notice_banner">Android OS permissions are managed in system settings — tap \'Open system settings\' to review or adjust device-level grants.</string>
+    <string name="s08_btn_create_capsule">Seal a new moment (S-04)</string>
+    <string name="s08_btn_sign_out">Sign out of this session</string>
+    <string name="s08_copied_toast">Auth UID copied to clipboard</string>
 
     <!-- S-04 strings -->
     <string name="s04_header_title">Seal your moment</string>

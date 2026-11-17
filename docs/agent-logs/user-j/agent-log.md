@@ -6,6 +6,42 @@ Weekly coursework remains in `agent-log-w1.md`–`agent-log-w4.md`.
 
 ## Entries
 
+## 2026-11-13-issue37-ui-design-correction — S-01, S-02, S-08 Stitch UI design correction & review fixes
+
+- **Owner:** User J, explicitly confirmed as implementation owner for Issue #37. Reviewer: User G.
+- **Environment/model:** Android Studio Agent Mode (Gemini Flash 3.8).
+- **Status:** Implemented, verified with unit tests and Android Lint, verified on emulator, branch pushed, PR #38 updated.
+- **Requested outcome:** Correct S-01 (Sign In), S-02 (Register), and S-08 (Account/Profile) screen layouts and styling to match connected Stitch wireframes ("TimeCapsule Android UI Design", project ID `15276828764661611137`) using Kotlin + native Android Views/XML + ViewBinding, while preserving working account authentication/profile creation/repair, UID display/copy, logout, and session functionality. Apply code review corrections for input validation messages, accessibility touch targets, Show/Hide content descriptions, and truthful OS permissions status.
+- **References:** [Issue #37](https://github.com/theguardianofthebed/Time-Capsule/issues/37); [PR #38](https://github.com/theguardianofthebed/Time-Capsule/pull/38); FR-01, FR-10; ARC-01, ARC-06; DD-01, DD-03, DD-07, DD-19, DD-24, DD-26; AC-01, AC-10.
+
+### Work performed
+
+- **Stitch Wireframe Inspection:** Retrieved and analyzed authoritative HTML/CSS wireframes for S-01, S-02, and S-08 from connected Stitch project `TimeCapsule Android UI Design`.
+- **UI & Layout Corrections:**
+  - Defined Stitch design tokens in `res/values/colors.xml` (`capsule_bg`, `capsule_card_surface`, `capsule_border`, `capsule_text_dark`, `capsule_primary` `#865B4B`, `capsule_badge_bg`, etc.) and string resources in `res/values/strings.xml`.
+  - Created vector assets (`ic_capsule_logo`, `ic_hero_envelope`, `ic_mail`, `ic_lock`, `ic_visibility`, `ic_arrow_right`, `ic_leaf`, `ic_copy`, `ic_location`, `ic_bell`, `ic_logout`, `ic_edit`, `ic_info`) and shape drawables (`bg_card_surface`, `bg_button_primary`, `bg_button_outlined`, `bg_badge_success`, `bg_badge_neutral`, `bg_banner_info`, `bg_circle_badge`, `bg_circle_avatar`).
+  - Redesigned `fragment_s01_sign_in.xml` with top brand header (`timecapsule` + `A MOMENT, KEPT.`), handcrafted envelope illustration, "Hello, again." headline, outlined inputs with mail/lock icons, 48×48dp password visibility toggle button, terracotta CTA button ("Come on in"), and "New around here? Create an account" link.
+  - Redesigned `fragment_s02_register.xml` with circular leaf badge, "YOUR NEXT CHAPTER" eyebrow, "Make room for memories." headline, name/email/password/confirm password inputs, terracotta CTA button ("Create your account"), "Already have an account? Sign in" link, and profile repair mode handling (hides email/passwords and adapts titles when repairing an incomplete profile). Updated footer to "A time capsule for your meaningful moments."
+  - Redesigned `fragment_s08_account_settings.xml` with "Your account" header, initial avatar + greeting ("Hello, [DisplayName]."), UID card with monospace UID and 48×48dp one-tap clipboard copy button, display name update card, "A little permission" section with Location & Notifications system permission status badges + "Open system settings →" link, info banner, "Seal a new moment (S-04)" navigation button, and "Sign out of this session" button. Updated location description to "For verifying location lock conditions when unlocking".
+- **Fragment Wiring & Pre-Merge Fixes:**
+  - `S01SignInFragment.kt`: Added password visibility toggle with dynamic accessibility content descriptions (`cd_show_password` / `cd_hide_password`), field-specific validation error message (`err_email_password_required`), and wired `btnGoToRegister` / `btnSignIn`.
+  - `S02RegisterFragment.kt`: Added `onGoToSignInListener`, password visibility toggle with dynamic accessibility descriptions, field-specific validation error messages (`err_required_field`, `err_name_required`), and adapted profile repair layout visibility.
+  - `S08AccountSettingsViewModel.kt` & `S08AccountSettingsFragment.kt`: Resolved profile-editing race conditions by guarding `checkProfile()` callback when `etDisplayName` has focus or active user edits, tracking `lastSubmittedName` to update header display with confirmed submitted text on update success, and disabling `btnUpdateProfile` while update operations are in flight.
+  - `S08AccountSettingsViewModel.kt` & `S08AccountSettingsFragment.kt`: Resolved profile-editing race conditions by guarding `checkProfile()` callback when `etDisplayName` has focus or active user edits, invalidating delayed profile lookups via `activeProfileCheckToken` when a newer update starts, tracking `lastSubmittedName` to update header display with confirmed submitted text on update success, and disabling `btnUpdateProfile` while update operations are in flight.
+  - `S08AccountSettingsViewModelTest.kt`: Added 7 unit tests covering profile check, profile repair, duplicate submission prevention, delayed profile lookup invalidation, submitted name retention, state clearing, and sign-out.
+  - `MainActivity.kt`: Wired `onGoToSignInListener` on `S02RegisterFragment`.
+
+### Checks and verification
+
+- `:app:assembleDebug`: PASS (`BUILD SUCCESSFUL`)
+- `:app:testDebugUnitTest`: PASS (76 unit tests passed across project, 0 failed)
+- `:app:lintDebug`: PASS (0 errors)
+- Emulator runtime verification: Deployed app to `emulator-5554`, captured screenshots, verified S-01, S-02, and S-08 rendering against Stitch wireframes, verified navigation flow (S-01 ↔ S-02, S-08 ↔ S-04/S-01), verified Auth error messages, field-specific validation, password show/hide content descriptions, UID copy to clipboard, system settings intent launch, and profile update race prevention.
+
+### Human input and remaining work
+
+User J confirmed task ownership and manual testing. Personal reflections, teammate PR review by User G, and human merge into `main` remain for the students to complete.
+
 ## 2026-11-10-governance — Readiness, ownership, and resumable work
 
 - **Owner:** User J, explicitly selected by the requester for this coordination task.
