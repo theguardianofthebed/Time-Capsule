@@ -99,12 +99,12 @@ Translate the pre-made Stitch UI designs for S-01, S-02, and S-08 into native An
   - `app/src/main/java/com/example/timecapsule/ui/s01/S01SignInFragment.kt`: Added password visibility toggle and wired email/password authentication observers.
   - `app/src/main/java/com/example/timecapsule/ui/s01/S01SignInFragment.kt`: Added password visibility toggle with dynamic accessibility content descriptions (`cd_show_password` / `cd_hide_password`), field-specific validation error message (`err_email_password_required`), and wired email/password authentication observers.
   - `app/src/main/java/com/example/timecapsule/ui/s02/S02RegisterFragment.kt`: Added `onGoToSignInListener`, password visibility toggle with dynamic accessibility descriptions, field-specific validation error messages (`err_required_field`, `err_name_required`), adapted profile repair layout visibility, and updated footer text.
-  - `app/src/main/java/com/example/timecapsule/ui/s08/S08AccountSettingsViewModel.kt` & `S08AccountSettingsFragment.kt`: Resolved profile-editing race conditions by guarding `checkProfile()` callback when `etDisplayName` has focus or active user edits, tracking `lastSubmittedName` to update header display with confirmed submitted text on update success, and disabling `btnUpdateProfile` while update operations are in flight.
-  - `app/src/test/java/com/example/timecapsule/ui/s08/S08AccountSettingsViewModelTest.kt`: Added 5 unit tests covering profile check, profile repair, duplicate submission prevention, state clearing, and sign-out.
+  - `app/src/main/java/com/example/timecapsule/ui/s08/S08AccountSettingsViewModel.kt` & `S08AccountSettingsFragment.kt`: Resolved profile-editing race conditions by guarding `checkProfile()` callback when `etDisplayName` has focus or active user edits, invalidating delayed profile lookups via `activeProfileCheckToken` when a newer update starts, tracking `lastSubmittedName` to update header display with confirmed submitted text on update success, and disabling `btnUpdateProfile` while update operations are in flight.
+  - `app/src/test/java/com/example/timecapsule/ui/s08/S08AccountSettingsViewModelTest.kt`: Added 7 unit tests covering profile check, profile repair, duplicate submission prevention, delayed lookup invalidation, submitted name retention, state clearing, and sign-out.
   - `app/src/main/java/com/example/timecapsule/MainActivity.kt`: Wired `onGoToSignInListener` for `S02RegisterFragment`.
 - **Checks and results:**
   - `:app:assembleDebug`: PASS (`BUILD SUCCESSFUL`)
-  - `:app:testDebugUnitTest`: PASS (74 unit tests passed across project, 0 failed)
+  - `:app:testDebugUnitTest`: PASS (76 unit tests passed across project, 0 failed)
   - `:app:lintDebug`: PASS (0 errors)
   - Emulator runtime walkthrough: Deployed app to `emulator-5554`, verified S-01, S-02, and S-08 visual alignment with Stitch wireframes, tested field-specific validation errors, password show/hide content descriptions, clipboard copy, navigation flow, and profile update race prevention.
 
@@ -114,7 +114,7 @@ Translate the pre-made Stitch UI designs for S-01, S-02, and S-08 into native An
 - Replaced generic `err_session_unavailable` on blank field inputs with field-specific validation messages (`err_email_password_required`, `err_required_field`, `err_name_required`).
 - Fixed Android notification permission check on API <33 by using `NotificationManagerCompat.from(context).areNotificationsEnabled()`.
 - Updated touch targets to 48×48dp minimum for password show/hide buttons, UID copy button, and navigation text links.
-- Fixed S-08 profile-editing race condition by tracking submitted name and preventing late profile checks from overwriting in-progress user input.
+- Fixed S-08 profile-editing race condition by tracking submitted name, invalidating delayed in-flight profile checks (`activeProfileCheckToken`), and preventing late profile checks from overwriting in-progress user input.
 
 ### My review and understanding
 
@@ -126,6 +126,6 @@ Translate the pre-made Stitch UI designs for S-01, S-02, and S-08 into native An
   - I can explain how `S08AccountSettingsFragment` inspects system permissions using `NotificationManagerCompat.areNotificationsEnabled()` across Android versions and opens `Settings.ACTION_APPLICATION_DETAILS_SETTINGS`.
   - I understand how `S02RegisterFragment` adapts its layout for missing-profile repair mode by hiding credentials fields while reusing the same `AccountSessionManager` workflow.
 - **Feedback and next step:**
-  - The changes pass build, 74 unit tests, lint, and emulator walkthrough.
+  - The changes pass build, 76 unit tests, lint, and emulator walkthrough.
   - I will submit the PR for teammate review by User G.
 

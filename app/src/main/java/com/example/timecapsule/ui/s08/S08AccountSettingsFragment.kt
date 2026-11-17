@@ -89,7 +89,9 @@ class S08AccountSettingsFragment : Fragment() {
                         if (!isUserEditingName && !binding.etDisplayName.hasFocus()) {
                             binding.etDisplayName.setText(name)
                         }
-                        updateHeaderProfileDisplay(name, activeEmail)
+                        if (viewModel.lastSubmittedName == null) {
+                            updateHeaderProfileDisplay(name, activeEmail)
+                        }
                     }
                 }
                 is OperationResult.Invalid -> {
@@ -116,7 +118,9 @@ class S08AccountSettingsFragment : Fragment() {
                     binding.tvStatusMessage.text = getString(R.string.msg_profile_updated)
                     val savedName = viewModel.lastSubmittedName ?: binding.etDisplayName.text.toString().trim()
                     updateHeaderProfileDisplay(savedName, activeEmail)
-                    isUserEditingName = false
+                    if (!isUserEditingName) {
+                        binding.etDisplayName.setText(savedName)
+                    }
                     binding.etDisplayName.clearFocus()
                     viewModel.clearState()
                 }
@@ -150,6 +154,7 @@ class S08AccountSettingsFragment : Fragment() {
                 binding.tvStatusMessage.text = getString(R.string.err_name_required)
                 return@setOnClickListener
             }
+            isUserEditingName = false
             binding.btnUpdateProfile.isEnabled = false
             viewModel.repairProfile(newName)
         }

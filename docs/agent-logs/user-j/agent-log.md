@@ -27,13 +27,14 @@ Weekly coursework remains in `agent-log-w1.md`–`agent-log-w4.md`.
   - `S01SignInFragment.kt`: Added password visibility toggle with dynamic accessibility content descriptions (`cd_show_password` / `cd_hide_password`), field-specific validation error message (`err_email_password_required`), and wired `btnGoToRegister` / `btnSignIn`.
   - `S02RegisterFragment.kt`: Added `onGoToSignInListener`, password visibility toggle with dynamic accessibility descriptions, field-specific validation error messages (`err_required_field`, `err_name_required`), and adapted profile repair layout visibility.
   - `S08AccountSettingsViewModel.kt` & `S08AccountSettingsFragment.kt`: Resolved profile-editing race conditions by guarding `checkProfile()` callback when `etDisplayName` has focus or active user edits, tracking `lastSubmittedName` to update header display with confirmed submitted text on update success, and disabling `btnUpdateProfile` while update operations are in flight.
-  - `S08AccountSettingsViewModelTest.kt`: Added 5 unit tests covering profile check, profile repair, duplicate submission prevention, state clearing, and sign-out.
+  - `S08AccountSettingsViewModel.kt` & `S08AccountSettingsFragment.kt`: Resolved profile-editing race conditions by guarding `checkProfile()` callback when `etDisplayName` has focus or active user edits, invalidating delayed profile lookups via `activeProfileCheckToken` when a newer update starts, tracking `lastSubmittedName` to update header display with confirmed submitted text on update success, and disabling `btnUpdateProfile` while update operations are in flight.
+  - `S08AccountSettingsViewModelTest.kt`: Added 7 unit tests covering profile check, profile repair, duplicate submission prevention, delayed profile lookup invalidation, submitted name retention, state clearing, and sign-out.
   - `MainActivity.kt`: Wired `onGoToSignInListener` on `S02RegisterFragment`.
 
 ### Checks and verification
 
 - `:app:assembleDebug`: PASS (`BUILD SUCCESSFUL`)
-- `:app:testDebugUnitTest`: PASS (74 unit tests passed across project, 0 failed)
+- `:app:testDebugUnitTest`: PASS (76 unit tests passed across project, 0 failed)
 - `:app:lintDebug`: PASS (0 errors)
 - Emulator runtime verification: Deployed app to `emulator-5554`, captured screenshots, verified S-01, S-02, and S-08 rendering against Stitch wireframes, verified navigation flow (S-01 ↔ S-02, S-08 ↔ S-04/S-01), verified Auth error messages, field-specific validation, password show/hide content descriptions, UID copy to clipboard, system settings intent launch, and profile update race prevention.
 

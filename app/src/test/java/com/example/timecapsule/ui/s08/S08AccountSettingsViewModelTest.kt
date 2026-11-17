@@ -9,6 +9,7 @@ import com.example.timecapsule.data.session.DefaultSessionTracker
 import com.example.timecapsule.domain.model.RecipientProfile
 import com.example.timecapsule.domain.result.OperationResult
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.runBlocking
@@ -56,12 +57,14 @@ private class FakeAuthAdapterForS08 : AuthAdapter {
 }
 
 private class FakeFirestoreAdapterForS08 : FirestoreAdapter {
-    var profileToReturn: RecipientProfile? = RecipientProfile("test-uid-123", "Remote Profile Name")
+    var profileToReturn: RecipientProfile? = RecipientProfile("test-uid-123", "Remote Old Profile Name")
+    var getProfileDeferred: CompletableDeferred<Unit>? = null
 
     override fun isAvailable(): Boolean = true
     override fun firestoreInstance(): FirebaseFirestore? = null
 
     override suspend fun getRecipientProfile(uid: String): OperationResult<RecipientProfile> {
+        getProfileDeferred?.await()
         val profile = profileToReturn
         return if (profile != null && profile.uid == uid) {
             OperationResult.Success(profile)
@@ -116,7 +119,7 @@ class S08AccountSettingsViewModelTest {
 
         val state = viewModel.profileCheckState.value
         assertTrue(state is OperationResult.Success)
-        assertEquals("Remote Profile Name", (state as OperationResult.Success).data.displayName)
+        assertEquals("Remote Old Profile Name", (state as OperationResult.Success).data.displayName)
     }
 
     @Test
@@ -140,6 +143,42 @@ class S08AccountSettingsViewModelTest {
 
         assertEquals("First Name", viewModel.lastSubmittedName)
         assertEquals(1, authAdapter.updateCount)
+    }
+
+    @Test
+    fun delayedCheckProfileCompletingAfterNewerUpdateIsIgnored() = runBlockingTest {
+        val deferred = CompletableDeferred<Unit>()
+        firestoreAdapter.getProfileDeferred = deferred
+
+        // Launch delayed checkProfile (token 1)
+        viewModel.checkProfile("test-uid-123")
+
+        // Perform a newer profile update (token 2)
+        viewModel.repairProfile("Newer Updated Name")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Verify update completed successfully
+        assertEquals("Newer Updated Name", viewModel.lastSubmittedName)
+
+        // Now resume the old delayed checkProfile (token 1)
+        deferred.complete(Unit)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // The stale checkProfile result must NOT overwrite profileCheckState
+        assertNull(viewModel.profileCheckState.value)
+    }
+
+    @Test
+    fun repairProfilePreservesLastSubmittedNameIndependentlyOfViewTextChanges() = runBlockingTest {
+        viewModel.repairProfile("Name Saved To Cloud")
+
+        assertEquals("Name Saved To Cloud", viewModel.lastSubmittedName)
+
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val updateResult = viewModel.updateState.value
+        assertTrue(updateResult is OperationResult.Success)
+        assertEquals("Name Saved To Cloud", viewModel.lastSubmittedName)
     }
 
     @Test
