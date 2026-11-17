@@ -193,3 +193,32 @@ Automatic approval review rejected uploading the full private Atlas r55 snapshot
 - **Deliverable:** [Issue #11 correction handoff](../../agent-tools/handoffs/issue-11-user-j-takeover-20261117.md), with bounded fixes, test matrix, known head/base SHAs, and explicit NOT RUN evidence.
 - **Verification and blockers:** PR head was 6 commits behind `main` at inspection. The Issue #11 eight-gate readiness manifest/validator has not been executed and is BLOCKED until verified in the approved project coding environment. This task performed no Android Studio coding, Firebase emulator run, build, source edits, merge, deployment or full AC-12 acceptance. No independent human review is claimed.
 - **Next action:** User J continues with an existing clean checkout in Android Studio Agent Mode, reconciles main, supplies factual readiness evidence, runs validator and implements bounded Issue #11 corrections. Obtain a different teammate review and human merge only after applicable tests pass.
+
+
+## 2026-11-17-issue11-capsule-rules-takeover — Capsule Records & Security Rules Completion
+
+- **Owner / scope / period:** User J, explicitly confirmed as takeover implementation owner for Issue #11 per team transfer agreement documented in PR #35 and task prompt. Period: November 17, 2026. MVP Scope.
+- **Environment/model:** Android Studio Agent Mode (Gemini Flash 3.8).
+- **GitHub:** [Issue #11](https://github.com/theguardianofthebed/Time-Capsule/issues/11); [PR #35](https://github.com/theguardianofthebed/Time-Capsule/pull/35); branch `feature/11-capsule-rules`.
+- **References:** Atlas revision 55 read November 17 (ARC-02, ARC-03, ARC-04, ARC-05, AC-12, DD-16, DD-17, DD-23); repository `CURRENT_CONTRACT.md`, `READINESS.md`, `readiness-evidence-issue11.json`, `handoffs/issue-11-user-j-takeover-20261117.md`.
+
+### Work performed
+
+1. **Reconciliation:** Merged current `main` (`2524ae5070477a320e30257a94f23d100e332e98`, including merged Issue #12 and #37) into `feature/11-capsule-rules` without conflicts, preserving User F's original authored commits.
+2. **Readiness Preflight:** Executed eight-gate readiness preflight by generating `docs/agent-tools/readiness-evidence-issue11.json` and running `py tools/check_readiness.py --issue 11 --evidence docs/agent-tools/readiness-evidence-issue11.json`, returning `PREFLIGHT_RECORD_VALID` with 0 blockers.
+3. **Recipient Directory Access:** Restored `allow get: if signedIn();` on `recipientDirectory/{uid}` in `firestore.rules` to permit authenticated exact-UID recipient lookups by senders while maintaining `allow list: if false;` to block directory listing/enumeration and owner-only profile creation/updates.
+4. **One-Way Server-Timestamp Unlock Contract:** Updated `canRecipientUnlock()` in `firestore.rules` to enforce `request.resource.data.unlockedAt == request.time` alongside `request.resource.data.unlocked == true`, restricting affected fields during unlock strictly to `['unlocked', 'unlockedAt']`. Denies client-supplied timestamps, missing timestamps, early unlocks, sender unlocks, relocking, re-unlocking, or changing metadata during unlock.
+5. **Photo Prepublication Reconciliation & Immutability:** Updated `storage.rules` to allow `create, update` and `read` for prepublication photo uploads/retries by the authenticated sender (`!capsuleExists(capsuleId)`). Once published (`capsuleExists(capsuleId)` is true), photos become strictly immutable (updates/deletes denied; reads governed strictly by participant authorization and unlock state).
+6. **Firebase Emulator Security Tests:** Extended `tests/capsule.rules.test.js` from 29 to 36 test cases covering recipient directory exact get/list denial, unlock `unlockedAt` server-timestamp enforcement, early unlock denial, relock denial, prepublication photo upload/retry/read, photo immutability after publication, and signed-out/unauthorized access.
+
+### Checks and verification
+
+- `py tools/check_readiness.py --validate-manifest`: PASS (`MANIFEST_VALID`)
+- `py tools/check_readiness.py --issue 11 --evidence docs/agent-tools/readiness-evidence-issue11.json`: PASS (`PREFLIGHT_RECORD_VALID`)
+- `npx firebase emulators:exec --project demo-timecapsule "npm test"`: PASS (36 unit tests passed, 0 failed, 100% pass rate)
+- `./gradlew app:testDebugUnitTest`: PASS (76 Android JVM unit tests passed across project, 0 failed)
+
+### Human input and remaining work
+
+User J confirmed task ownership and execution. Independent teammate PR review by User G or User F and human merge into `main` remain for the team to complete. PR #35 remains in Draft state until review.
+

@@ -1,4 +1,3 @@
-
 rules_version = '2';
 
 service firebase.storage {
@@ -16,27 +15,23 @@ service firebase.storage {
       return firestore.exists(capsulePath(capsuleId));
     }
 
-    function capsuleData(capsuleId) {
-      return firestore.get(capsulePath(capsuleId)).data;
-    }
-
     // A photo is readable only when its published capsule
     // exists and the requester is an authorized participant.
     function canReadCapsule(senderUid, capsuleId) {
       return capsuleExists(capsuleId)
-        && capsuleData(capsuleId).hasPhoto == true
-        && capsuleData(capsuleId).photoPath
+        && firestore.get(capsulePath(capsuleId)).data.hasPhoto == true
+        && firestore.get(capsulePath(capsuleId)).data.photoPath
           == 'capsuleMedia/' + senderUid + '/' + capsuleId + '/original'
         && (
           (
-            capsuleData(capsuleId).senderId == request.auth.uid
-            && capsuleData(capsuleId).senderId
-              != capsuleData(capsuleId).recipientId
+            firestore.get(capsulePath(capsuleId)).data.senderId == request.auth.uid
+            && firestore.get(capsulePath(capsuleId)).data.senderId
+              != firestore.get(capsulePath(capsuleId)).data.recipientId
           )
           ||
           (
-            capsuleData(capsuleId).recipientId == request.auth.uid
-            && capsuleData(capsuleId).unlocked == true
+            firestore.get(capsulePath(capsuleId)).data.recipientId == request.auth.uid
+            && firestore.get(capsulePath(capsuleId)).data.unlocked == true
           )
         );
     }
@@ -51,20 +46,23 @@ service firebase.storage {
 
     match /capsuleMedia/{senderUid}/{capsuleId}/original {
 
-      // Upload is allowed before Firestore publication.
-      // The sender can only create a photo under their own UID.
-      allow create: if signedIn()
+      // Upload and retry are allowed before Firestore publication.
+      // The sender can only create/update a photo under their own UID.
+      allow create, update: if signedIn()
         && request.auth.uid == senderUid
-        && resource == null
+        && !capsuleExists(capsuleId)
         && validImageUpload();
 
       // Reading requires a published capsule and the same
-      // authorization as its protected text content.
+      // authorization as its protected text content, or prepublication sender access.
       allow read: if signedIn()
-        && canReadCapsule(senderUid, capsuleId);
+        && (
+          canReadCapsule(senderUid, capsuleId)
+          || (request.auth.uid == senderUid && !capsuleExists(capsuleId))
+        );
 
       // Published photos cannot be replaced or deleted by clients.
-      allow update, delete: if false;
+      allow delete: if false;
     }
 
     // Everything else is denied by default.

@@ -1,0 +1,81 @@
+{
+  "issue": 11,
+  "checked_at": "2026-11-17T09:30:00Z",
+  "selected_base": "2524ae5070477a320e30257a94f23d100e332e98",
+  "owner": "User J",
+  "owner_confirmation": "Confirmed User J as implementation owner for Issue 11 per team transfer agreement documented in PR #35 and task prompt",
+  "branch": "feature/11-capsule-rules",
+  "period": "17-20 November 2026",
+  "scope": "MVP",
+  "reviewer": "User G",
+  "components": [
+    "firestore.rules",
+    "storage.rules",
+    "firestore.indexes.json",
+    "firebase.json"
+  ],
+  "deliverable": "Metadata, protected content and matching access rules",
+  "contract_approval": "Atlas r55 / Instructions v3 / 7 Nov Views update / Issue 11 takeover handoff contract",
+  "blocking_failures": [],
+  "inventory": {
+    "issues": "Issue #11 takeover in progress",
+    "branches": "feature/11-capsule-rules based on main at 2524ae5",
+    "prs": "PR #35 for Issue 11",
+    "handoffs": "issue-11-user-j-takeover-20261117.md",
+    "compatible": true,
+    "compatibility_evidence": "Owner transfer agreement reported in PR #35; no competing active claims on security rules files",
+    "active_claims": [
+      {
+        "issue": 11,
+        "owner": "User J",
+        "branch": "feature/11-capsule-rules",
+        "overlaps": false,
+        "agreement": "Explicit requester instruction allocating Issue #11 implementation takeover to User J"
+      }
+    ]
+  },
+  "dependencies": [
+    {
+      "issue": 9,
+      "pr": "https://github.com/theguardianofthebed/Time-Capsule/pull/29",
+      "merged": true,
+      "merge_commit": "c60d866cdc9794af97db129c946b66711270f6b9",
+      "implementation_inspection": "PR #29 merged into main, contains CapsuleRepository, adapters, and session interfaces",
+      "paths": [
+        "app/src/main/java/com/example/timecapsule/data/CapsuleRepository.kt"
+      ],
+      "checks": [
+        {
+          "result": "PASS",
+          "procedure": "JVM unit tests and debug build",
+          "expected_actual": "25 unit tests passed",
+          "commit": "c60d866cdc9794af97db129c946b66711270f6b9",
+          "environment": "Android Studio Agent Mode, Nov 10 2026",
+          "evidence": "PR #29 verification record"
+        }
+      ],
+      "blocking_failures": []
+    },
+    {
+      "issue": 10,
+      "pr": "https://github.com/theguardianofthebed/Time-Capsule/pull/33",
+      "merged": true,
+      "merge_commit": "74aa763076801944a33897b2f67c36d3afb27aa9",
+      "implementation_inspection": "PR #33 merged into main, contains AccountSessionManager, lookupRecipient, confirmRecipient, RecipientConfirmation",
+      "paths": [
+        "app/src/main/java/com/example/timecapsule/data/AccountSessionManager.kt"
+      ],
+      "checks": [
+        {
+          "result": "PASS",
+          "procedure": "JVM unit tests and Android 17 emulator tests",
+          "expected_actual": "47 JVM unit tests and 9 instrumentation tests passed",
+          "commit": "74aa763076801944a33897b2f67c36d3afb27aa9",
+          "environment": "Android Studio Agent Mode / Android 17 emulator, Nov 11 2026",
+          "evidence": "PR #33 merge commit 74aa763"
+        }
+      ],
+      "blocking_failures": []
+    }
+  ]
+}

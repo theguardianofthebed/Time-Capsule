@@ -1,4 +1,3 @@
-
 // 1. Imports
 
 import { readFileSync } from "node:fs";
@@ -34,6 +33,7 @@ import {
     ref,
     uploadBytes,
     getBytes,
+    deleteObject,
 } from "firebase/storage";
 
 
@@ -49,6 +49,7 @@ let testEnv;
 const capsuleId = "test-capsule-001";
 const senderUid = "sender-a";
 const recipientUid = "recipient-b";
+const snapshotDigest = "a".repeat(64);
 
 beforeAll(async () => {
     testEnv = await initializeTestEnvironment({
@@ -76,41 +77,48 @@ beforeEach(async () => {
     await testEnv.clearFirestore();
     await testEnv.clearStorage();
 
-    // Create the recipient directory entry for our test.
-    // Security rules are disabled only while preparing test data.
+    // Create the recipient directory entries for our test data.
     await testEnv.withSecurityRulesDisabled(async (context) => {
+        const db = context.firestore();
         await setDoc(
-            doc(context.firestore(), "recipientDirectory", recipientUid),
+            doc(db, "recipientDirectory", recipientUid),
             {
                 uid: recipientUid,
                 displayName: "Recipient B",
             }
         );
+        await setDoc(
+            doc(db, "recipientDirectory", senderUid),
+            {
+                uid: senderUid,
+                displayName: "Sender A",
+            }
+        );
     });
 });
 
-const snapshotDigest = "a".repeat(64);
 
 
-
-// 4. seedCapsule() and seedPhotoCapsule()
+// 4. Test seed functions
 
 async function seedCapsule({
     id = capsuleId,
     sender = senderUid,
     recipient = recipientUid,
     unlocked = false,
+    unlockedAt = null,
     unlockAtMillis = Date.now() + 60 * 60 * 1000,
+    lockMode = "TIME",
 } = {}) {
     await testEnv.withSecurityRulesDisabled(async (context) => {
         const db = context.firestore();
 
-        await setDoc(doc(db, "capsules", id), {
+        const metadata = {
             capsuleId: id,
             senderId: sender,
             recipientId: recipient,
-            lockMode: "TIME",
-            unlockAt: Timestamp.fromMillis(unlockAtMillis),
+            lockMode,
+            unlockAt: lockMode === "LOCATION" ? null : Timestamp.fromMillis(unlockAtMillis),
             location: null,
             hasPhoto: false,
             photoPath: null,
@@ -118,7 +126,12 @@ async function seedCapsule({
             creationZone: "Asia/Seoul",
             snapshotDigest,
             unlocked,
-        });
+        };
+        if (unlockedAt !== null) {
+            metadata.unlockedAt = unlockedAt;
+        }
+
+        await setDoc(doc(db, "capsules", id), metadata);
 
         await setDoc(doc(db, "protectedContent", id), {
             capsuleId: id,
@@ -134,11 +147,12 @@ async function seedPhotoCapsule({
     sender = senderUid,
     recipient = recipientUid,
     unlocked = false,
+    unlockedAt = null,
 } = {}) {
     await testEnv.withSecurityRulesDisabled(async (context) => {
         const db = context.firestore();
 
-        await setDoc(doc(db, "capsules", id), {
+        const metadata = {
             capsuleId: id,
             senderId: sender,
             recipientId: recipient,
@@ -151,13 +165,18 @@ async function seedPhotoCapsule({
             creationZone: "Asia/Seoul",
             snapshotDigest,
             unlocked,
-        });
+        };
+        if (unlockedAt !== null) {
+            metadata.unlockedAt = unlockedAt;
+        }
+
+        await setDoc(doc(db, "capsules", id), metadata);
     });
 }
 
 
 
-// 5. Firestore tests
+// 5. Firestore security rules tests
 
 describe("Capsule Firestore security rules", () => {
 
@@ -202,20 +221,50 @@ describe("Capsule Firestore security rules", () => {
         }
 
         return batch.commit();
-      }
+    }
 
+    // Recipient directory tests
 
+    it("allows an authenticated user to look up another user's recipient directory profile by exact UID", async () => {
+        const senderDb = testEnv.authenticatedContext(senderUid).firestore();
 
-    // Test: Sender creates a capsule; recipient cannot read locked content.
+        await assertSucceeds(
+            getDoc(doc(senderDb, "recipientDirectory", recipientUid))
+        );
+    });
+
+    it("denies listing the recipient directory", async () => {
+        const senderDb = testEnv.authenticatedContext(senderUid).firestore();
+
+        await assertFails(
+            getDocs(collection(senderDb, "recipientDirectory"))
+        );
+    });
+
+    it("denies signed-out access to recipient directory profiles", async () => {
+        const unauthDb = testEnv.unauthenticatedContext().firestore();
+
+        await assertFails(
+            getDoc(doc(unauthDb, "recipientDirectory", recipientUid))
+        );
+    });
+
+    it("denies user A from modifying recipient B's directory profile", async () => {
+        const senderDb = testEnv.authenticatedContext(senderUid).firestore();
+
+        await assertFails(
+            setDoc(doc(senderDb, "recipientDirectory", recipientUid), {
+                uid: recipientUid,
+                displayName: "Forged Name",
+            })
+        );
+    });
+
+    // Capsule creation & access tests
+
     it("allows the sender to create a capsule but keeps its content locked from the recipient", async () => {
-
-        const senderDb = testEnv
-        .authenticatedContext(senderUid)
-        .firestore();
-
-        const recipientDb = testEnv
-            .authenticatedContext(recipientUid)
-            .firestore();
+        const senderDb = testEnv.authenticatedContext(senderUid).firestore();
+        const recipientDb = testEnv.authenticatedContext(recipientUid).firestore();
 
         const metadata = {
             capsuleId,
@@ -240,7 +289,6 @@ describe("Capsule Firestore security rules", () => {
         };
 
         const batch = writeBatch(senderDb);
-
         batch.set(doc(senderDb, "capsules", capsuleId), metadata);
         batch.set(doc(senderDb, "protectedContent", capsuleId), content);
 
@@ -251,25 +299,22 @@ describe("Capsule Firestore security rules", () => {
         );
 
         await assertFails(
-          getDoc(doc(recipientDb, "protectedContent", capsuleId))
+            getDoc(doc(recipientDb, "protectedContent", capsuleId))
         );
     });
 
-    // Test: Metadata cannot be created without protected content.
     it("denies capsule metadata creation without protected content", async () => {
         await assertFails(
             attemptPairedCreate({ includeContent: false })
         );
     });
 
-    // Test: Protected content cannot be created without metadata.
     it("denies protected content creation without capsule metadata", async () => {
         await assertFails(
             attemptPairedCreate({ includeMetadata: false })
         );
     });
 
-    // Test: Metadata and content must have matching snapshot digests.
     it("denies paired creation with mismatched snapshot digests", async () => {
         await assertFails(
             attemptPairedCreate({
@@ -279,39 +324,30 @@ describe("Capsule Firestore security rules", () => {
         );
     });
 
-    // Test: Unrelated users cannot read capsule metadata.
     it("denies metadata access to unrelated users", async () => {
         await seedCapsule();
 
-        const outsiderDb = testEnv
-            .authenticatedContext("outsider-c")
-            .firestore();
+        const outsiderDb = testEnv.authenticatedContext("outsider-c").firestore();
 
         await assertFails(
             getDoc(doc(outsiderDb, "capsules", capsuleId))
         );
     });
 
-    // Test: Unrelated users cannot list capsules.
     it("denies capsule listing to unrelated users", async () => {
         await seedCapsule();
 
-        const outsiderDb = testEnv
-            .authenticatedContext("outsider-c")
-            .firestore();
+        const outsiderDb = testEnv.authenticatedContext("outsider-c").firestore();
 
         await assertFails(
             getDocs(collection(outsiderDb, "capsules"))
         );
     });
 
-    // Test: Sender can list their own capsules.
     it("allows the sender to list their own capsules", async () => {
         await seedCapsule();
 
-        const senderDb = testEnv
-            .authenticatedContext(senderUid)
-            .firestore();
+        const senderDb = testEnv.authenticatedContext(senderUid).firestore();
 
         const senderQuery = query(
             collection(senderDb, "capsules"),
@@ -321,13 +357,10 @@ describe("Capsule Firestore security rules", () => {
         await assertSucceeds(getDocs(senderQuery));
     });
 
-    // Test: Recipient can list capsules addressed to them.
     it("allows the recipient to list capsules addressed to them", async () => {
         await seedCapsule();
 
-        const recipientDb = testEnv
-            .authenticatedContext(recipientUid)
-            .firestore();
+        const recipientDb = testEnv.authenticatedContext(recipientUid).firestore();
 
         const recipientQuery = query(
             collection(recipientDb, "capsules"),
@@ -337,33 +370,26 @@ describe("Capsule Firestore security rules", () => {
         await assertSucceeds(getDocs(recipientQuery));
     });
 
-    // Test: Users cannot run unrestricted capsule queries.
     it("denies unrestricted capsule queries", async () => {
         await seedCapsule();
 
-        const senderDb = testEnv
-            .authenticatedContext(senderUid)
-            .firestore();
+        const senderDb = testEnv.authenticatedContext(senderUid).firestore();
 
         await assertFails(
             getDocs(collection(senderDb, "capsules"))
         );
     });
 
-    // Test: Recipient can read content after unlocking.
     it("allows the recipient to read content after unlocking", async () => {
-        await seedCapsule({ unlocked: true });
+        await seedCapsule({ unlocked: true, unlockedAt: Timestamp.now() });
 
-        const recipientDb = testEnv
-            .authenticatedContext(recipientUid)
-            .firestore();
+        const recipientDb = testEnv.authenticatedContext(recipientUid).firestore();
 
         await assertSucceeds(
             getDoc(doc(recipientDb, "protectedContent", capsuleId))
         );
     });
 
-    // Test: Users cannot read their own locked self-sent capsules.
     it("denies access to a locked self-sent capsule", async () => {
         const selfUid = "self-user";
 
@@ -373,17 +399,16 @@ describe("Capsule Firestore security rules", () => {
             recipient: selfUid,
         });
 
-        const selfDb = testEnv
-            .authenticatedContext(selfUid)
-            .firestore();
+        const selfDb = testEnv.authenticatedContext(selfUid).firestore();
 
         await assertFails(
             getDoc(doc(selfDb, "protectedContent", "self-capsule"))
         );
     });
 
-    // Test: Recipient can unlock a capsule after its unlock time.
-    it("allows the recipient to unlock a TIME capsule after its unlock time", async () => {
+    // One-way unlock rules & unlockedAt server timestamp tests
+
+    it("allows the recipient to unlock a TIME capsule after its unlock time with unlockedAt server timestamp", async () => {
         await seedCapsule({
             unlockAtMillis: Date.now() - 60 * 1000,
         });
@@ -393,13 +418,15 @@ describe("Capsule Firestore security rules", () => {
         await assertSucceeds(
             updateDoc(doc(db, "capsules", capsuleId), {
                 unlocked: true,
+                unlockedAt: serverTimestamp(),
             })
         );
     });
 
-    // Test: Recipient cannot unlock an early capsule.
-    it("denies the recipient an early unlock", async () => {
-        await seedCapsule();
+    it("denies recipient unlock without unlockedAt timestamp", async () => {
+        await seedCapsule({
+            unlockAtMillis: Date.now() - 60 * 1000,
+        });
 
         const db = testEnv.authenticatedContext(recipientUid).firestore();
 
@@ -410,7 +437,34 @@ describe("Capsule Firestore security rules", () => {
         );
     });
 
-    // Test: Sender cannot unlock a capsule.
+    it("denies recipient unlock with a client-provided timestamp instead of serverTimestamp()", async () => {
+        await seedCapsule({
+            unlockAtMillis: Date.now() - 60 * 1000,
+        });
+
+        const db = testEnv.authenticatedContext(recipientUid).firestore();
+
+        await assertFails(
+            updateDoc(doc(db, "capsules", capsuleId), {
+                unlocked: true,
+                unlockedAt: Timestamp.now(),
+            })
+        );
+    });
+
+    it("denies the recipient an early unlock", async () => {
+        await seedCapsule();
+
+        const db = testEnv.authenticatedContext(recipientUid).firestore();
+
+        await assertFails(
+            updateDoc(doc(db, "capsules", capsuleId), {
+                unlocked: true,
+                unlockedAt: serverTimestamp(),
+            })
+        );
+    });
+
     it("denies the sender from unlocking a capsule", async () => {
         await seedCapsule({
             unlockAtMillis: Date.now() - 60 * 1000,
@@ -421,11 +475,11 @@ describe("Capsule Firestore security rules", () => {
         await assertFails(
             updateDoc(doc(db, "capsules", capsuleId), {
                 unlocked: true,
+                unlockedAt: serverTimestamp(),
             })
         );
     });
 
-    // Test: Unrelated users cannot unlock a capsule.
     it("denies an unrelated user from unlocking a capsule", async () => {
         await seedCapsule({
             unlockAtMillis: Date.now() - 60 * 1000,
@@ -436,13 +490,13 @@ describe("Capsule Firestore security rules", () => {
         await assertFails(
             updateDoc(doc(db, "capsules", capsuleId), {
                 unlocked: true,
+                unlockedAt: serverTimestamp(),
             })
         );
     });
 
-    // Test: Recipient cannot relock an unlocked capsule.
     it("denies relocking an unlocked capsule", async () => {
-        await seedCapsule({ unlocked: true });
+        await seedCapsule({ unlocked: true, unlockedAt: Timestamp.now() });
 
         const db = testEnv.authenticatedContext(recipientUid).firestore();
 
@@ -453,7 +507,6 @@ describe("Capsule Firestore security rules", () => {
         );
     });
 
-    // Test: Sender cannot change capsule metadata while unlocking.
     it("denies changing capsule metadata while unlocking", async () => {
         await seedCapsule({
             unlockAtMillis: Date.now() - 60 * 1000,
@@ -464,26 +517,16 @@ describe("Capsule Firestore security rules", () => {
         await assertFails(
             updateDoc(doc(db, "capsules", capsuleId), {
                 unlocked: true,
+                unlockedAt: serverTimestamp(),
                 title: "Changed title",
             })
-        );
-    });
-
-    // Test: Users cannot list the recipient directory.
-    it("denies listing the recipient directory", async () => {
-        const db = testEnv
-            .authenticatedContext(senderUid)
-            .firestore();
-
-        await assertFails(
-            getDocs(collection(db, "recipientDirectory"))
         );
     });
 });
 
 
 
-// 6. Storage tests
+// 6. Storage security rules tests
 
 describe("Capsule Storage security rules", () => {
     function photoPathFor(id) {
@@ -492,14 +535,9 @@ describe("Capsule Storage security rules", () => {
 
     const imageData = new Uint8Array([255, 216, 255, 224]);
 
-    // Test: Sender creates a capsule; recipient cannot read locked content.
-    it("allows the sender to upload a photo", async () => {
-        const id = "storage-upload-test";
-        await seedPhotoCapsule({ id });
-
-        const senderStorage = testEnv
-            .authenticatedContext(senderUid)
-            .storage();
+    it("allows the sender to upload a photo before capsule publication", async () => {
+        const id = "storage-prepub-upload-test";
+        const senderStorage = testEnv.authenticatedContext(senderUid).storage();
 
         await assertSucceeds(
             uploadBytes(
@@ -510,14 +548,38 @@ describe("Capsule Storage security rules", () => {
         );
     });
 
-    // Test: Unrelated users cannot read capsule metadata.
+    it("allows the sender to retry uploading a photo before capsule publication", async () => {
+        const id = "storage-prepub-retry-test";
+        const senderStorage = testEnv.authenticatedContext(senderUid).storage();
+        const photoRef = ref(senderStorage, photoPathFor(id));
+
+        await assertSucceeds(
+            uploadBytes(photoRef, imageData, { contentType: "image/jpeg" })
+        );
+
+        // Prepublication retry (re-upload before Firestore batch) succeeds
+        await assertSucceeds(
+            uploadBytes(photoRef, imageData, { contentType: "image/jpeg" })
+        );
+    });
+
+    it("allows the sender to read their own photo before capsule publication", async () => {
+        const id = "storage-prepub-read-test";
+        const senderStorage = testEnv.authenticatedContext(senderUid).storage();
+        const photoRef = ref(senderStorage, photoPathFor(id));
+
+        await assertSucceeds(
+            uploadBytes(photoRef, imageData, { contentType: "image/jpeg" })
+        );
+
+        await assertSucceeds(
+            getBytes(photoRef)
+        );
+    });
+
     it("denies photo uploads from unrelated users", async () => {
         const id = "storage-outsider-test";
-        await seedPhotoCapsule({ id });
-
-        const outsiderStorage = testEnv
-            .authenticatedContext("outsider-c")
-            .storage();
+        const outsiderStorage = testEnv.authenticatedContext("outsider-c").storage();
 
         await assertFails(
             uploadBytes(
@@ -528,116 +590,98 @@ describe("Capsule Storage security rules", () => {
         );
     });
 
-    // Test: Recipient can read content after unlocking.
-    it("denies overwriting an existing photo", async () => {
+    it("denies overwriting an existing photo after capsule publication (immutable)", async () => {
         const id = "storage-overwrite-test";
+        const senderStorage = testEnv.authenticatedContext(senderUid).storage();
+        const photoRef = ref(senderStorage, photoPathFor(id));
+
+        // 1. Upload photo before publication
+        await assertSucceeds(
+            uploadBytes(photoRef, imageData, { contentType: "image/jpeg" })
+        );
+
+        // 2. Publish capsule to Firestore
         await seedPhotoCapsule({ id });
 
-        const senderStorage = testEnv
-            .authenticatedContext(senderUid)
-            .storage();
+        // 3. Attempt to overwrite published photo -> fails (immutable)
+        await assertFails(
+            uploadBytes(photoRef, imageData, { contentType: "image/jpeg" })
+        );
+    });
 
+    it("denies deleting a photo after capsule publication (immutable)", async () => {
+        const id = "storage-delete-test";
+        const senderStorage = testEnv.authenticatedContext(senderUid).storage();
         const photoRef = ref(senderStorage, photoPathFor(id));
 
         await assertSucceeds(
-            uploadBytes(photoRef, imageData, {
-                contentType: "image/jpeg",
-            })
+            uploadBytes(photoRef, imageData, { contentType: "image/jpeg" })
         );
 
+        await seedPhotoCapsule({ id });
+
         await assertFails(
-            uploadBytes(photoRef, imageData, {
-                contentType: "image/jpeg",
-            })
+            deleteObject(photoRef)
         );
     });
 
-    // Test: Users cannot read their own locked self-sent capsules.
     it("denies the recipient from downloading a locked photo", async () => {
         const id = "storage-locked-test";
-        await seedPhotoCapsule({ id });
-
-        const senderStorage = testEnv
-            .authenticatedContext(senderUid)
-            .storage();
-
-        const recipientStorage = testEnv
-            .authenticatedContext(recipientUid)
-            .storage();
+        const senderStorage = testEnv.authenticatedContext(senderUid).storage();
+        const recipientStorage = testEnv.authenticatedContext(recipientUid).storage();
+        const photoRef = ref(senderStorage, photoPathFor(id));
 
         await assertSucceeds(
-            uploadBytes(
-                ref(senderStorage, photoPathFor(id)),
-                imageData,
-                { contentType: "image/jpeg" }
-            )
+            uploadBytes(photoRef, imageData, { contentType: "image/jpeg" })
         );
+
+        await seedPhotoCapsule({ id, unlocked: false });
 
         await assertFails(
             getBytes(ref(recipientStorage, photoPathFor(id)))
         );
     });
 
-    // Test: Recipient can unlock a capsule after its unlock time.
     it("allows the recipient to download an unlocked photo", async () => {
         const id = "storage-unlocked-test";
-        await seedPhotoCapsule({ id, unlocked: true });
+        const senderStorage = testEnv.authenticatedContext(senderUid).storage();
+        const recipientStorage = testEnv.authenticatedContext(recipientUid).storage();
+        const photoRef = ref(senderStorage, photoPathFor(id));
 
-        const senderStorage = testEnv
-            .authenticatedContext(senderUid)
-            .storage();
-
-        const recipientStorage = testEnv
-            .authenticatedContext(recipientUid)
-            .storage();
-
+        // Upload photo before publication
         await assertSucceeds(
-            uploadBytes(
-                ref(senderStorage, photoPathFor(id)),
-                imageData,
-                { contentType: "image/jpeg" }
-            )
+            uploadBytes(photoRef, imageData, { contentType: "image/jpeg" })
         );
 
+        // Publish unlocked capsule
+        await seedPhotoCapsule({ id, unlocked: true, unlockedAt: Timestamp.now() });
+
+        // Recipient can download unlocked photo
         await assertSucceeds(
             getBytes(ref(recipientStorage, photoPathFor(id)))
         );
     });
 
-    // Test: Unrelated users cannot download photos.
     it("denies unrelated users from downloading photos", async () => {
         const id = "storage-download-outsider-test";
-        await seedPhotoCapsule({ id, unlocked: true });
-
-        const senderStorage = testEnv
-            .authenticatedContext(senderUid)
-            .storage();
-
-        const outsiderStorage = testEnv
-            .authenticatedContext("outsider-c")
-            .storage();
+        const senderStorage = testEnv.authenticatedContext(senderUid).storage();
+        const outsiderStorage = testEnv.authenticatedContext("outsider-c").storage();
+        const photoRef = ref(senderStorage, photoPathFor(id));
 
         await assertSucceeds(
-            uploadBytes(
-                ref(senderStorage, photoPathFor(id)),
-                imageData,
-                { contentType: "image/jpeg" }
-            )
+            uploadBytes(photoRef, imageData, { contentType: "image/jpeg" })
         );
 
+        await seedPhotoCapsule({ id, unlocked: true, unlockedAt: Timestamp.now() });
+
         await assertFails(
-          getBytes(ref(outsiderStorage, photoPathFor(id)))
+            getBytes(ref(outsiderStorage, photoPathFor(id)))
         );
     });
 
-    // Test: Recipient can unlock a capsule after its unlock time.
     it("denies uploads with unsupported file types", async () => {
         const id = "storage-invalid-type-test";
-        await seedPhotoCapsule({ id });
-
-        const senderStorage = testEnv
-            .authenticatedContext(senderUid)
-            .storage();
+        const senderStorage = testEnv.authenticatedContext(senderUid).storage();
 
         await assertFails(
             uploadBytes(
@@ -648,18 +692,10 @@ describe("Capsule Storage security rules", () => {
         );
     });
 
-    //Test: Recipient can unlock a capsule after its unlock time.
     it("denies photos larger than 5 MB", async () => {
         const id = "storage-oversized-test";
-        await seedPhotoCapsule({ id });
-
-        const senderStorage = testEnv
-            .authenticatedContext(senderUid)
-            .storage();
-
-        const oversizedImage = new Uint8Array(
-           5 * 1024 * 1024 + 1
-        );
+        const senderStorage = testEnv.authenticatedContext(senderUid).storage();
+        const oversizedImage = new Uint8Array(5 * 1024 * 1024 + 1);
 
         await assertFails(
             uploadBytes(
@@ -670,57 +706,27 @@ describe("Capsule Storage security rules", () => {
         );
     });
 
-    // Test: Sender creates a capsule; recipient cannot read locked content.
-    it('allows sender to upload a photo before capsule publication', async () => {
-        const senderStorage = testEnv
-            .authenticatedContext('senderA')
-            .storage();
-
-        const photoRef = ref(
-            senderStorage,
-            'capsuleMedia/senderA/capsule-before-publication/original'
-        );
-
-        const photoBytes = new Uint8Array([0xFF, 0xD8, 0xFF]);
-
-        await assertSucceeds(
-            uploadBytes(photoRef, photoBytes, {
-                contentType: 'image/jpeg',
-            })
-        );
-    });
-
-    // Test: Unrelated users cannot read capsule metadata.
-    it('denies uploading a photo under another users UID', async () => {
-        const userBStorage = testEnv
-            .authenticatedContext('senderB')
-            .storage();
-
+    it("denies uploading a photo under another user's UID", async () => {
+        const userBStorage = testEnv.authenticatedContext("senderB").storage();
         const photoRef = ref(
             userBStorage,
-            'capsuleMedia/senderA/capsule-unauthorized/original'
+            "capsuleMedia/senderA/capsule-unauthorized/original"
         );
 
         await assertFails(
-            uploadBytes(photoRef, new Uint8Array([0xFF, 0xD8, 0xFF]), {
-                contentType: 'image/jpeg',
-            })
+            uploadBytes(photoRef, imageData, { contentType: "image/jpeg" })
         );
     });
 
-    // Test: Recipient can unlock a capsule after its unlock time.
-    it('denies photo uploads when signed out', async () => {
+    it("denies photo uploads when signed out", async () => {
         const signedOutStorage = testEnv.unauthenticatedContext().storage();
-
         const photoRef = ref(
             signedOutStorage,
-            'capsuleMedia/senderA/capsule-signed-out/original'
+            "capsuleMedia/senderA/capsule-signed-out/original"
         );
 
         await assertFails(
-            uploadBytes(photoRef, new Uint8Array([0xFF, 0xD8, 0xFF]), {
-                contentType: 'image/jpeg',
-            })
+            uploadBytes(photoRef, imageData, { contentType: "image/jpeg" })
         );
     });
 });
