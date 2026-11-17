@@ -6,6 +6,42 @@ Weekly coursework remains in `agent-log-w1.md`–`agent-log-w4.md`.
 
 ## Entries
 
+## 2026-11-13-issue37-ui-design-correction — S-01, S-02, S-08 Stitch UI design correction & review fixes
+
+- **Owner:** User J, explicitly confirmed as implementation owner for Issue #37. Reviewer: User G.
+- **Environment/model:** Android Studio Agent Mode (Gemini Flash 3.8).
+- **Status:** Implemented, verified with unit tests and Android Lint, verified on emulator, branch pushed, PR #38 updated.
+- **Requested outcome:** Correct S-01 (Sign In), S-02 (Register), and S-08 (Account/Profile) screen layouts and styling to match connected Stitch wireframes ("TimeCapsule Android UI Design", project ID `15276828764661611137`) using Kotlin + native Android Views/XML + ViewBinding, while preserving working account authentication/profile creation/repair, UID display/copy, logout, and session functionality. Apply code review corrections for input validation messages, accessibility touch targets, Show/Hide content descriptions, and truthful OS permissions status.
+- **References:** [Issue #37](https://github.com/theguardianofthebed/Time-Capsule/issues/37); [PR #38](https://github.com/theguardianofthebed/Time-Capsule/pull/38); FR-01, FR-10; ARC-01, ARC-06; DD-01, DD-03, DD-07, DD-19, DD-24, DD-26; AC-01, AC-10.
+
+### Work performed
+
+- **Stitch Wireframe Inspection:** Retrieved and analyzed authoritative HTML/CSS wireframes for S-01, S-02, and S-08 from connected Stitch project `TimeCapsule Android UI Design`.
+- **UI & Layout Corrections:**
+  - Defined Stitch design tokens in `res/values/colors.xml` (`capsule_bg`, `capsule_card_surface`, `capsule_border`, `capsule_text_dark`, `capsule_primary` `#865B4B`, `capsule_badge_bg`, etc.) and string resources in `res/values/strings.xml`.
+  - Created vector assets (`ic_capsule_logo`, `ic_hero_envelope`, `ic_mail`, `ic_lock`, `ic_visibility`, `ic_arrow_right`, `ic_leaf`, `ic_copy`, `ic_location`, `ic_bell`, `ic_logout`, `ic_edit`, `ic_info`) and shape drawables (`bg_card_surface`, `bg_button_primary`, `bg_button_outlined`, `bg_badge_success`, `bg_badge_neutral`, `bg_banner_info`, `bg_circle_badge`, `bg_circle_avatar`).
+  - Redesigned `fragment_s01_sign_in.xml` with top brand header (`timecapsule` + `A MOMENT, KEPT.`), handcrafted envelope illustration, "Hello, again." headline, outlined inputs with mail/lock icons, 48×48dp password visibility toggle button, terracotta CTA button ("Come on in"), and "New around here? Create an account" link.
+  - Redesigned `fragment_s02_register.xml` with circular leaf badge, "YOUR NEXT CHAPTER" eyebrow, "Make room for memories." headline, name/email/password/confirm password inputs, terracotta CTA button ("Create your account"), "Already have an account? Sign in" link, and profile repair mode handling (hides email/passwords and adapts titles when repairing an incomplete profile). Updated footer to "A time capsule for your meaningful moments."
+  - Redesigned `fragment_s08_account_settings.xml` with "Your account" header, initial avatar + greeting ("Hello, [DisplayName]."), UID card with monospace UID and 48×48dp one-tap clipboard copy button, display name update card, "A little permission" section with Location & Notifications system permission status badges + "Open system settings →" link, info banner, "Seal a new moment (S-04)" navigation button, and "Sign out of this session" button. Updated location description to "For verifying location lock conditions when unlocking".
+- **Fragment Wiring & Pre-Merge Fixes:**
+  - `S01SignInFragment.kt`: Added password visibility toggle with dynamic accessibility content descriptions (`cd_show_password` / `cd_hide_password`), field-specific validation error message (`err_email_password_required`), and wired `btnGoToRegister` / `btnSignIn`.
+  - `S02RegisterFragment.kt`: Added `onGoToSignInListener`, password visibility toggle with dynamic accessibility descriptions, field-specific validation error messages (`err_required_field`, `err_name_required`), and adapted profile repair layout visibility.
+  - `S08AccountSettingsViewModel.kt` & `S08AccountSettingsFragment.kt`: Resolved profile-editing race conditions by guarding `checkProfile()` callback when `etDisplayName` has focus or active user edits, tracking `lastSubmittedName` to update header display with confirmed submitted text on update success, and disabling `btnUpdateProfile` while update operations are in flight.
+  - `S08AccountSettingsViewModel.kt` & `S08AccountSettingsFragment.kt`: Resolved profile-editing race conditions by guarding `checkProfile()` callback when `etDisplayName` has focus or active user edits, invalidating delayed profile lookups via `activeProfileCheckToken` when a newer update starts, tracking `lastSubmittedName` to update header display with confirmed submitted text on update success, and disabling `btnUpdateProfile` while update operations are in flight.
+  - `S08AccountSettingsViewModelTest.kt`: Added 7 unit tests covering profile check, profile repair, duplicate submission prevention, delayed profile lookup invalidation, submitted name retention, state clearing, and sign-out.
+  - `MainActivity.kt`: Wired `onGoToSignInListener` on `S02RegisterFragment`.
+
+### Checks and verification
+
+- `:app:assembleDebug`: PASS (`BUILD SUCCESSFUL`)
+- `:app:testDebugUnitTest`: PASS (76 unit tests passed across project, 0 failed)
+- `:app:lintDebug`: PASS (0 errors)
+- Emulator runtime verification: Deployed app to `emulator-5554`, captured screenshots, verified S-01, S-02, and S-08 rendering against Stitch wireframes, verified navigation flow (S-01 ↔ S-02, S-08 ↔ S-04/S-01), verified Auth error messages, field-specific validation, password show/hide content descriptions, UID copy to clipboard, system settings intent launch, and profile update race prevention.
+
+### Human input and remaining work
+
+User J confirmed task ownership and manual testing. Personal reflections, teammate PR review by User G, and human merge into `main` remain for the students to complete.
+
 ## 2026-11-10-governance — Readiness, ownership, and resumable work
 
 - **Owner:** User J, explicitly selected by the requester for this coordination task.
@@ -98,6 +134,51 @@ Automatic approval review rejected uploading the full private Atlas r55 snapshot
 
 - **Owner / period / scope:** User J, 10 November 2026 (KST); MVP documentation/handoff only, on existing Draft PR #33. User G's existing Issue #10 implementation and authorship are retained.
 - **Requester-directed implementation allocation:** Issue #10 provides the exact UID lookup and recipient-confirmation interface/state; Issue #12 owns the actual S-05 user-facing recipient selection/confirmation UI. This is an implementation allocation, **not** removal of recipient confirmation from the MVP.
+
+## 2026-11-11-issue12-draft-review-flow — S-04, S-05, and S-06 Stitch Design Integration and Drafting Flow
+
+- **Owner / period / scope:** User J; 11 November 2026; MVP Issue #12 implementation.
+- **Environment/model:** Gemini Flash 3.8 / Android Studio Agent Mode.
+- **Branch / PR:** Branch `feature/12-draft-review-flow`, PR targeting `main`.
+- **Requested work:** Implement GitHub Issue #12 delivering the S-04 → S-05 → S-06 content creation, recipient confirmation, lock selection, and review flow based on the pre-made designs in the Stitch project `TimeCapsule Android UI Design`.
+- **Stitch Project & Screen IDs:**
+  - Project ID: `projects/15276828764661611137` (`TimeCapsule Android UI Design`)
+  - S-04 Content creation: Screen `projects/15276828764661611137/screens/107630f968bd46bc84cdc75a2b2830b9`
+  - S-05 Recipient and locks: Screen `projects/15276828764661611137/screens/fe93d8abf5534ff0a443d55ffdfcfaad`
+  - S-06 Confirm send: Screen `projects/15276828764661611137/screens/b343b7b4940d4020baa12610db6019bc`
+- **Work performed:**
+  - Completed eight-gate readiness preflight with `check_readiness.py` (`PREFLIGHT_RECORD_VALID`).
+  - Extended `CapsuleDraft` domain model and built `CapsuleDraftViewModel` handling shared draft state across S-04, S-05, and S-06.
+  - Implemented `S04ContentDraftFragment` and `fragment_s04_content_draft.xml` (optional title, title pre-unlock disclosure note, multiline body, 5 MiB photo boundary validation, discard draft).
+  - Implemented `S05RecipientLockFragment` and `fragment_s05_recipient_lock.xml` (Future Me vs Someone Else exact UID lookup, explicit recipient confirmation, confirmation reset on UID text edit/lookup error/session change, rejection of stale async lookup callbacks, LockMode TIME/LOCATION/TIME_AND_LOCATION, future date/time picker, 150m place selector, disabled review CTA until recipient confirmed).
+  - Implemented `S06ConfirmSendFragment` and `fragment_s06_confirm_send.xml` (complete review summary of optional title, recipient name & UID, lock conditions, content summary, downstream Issue #14 send notice, back to edit draft).
+  - Wired navigation and listener callbacks in `MainActivity`.
+  - Added comprehensive unit tests in `CapsuleDraftViewModelTest`.
+- **Checks and results:**
+  - `python tools/check_readiness.py --issue 12 --evidence docs/agent-tools/readiness-evidence-issue12.json`: PASS (`PREFLIGHT_RECORD_VALID`)
+  - `gradle_build("app:testDebugUnitTest")`: PASS (69 unit tests passed across project, 0 failed)
+  - `gradle_build("app:assembleDebug")`: PASS
+  - `gradle_build("app:lintDebug")`: PASS (0 errors)
+
+## 2026-11-11-issue12-refinements — Review Findings Corrections & Manual Testing Package
+
+- **Owner / period / scope:** User J; 11 November 2026; MVP Issue #12 refinements and manual test preparation.
+- **Environment/model:** Gemini Flash 3.8 / Android Studio Agent Mode.
+- **Branch / PR:** Branch `feature/12-draft-review-flow` (pushed to `origin/feature/12-draft-review-flow`). PR merge into `main` deferred until manual testing complete.
+- **Fixes applied:**
+  1. **S-04 Reachability:** Authenticated app launch defaults directly to S-04 (`navigateToContentDraft()`); added `btnCreateCapsule` ("Create Time Capsule (S-04)") on S-08 Account Settings to guarantee bidirectional navigation without bypassing authentication or adding a 9th screen.
+  2. **Removed Fake Locations:** Removed hardcoded `University garden` coordinates (`37.5665, 126.9780`). Selecting Location or Both locks sets `locationTarget = null` and displays truthful subtext: `"Location lock selection is unavailable until Issue #16 (Map and fresh location)."`, blocking progression to S-06 while leaving functional Time-only drafting fully available.
+  3. **Actual Content in S-06 Review:** Updated S-06 to display actual draft message text (`tvReviewMessageBody`), optional title, recipient name & UID, unlock date/time, and explicit pre-unlock title disclosure note.
+  4. **Stale Recipient Lookup Protection:** Invalidation token (`activeLookupToken++`) is incremented whenever UID input text, recipient mode, or user session changes, instantly rejecting in-flight async lookup responses from stale UID inputs or older queries. Added unit test `staleAsyncLookupCallbackIsRejected_whenUidChangedAndChangedBack`.
+  5. **Truthful Photo Handling:** Photo attachment action displays truthful notice: `"Photo attachment is unavailable until Issue #13 (Original photo support)."` while preserving `CapsuleDraft` photo model and unit-test coverage.
+  6. **Truthful Bottom Navigation:** "Moments" bottom nav for authenticated users displays a Toast notice (`"Moments list is unavailable until Issue #21"`) instead of redirecting to Sign In.
+- **Checks and results:**
+  - `py tools/check_readiness.py --issue 12 --evidence docs/agent-tools/readiness-evidence-issue12.json`: PASS (`PREFLIGHT_RECORD_VALID`)
+  - `gradle_build("app:testDebugUnitTest")`: PASS (69 unit tests passed, 0 failed)
+  - `gradle_build("app:assembleDebug")`: PASS (`BUILD SUCCESSFUL`)
+  - `gradle_build("app:lintDebug")`: PASS (0 errors)
+
+
 - **Documentation changes:** Updated the #10/#12 issue boundaries, PR #33, implementation contract, implementation order, roadmap, design guide, and a dedicated #10→#12 task handoff. Kept the original dependency graph unchanged; no app code or rules were edited.
 - **Verification:** Documentation changes and live Issue/PR readback checked; code tests, emulator tests and manual user-flow checks **NOT RUN** for this documentation-only update. Existing PR log reports earlier local test evidence, not a new test execution. Reviewer approval and PR merge remain pending.
 - **Next action:** User G and a different teammate review the remaining asynchronous account-switch race in PR #33; assign an Issue #12 implementer/reviewer and begin S-05 UI only after #10 satisfies its merge/preflight gates. No additional coursework learning or human review is claimed by this entry.

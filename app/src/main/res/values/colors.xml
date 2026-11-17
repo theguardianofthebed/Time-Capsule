@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Legacy colors for backwards compatibility -->
     <color name="purple_200">#FFBB86FC</color>
     <color name="purple_500">#FF6200EE</color>
     <color name="purple_700">#FF3700B3</color>
@@ -7,4 +8,25 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
+    <!-- TimeCapsule Stitch UI Design System Palette Tokens -->
+    <color name="capsule_bg">#FAF9F5</color>
+    <color name="capsule_card_surface">#FFFDF9</color>
+    <color name="capsule_border">#E8E3DA</color>
+    <color name="capsule_text_dark">#222220</color>
+    <color name="capsule_text_body">#3D3933</color>
+    <color name="capsule_text_muted">#7E7A75</color>
+    <color name="capsule_text_subtle">#AAA59E</color>
+    <color name="capsule_primary">#865B4B</color>
+    <color name="capsule_primary_hover">#754E40</color>
+    <color name="capsule_badge_bg">#ECE7DD</color>
+    <color name="capsule_banner_bg">#EDE6DD</color>
+    <color name="capsule_banner_text">#7D736A</color>
+    <color name="capsule_avatar_bg">#E5D7C7</color>
+    <color name="capsule_avatar_text">#7C5A48</color>
+    <color name="capsule_error_text">#B3261E</color>
+    <color name="capsule_error_bg">#F7EAE4</color>
+    <color name="capsule_success_bg">#EAF2DE</color>
+    <color name="capsule_success_text">#364722</color>
+    <color name="capsule_success_border">#D5EAB7</color>
 </resources>

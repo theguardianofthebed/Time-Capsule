@@ -1,33 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/mainRootView"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="16dp">
+    android:layout_height="match_parent">
 
-    <!-- Main container layout for the TimeCapsule Views skeleton -->
-    <TextView
-        android:id="@+id/tvMainTitle"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/title_main_skeleton"
-        android:textSize="20sp"
-        android:textStyle="bold" />
-
-    <TextView
-        android:id="@+id/tvMainSubtitle"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:text="@string/subtitle_main_skeleton"
-        android:textSize="14sp" />
-
+    <!-- Fragment container occupying full application content area -->
     <FrameLayout
         android:id="@+id/fragmentContainer"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:layout_marginTop="16dp" />
+        android:layout_height="match_parent" />
 
-</LinearLayout>
+    <!-- Error message text displayed only if Firebase initialization fails -->
+    <TextView
+        android:id="@+id/tvInitError"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:gravity="center"
+        android:padding="16dp"
+        android:textColor="#B00020"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+</FrameLayout>

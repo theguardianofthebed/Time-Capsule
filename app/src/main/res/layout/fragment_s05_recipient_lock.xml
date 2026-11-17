@@ -1,18 +1,545 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/s05RootView"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="16dp">
+    android:background="#FAF8F5"
+    android:orientation="vertical">
 
-    <!-- S-05 Recipient & lock choice screen placeholder -->
-    <TextView
-        android:id="@+id/tvS05Title"
-        android:layout_width="wrap_content"
+    <!-- Top Header Bar -->
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@string/title_s05_recipient_lock"
-        android:textSize="18sp"
-        android:textStyle="bold" />
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="16dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="8dp">
 
+        <ImageButton
+            android:id="@+id/btnBack"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Go back"
+            android:src="@android:drawable/ic_menu_revert"
+            app:tint="#3D3933" />
+
+        <TextView
+            android:id="@+id/tvHeaderTitle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:text="@string/s04_header_title"
+            android:textColor="#3D3933"
+            android:textSize="17sp"
+            android:textStyle="bold" />
+
+        <View
+            android:layout_width="40dp"
+            android:layout_height="40dp" />
+    </LinearLayout>
+
+    <!-- Step Indicator -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:paddingHorizontal="16dp"
+        android:paddingBottom="12dp">
+
+        <TextView
+            android:id="@+id/tvStep1"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/s04_step_01"
+            android:textColor="#9C9488"
+            android:textSize="13sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="16dp"
+            android:text="·"
+            android:textColor="#C4BDB2" />
+
+        <TextView
+            android:id="@+id/tvStep2"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/s04_step_02"
+            android:textColor="#3D3933"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="16dp"
+            android:text="·"
+            android:textColor="#C4BDB2" />
+
+        <TextView
+            android:id="@+id/tvStep3"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/s04_step_03"
+            android:textColor="#9C9488"
+            android:textSize="13sp" />
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#ECE7DE" />
+
+    <!-- Main Content Scroll Area -->
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="20dp">
+
+            <!-- Headline -->
+            <TextView
+                android:id="@+id/tvHeadline"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/s05_headline"
+                android:textColor="#2B2723"
+                android:textSize="24sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvSubtitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="@string/s05_subtitle"
+                android:textColor="#8C857B"
+                android:textSize="14sp" />
+
+            <!-- Recipient Section -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:text="@string/s05_label_recipient_section"
+                android:textColor="#3D3933"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <!-- Mode Toggle Row -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="#ECE7DF"
+                android:orientation="horizontal"
+                android:padding="4dp">
+
+                <Button
+                    android:id="@+id/btnModeFutureMe"
+                    style="?attr/borderlessButtonStyle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/s05_mode_future_me"
+                    android:textColor="#3D3933"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
+                <Button
+                    android:id="@+id/btnModeSomeoneElse"
+                    style="?attr/borderlessButtonStyle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/s05_mode_someone_else"
+                    android:textColor="#8C857B"
+                    android:textSize="13sp" />
+            </LinearLayout>
+
+            <!-- UID Input and Lookup Layout -->
+            <LinearLayout
+                android:id="@+id/layoutUidInputSection"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/s05_label_exact_uid"
+                    android:textColor="#3D3933"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <EditText
+                        android:id="@+id/etRecipientUid"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:background="@android:drawable/editbox_background"
+                        android:hint="@string/s05_hint_exact_uid"
+                        android:inputType="textNoSuggestions"
+                        android:padding="12dp"
+                        android:textColor="#3D3933"
+                        android:textSize="14sp" />
+
+                    <Button
+                        android:id="@+id/btnLookupRecipient"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:backgroundTint="#865B4B"
+                        android:text="@string/s05_btn_lookup"
+                        android:textColor="#FFFDF9"
+                        android:textSize="12sp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Lookup Result and Confirmation Card -->
+            <LinearLayout
+                android:id="@+id/layoutRecipientResult"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:background="#F6F3EE"
+                android:orientation="vertical"
+                android:padding="14dp">
+
+                <LinearLayout
+                    android:id="@+id/layoutLookupInfo"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/tvLookupResultName"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Found Jamie"
+                            android:textColor="#2B2723"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tvLookupResultUid"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="UID: TC-JAMIE1ff"
+                            android:textColor="#8C857B"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/tvLookupResultBadge"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:background="#ECE2D8"
+                        android:paddingHorizontal="8dp"
+                        android:paddingVertical="4dp"
+                        android:text="Found"
+                        android:textColor="#865B4B"
+                        android:textSize="11sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <Button
+                    android:id="@+id/btnConfirmRecipient"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:backgroundTint="#2B2723"
+                    android:text="@string/s05_btn_confirm_recipient"
+                    android:textColor="#FFFDF9"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
+                <!-- Confirmed Recipient View -->
+                <LinearLayout
+                    android:id="@+id/layoutRecipientConfirmed"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:background="#EFECE6"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:padding="10dp"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:id="@+id/tvConfirmedMessage"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Recipient confirmed: Jamie (TC-JAMIE1ff)"
+                        android:textColor="#2B2723"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/tvRecipientNote"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:gravity="center"
+                    android:text="@string/s05_note_confirm"
+                    android:textColor="#8C857B"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <!-- Unlock Condition Section -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:text="@string/s05_label_when"
+                android:textColor="#3D3933"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btnLockTime"
+                    style="?attr/borderlessButtonStyle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/s05_lock_time"
+                    android:textColor="#3D3933"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <Button
+                    android:id="@+id/btnLockPlace"
+                    style="?attr/borderlessButtonStyle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/s05_lock_place"
+                    android:textColor="#8C857B"
+                    android:textSize="12sp" />
+
+                <Button
+                    android:id="@+id/btnLockBoth"
+                    style="?attr/borderlessButtonStyle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/s05_lock_both"
+                    android:textColor="#8C857B"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <!-- Date & Time Picker Section -->
+            <LinearLayout
+                android:id="@+id/layoutTimeSection"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/s05_label_date_time"
+                    android:textColor="#3D3933"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
+                <Button
+                    android:id="@+id/btnSelectDateTime"
+                    style="?attr/borderlessButtonStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:background="#FFFFFF"
+                    android:gravity="start|center_vertical"
+                    android:padding="12dp"
+                    android:text="Select future date &amp; time"
+                    android:textColor="#3D3933"
+                    android:textSize="14sp" />
+            </LinearLayout>
+
+            <!-- Place Selector Section -->
+            <LinearLayout
+                android:id="@+id/layoutPlaceSection"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/s05_label_place"
+                    android:textColor="#3D3933"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
+                <Button
+                    android:id="@+id/btnSelectPlace"
+                    style="?attr/borderlessButtonStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:background="#FFFFFF"
+                    android:enabled="false"
+                    android:gravity="start|center_vertical"
+                    android:padding="12dp"
+                    android:text="Location picker (Unavailable until Issue #16)"
+                    android:textColor="#8C857B"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:id="@+id/tvLocationSubtext"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="@string/s05_location_notice"
+                    android:textColor="#8C857B"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <!-- Both Conditions Notice -->
+            <TextView
+                android:id="@+id/tvBothNotice"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:background="#F0ECE5"
+                android:padding="10dp"
+                android:text="@string/s05_notice_both"
+                android:textColor="#666056"
+                android:textSize="12sp"
+                android:visibility="gone" />
+
+            <!-- Error Notice -->
+            <TextView
+                android:id="@+id/tvS05Error"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:textColor="#B00020"
+                android:textSize="13sp"
+                android:visibility="gone" />
+
+            <!-- Primary CTA -->
+            <Button
+                android:id="@+id/btnReviewCapsule"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:backgroundTint="#865B4B"
+                android:enabled="false"
+                android:paddingVertical="12dp"
+                android:text="@string/s05_btn_review_disabled"
+                android:textColor="#FFFDF9"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+        </LinearLayout>
+    </ScrollView>
+
+    <!-- Bottom Navigation Bar -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#ECE7DE" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#FAF8F5"
+        android:orientation="horizontal"
+        android:paddingVertical="8dp">
+
+        <LinearLayout
+            android:id="@+id/btnNavMoments"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/nav_moments"
+                android:textColor="#9C9488"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/btnNavCreate"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/nav_create"
+                android:textColor="#3D3933"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/btnNavAccount"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/nav_account"
+                android:textColor="#9C9488"
+                android:textSize="12sp" />
+        </LinearLayout>
+    </LinearLayout>
 </LinearLayout>

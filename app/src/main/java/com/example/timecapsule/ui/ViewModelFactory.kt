@@ -3,6 +3,7 @@ package com.example.timecapsule.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.example.timecapsule.data.AccountSessionManager
+import com.example.timecapsule.ui.draft.CapsuleDraftViewModel
 import com.example.timecapsule.ui.s01.S01SignInViewModel
 import com.example.timecapsule.ui.s02.S02RegisterViewModel
 import com.example.timecapsule.ui.s08.S08AccountSettingsViewModel
@@ -25,6 +26,9 @@ class ViewModelFactory(
             }
             modelClass.isAssignableFrom(S08AccountSettingsViewModel::class.java) -> {
                 S08AccountSettingsViewModel(accountSessionManager) as T
+            }
+            modelClass.isAssignableFrom(CapsuleDraftViewModel::class.java) -> {
+                CapsuleDraftViewModel(accountSessionManager) as T
             }
             else -> throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
         }

@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="120dp"
+    android:height="120dp"
+    android:viewportWidth="160"
+    android:viewportHeight="160">
+
+    <!-- Soft Backdrop Circle -->
+    <path
+        android:fillColor="#EFECE3"
+        android:pathData="M80,16A64,64 0 1,0 80,144A64,64 0 1,0 80,16Z" />
+
+    <!-- Leaf Left -->
+    <path
+        android:fillColor="#7E8B75"
+        android:pathData="M42,66C38,60 38,48 48,48C48,58 46,64 42,66Z" />
+
+    <!-- Leaf Right -->
+    <path
+        android:fillColor="#7E8B75"
+        android:pathData="M120,44C122,36 128,32 134,36C132,44 126,46 120,44Z" />
+
+    <!-- Letter Paper Sheet -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M48,38h64v66h-64z" />
+
+    <!-- Letter Lines -->
+    <path
+        android:pathData="M56,52h36M56,60h44M55,68h29"
+        android:strokeWidth="2.5"
+        android:strokeColor="#DFDBD2"
+        android:strokeLineCap="round" />
+
+    <!-- Envelope Back Body -->
+    <path
+        android:fillColor="#E4D2C1"
+        android:pathData="M32,64L80,98L128,64V124C128,127 125,130 121,130H39C35,130 32,127 32,124V64Z" />
+
+    <!-- Envelope Bottom Flap -->
+    <path
+        android:fillColor="#DECAB8"
+        android:pathData="M32,130H128L80,92L32,130Z" />
+
+    <!-- Wax Seal Stamp -->
+    <path
+        android:fillColor="#784E3F"
+        android:pathData="M80,96m-11,0a11,11 0 1,0 22,0a11,11 0 1,0 -22,0" />
+
+    <path
+        android:pathData="M76,96h8"
+        android:strokeWidth="1.5"
+        android:strokeColor="#FAF9F5" />
+</vector>
