@@ -19,6 +19,7 @@ class ViewModelFactory(
 ) : ViewModelProvider.Factory {
 
     @Suppress("UNCHECKED_CAST")
+    /** Creates supported models and initializes private media persistence for the shared draft. */
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         return when {
             modelClass.isAssignableFrom(S01SignInViewModel::class.java) -> {

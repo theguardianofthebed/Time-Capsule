@@ -151,4 +151,9 @@
     <string name="nav_create">Create</string>
     <string name="nav_account">Account</string>
     <string name="photo_preview_description">Selected photo preview</string>
+    <string name="photo_restore_failure">Saved photo is missing or changed. Choose it again.</string>
+    <string name="photo_save_failure">Cannot save draft. Free some storage and try again.</string>
+    <string name="photo_access_denied">Photo access was denied. Choose the photo again.</string>
+    <string name="photo_invalid">Choose a readable JPEG or PNG between 1 byte and 5 MiB.</string>
+    <string name="photo_io_failure">Cannot read or save the photo. Check available storage and try again.</string>
 </resources>

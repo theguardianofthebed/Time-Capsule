@@ -20,7 +20,6 @@ import com.example.timecapsule.data.adapter.DefaultAuthAdapter
 import com.example.timecapsule.data.adapter.DefaultFirestoreAdapter
 import com.example.timecapsule.data.adapter.LocalRetentionAdapter
 import com.example.timecapsule.data.adapter.LocationAdapter
-import com.example.timecapsule.data.adapter.StorageAdapter
 import com.example.timecapsule.data.di.AppDependencyContainer
 import com.example.timecapsule.data.session.DefaultSessionTracker
 import com.example.timecapsule.databinding.ActivityMainBinding

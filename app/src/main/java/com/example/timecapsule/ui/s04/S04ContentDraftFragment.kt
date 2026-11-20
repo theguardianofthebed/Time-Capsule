@@ -22,6 +22,7 @@ import com.example.timecapsule.domain.result.OperationResult
 import com.example.timecapsule.ui.ViewModelFactory
 import com.example.timecapsule.ui.draft.CapsuleDraftViewModel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.collectLatest
 
 /**
  * S-04 Content Creation ScreenFragment using native Android Views and ViewBinding.
@@ -45,15 +46,16 @@ class S04ContentDraftFragment : Fragment() {
     private val photoPickerLauncher = registerForActivityResult(
         ActivityResultContracts.PickVisualMedia()
     ) { uri ->
-        if (uri != null) viewModel.selectPhoto(photoInput, uri)
+        if (uri != null) viewModel.selectPhoto(photoInput, uri.toString())
     }
 
     private val documentLauncher = registerForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
-        if (uri != null) viewModel.selectPhoto(photoInput, uri)
+        if (uri != null) viewModel.selectPhoto(photoInput, uri.toString())
     }
 
+    /** Inflates the content form and selected-photo preview. */
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -63,6 +65,7 @@ class S04ContentDraftFragment : Fragment() {
         return binding.root
     }
 
+    /** Connects the shared draft to private media storage and lifecycle-bound rendering. */
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         photoInput = AndroidPhotoInput(requireContext())
@@ -107,6 +110,7 @@ class S04ContentDraftFragment : Fragment() {
         })
     }
 
+    /** Launches one-image selection and handles editable draft actions without publishing. */
     private fun setupClickListeners() {
         binding.btnAttachPhoto.setOnClickListener {
             // Older devices use OPEN_DOCUMENT; the private copy removes future URI dependency.
@@ -146,19 +150,24 @@ class S04ContentDraftFragment : Fragment() {
         }
     }
 
+    /** Cancels obsolete previews and observes state only while this view is started. */
     private fun observeViewModelState() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.uiState.collect { state ->
+                var previewedPhoto: com.example.timecapsule.domain.model.RetainedOriginalPhoto? = null
+                viewModel.uiState.collectLatest { state ->
                     binding.btnAttachPhoto.isEnabled = !state.photoBusy
                     binding.btnContinue.isEnabled = !state.photoBusy
                     binding.etCapsuleTitle.isEnabled = !state.photoBusy
                     binding.etCapsuleBody.isEnabled = !state.photoBusy
-                    binding.tvS04Error.text = state.photoError
+                    binding.tvS04Error.text = state.photoError?.let { getString(it) }
                     binding.tvS04Error.visibility = if (state.photoError == null) View.GONE else View.VISIBLE
                     val photo = state.originalPhoto
-                    val preview = if (photo != null) photoInput.preview(photo) else null
-                    binding.ivPhotoPreview.setImageBitmap(preview)
+                    if (photo != previewedPhoto) {
+                        val preview = if (photo != null) photoInput.preview(photo) else null
+                        binding.ivPhotoPreview.setImageBitmap(preview)
+                        previewedPhoto = photo
+                    }
                     isSyncingText = true
                     if (binding.etCapsuleTitle.text.toString() != state.title) {
                         binding.etCapsuleTitle.setText(state.title)
@@ -181,6 +190,7 @@ class S04ContentDraftFragment : Fragment() {
         }
     }
 
+    /** Releases view references; draft work remains owned by the activity ViewModel. */
     override fun onDestroyView() {
         super.onDestroyView()
         _binding = null

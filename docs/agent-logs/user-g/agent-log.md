@@ -123,3 +123,45 @@ Weekly coursework remains in `agent-log-w1.md`–`agent-log-w4.md`.
   at step 6. Storage rule execution and real SDK uploads NOT RUN without device/backend test setup.
 - **Remaining:** Focused retry/recovery tests, final build/lint, device handoff and teammate review.
 - **Human review/understanding:** Pending.
+
+## 2026-11-20-06 — Issue #13: regression checks and verification boundary (step 6 of 6)
+
+- **Owner:** User G
+- **Agent environment:**
+- **Model used:**
+- **Status:** Implementation checkpoint complete; device/backend verification and review pending.
+- **Requested outcome:** Complete remaining steps with one real commit per step; keep personal
+  phone configuration instructions out of repository documentation.
+- **References:** Issue #13; DD-04/DD-25; bounded T-05/T-09/T-31/T-36 portions.
+
+### Work performed
+
+- Added real-filesystem tests for stable retry bytes, SHA-256 mutation detection, missing files,
+  wrong paths/acknowledgments, cancellation, session changes, private journal recovery and cleanup.
+- Replaced metadata-only URI attachment with the validated storage boundary; updated UI tests.
+  Added delayed-provider tests for removal and account switching so late results cannot reattach.
+- Local selection removal/discard now saves removal before deleting its editable private bytes.
+  Frozen upload bytes remain separate. Resource strings describe photo failures, and obsolete
+  preview decoding is cancelled with the screen lifecycle.
+- Prepared three Android decoder tests and four Storage-rule cases, without claiming execution.
+- Set the credential-free local Firebase project's Storage bucket so SDK references can resolve.
+- Added a code-status handoff with integration boundaries; no personal device setup instructions.
+
+### Checks and results
+
+- `:app:testDebugUnitTest`: PASS, 103 tests, zero failures/errors/skips.
+- `:app:assembleDebug`: PASS.
+- `:app:assembleDebugAndroidTest`: PASS (compilation only).
+- `:app:lintDebug`: PASS with warnings, no errors; no zero-warning claim.
+- `node --check tests/capsule.rules.test.js`: PASS (syntax only, not security-rule execution).
+- `git diff --check`: PASS.
+- Real Android execution, provider access, process lifecycle, Firebase SDK connectivity/upload,
+  Storage rules and end-to-end media delivery: NOT RUN. No device was connected for this task.
+- These checks exercise the final implementation tree before the sixth commit; no publication,
+  merge, full AC pass or actual SENT outcome is claimed.
+
+### Human input and remaining work
+
+- Reviewer remains unassigned. Human review, manual edits and personal understanding are pending.
+- Await device/backend verification and #14 publication integration. Keep the current task branch
+  and earlier commits; PR creation remains deferred as requested.
