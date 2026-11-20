@@ -2,6 +2,11 @@ package com.example.timecapsule.ui.draft
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import android.net.Uri
+import com.example.timecapsule.data.media.AndroidPhotoInput
+import com.example.timecapsule.domain.model.RetainedOriginalPhoto
+import kotlinx.coroutines.CancellationException
+import java.io.IOException
 import com.example.timecapsule.data.AccountSessionManager
 import com.example.timecapsule.domain.model.CapsuleDraft
 import com.example.timecapsule.domain.model.CapsuleLock
@@ -43,6 +48,9 @@ data class CapsuleDraftUiState(
     val localPhotoUri: String? = null,
     val photoName: String? = null,
     val photoSizeBytes: Long? = null,
+    val originalPhoto: RetainedOriginalPhoto? = null,
+    val photoBusy: Boolean = false,
+    val photoError: String? = null,
     val recipientMode: RecipientMode = RecipientMode.FUTURE_ME,
     val recipientUidInput: String = "",
     val lookupStatus: RecipientLookupStatus = RecipientLookupStatus.IDLE,
@@ -70,6 +78,42 @@ class CapsuleDraftViewModel(
     val uiState: StateFlow<CapsuleDraftUiState> = _uiState.asStateFlow()
 
     private var activeLookupToken: Long = 0L
+    private var photoToken = 0L
+
+    /** Retains provider content asynchronously and ignores obsolete selections or accounts. */
+    fun selectPhoto(input: AndroidPhotoInput, uri: Uri) {
+        val state = _uiState.value
+        val uid = state.activeSessionUid ?: return
+        val token = ++photoToken
+        _uiState.update { it.copy(photoBusy = true, photoError = null) }
+        viewModelScope.launch {
+            try {
+                val photo = input.retain(uid, state.capsuleId, uri)
+                if (token != photoToken || _uiState.value.activeSessionUid != uid ||
+                    accountSessionManager.restoreSessionIfAuthenticated() != uid ||
+                    _uiState.value.capsuleId != state.capsuleId) {
+                    input.remove(photo)
+                    return@launch
+                }
+                val previous = _uiState.value.originalPhoto
+                _uiState.update { it.copy(originalPhoto = photo,
+                    localPhotoUri = Uri.fromFile(input.file(photo)).toString(),
+                    photoName = "Photo", photoSizeBytes = photo.sizeBytes, photoBusy = false) }
+                if (previous != null) input.remove(previous)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: SecurityException) {
+                photoFailed(token, "Photo access was denied. Choose the photo again.")
+            } catch (error: IOException) {
+                photoFailed(token, error.message ?: "Cannot read photo. Choose it again or retry.")
+            }
+        }
+    }
+
+    /** Updates only the current request's error without replacing a previous valid selection. */
+    private fun photoFailed(token: Long, message: String) {
+        if (token == photoToken) _uiState.update { it.copy(photoBusy = false, photoError = message) }
+    }
 
     init {
         val currentUid = accountSessionManager.restoreSessionIfAuthenticated()
@@ -123,11 +167,13 @@ class CapsuleDraftViewModel(
 
     /** Removes attached photo. */
     fun removePhoto() {
+        photoToken++
         _uiState.update {
             it.copy(
                 localPhotoUri = null,
                 photoName = null,
-                photoSizeBytes = null
+                photoSizeBytes = null,
+                originalPhoto = null, photoBusy = false, photoError = null
             )
         }
     }
@@ -328,6 +374,7 @@ class CapsuleDraftViewModel(
     /** Validates S-04 content requirements: message body or photo required. Title alone is invalid. */
     fun validateS04Content(): OperationResult<Unit> {
         val state = _uiState.value
+        if (state.photoBusy) return OperationResult.Invalid("Please wait for the photo to finish.")
         val hasText = state.text.isNotBlank()
         val hasPhoto = !state.localPhotoUri.isNullOrBlank()
         return if (hasText || hasPhoto) {
@@ -408,6 +455,7 @@ class CapsuleDraftViewModel(
 
     /** Resets draft state with a new unique capsule ID. */
     fun discardDraft() {
+        photoToken++
         val activeUid = accountSessionManager.restoreSessionIfAuthenticated()
         _uiState.value = CapsuleDraftUiState(activeSessionUid = activeUid)
         if (!activeUid.isNullOrBlank()) {

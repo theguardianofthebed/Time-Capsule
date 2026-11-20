@@ -1,0 +1,46 @@
+package com.example.timecapsule.data.media
+
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
+import com.example.timecapsule.domain.model.RetainedOriginalPhoto
+import java.io.File
+import java.io.FileNotFoundException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
+/** Opens provider content once and retains originals outside Android backup and shared storage. */
+class AndroidPhotoInput(context: Context) {
+    private val context = context.applicationContext
+    private val root = File(this.context.noBackupFilesDir, "original-photos")
+    private val store = OriginalPhotoStore(root, AndroidOriginalImageProbe())
+
+    /** Copies and validates provider bytes on I/O; never trusts URI names or reported sizes. */
+    suspend fun retain(uid: String, capsuleId: String, uri: Uri): RetainedOriginalPhoto =
+        withContext(Dispatchers.IO) {
+            val resolver = context.contentResolver
+            val mime = resolver.getType(uri)
+            val input = resolver.openInputStream(uri) ?: throw FileNotFoundException()
+            store.retain(uid, capsuleId, mime, input)
+        }
+
+    /** Resolves only a safe, identity-scoped original name under this store. */
+    fun file(photo: RetainedOriginalPhoto): File = store.file(photo)
+
+    /** Releases an unsubmitted local selection; frozen upload inputs must not use this method. */
+    suspend fun remove(photo: RetainedOriginalPhoto) = withContext(Dispatchers.IO) {
+        store.file(photo).delete()
+        Unit
+    }
+
+    /** Decodes a small preview from private bytes, keeping full-resolution pixels out of the UI. */
+    suspend fun preview(photo: RetainedOriginalPhoto): Bitmap? = withContext(Dispatchers.IO) {
+        val file = file(photo)
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(file.path, bounds)
+        var sample = 1
+        while (bounds.outWidth / sample > 512 || bounds.outHeight / sample > 512) sample *= 2
+        BitmapFactory.decodeFile(file.path, BitmapFactory.Options().apply { inSampleSize = sample })
+    }
+}

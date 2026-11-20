@@ -75,3 +75,17 @@ Weekly coursework remains in `agent-log-w1.md`–`agent-log-w4.md`.
 - Reviewer remains unassigned as confirmed by the user. Human review/understanding is pending.
 - These components are not yet wired to the screen or upload path. Next: picker and preview wiring
   with the store rooted under Android's non-backed-up private directory, then persistent recovery.
+
+## 2026-11-20-03 — Issue #13: picker and private preview (step 3 of 6)
+
+- **Owner:** User G
+- **Agent environment:**
+- **Model used:**
+- **Status:** Partial.
+- **Requested outcome:** Continue through steps 3–6 with a separate commit per step.
+- **Work performed:** Connected API 33+ Photo Picker and API 26–32 OpenDocument to bounded private
+  retention. Added sampled preview, progress gating and stale-selection rejection in S-04.
+- **Checks:** Source review and whitespace check; device picker/decoder checks NOT RUN until phone
+  connection. Build validation is recorded in the final checkpoint.
+- **Remaining:** Restart recovery, authenticated upload, failure tests and device verification.
+- **Human review/understanding:** Pending; reviewer not assigned.

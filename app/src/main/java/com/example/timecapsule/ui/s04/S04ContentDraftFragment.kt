@@ -1,6 +1,9 @@
 package com.example.timecapsule.ui.s04
 
 import android.os.Bundle
+import android.os.Build
+import androidx.activity.result.PickVisualMediaRequest
+import com.example.timecapsule.data.media.AndroidPhotoInput
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.LayoutInflater
@@ -37,26 +40,18 @@ class S04ContentDraftFragment : Fragment() {
     var onNavigateToAccountListener: (() -> Unit)? = null
 
     private var isSyncingText = false
+    private lateinit var photoInput: AndroidPhotoInput
 
     private val photoPickerLauncher = registerForActivityResult(
-        ActivityResultContracts.GetContent()
+        ActivityResultContracts.PickVisualMedia()
     ) { uri ->
-        if (uri != null) {
-            val contentResolver = requireContext().contentResolver
-            val size = try {
-                contentResolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: 0L
-            } catch (e: Exception) {
-                0L
-            }
-            val fileName = uri.lastPathSegment ?: "photo.jpg"
-            val result = viewModel.attachPhoto(uri.toString(), fileName, size)
-            if (result is OperationResult.Invalid) {
-                binding.tvS04Error.text = result.message
-                binding.tvS04Error.visibility = View.VISIBLE
-            } else {
-                binding.tvS04Error.visibility = View.GONE
-            }
-        }
+        if (uri != null) viewModel.selectPhoto(photoInput, uri)
+    }
+
+    private val documentLauncher = registerForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) viewModel.selectPhoto(photoInput, uri)
     }
 
     override fun onCreateView(
@@ -70,6 +65,7 @@ class S04ContentDraftFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        photoInput = AndroidPhotoInput(requireContext())
 
         val mainActivity = requireActivity() as MainActivity
         viewModel = ViewModelProvider(
@@ -113,8 +109,12 @@ class S04ContentDraftFragment : Fragment() {
 
     private fun setupClickListeners() {
         binding.btnAttachPhoto.setOnClickListener {
-            binding.tvS04Error.text = getString(R.string.s04_photo_notice)
-            binding.tvS04Error.visibility = View.VISIBLE
+            // Older devices use OPEN_DOCUMENT; the private copy removes future URI dependency.
+            if (Build.VERSION.SDK_INT >= 33) {
+                photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+            } else {
+                documentLauncher.launch(arrayOf("image/jpeg", "image/png"))
+            }
         }
 
         binding.btnRemovePhoto.setOnClickListener {
@@ -150,6 +150,13 @@ class S04ContentDraftFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.uiState.collect { state ->
+                    binding.btnAttachPhoto.isEnabled = !state.photoBusy
+                    binding.btnContinue.isEnabled = !state.photoBusy
+                    binding.tvS04Error.text = state.photoError
+                    binding.tvS04Error.visibility = if (state.photoError == null) View.GONE else View.VISIBLE
+                    val photo = state.originalPhoto
+                    val preview = if (photo != null) photoInput.preview(photo) else null
+                    binding.ivPhotoPreview.setImageBitmap(preview)
                     isSyncingText = true
                     if (binding.etCapsuleTitle.text.toString() != state.title) {
                         binding.etCapsuleTitle.setText(state.title)

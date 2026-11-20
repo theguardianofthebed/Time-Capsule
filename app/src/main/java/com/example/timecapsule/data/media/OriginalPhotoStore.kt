@@ -96,6 +96,13 @@ class OriginalPhotoStore(
     }
 
     /** Hashes identity components so provider/account text cannot escape private directories. */
+    fun file(photo: RetainedOriginalPhoto): File {
+        require(photo.privateFileName.matches(Regex("[a-f0-9-]{36}\\.original")))
+        return File(File(File(root, digestName(photo.ownerUid)), digestName(photo.capsuleId)),
+            photo.privateFileName)
+    }
+
+    /** Hashes identity components so provider/account text cannot escape private directories. */
     private fun digestName(value: String): String =
         hex(MessageDigest.getInstance("SHA-256").digest(value.toByteArray(Charsets.UTF_8)))
 
