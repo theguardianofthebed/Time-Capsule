@@ -40,3 +40,38 @@ Weekly coursework remains in `agent-log-w1.md`–`agent-log-w4.md`.
 - Next: bounded copying, hash calculation and actual-format validation, followed by picker,
   recovery, upload and focused tests. Remote orphan deletion needs reconciliation with current
   Storage rules, which deny client deletion. No deletion success is claimed.
+
+## 2026-11-20-02 — Issue #13: bounded original retention (step 2 of 6)
+
+- **Owner:** User G
+- **Agent environment:**
+- **Model used:**
+- **Status:** Partial; second implementation checkpoint.
+- **Requested outcome:** Continue to the next step and stop after its commit.
+- **References:** Issue #13; DD-04, DD-25; T-05, T-31 (bounded local portions).
+
+### Work performed
+
+- Added `OriginalPhotoStore` to stream one original into identity-scoped directories, count actual
+  bytes, enforce 1–5,242,880 bytes and compute SHA-256 without transforming the original.
+- Added `AndroidOriginalImageProbe` to check decoded MIME/dimensions and decode a sampled preview.
+- Failed replacements preserve the previous file; read failures, revoked access and cancellation
+  propagate to the caller and remove this attempt's incomplete candidate.
+- Added eight focused JVM tests for exact-boundary preservation/hash, oversized/empty input,
+  MIME mismatch, unreadable input, revoked access, failed replacement and cancellation.
+
+### Checks and results
+
+- `:app:testDebugUnitTest --tests '*OriginalPhotoStoreTest'`: PASS, eight tests, zero failures.
+- `:app:assembleDebug`: PASS. Existing deprecation/native-symbol warnings did not block the build.
+- `git diff --check`: PASS.
+- Initial sandboxed Gradle attempt could not open its cache lock; retry with authorized cache
+  access succeeded.
+- JVM tests inject an image probe: they verify copying and failure behavior, not Android decoding.
+  Real JPEG/PNG decoding, picker and device lifecycle checks remain NOT RUN pending phone access.
+
+### Human input and remaining work
+
+- Reviewer remains unassigned as confirmed by the user. Human review/understanding is pending.
+- These components are not yet wired to the screen or upload path. Next: picker and preview wiring
+  with the store rooted under Android's non-backed-up private directory, then persistent recovery.
