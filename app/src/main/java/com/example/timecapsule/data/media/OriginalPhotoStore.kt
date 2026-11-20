@@ -95,11 +95,32 @@ class OriginalPhotoStore(
         }
     }
 
-    /** Hashes identity components so provider/account text cannot escape private directories. */
+    /** Resolves a stored name without permitting paths outside this account/capsule directory. */
     fun file(photo: RetainedOriginalPhoto): File {
         require(photo.privateFileName.matches(Regex("[a-f0-9-]{36}\\.original")))
         return File(File(File(root, digestName(photo.ownerUid)), digestName(photo.capsuleId)),
             photo.privateFileName)
+    }
+
+    /** Rechecks retained length and hash before recovery or upload; never trusts stale metadata. */
+    fun verify(photo: RetainedOriginalPhoto): File {
+        val file = file(photo)
+        if (!OriginalPhotoLimits.acceptsSize(photo.sizeBytes) || file.length() != photo.sizeBytes) {
+            throw InvalidOriginalPhotoException("Saved photo is missing or has changed. Choose it again.")
+        }
+        val digest = MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { source ->
+            val buffer = ByteArray(8192)
+            while (true) {
+                val read = source.read(buffer)
+                if (read == -1) break
+                digest.update(buffer, 0, read)
+            }
+        }
+        if (hex(digest.digest()) != photo.sha256) {
+            throw InvalidOriginalPhotoException("Saved photo has changed. Choose it again.")
+        }
+        return file
     }
 
     /** Hashes identity components so provider/account text cannot escape private directories. */

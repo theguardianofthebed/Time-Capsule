@@ -9,12 +9,28 @@ import java.io.File
 import java.io.FileNotFoundException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /** Opens provider content once and retains originals outside Android backup and shared storage. */
 class AndroidPhotoInput(context: Context) {
     private val context = context.applicationContext
     private val root = File(this.context.noBackupFilesDir, "original-photos")
     private val store = OriginalPhotoStore(root, AndroidOriginalImageProbe())
+    private val journal = PhotoDraftJournal(File(this.context.noBackupFilesDir, "photo-drafts"))
+    private val journalMutex = Mutex()
+
+    /** Serializes atomic draft writes so older state cannot overwrite a newer save. */
+    suspend fun save(uid: String, draft: PhotoDraftRecord) = withContext(Dispatchers.IO) {
+        journalMutex.withLock { journal.save(uid, draft) }
+    }
+
+    /** Restores an account draft and verifies its private original without reopening a provider URI. */
+    suspend fun restore(uid: String): PhotoDraftRecord? = withContext(Dispatchers.IO) {
+        journalMutex.withLock {
+            journal.load(uid)?.also { record -> record.photo?.let { store.verify(it) } }
+        }
+    }
 
     /** Copies and validates provider bytes on I/O; never trusts URI names or reported sizes. */
     suspend fun retain(uid: String, capsuleId: String, uri: Uri): RetainedOriginalPhoto =

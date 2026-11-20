@@ -89,3 +89,19 @@ Weekly coursework remains in `agent-log-w1.md`–`agent-log-w4.md`.
   connection. Build validation is recorded in the final checkpoint.
 - **Remaining:** Restart recovery, authenticated upload, failure tests and device verification.
 - **Human review/understanding:** Pending; reviewer not assigned.
+
+## 2026-11-20-04 — Issue #13: private restart recovery (step 4 of 6)
+
+- **Owner:** User G
+- **Agent environment:**
+- **Model used:**
+- **Status:** Partial.
+- **Requested outcome:** Continue the previously authorized six-step implementation.
+- **Work performed:** Added atomic UID-scoped draft journals outside Android backup. The same
+  capsule ID, title, text and original-photo metadata restore without relying on the original URI.
+  Recovery checks retained size/hash; recipient/lock choices must be re-established after restart.
+  Serialized saves and account/request tokens prevent obsolete results from replacing active state.
+- **Checks:** Debug build and existing JVM tests PASS before final serialization review; final
+  checkpoint reruns relevant checks. Device/process-death behavior NOT RUN pending phone access.
+- **Remaining:** Upload ACK/retry boundary, cleanup lifecycle and regression coverage.
+- **Human review/understanding:** Pending.

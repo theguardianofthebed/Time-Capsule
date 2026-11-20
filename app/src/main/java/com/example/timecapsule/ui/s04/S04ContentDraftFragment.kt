@@ -70,7 +70,7 @@ class S04ContentDraftFragment : Fragment() {
         val mainActivity = requireActivity() as MainActivity
         viewModel = ViewModelProvider(
             requireActivity(),
-            ViewModelFactory(mainActivity.container.accountSessionManager)
+            ViewModelFactory(mainActivity.container.accountSessionManager, requireContext().applicationContext)
         )[CapsuleDraftViewModel::class.java]
 
         viewModel.syncSessionState()
@@ -152,6 +152,8 @@ class S04ContentDraftFragment : Fragment() {
                 viewModel.uiState.collect { state ->
                     binding.btnAttachPhoto.isEnabled = !state.photoBusy
                     binding.btnContinue.isEnabled = !state.photoBusy
+                    binding.etCapsuleTitle.isEnabled = !state.photoBusy
+                    binding.etCapsuleBody.isEnabled = !state.photoBusy
                     binding.tvS04Error.text = state.photoError
                     binding.tvS04Error.visibility = if (state.photoError == null) View.GONE else View.VISIBLE
                     val photo = state.originalPhoto

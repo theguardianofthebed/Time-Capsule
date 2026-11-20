@@ -49,7 +49,7 @@ class S06ConfirmSendFragment : Fragment() {
         val mainActivity = requireActivity() as MainActivity
         viewModel = ViewModelProvider(
             requireActivity(),
-            ViewModelFactory(mainActivity.container.accountSessionManager)
+            ViewModelFactory(mainActivity.container.accountSessionManager, requireContext().applicationContext)
         )[CapsuleDraftViewModel::class.java]
 
         viewModel.syncSessionState()
