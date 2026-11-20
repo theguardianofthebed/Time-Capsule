@@ -1,6 +1,14 @@
 package com.example.timecapsule
 
 import android.os.Bundle
+import com.example.timecapsule.data.adapter.DefaultStorageAdapter
+import com.example.timecapsule.data.media.OriginalPhotoStore
+import com.example.timecapsule.data.media.OriginalPhotoUploads
+import com.example.timecapsule.data.media.AndroidOriginalImageProbe
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.storage.FirebaseStorage
+import java.io.File
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -64,9 +72,11 @@ class MainActivity : AppCompatActivity() {
         val firestoreAdapter = DefaultFirestoreAdapter { applicationContext }
         val accountSessionManager = AccountSessionManager(authAdapter, firestoreAdapter, sessionTracker)
 
-        val storageAdapter = object : StorageAdapter {
-            override fun isAvailable(): Boolean = false
-        }
+        val storageAdapter = DefaultStorageAdapter(FirebaseStorage.getInstance(),
+            FirebaseFirestore.getInstance(), FirebaseAuth.getInstance())
+        val photoUploads = OriginalPhotoUploads(
+            OriginalPhotoStore(File(noBackupFilesDir, "original-photos"), AndroidOriginalImageProbe()),
+            File(noBackupFilesDir, "frozen-photos"), storageAdapter, sessionTracker::currentSession)
         val locationAdapter = object : LocationAdapter {
             override fun isLocationAvailable(): Boolean = false
         }
@@ -84,7 +94,8 @@ class MainActivity : AppCompatActivity() {
             locationAdapter = locationAdapter,
             retentionAdapter = retentionAdapter,
             repository = repository,
-            accountSessionManager = accountSessionManager
+            accountSessionManager = accountSessionManager,
+            photoUploads = photoUploads
         )
 
         // Unconditionally restore session into SessionTracker on every Activity/container creation

@@ -105,3 +105,21 @@ Weekly coursework remains in `agent-log-w1.md`–`agent-log-w4.md`.
   checkpoint reruns relevant checks. Device/process-death behavior NOT RUN pending phone access.
 - **Remaining:** Upload ACK/retry boundary, cleanup lifecycle and regression coverage.
 - **Human review/understanding:** Pending.
+
+## 2026-11-20-05 — Issue #13: frozen uploads and outcome-gated cleanup (step 5 of 6)
+
+- **Owner:** User G
+- **Agent environment:**
+- **Model used:**
+- **Status:** Partial; device/backend integration remains unverified.
+- **Requested outcome:** Continue the previously authorized six-step implementation.
+- **Work performed:** Added durable, separate frozen originals, stable object paths, serialized
+  upload/retry/cleanup and stale-session acknowledgment rejection. Firebase Storage uses authenticated
+  SDK calls and checks acknowledged path, size, MIME and MD5. No public download URL is used.
+  MainActivity exposes the upload service for #14; S-06 still does not publish capsules.
+- **Rules:** Reject zero-byte uploads. Allow only owner deletion of unpublished objects for definite
+  foreground abandonment; published deletion remains denied. Unknown outcomes retain remote/local bytes.
+- **Checks:** Compile/build/unit checks initiated; final results and focused upload tests are recorded
+  at step 6. Storage rule execution and real SDK uploads NOT RUN without device/backend test setup.
+- **Remaining:** Focused retry/recovery tests, final build/lint, device handoff and teammate review.
+- **Human review/understanding:** Pending.

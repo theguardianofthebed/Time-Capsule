@@ -48,6 +48,7 @@ data class CapsuleDraft(
     val recipientDisplayName: String? = null,
     val isRecipientConfirmed: Boolean = false,
     val locationName: String? = null,
+    val originalPhoto: RetainedOriginalPhoto? = null,
 ) {
     fun hasAnyContent(): Boolean = text.isNotBlank() || !localPhotoUri.isNullOrBlank()
 }

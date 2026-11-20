@@ -506,7 +506,8 @@ class CapsuleDraftViewModel(
             title = state.title.ifBlank { null },
             recipientDisplayName = state.resolvedProfile?.displayName,
             isRecipientConfirmed = state.isRecipientConfirmed,
-            locationName = state.locationName
+            locationName = state.locationName,
+            originalPhoto = state.originalPhoto
         )
     }
 

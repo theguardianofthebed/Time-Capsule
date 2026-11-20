@@ -1,6 +1,7 @@
 package com.example.timecapsule.data.di
 
 import com.example.timecapsule.data.AccountSessionManager
+import com.example.timecapsule.data.media.OriginalPhotoUploads
 import com.example.timecapsule.data.CapsuleRepository
 import com.example.timecapsule.data.adapter.AuthAdapter
 import com.example.timecapsule.data.adapter.FirestoreAdapter
@@ -20,5 +21,6 @@ class AppDependencyContainer(
     val locationAdapter: LocationAdapter,
     val retentionAdapter: LocalRetentionAdapter,
     val repository: CapsuleRepository,
-    val accountSessionManager: AccountSessionManager
+    val accountSessionManager: AccountSessionManager,
+    val photoUploads: OriginalPhotoUploads? = null
 )
