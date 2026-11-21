@@ -38,9 +38,15 @@ class DefaultCapsuleRepository(
         publicationCoordinator?.publish(frozenOperation)
             ?: OperationResult.Unavailable("Capsule publication service is unavailable.")
 
-    override suspend fun reconcile(capsuleId: String): OperationResult<SendStatus> {
-        return OperationResult.Invalid("Reconciliation requires Issue #14 implementation.")
-    }
+    /** Resolves server-only matching evidence without treating a missing record as a failed write. */
+    override suspend fun reconcile(capsuleId: String): OperationResult<SendStatus> =
+        publicationCoordinator?.reconcile(capsuleId)
+            ?: OperationResult.Unavailable("Publication reconciliation is unavailable.")
+
+    /** Replays the original saved snapshot only after the coordinator's server check. */
+    override suspend fun retryPublication(capsuleId: String): OperationResult<String> =
+        publicationCoordinator?.retry(capsuleId)
+            ?: OperationResult.Unavailable("Publication retry is unavailable.")
 
     override suspend fun lists(uid: String): OperationResult<CapsuleListsSnapshot> {
         return OperationResult.Unavailable("Capsule lists query requires Issue #21 implementation.")

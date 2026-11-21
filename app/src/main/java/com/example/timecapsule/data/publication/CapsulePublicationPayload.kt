@@ -52,4 +52,49 @@ data class CapsulePublicationPayload(
 fun interface CapsulePublicationBackend {
     /** Commits both documents atomically; a thrown error may still require server reconciliation. */
     suspend fun publish(operation: FrozenCapsuleOperation)
+
+    /** Reads server-only publication evidence; unimplemented/unavailable checks never prove absence. */
+    suspend fun inspect(operation: FrozenCapsuleOperation): PublicationInspection =
+        PublicationInspection.UNAVAILABLE
+}
+
+/** Server evidence for the exact operation, distinct from a local pending-write snapshot. */
+enum class PublicationInspection { MATCHING, ABSENT, CONFLICT, PENDING, UNAVAILABLE }
+
+/** The SDK confirmed rejection of this attempt; older unresolved attempts may still exist. */
+class PublicationRejectedException(message: String, cause: Throwable? = null) :
+    Exception(message, cause)
+
+/** Compares actual immutable fields as well as their digest, without relying on hash equality alone. */
+object PublicationRecordMatcher {
+    /** Allows locked self-send recovery from metadata because the batch rules require paired content. */
+    fun matches(
+        operation: FrozenCapsuleOperation,
+        metadata: Map<String, Any?>,
+        content: Map<String, Any?>?
+    ): Boolean {
+        if (!matchesMetadata(operation, metadata)) return false
+        if (content == null) return operation.senderUid == operation.recipientUid
+        return equalFields(CapsulePublicationPayload.from(operation).content, content)
+    }
+
+    /** Detects visible metadata conflicts before attempting a potentially protected content read. */
+    fun matchesMetadata(operation: FrozenCapsuleOperation, metadata: Map<String, Any?>): Boolean {
+        val expected = CapsulePublicationPayload.from(operation)
+        val mutable = setOf("createdAt", "unlocked", "unlockedAt")
+        if (metadata["createdAt"] !is java.time.Instant || metadata["unlocked"] !is Boolean) return false
+        return equalFields(expected.metadata.filterKeys { it !in mutable },
+            metadata.filterKeys { it !in mutable })
+    }
+
+    /** Normalizes Firestore numeric representations, keeping exact field sets and other types. */
+    private fun equalFields(expected: Map<*, *>, actual: Map<*, *>): Boolean =
+        expected.keys == actual.keys && expected.all { (key, value) ->
+            val other = actual[key]
+            when {
+                value is Map<*, *> && other is Map<*, *> -> equalFields(value, other)
+                value is Number && other is Number -> value.toDouble() == other.toDouble()
+                else -> value == other
+            }
+        }
 }

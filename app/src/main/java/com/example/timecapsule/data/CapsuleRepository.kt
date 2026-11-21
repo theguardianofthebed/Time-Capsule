@@ -27,6 +27,10 @@ interface CapsuleRepository {
     /** Reconciles the authoritative outcome for [capsuleId]. */
     suspend fun reconcile(capsuleId: String): OperationResult<SendStatus>
 
+    /** Checks the server and retries only the same durably saved publication identity/content. */
+    suspend fun retryPublication(capsuleId: String): OperationResult<String> =
+        OperationResult.Unavailable("Publication retry is unavailable.")
+
     /** Retrieves participant-scoped Sent and Received capsule lists for active user [uid]. */
     suspend fun lists(uid: String): OperationResult<CapsuleListsSnapshot>
 

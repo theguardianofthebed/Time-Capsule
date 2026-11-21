@@ -101,11 +101,20 @@ data class FrozenCapsuleOperation(
             creationZone: String,
             now: Instant
         ): FrozenCapsuleOperation {
+            draft.lock.unlockAt?.let { require(it.isAfter(now)) { "Select a future unlock time." } }
+            return fromConfirmedDraft(draft, senderUid, creationZone)
+        }
+
+        /** Rebuilds confirmed content for comparison without changing an existing send's time. */
+        fun fromConfirmedDraft(
+            draft: CapsuleDraft,
+            senderUid: String,
+            creationZone: String
+        ): FrozenCapsuleOperation {
             require(draft.isRecipientConfirmed) { "Confirm the recipient before sending." }
             require(draft.localPhotoUri.isNullOrBlank() || draft.originalPhoto != null) {
                 "A provider URI alone is not a validated original photo."
             }
-            draft.lock.unlockAt?.let { require(it.isAfter(now)) { "Select a future unlock time." } }
             val candidate = FrozenCapsuleOperation(
                 draft.capsuleId, senderUid, draft.recipientUid, draft.title, draft.text,
                 draft.lock, creationZone, draft.originalPhoto, ""
@@ -118,5 +127,8 @@ data class FrozenCapsuleOperation(
 /** A recoverable local record; phase is operational progress, not independent server evidence. */
 data class FrozenOperationRecord(
     val operation: FrozenCapsuleOperation,
-    val phase: PublicationPhase = PublicationPhase.PREPARED
+    val phase: PublicationPhase = PublicationPhase.PREPARED,
+    val photoAcknowledged: Boolean = false,
+    val hasUnresolvedWrite: Boolean = false,
+    val terminalRejectionConfirmed: Boolean = false
 )

@@ -86,10 +86,26 @@ class FrozenOperationJournal(private val root: File) {
                 fields.required("creationZone"), photo, fields.required("snapshotDigest")
             )
             operation.verify()
-            FrozenOperationRecord(operation, PublicationPhase.valueOf(fields.required("phase")))
+            FrozenOperationRecord(operation, PublicationPhase.valueOf(fields.required("phase")),
+                fields.getProperty("photoAcknowledged", "false").toBooleanStrict(),
+                fields.getProperty("hasUnresolvedWrite", "false").toBooleanStrict(),
+                fields.getProperty("terminalRejectionConfirmed", "false").toBooleanStrict())
         } catch (error: RuntimeException) {
             throw IOException("Saved capsule operation is invalid; do not start a new send.", error)
         }
+    }
+
+    /** Atomically reads and updates progress without allowing a timeout to overwrite a later ACK. */
+    fun update(
+        uid: String,
+        capsuleId: String,
+        change: (FrozenOperationRecord) -> FrozenOperationRecord
+    ): FrozenOperationRecord = synchronized(access) {
+        val current = load(uid, capsuleId) ?: throw IOException("Saved operation is missing.")
+        val updated = change(current)
+        require(updated.operation.senderUid == uid && updated.operation.capsuleId == capsuleId)
+        save(updated)
+        updated
     }
 
     /** Lists only the current UID's durable operations for foreground recovery. */
@@ -115,6 +131,9 @@ class FrozenOperationJournal(private val root: File) {
         setProperty("creationZone", operation.creationZone)
         setProperty("snapshotDigest", operation.snapshotDigest)
         setProperty("phase", record.phase.name)
+        setProperty("photoAcknowledged", record.photoAcknowledged.toString())
+        setProperty("hasUnresolvedWrite", record.hasUnresolvedWrite.toString())
+        setProperty("terminalRejectionConfirmed", record.terminalRejectionConfirmed.toString())
         setProperty("lockMode", operation.lock.mode.name)
         operation.lock.unlockAt?.let { setProperty("unlockAt", it.toString()) }
         operation.lock.location?.let {
