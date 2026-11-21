@@ -259,6 +259,20 @@
                 android:textSize="15sp"
                 android:textStyle="bold" />
 
+            <Button
+                android:id="@+id/btnCheckPublication"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/publication_check"
+                android:visibility="gone" />
+
+            <Button
+                android:id="@+id/btnReplacePublication"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/publication_replace"
+                android:visibility="gone" />
+
             <TextView
                 android:id="@+id/tvSendDisclaimer"
                 android:layout_width="wrap_content"

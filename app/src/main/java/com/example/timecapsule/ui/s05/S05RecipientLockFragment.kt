@@ -64,7 +64,8 @@ class S05RecipientLockFragment : Fragment() {
         val mainActivity = requireActivity() as MainActivity
         viewModel = ViewModelProvider(
             requireActivity(),
-            ViewModelFactory(mainActivity.container.accountSessionManager, requireContext().applicationContext)
+            ViewModelFactory(mainActivity.container.accountSessionManager,
+                requireContext().applicationContext, mainActivity.container.repository)
         )[CapsuleDraftViewModel::class.java]
 
         viewModel.syncSessionState()
@@ -186,6 +187,11 @@ class S05RecipientLockFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.uiState.collect { state ->
+                    listOf(binding.btnModeFutureMe, binding.btnModeSomeoneElse,
+                        binding.btnLookupRecipient, binding.btnConfirmRecipient,
+                        binding.btnLockBoth, binding.btnLockPlace, binding.btnLockTime,
+                        binding.btnSelectDateTime, binding.btnSelectPlace,
+                        binding.etRecipientUid).forEach { it.isEnabled = state.editable }
                     // Recipient Mode toggle formatting
                     if (state.recipientMode == RecipientMode.FUTURE_ME) {
                         binding.btnModeFutureMe.setTextColor(requireContext().getColor(android.R.color.black))

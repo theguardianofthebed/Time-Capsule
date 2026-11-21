@@ -1,6 +1,7 @@
 package com.example.timecapsule.config
 
 import android.content.Context
+import android.os.Build
 import com.example.timecapsule.data.adapter.FirestoreCachePolicy
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
@@ -98,7 +99,11 @@ object FirebaseConfig {
             val firestore = getMemoryOnlyFirestore(appContext) ?: return false
             val storage = FirebaseStorage.getInstance()
 
-            useEmulators(auth, firestore, storage, EMULATOR_HOST)
+            // Physical phones reach the developer host through explicit adb reverse mappings.
+            // Android virtual devices retain their standard host gateway.
+            val host = if (Build.HARDWARE in setOf("goldfish", "ranchu") ||
+                Build.PRODUCT.startsWith("sdk")) EMULATOR_HOST else LOCALHOST
+            useEmulators(auth, firestore, storage, host)
             isEmulatorMode = true
             true
         } catch (_: Exception) {

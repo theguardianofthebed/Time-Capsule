@@ -2,6 +2,7 @@ package com.example.timecapsule.data
 
 import com.example.timecapsule.data.adapter.AuthAdapter
 import com.example.timecapsule.data.adapter.FirestoreAdapter
+import com.example.timecapsule.data.publication.CapsulePublicationCoordinator
 import com.example.timecapsule.data.session.SessionTracker
 import com.example.timecapsule.domain.model.Availability
 import com.example.timecapsule.domain.model.CapsuleDraft
@@ -18,7 +19,8 @@ import com.example.timecapsule.domain.session.SessionSnapshot
 class DefaultCapsuleRepository(
     private val sessionTracker: SessionTracker,
     private val authAdapter: AuthAdapter,
-    private val firestoreAdapter: FirestoreAdapter
+    private val firestoreAdapter: FirestoreAdapter,
+    private val publicationCoordinator: CapsulePublicationCoordinator? = null
 ) : CapsuleRepository {
 
     override fun session(): SessionSnapshot = sessionTracker.currentSession()
@@ -31,13 +33,30 @@ class DefaultCapsuleRepository(
         return firestoreAdapter.getRecipientProfile(cleanUid)
     }
 
-    override suspend fun publish(frozenOperation: CapsuleDraft): OperationResult<String> {
-        return OperationResult.Invalid("Publication requires Issue #14 implementation.")
-    }
+    /** Persists and submits through the shared publication coordinator; success requires server ACK. */
+    override suspend fun publish(frozenOperation: CapsuleDraft): OperationResult<String> =
+        publicationCoordinator?.publish(frozenOperation)
+            ?: OperationResult.Unavailable("Capsule publication service is unavailable.")
 
-    override suspend fun reconcile(capsuleId: String): OperationResult<SendStatus> {
-        return OperationResult.Invalid("Reconciliation requires Issue #14 implementation.")
-    }
+    /** Resolves server-only matching evidence without treating a missing record as a failed write. */
+    override suspend fun reconcile(capsuleId: String): OperationResult<SendStatus> =
+        publicationCoordinator?.reconcile(capsuleId)
+            ?: OperationResult.Unavailable("Publication reconciliation is unavailable.")
+
+    /** Replays the original saved snapshot only after the coordinator's server check. */
+    override suspend fun retryPublication(capsuleId: String): OperationResult<String> =
+        publicationCoordinator?.retry(capsuleId)
+            ?: OperationResult.Unavailable("Publication retry is unavailable.")
+
+    /** Restores private operations through server reconciliation without implicit replay. */
+    override suspend fun recoverPublications() =
+        publicationCoordinator?.recoverPublications()
+            ?: OperationResult.Unavailable("Publication recovery is unavailable.")
+
+    /** Retains failed content under a new identity only when safe abandonment is established. */
+    override suspend fun abandonPublication(capsuleId: String) =
+        publicationCoordinator?.abandonForNewDraft(capsuleId)
+            ?: OperationResult.Unavailable("Publication replacement is unavailable.")
 
     override suspend fun lists(uid: String): OperationResult<CapsuleListsSnapshot> {
         return OperationResult.Unavailable("Capsule lists query requires Issue #21 implementation.")

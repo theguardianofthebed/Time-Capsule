@@ -324,6 +324,16 @@ describe("Capsule Firestore security rules", () => {
         );
     });
 
+    it("allows authenticated exact-ID absence checks for send recovery", async () => {
+        const db = testEnv.authenticatedContext(senderUid).firestore();
+        await assertSucceeds(getDoc(doc(db, "capsules", "missing-recovery-capsule")));
+    });
+
+    it("denies unauthenticated exact-ID absence checks", async () => {
+        const db = testEnv.unauthenticatedContext().firestore();
+        await assertFails(getDoc(doc(db, "capsules", "missing-recovery-capsule")));
+    });
+
     it("denies metadata access to unrelated users", async () => {
         await seedCapsule();
 

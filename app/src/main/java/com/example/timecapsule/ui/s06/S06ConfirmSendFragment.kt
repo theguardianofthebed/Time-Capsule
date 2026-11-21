@@ -10,6 +10,8 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.example.timecapsule.MainActivity
+import com.example.timecapsule.R
+import com.example.timecapsule.domain.model.PublicationPhase
 import com.example.timecapsule.databinding.FragmentS06ConfirmSendBinding
 import com.example.timecapsule.domain.model.LockMode
 import com.example.timecapsule.ui.ViewModelFactory
@@ -21,7 +23,7 @@ import kotlinx.coroutines.launch
 /**
  * S-06 Confirm Send / Review ScreenFragment using native Views and ViewBinding.
  * Displays final summary of draft title, recipient identity, lock conditions, and content.
- * Handles Back navigation to edit draft and honestly represents downstream Issue #14 publication.
+ * Observes the shared submission state; only the coordinator can confirm SENT or safe abandonment.
  */
 class S06ConfirmSendFragment : Fragment() {
 
@@ -34,6 +36,7 @@ class S06ConfirmSendFragment : Fragment() {
     var onNavigateToMomentsListener: (() -> Unit)? = null
     var onNavigateToAccountListener: (() -> Unit)? = null
 
+    /** Inflates review and publication controls for this view lifetime. */
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -43,13 +46,15 @@ class S06ConfirmSendFragment : Fragment() {
         return binding.root
     }
 
+    /** Obtains the activity-scoped draft so rotations do not restart publication. */
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
         val mainActivity = requireActivity() as MainActivity
         viewModel = ViewModelProvider(
             requireActivity(),
-            ViewModelFactory(mainActivity.container.accountSessionManager, requireContext().applicationContext)
+            ViewModelFactory(mainActivity.container.accountSessionManager,
+                requireContext().applicationContext, mainActivity.container.repository)
         )[CapsuleDraftViewModel::class.java]
 
         viewModel.syncSessionState()
@@ -58,11 +63,13 @@ class S06ConfirmSendFragment : Fragment() {
         observeViewModelState()
     }
 
+    /** Rechecks saved outcomes on foreground return without automatically publishing again. */
     override fun onResume() {
         super.onResume()
         viewModel.syncSessionState()
     }
 
+    /** Routes user actions through guarded ViewModel operations instead of Firebase calls. */
     private fun setupClickListeners() {
         binding.btnBack.setOnClickListener {
             onBackToRecipientLockListener?.invoke()
@@ -73,8 +80,19 @@ class S06ConfirmSendFragment : Fragment() {
         }
 
         binding.btnSendCapsule.setOnClickListener {
-            viewModel.triggerSendNotice()
+            when (viewModel.uiState.value.publicationPhase) {
+                PublicationPhase.SENT -> {
+                    viewModel.startNewAfterSent()
+                    if (viewModel.uiState.value.editable) {
+                        (requireActivity() as MainActivity).navigateToContentDraft()
+                    }
+                }
+                null -> viewModel.sendCapsule()
+                else -> viewModel.retryPublication()
+            }
         }
+        binding.btnCheckPublication.setOnClickListener { viewModel.recoverPublicationState() }
+        binding.btnReplacePublication.setOnClickListener { viewModel.replaceFailedPublication() }
 
         binding.btnNavMoments.setOnClickListener {
             onNavigateToMomentsListener?.invoke()
@@ -85,10 +103,31 @@ class S06ConfirmSendFragment : Fragment() {
         }
     }
 
+    /** Displays frozen results and hides raw sent content while disabling unsafe editing. */
     private fun observeViewModelState() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.uiState.collect { state ->
+                    val busy = state.publicationBusy || state.recoveryBusy || state.photoBusy
+                    val sent = state.publicationPhase == PublicationPhase.SENT
+                    binding.layoutSummaryCard.visibility =
+                        if (sent || state.recoveryBusy || state.recoveryBlocked) View.GONE else View.VISIBLE
+                    binding.btnSendCapsule.isEnabled = !busy && !state.recoveryBlocked
+                    binding.btnSendCapsule.setText(when {
+                        sent -> R.string.publication_new
+                        state.publicationPhase != null -> R.string.publication_retry
+                        else -> R.string.s06_btn_send
+                    })
+                    binding.btnCheckPublication.visibility =
+                        if (state.publicationPhase != null || state.recoveryBlocked) View.VISIBLE else View.GONE
+                    binding.btnCheckPublication.isEnabled = !busy
+                    binding.btnCheckPublication.setText(if (state.recoveryBlocked)
+                        R.string.publication_recover else R.string.publication_check)
+                    binding.btnReplacePublication.visibility =
+                        if (state.canAbandon) View.VISIBLE else View.GONE
+                    binding.btnReplacePublication.isEnabled = !busy && !state.recoveryBlocked
+                    binding.btnEditDraft.isEnabled = state.editable && !busy
+                    binding.btnBack.isEnabled = state.editable && !busy
                     // Title
                     if (state.title.isNotBlank()) {
                         binding.tvReviewTitle.text = state.title
@@ -135,9 +174,10 @@ class S06ConfirmSendFragment : Fragment() {
                         binding.tvReviewLocation.visibility = View.GONE
                     }
 
-                    // Notice Banner for Downstream Issue #14 Send Notice
-                    if (!state.sendNotice.isNullOrBlank()) {
-                        binding.tvSendNoticeBanner.text = state.sendNotice
+                    val notice = if (state.recoveryBusy) R.string.publication_recovering
+                        else state.publicationMessage
+                    if (notice != null) {
+                        binding.tvSendNoticeBanner.setText(notice)
                         binding.tvSendNoticeBanner.visibility = View.VISIBLE
                     } else {
                         binding.tvSendNoticeBanner.visibility = View.GONE
@@ -147,6 +187,7 @@ class S06ConfirmSendFragment : Fragment() {
         }
     }
 
+    /** Releases bindings; the activity-scoped send continues independently of this view. */
     override fun onDestroyView() {
         super.onDestroyView()
         _binding = null

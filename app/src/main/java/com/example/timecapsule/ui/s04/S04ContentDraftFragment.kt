@@ -73,7 +73,8 @@ class S04ContentDraftFragment : Fragment() {
         val mainActivity = requireActivity() as MainActivity
         viewModel = ViewModelProvider(
             requireActivity(),
-            ViewModelFactory(mainActivity.container.accountSessionManager, requireContext().applicationContext)
+            ViewModelFactory(mainActivity.container.accountSessionManager,
+                requireContext().applicationContext, mainActivity.container.repository)
         )[CapsuleDraftViewModel::class.java]
 
         viewModel.syncSessionState()
@@ -126,6 +127,10 @@ class S04ContentDraftFragment : Fragment() {
         }
 
         binding.btnContinue.setOnClickListener {
+            if (viewModel.uiState.value.recoveryBlocked) {
+                viewModel.recoverPublicationState(restoreEditable = true)
+                return@setOnClickListener
+            }
             val validation = viewModel.validateS04Content()
             if (validation is OperationResult.Success) {
                 binding.tvS04Error.visibility = View.GONE
@@ -155,13 +160,26 @@ class S04ContentDraftFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 var previewedPhoto: com.example.timecapsule.domain.model.RetainedOriginalPhoto? = null
+                var openedRecovery = false
                 viewModel.uiState.collectLatest { state ->
-                    binding.btnAttachPhoto.isEnabled = !state.photoBusy
-                    binding.btnContinue.isEnabled = !state.photoBusy
-                    binding.etCapsuleTitle.isEnabled = !state.photoBusy
-                    binding.etCapsuleBody.isEnabled = !state.photoBusy
-                    binding.tvS04Error.text = state.photoError?.let { getString(it) }
-                    binding.tvS04Error.visibility = if (state.photoError == null) View.GONE else View.VISIBLE
+                    if (state.publicationPhase != null && !state.publicationBusy &&
+                        !state.recoveryBusy && !openedRecovery) {
+                        openedRecovery = true
+                        (requireActivity() as MainActivity).navigateToConfirmSend()
+                        return@collectLatest
+                    }
+                    binding.btnAttachPhoto.isEnabled = state.editable && !state.photoBusy
+                    binding.btnRemovePhoto.isEnabled = state.editable && !state.photoBusy
+                    binding.btnDiscardDraft.isEnabled = state.editable && !state.photoBusy
+                    binding.btnContinue.isEnabled = !state.photoBusy && !state.recoveryBusy
+                    binding.btnContinue.setText(if (state.recoveryBlocked)
+                        R.string.publication_recover else R.string.s04_btn_continue)
+                    binding.etCapsuleTitle.isEnabled = state.editable && !state.photoBusy
+                    binding.etCapsuleBody.isEnabled = state.editable && !state.photoBusy
+                    val error = state.photoError ?: if (state.recoveryBlocked)
+                        R.string.publication_recovery_failure else null
+                    binding.tvS04Error.text = error?.let { getString(it) }
+                    binding.tvS04Error.visibility = if (error == null) View.GONE else View.VISIBLE
                     val photo = state.originalPhoto
                     if (photo != previewedPhoto) {
                         val preview = if (photo != null) photoInput.preview(photo) else null

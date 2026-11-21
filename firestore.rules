@@ -211,7 +211,11 @@ service cloud.firestore {
     }
 
     match /capsules/{capsuleId} {
-      allow get, list: if isParticipant(resource.data);
+      // Authenticated exact-ID absence checks support same-ID recovery. Existing records
+      // remain participant-only, and list queries do not gain access from this exception.
+      allow get: if signedIn()
+        && (!exists(capsulePath(capsuleId)) || isParticipant(resource.data));
+      allow list: if isParticipant(resource.data);
 
       allow create: if signedIn()
         && validMetadata(request.resource.data, capsuleId)
