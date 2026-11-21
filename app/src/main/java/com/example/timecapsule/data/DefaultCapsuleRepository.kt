@@ -2,6 +2,7 @@ package com.example.timecapsule.data
 
 import com.example.timecapsule.data.adapter.AuthAdapter
 import com.example.timecapsule.data.adapter.FirestoreAdapter
+import com.example.timecapsule.data.publication.CapsulePublicationCoordinator
 import com.example.timecapsule.data.session.SessionTracker
 import com.example.timecapsule.domain.model.Availability
 import com.example.timecapsule.domain.model.CapsuleDraft
@@ -18,7 +19,8 @@ import com.example.timecapsule.domain.session.SessionSnapshot
 class DefaultCapsuleRepository(
     private val sessionTracker: SessionTracker,
     private val authAdapter: AuthAdapter,
-    private val firestoreAdapter: FirestoreAdapter
+    private val firestoreAdapter: FirestoreAdapter,
+    private val publicationCoordinator: CapsulePublicationCoordinator? = null
 ) : CapsuleRepository {
 
     override fun session(): SessionSnapshot = sessionTracker.currentSession()
@@ -31,9 +33,10 @@ class DefaultCapsuleRepository(
         return firestoreAdapter.getRecipientProfile(cleanUid)
     }
 
-    override suspend fun publish(frozenOperation: CapsuleDraft): OperationResult<String> {
-        return OperationResult.Invalid("Publication requires Issue #14 implementation.")
-    }
+    /** Persists and submits through the shared publication coordinator; success requires server ACK. */
+    override suspend fun publish(frozenOperation: CapsuleDraft): OperationResult<String> =
+        publicationCoordinator?.publish(frozenOperation)
+            ?: OperationResult.Unavailable("Capsule publication service is unavailable.")
 
     override suspend fun reconcile(capsuleId: String): OperationResult<SendStatus> {
         return OperationResult.Invalid("Reconciliation requires Issue #14 implementation.")

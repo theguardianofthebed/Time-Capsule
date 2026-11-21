@@ -22,6 +22,10 @@ import java.util.Properties
  * A process-wide lock also serializes independent instances during Activity recreation.
  */
 class FrozenOperationJournal(private val root: File) {
+    /** Identifies the private store when coordinating attempts across recreated instances. */
+    val storageIdentity: String
+        get() = root.canonicalPath
+
     companion object {
         private val access = Any()
     }

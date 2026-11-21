@@ -1,6 +1,10 @@
 package com.example.timecapsule
 
 import android.os.Bundle
+import com.example.timecapsule.data.adapter.FirestoreCapsulePublication
+import com.example.timecapsule.data.publication.CapsulePublicationCoordinator
+import com.example.timecapsule.data.publication.FrozenOperationJournal
+import com.example.timecapsule.data.publication.OriginalPublicationMedia
 import com.example.timecapsule.data.adapter.DefaultStorageAdapter
 import com.example.timecapsule.data.media.OriginalPhotoStore
 import com.example.timecapsule.data.media.OriginalPhotoUploads
@@ -83,7 +87,14 @@ class MainActivity : AppCompatActivity() {
             override suspend fun clearAccountData(uid: String) {}
         }
 
-        val repository = DefaultCapsuleRepository(sessionTracker, authAdapter, firestoreAdapter)
+        val publication = firestoreAdapter.firestoreInstance()?.let { firestore ->
+            CapsulePublicationCoordinator(
+                FrozenOperationJournal(File(noBackupFilesDir, "capsule-operations")),
+                FirestoreCapsulePublication(firestore, FirebaseAuth.getInstance()),
+                OriginalPublicationMedia(photoUploads), sessionTracker::currentSession)
+        }
+        val repository = DefaultCapsuleRepository(sessionTracker, authAdapter, firestoreAdapter,
+            publication)
 
         container = AppDependencyContainer(
             sessionTracker = sessionTracker,
