@@ -11,7 +11,8 @@
 - Prerequisites: #9/PR #29, #11/PR #35 and #12/PR #36 are merged in the selected base.
   Their recorded checks are predecessor evidence, not new independent integration passes.
 - State: implementation prepared; device/backend verification and human review remain pending.
-- PR: not opened, as requested for this checkpoint. No merge performed.
+- PR: https://github.com/theguardianofthebed/Time-Capsule/pull/39 (Draft, opened 21 November 2026).
+  Teammate review and verification requested; no merge performed.
 
 ## Implementation and verification
 
@@ -40,5 +41,10 @@ mean device tests ran. Security-rule JavaScript passes syntax checking only.
   overwrite/deletion remains denied. Re-run the full rule suite before human review/merge.
 - Reinspect current upstream work before resuming; retain the original checkout's unrelated edits.
 
-Next action: perform outstanding device/backend checks and obtain an independent teammate review.
+Update, 21 November 2026: real Android-device and Firebase integration verification was performed;
+individual scenario results remain to be recorded. The Week 2 log now records the supplied activity
+dates of 17, 18 and 20 November and links PR #39. The six implementation commits remain unchanged;
+a separate documentation follow-up records the weekly submission and PR.
+
+Next action: obtain teammate review and independent confirmation of remaining device/backend checks.
 No personal phone configuration instructions are included in the repository.

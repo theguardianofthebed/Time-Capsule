@@ -165,3 +165,16 @@ Weekly coursework remains in `agent-log-w1.md`–`agent-log-w4.md`.
 - Reviewer remains unassigned. Human review, manual edits and personal understanding are pending.
 - Await device/backend verification and #14 publication integration. Keep the current task branch
   and earlier commits; PR creation remains deferred as requested.
+
+## 2026-11-21-01 — Issue #13 PR and Week 2 record
+
+- **Owner:** User G
+- **Agent environment:**
+- **Model used:**
+- **Status:** PR opened; independent review pending.
+- **Work performed:** Corrected the Week 2 goal to describe the photo feature, recorded activity
+  dates supplied as 17, 18 and 20 November, and added the real PR link. Real-device and Firebase
+  integration verification was confirmed; specific scenario results remain to be recorded.
+- **PR:** https://github.com/theguardianofthebed/Time-Capsule/pull/39 (Draft).
+- **Checks:** Documentation whitespace/diff review only; no new implementation tests needed.
+- **Next:** Teammate code review and independent verification requested in the PR. No merge performed.
