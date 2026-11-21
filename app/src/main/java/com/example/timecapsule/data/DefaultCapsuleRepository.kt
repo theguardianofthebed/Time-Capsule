@@ -48,6 +48,16 @@ class DefaultCapsuleRepository(
         publicationCoordinator?.retry(capsuleId)
             ?: OperationResult.Unavailable("Publication retry is unavailable.")
 
+    /** Restores private operations through server reconciliation without implicit replay. */
+    override suspend fun recoverPublications() =
+        publicationCoordinator?.recoverPublications()
+            ?: OperationResult.Unavailable("Publication recovery is unavailable.")
+
+    /** Retains failed content under a new identity only when safe abandonment is established. */
+    override suspend fun abandonPublication(capsuleId: String) =
+        publicationCoordinator?.abandonForNewDraft(capsuleId)
+            ?: OperationResult.Unavailable("Publication replacement is unavailable.")
+
     override suspend fun lists(uid: String): OperationResult<CapsuleListsSnapshot> {
         return OperationResult.Unavailable("Capsule lists query requires Issue #21 implementation.")
     }

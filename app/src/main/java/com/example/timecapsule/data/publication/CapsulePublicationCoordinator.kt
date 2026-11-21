@@ -8,6 +8,7 @@ import com.example.timecapsule.domain.model.FrozenPhotoUpload
 import com.example.timecapsule.domain.model.PhotoUploadAcknowledgment
 import com.example.timecapsule.domain.model.PublicationPhase
 import com.example.timecapsule.domain.model.RetainedOriginalPhoto
+import com.example.timecapsule.domain.model.RecoveredPublication
 import com.example.timecapsule.domain.model.SendStatus
 import com.example.timecapsule.domain.result.OperationResult
 import com.example.timecapsule.domain.session.SessionSnapshot
@@ -53,7 +54,9 @@ class CapsulePublicationCoordinator(
     private val session: () -> SessionSnapshot,
     private val now: () -> Instant = Instant::now,
     private val zone: () -> String = { ZoneId.systemDefault().id },
-    private val responseTimeoutMillis: Long = 15_000L
+    private val responseTimeoutMillis: Long = 15_000L,
+    private val drafts: PublicationDraftStore? = null,
+    private val newId: () -> String = { java.util.UUID.randomUUID().toString() }
 ) {
     /** Identifies one shared attempt across recreated coordinators using the same private store. */
     private data class AttemptKey(val store: String, val uid: String, val capsuleId: String)
@@ -77,6 +80,9 @@ class CapsulePublicationCoordinator(
         try {
             val attempt = registration.withLock {
                 val previous = journal.load(uid, draft.capsuleId)
+                require(previous?.phase != PublicationPhase.ABANDONED) {
+                    "An abandoned operation cannot be submitted again."
+                }
                 val candidate = if (previous == null) {
                     FrozenCapsuleOperation.freeze(draft, uid, zone(), now())
                 } else {
@@ -118,6 +124,9 @@ class CapsulePublicationCoordinator(
             val attempt = registration.withLock {
                 val saved = journal.load(uid, capsuleId)
                     ?: return@withLock null
+                require(saved.phase != PublicationPhase.ABANDONED) {
+                    "An abandoned operation cannot be retried."
+                }
                 val key = key(saved.operation)
                 active[key] ?: start(key) { recover(saved, captured, replay = true) }
             } ?: return@withContext OperationResult.Invalid("No saved send exists for this account.")
@@ -138,6 +147,9 @@ class CapsulePublicationCoordinator(
             try {
                 val saved = journal.load(uid, capsuleId)
                     ?: return@withContext OperationResult.Invalid("No saved send exists for this account.")
+                if (saved.phase == PublicationPhase.ABANDONED) {
+                    return@withContext OperationResult.Invalid("This operation was abandoned.")
+                }
                 val evidence = inspect(saved.operation)
                 if (session() != captured) return@withContext denied()
                 when (evidence) {
@@ -173,6 +185,115 @@ class CapsulePublicationCoordinator(
                 unknown(capsuleId)
             }
         }
+
+    /** Foreground-only recovery checks saved sends and never starts a new publication implicitly. */
+    suspend fun recoverPublications(): OperationResult<List<RecoveredPublication>> =
+        withContext(Dispatchers.IO) {
+            val captured = session()
+            val uid = captured.uid
+            if (uid.isNullOrBlank()) return@withContext denied()
+            try {
+                val recovered = mutableListOf<RecoveredPublication>()
+                for (record in journal.list(uid)) {
+                    if (session() != captured) return@withContext denied()
+                    if (record.phase == PublicationPhase.ABANDONED) {
+                        if (!record.replacementPrepared && record.replacementDraftId != null) {
+                            when (val result = prepareReplacement(record, captured)) {
+                                is OperationResult.Success -> Unit
+                                else -> return@withContext OperationResult.Unavailable(
+                                    "Finish recovering the replacement draft before starting another send.")
+                            }
+                        }
+                        continue
+                    }
+                    if (record.phase != PublicationPhase.SENT) reconcile(record.operation.capsuleId)
+                    if (session() != captured) return@withContext denied()
+                    val latest = journal.load(uid, record.operation.capsuleId) ?: record
+                    if (latest.phase == PublicationPhase.ABANDONED) continue
+                    val cleared = if (latest.phase == PublicationPhase.SENT && hasPhotoProof(latest)) {
+                        drafts?.clearConfirmed(latest.operation) ?: false
+                    } else false
+                    if (session() != captured) return@withContext denied()
+                    recovered += RecoveredPublication(latest.operation.capsuleId, latest.phase,
+                        if (latest.phase == PublicationPhase.SENT) null else latest.operation,
+                        latest.phase == PublicationPhase.FAILED && !mayHaveEarlierWrite(latest) &&
+                            active[key(latest.operation)]?.isActive != true, cleared)
+                }
+                OperationResult.Success(recovered)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                OperationResult.Unavailable("Cannot restore saved sends. Keep them and retry recovery.")
+            }
+        }
+
+    /**
+     * Abandons only a definitively failed unpublished operation with no active attempt.
+     * The new ID is journaled first so an interrupted replacement cannot generate several drafts.
+     */
+    suspend fun abandonForNewDraft(capsuleId: String): OperationResult<CapsuleDraft> =
+        withContext(Dispatchers.IO) {
+            val captured = session()
+            val uid = captured.uid
+            if (uid.isNullOrBlank()) return@withContext denied()
+            if (drafts == null) return@withContext OperationResult.Unavailable("Draft recovery is unavailable.")
+            try {
+                val saved = journal.load(uid, capsuleId)
+                    ?: return@withContext OperationResult.Invalid("No saved send exists for this account.")
+                if (saved.phase == PublicationPhase.ABANDONED) {
+                    return@withContext prepareReplacement(saved, captured)
+                }
+                val evidence = inspect(saved.operation)
+                if (session() != captured) return@withContext denied()
+                if (evidence == PublicationInspection.MATCHING) {
+                    resolveMatching(saved.operation)
+                    return@withContext OperationResult.Denied("This capsule is published; it cannot be abandoned.")
+                }
+                if (evidence != PublicationInspection.ABSENT) {
+                    return@withContext unknown(capsuleId)
+                }
+                val abandoned = registration.withLock {
+                    val latest = journal.load(uid, capsuleId) ?: saved
+                    if (latest.phase == PublicationPhase.ABANDONED) return@withLock latest
+                    if (active[key(latest.operation)]?.isActive == true ||
+                        latest.phase != PublicationPhase.FAILED || mayHaveEarlierWrite(latest)) {
+                        return@withLock null
+                    }
+                    val replacementId = newId()
+                    require(replacementId != capsuleId &&
+                        replacementId.matches(Regex("[A-Za-z0-9_-]+")) &&
+                        journal.load(uid, replacementId) == null) { "Replacement ID is already used or invalid." }
+                    latest.copy(phase = PublicationPhase.ABANDONED,
+                        replacementDraftId = replacementId).also { journal.save(it) }
+                } ?: return@withContext unknown(capsuleId)
+                prepareReplacement(abandoned, captured)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (invalid: IllegalArgumentException) {
+                OperationResult.Invalid(invalid.message ?: "Invalid replacement draft.")
+            } catch (error: Exception) {
+                OperationResult.Unavailable("Cannot prepare the replacement draft. Original content is retained.")
+            }
+        }
+
+    /** Completes an idempotent local replacement without reusing the old publication identity. */
+    private suspend fun prepareReplacement(
+        record: FrozenOperationRecord,
+        captured: SessionSnapshot
+    ): OperationResult<CapsuleDraft> {
+        val handler = drafts ?: return OperationResult.Unavailable("Draft recovery is unavailable.")
+        val id = record.replacementDraftId
+            ?: return OperationResult.Invalid("Replacement draft identity is missing.")
+        if (session() != captured) return denied()
+        val replacement = handler.replacement(record.operation, id)
+        if (session() != captured) return denied()
+        require(replacement.capsuleId == id && id != record.operation.capsuleId)
+        journal.update(record.operation.senderUid, record.operation.capsuleId) {
+            require(it.phase == PublicationPhase.ABANDONED)
+            it.copy(replacementPrepared = true)
+        }
+        return OperationResult.Success(replacement)
+    }
 
     /** Registers work before starting it; caller holds the short process-wide registration mutex. */
     private fun start(
@@ -330,7 +451,8 @@ class CapsulePublicationCoordinator(
         photoAcknowledged: Boolean? = null,
         rejected: Boolean? = null
     ): FrozenOperationRecord = journal.update(operation.senderUid, operation.capsuleId) { current ->
-        if (current.phase == PublicationPhase.SENT && phase != PublicationPhase.SENT) current
+        if (current.phase == PublicationPhase.ABANDONED ||
+            (current.phase == PublicationPhase.SENT && phase != PublicationPhase.SENT)) current
         else current.copy(operation = operation, phase = phase,
             hasUnresolvedWrite = unresolved ?: current.hasUnresolvedWrite,
             photoAcknowledged = photoAcknowledged ?: current.photoAcknowledged,
@@ -355,6 +477,9 @@ class CapsulePublicationCoordinator(
     private fun resolveMatching(operation: FrozenCapsuleOperation): OperationResult<String> {
         val saved = journal.load(operation.senderUid, operation.capsuleId)
             ?: return unknown(operation.capsuleId)
+        if (saved.phase == PublicationPhase.ABANDONED) {
+            return OperationResult.Invalid("This operation was abandoned.")
+        }
         if (!hasPhotoProof(saved)) {
             return OperationResult.OutcomeUnknown(operation.capsuleId,
                 "Publication matches, but the required saved photo acknowledgment is missing.")

@@ -130,5 +130,16 @@ data class FrozenOperationRecord(
     val phase: PublicationPhase = PublicationPhase.PREPARED,
     val photoAcknowledged: Boolean = false,
     val hasUnresolvedWrite: Boolean = false,
-    val terminalRejectionConfirmed: Boolean = false
+    val terminalRejectionConfirmed: Boolean = false,
+    val replacementDraftId: String? = null,
+    val replacementPrepared: Boolean = false
+)
+
+/** Authenticated recovery state; completed operations never expose their raw compose snapshot. */
+data class RecoveredPublication(
+    val capsuleId: String,
+    val phase: PublicationPhase,
+    val snapshot: FrozenCapsuleOperation?,
+    val canAbandon: Boolean,
+    val clearedEditableDraft: Boolean = false
 )

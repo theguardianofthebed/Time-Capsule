@@ -91,7 +91,12 @@ class MainActivity : AppCompatActivity() {
             CapsulePublicationCoordinator(
                 FrozenOperationJournal(File(noBackupFilesDir, "capsule-operations")),
                 FirestoreCapsulePublication(firestore, FirebaseAuth.getInstance()),
-                OriginalPublicationMedia(photoUploads), sessionTracker::currentSession)
+                OriginalPublicationMedia(photoUploads), sessionTracker::currentSession,
+                drafts = com.example.timecapsule.data.publication.PrivatePublicationDrafts(
+                    OriginalPhotoStore(File(noBackupFilesDir, "original-photos"),
+                        AndroidOriginalImageProbe()),
+                    com.example.timecapsule.data.media.PhotoDraftJournal(
+                        File(noBackupFilesDir, "photo-drafts"))))
         }
         val repository = DefaultCapsuleRepository(sessionTracker, authAdapter, firestoreAdapter,
             publication)
