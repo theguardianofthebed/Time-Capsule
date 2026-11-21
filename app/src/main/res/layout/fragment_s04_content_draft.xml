@@ -235,6 +235,14 @@
                 android:padding="12dp"
                 android:visibility="gone">
 
+                <ImageView
+                    android:id="@+id/ivPhotoPreview"
+                    android:layout_width="64dp"
+                    android:layout_height="64dp"
+                    android:layout_marginEnd="8dp"
+                    android:scaleType="centerCrop"
+                    android:contentDescription="@string/photo_preview_description" />
+
                 <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"

@@ -2,6 +2,15 @@ package com.example.timecapsule.ui.draft
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.timecapsule.R
+import com.example.timecapsule.data.media.InvalidOriginalPhotoException
+import com.example.timecapsule.data.media.PhotoDraftStorage
+import com.example.timecapsule.data.media.PhotoDraftRecord
+import com.example.timecapsule.domain.model.RetainedOriginalPhoto
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import java.io.IOException
 import com.example.timecapsule.data.AccountSessionManager
 import com.example.timecapsule.domain.model.CapsuleDraft
 import com.example.timecapsule.domain.model.CapsuleLock
@@ -43,6 +52,9 @@ data class CapsuleDraftUiState(
     val localPhotoUri: String? = null,
     val photoName: String? = null,
     val photoSizeBytes: Long? = null,
+    val originalPhoto: RetainedOriginalPhoto? = null,
+    val photoBusy: Boolean = false,
+    val photoError: Int? = null,
     val recipientMode: RecipientMode = RecipientMode.FUTURE_ME,
     val recipientUidInput: String = "",
     val lookupStatus: RecipientLookupStatus = RecipientLookupStatus.IDLE,
@@ -70,6 +82,109 @@ class CapsuleDraftViewModel(
     val uiState: StateFlow<CapsuleDraftUiState> = _uiState.asStateFlow()
 
     private var activeLookupToken: Long = 0L
+    private var photoToken = 0L
+    private var photoInput: PhotoDraftStorage? = null
+    private val photoSaveMutex = Mutex()
+
+    /** Configures account-private persistence once for this activity-scoped ViewModel. */
+    fun configurePhotos(input: PhotoDraftStorage) {
+        if (photoInput != null) return
+        photoInput = input
+        restorePhotoDraft()
+    }
+
+    /** Restores only the still-active account; recipient confirmation must be established again. */
+    private fun restorePhotoDraft() {
+        val input = photoInput ?: return
+        val uid = _uiState.value.activeSessionUid ?: return
+        val token = ++photoToken
+        _uiState.update { it.copy(photoBusy = true) }
+        viewModelScope.launch {
+            try {
+                val record = input.restore(uid)
+                if (token != photoToken || _uiState.value.activeSessionUid != uid) return@launch
+                _uiState.update { state ->
+                    if (record == null) state.copy(photoBusy = false) else state.copy(
+                        capsuleId = record.capsuleId, title = record.title, text = record.text,
+                        originalPhoto = record.photo,
+                        localPhotoUri = record.photo?.let { input.file(it).toURI().toString() },
+                        photoName = record.photo?.let { "Photo" },
+                        photoSizeBytes = record.photo?.sizeBytes, photoBusy = false)
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: IOException) {
+                photoFailed(token, R.string.photo_restore_failure)
+            } catch (error: IllegalArgumentException) {
+                photoFailed(token, R.string.photo_restore_failure)
+            }
+        }
+    }
+
+    /** Captures editable fields now and queues their atomic save in UI event order. */
+    private fun persistPhotoDraft(released: RetainedOriginalPhoto? = null) {
+        val input = photoInput ?: return
+        val state = _uiState.value
+        val uid = state.activeSessionUid ?: return
+        val record = PhotoDraftRecord(state.capsuleId, state.title, state.text, state.originalPhoto)
+        viewModelScope.launch {
+            try {
+                photoSaveMutex.withLock {
+                    input.save(uid, record)
+                    if (released != null && released != record.photo) input.remove(released)
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: IOException) {
+                if (_uiState.value.activeSessionUid == uid) {
+                    _uiState.update { it.copy(photoError = R.string.photo_save_failure) }
+                }
+            }
+        }
+    }
+
+    /** Retains provider content asynchronously and ignores obsolete selections or accounts. */
+    fun selectPhoto(input: PhotoDraftStorage, uri: String) {
+        val state = _uiState.value
+        val uid = state.activeSessionUid ?: return
+        val token = ++photoToken
+        _uiState.update { it.copy(photoBusy = true, photoError = null) }
+        viewModelScope.launch {
+            try {
+                val photo = input.retain(uid, state.capsuleId, uri)
+                if (token != photoToken || _uiState.value.activeSessionUid != uid ||
+                    accountSessionManager.restoreSessionIfAuthenticated() != uid ||
+                    _uiState.value.capsuleId != state.capsuleId) {
+                    input.remove(photo)
+                    return@launch
+                }
+                val previous = _uiState.value.originalPhoto
+                // Persist the new pointer before releasing the old bytes; failure keeps both recoverable.
+                val current = _uiState.value
+                photoSaveMutex.withLock {
+                    input.save(uid, PhotoDraftRecord(current.capsuleId, current.title, current.text, photo))
+                }
+                if (token != photoToken || _uiState.value.activeSessionUid != uid) return@launch
+                _uiState.update { it.copy(originalPhoto = photo,
+                    localPhotoUri = input.file(photo).toURI().toString(),
+                    photoName = "Photo", photoSizeBytes = photo.sizeBytes, photoBusy = false) }
+                if (previous != null) input.remove(previous)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: SecurityException) {
+                photoFailed(token, R.string.photo_access_denied)
+            } catch (error: InvalidOriginalPhotoException) {
+                photoFailed(token, R.string.photo_invalid)
+            } catch (error: IOException) {
+                photoFailed(token, R.string.photo_io_failure)
+            }
+        }
+    }
+
+    /** Updates only the current request's error without replacing a previous valid selection. */
+    private fun photoFailed(token: Long, message: Int) {
+        if (token == photoToken) _uiState.update { it.copy(photoBusy = false, photoError = message) }
+    }
 
     init {
         val currentUid = accountSessionManager.restoreSessionIfAuthenticated()
@@ -86,10 +201,12 @@ class CapsuleDraftViewModel(
     fun syncSessionState() {
         val activeUid = accountSessionManager.restoreSessionIfAuthenticated()
         if (activeUid != _uiState.value.activeSessionUid) {
+            photoToken++
             activeLookupToken++
             _uiState.value = CapsuleDraftUiState(activeSessionUid = activeUid)
             if (!activeUid.isNullOrBlank()) {
                 selectFutureMe(activeUid)
+                restorePhotoDraft()
             }
         }
     }
@@ -97,39 +214,28 @@ class CapsuleDraftViewModel(
     /** Updates optional capsule title. */
     fun updateTitle(newTitle: String) {
         _uiState.update { it.copy(title = newTitle) }
+        persistPhotoDraft()
     }
 
     /** Updates message body text. */
     fun updateText(newText: String) {
         _uiState.update { it.copy(text = newText) }
-    }
-
-    /**
-     * Attaches one photo boundary URI and enforces maximum 5 MiB size validation.
-     */
-    fun attachPhoto(uri: String, fileName: String, sizeBytes: Long): OperationResult<Unit> {
-        if (sizeBytes > 5 * 1024 * 1024) {
-            return OperationResult.Invalid("Photo exceeds maximum size of 5 MiB (5,242,880 bytes).")
-        }
-        _uiState.update {
-            it.copy(
-                localPhotoUri = uri,
-                photoName = fileName,
-                photoSizeBytes = sizeBytes
-            )
-        }
-        return OperationResult.Success(Unit)
+        persistPhotoDraft()
     }
 
     /** Removes attached photo. */
     fun removePhoto() {
+        val previous = _uiState.value.originalPhoto
+        photoToken++
         _uiState.update {
             it.copy(
                 localPhotoUri = null,
                 photoName = null,
-                photoSizeBytes = null
+                photoSizeBytes = null,
+                originalPhoto = null, photoBusy = false, photoError = null
             )
         }
+        persistPhotoDraft(previous)
     }
 
     /** Selects recipient mode: Future Me or Someone Else. */
@@ -328,8 +434,9 @@ class CapsuleDraftViewModel(
     /** Validates S-04 content requirements: message body or photo required. Title alone is invalid. */
     fun validateS04Content(): OperationResult<Unit> {
         val state = _uiState.value
+        if (state.photoBusy) return OperationResult.Invalid("Please wait for the photo to finish.")
         val hasText = state.text.isNotBlank()
-        val hasPhoto = !state.localPhotoUri.isNullOrBlank()
+        val hasPhoto = state.originalPhoto != null
         return if (hasText || hasPhoto) {
             OperationResult.Success(Unit)
         } else {
@@ -390,7 +497,8 @@ class CapsuleDraftViewModel(
             title = state.title.ifBlank { null },
             recipientDisplayName = state.resolvedProfile?.displayName,
             isRecipientConfirmed = state.isRecipientConfirmed,
-            locationName = state.locationName
+            locationName = state.locationName,
+            originalPhoto = state.originalPhoto
         )
     }
 
@@ -408,10 +516,13 @@ class CapsuleDraftViewModel(
 
     /** Resets draft state with a new unique capsule ID. */
     fun discardDraft() {
+        val previous = _uiState.value.originalPhoto
+        photoToken++
         val activeUid = accountSessionManager.restoreSessionIfAuthenticated()
         _uiState.value = CapsuleDraftUiState(activeSessionUid = activeUid)
         if (!activeUid.isNullOrBlank()) {
             selectFutureMe(activeUid)
         }
+        persistPhotoDraft(previous)
     }
 }

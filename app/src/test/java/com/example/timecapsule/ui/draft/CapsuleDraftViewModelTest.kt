@@ -1,6 +1,12 @@
 package com.example.timecapsule.ui.draft
 
 import com.example.timecapsule.data.AccountSessionManager
+import com.example.timecapsule.data.media.PhotoDraftStorage
+import com.example.timecapsule.data.media.PhotoDraftRecord
+import com.example.timecapsule.data.media.InvalidOriginalPhotoException
+import com.example.timecapsule.domain.model.RetainedOriginalPhoto
+import com.example.timecapsule.domain.model.OriginalPhotoFormat
+import java.io.File
 import com.example.timecapsule.data.adapter.AuthAdapter
 import com.example.timecapsule.data.adapter.FirestoreAdapter
 import com.example.timecapsule.data.session.DefaultSessionTracker
@@ -11,6 +17,7 @@ import com.example.timecapsule.domain.result.OperationResult
 import com.google.firebase.firestore.FirebaseFirestore
 import java.time.Instant
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -62,7 +69,7 @@ class CapsuleDraftViewModelTest {
 
     @Test
     fun `photoOnlyIsAccepted - attached photo without text passes validation`() {
-        val attachRes = viewModel.attachPhoto("content://media/photo.jpg", "photo.jpg", 1024L)
+        val attachRes = attachPhoto(1024L)
         assertTrue(attachRes is OperationResult.Success)
 
         val res = viewModel.validateS04Content()
@@ -72,7 +79,7 @@ class CapsuleDraftViewModelTest {
     @Test
     fun `textAndPhotoAccepted - both text and photo pass validation`() {
         viewModel.updateText("A message with photo")
-        viewModel.attachPhoto("content://media/photo.jpg", "photo.jpg", 2048L)
+        attachPhoto(2048L)
 
         val res = viewModel.validateS04Content()
         assertTrue(res is OperationResult.Success)
@@ -97,7 +104,7 @@ class CapsuleDraftViewModelTest {
     @Test
     fun `oversizedPhotoRejected - photo over 5 MiB is rejected`() {
         val oversized = 5 * 1024 * 1024 + 1L
-        val res = viewModel.attachPhoto("content://media/large.png", "large.png", oversized)
+        val res = attachPhoto(oversized)
 
         assertTrue(res is OperationResult.Invalid)
         assertNull(viewModel.uiState.value.localPhotoUri)
@@ -106,11 +113,61 @@ class CapsuleDraftViewModelTest {
     @Test
     fun `validPhotoAccepted - photo under 5 MiB is attached successfully`() {
         val validSize = 5 * 1024 * 1024L
-        val res = viewModel.attachPhoto("content://media/valid.jpg", "valid.jpg", validSize)
+        val res = attachPhoto(validSize)
 
         assertTrue(res is OperationResult.Success)
-        assertEquals("content://media/valid.jpg", viewModel.uiState.value.localPhotoUri)
-        assertEquals("valid.jpg", viewModel.uiState.value.photoName)
+        assertEquals(File("/private/photo.jpg").toURI().toString(), viewModel.uiState.value.localPhotoUri)
+        assertEquals(validSize, viewModel.uiState.value.originalPhoto?.sizeBytes)
+    }
+
+    /** Supplies a validated-storage fixture; real byte limits are tested by OriginalPhotoStoreTest. */
+    private fun attachPhoto(size: Long): OperationResult<Unit> {
+        viewModel.selectPhoto(FakePhotoStorage(size), "content://fixture")
+        testDispatcher.scheduler.advanceUntilIdle()
+        return if (viewModel.uiState.value.originalPhoto != null) OperationResult.Success(Unit)
+            else OperationResult.Invalid("Rejected by photo storage")
+    }
+
+    /** Removing a selection while its provider is reading prevents a late photo from reappearing. */
+    @Test fun removingPhotoInvalidatesPendingSelection() {
+        val gate = CompletableDeferred<Unit>()
+        val delegate = FakePhotoStorage(3)
+        val storage = object : PhotoDraftStorage by delegate {
+            /** Waits for a simulated slow provider before returning the validated fixture. */
+            override suspend fun retain(uid: String, capsuleId: String, uri: String): RetainedOriginalPhoto {
+                gate.await()
+                return delegate.retain(uid, capsuleId, uri)
+            }
+        }
+        viewModel.selectPhoto(storage, "content://slow")
+        testDispatcher.scheduler.runCurrent()
+        assertTrue(viewModel.uiState.value.photoBusy)
+        viewModel.removePhoto()
+        gate.complete(Unit)
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertNull(viewModel.uiState.value.originalPhoto)
+        assertFalse(viewModel.uiState.value.photoBusy)
+    }
+
+    /** An old account's pending photo never becomes visible in a new account draft. */
+    @Test fun accountChangeInvalidatesPendingPhoto() {
+        val gate = CompletableDeferred<Unit>()
+        val delegate = FakePhotoStorage(3)
+        val storage = object : PhotoDraftStorage by delegate {
+            /** Holds the old account's selection until after account switching. */
+            override suspend fun retain(uid: String, capsuleId: String, uri: String): RetainedOriginalPhoto {
+                gate.await()
+                return delegate.retain(uid, capsuleId, uri)
+            }
+        }
+        viewModel.selectPhoto(storage, "content://slow")
+        testDispatcher.scheduler.runCurrent()
+        mockAuthAdapter.setUid("another-user")
+        viewModel.syncSessionState()
+        gate.complete(Unit)
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals("another-user", viewModel.uiState.value.activeSessionUid)
+        assertNull(viewModel.uiState.value.originalPhoto)
     }
 
     // --- S-05 Recipient Lookup & Explicit Confirmation Tests ---
@@ -308,7 +365,7 @@ class CapsuleDraftViewModelTest {
     fun `buildCapsuleDraft - creates complete CapsuleDraft matching all inputs`() {
         viewModel.updateTitle("Graduation Letter")
         viewModel.updateText("Dear future self")
-        viewModel.attachPhoto("content://media/1.jpg", "1.jpg", 500000L)
+        attachPhoto(500000L)
         viewModel.selectFutureMe("sender-uid")
         viewModel.updateLockMode(LockMode.TIME)
         val futureTime = Instant.parse("2027-10-16T09:59:00Z")
@@ -318,7 +375,8 @@ class CapsuleDraftViewModelTest {
 
         assertEquals("Graduation Letter", draft.title)
         assertEquals("Dear future self", draft.text)
-        assertEquals("content://media/1.jpg", draft.localPhotoUri)
+        assertEquals(File("/private/photo.jpg").toURI().toString(), draft.localPhotoUri)
+        assertNotNull(draft.originalPhoto)
         assertEquals("sender-uid", draft.recipientUid)
         assertTrue(draft.isRecipientConfirmed)
         assertEquals(LockMode.TIME, draft.lock.mode)
@@ -350,6 +408,24 @@ class CapsuleDraftViewModelTest {
 }
 
 // --- Fakes for Test Isolation ---
+
+/** Emulates validated input without requiring Android's URI implementation. */
+private class FakePhotoStorage(private val size: Long) : PhotoDraftStorage {
+    /** Rejects invalid fixtures or returns retained metadata for the requested identity. */
+    override suspend fun retain(uid: String, capsuleId: String, uri: String): RetainedOriginalPhoto {
+        if (size !in 1L..5_242_880L) throw InvalidOriginalPhotoException("Invalid size")
+        return RetainedOriginalPhoto(uid, capsuleId, "fixture.original", OriginalPhotoFormat.JPEG,
+            size, "fixture-hash")
+    }
+    /** Supplies a stable private path for mapping assertions. */
+    override fun file(photo: RetainedOriginalPhoto): File = File("/private/photo.jpg")
+    /** This fixture owns no actual files. */
+    override suspend fun remove(photo: RetainedOriginalPhoto) {}
+    /** Persistence has separate real-filesystem tests. */
+    override suspend fun save(uid: String, draft: PhotoDraftRecord) {}
+    /** Starts without a saved draft. */
+    override suspend fun restore(uid: String): PhotoDraftRecord? = null
+}
 
 private class FakeAuthAdapter(initialUid: String?) : AuthAdapter {
     private var currentUid: String? = initialUid

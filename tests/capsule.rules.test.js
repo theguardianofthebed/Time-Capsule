@@ -609,6 +609,35 @@ describe("Capsule Storage security rules", () => {
         );
     });
 
+    it("allows the owner to remove an unpublished orphan", async () => {
+        const storage = testEnv.authenticatedContext(senderUid).storage();
+        const photoRef = ref(storage, photoPathFor("orphan-cleanup"));
+        await assertSucceeds(uploadBytes(photoRef, imageData, { contentType: "image/png" }));
+        await assertSucceeds(deleteObject(photoRef));
+    });
+
+    it("denies another account deleting an unpublished orphan", async () => {
+        const path = photoPathFor("orphan-other-account");
+        const owner = testEnv.authenticatedContext(senderUid).storage();
+        const other = testEnv.authenticatedContext("unrelated-c").storage();
+        await assertSucceeds(uploadBytes(ref(owner, path), imageData, { contentType: "image/png" }));
+        await assertFails(deleteObject(ref(other, path)));
+    });
+
+    it("denies signed-out deletion of an unpublished orphan", async () => {
+        const path = photoPathFor("orphan-signed-out");
+        const owner = testEnv.authenticatedContext(senderUid).storage();
+        const anonymous = testEnv.unauthenticatedContext().storage();
+        await assertSucceeds(uploadBytes(ref(owner, path), imageData, { contentType: "image/png" }));
+        await assertFails(deleteObject(ref(anonymous, path)));
+    });
+
+    it("denies empty original uploads", async () => {
+        const storage = testEnv.authenticatedContext(senderUid).storage();
+        await assertFails(uploadBytes(ref(storage, photoPathFor("empty-photo")),
+            new Uint8Array(0), { contentType: "image/png" }));
+    });
+
     it("denies deleting a photo after capsule publication (immutable)", async () => {
         const id = "storage-delete-test";
         const senderStorage = testEnv.authenticatedContext(senderUid).storage();

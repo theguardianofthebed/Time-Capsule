@@ -87,6 +87,7 @@ object FirebaseConfig {
             if (!isFirebaseAvailable(appContext)) {
                 val options = FirebaseOptions.Builder()
                     .setProjectId("demo-timecapsule")
+                    .setStorageBucket("demo-timecapsule.appspot.com")
                     .setApplicationId("1:1234567890:android:abcdef123456")
                     .setApiKey("AIzaSyDemoKeyForTestingOnly00000000000")
                     .build()
