@@ -19,6 +19,7 @@ import org.junit.BeforeClass
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.junit.rules.TestRule
 
 /**
  * Android Instrumentation Integration tests executing against live Firebase Auth & Firestore Emulators.
@@ -32,13 +33,9 @@ class FirebaseEmulatorIntegrationTest {
         @JvmStatic
         fun setupEmulatorConnection() {
             val context = InstrumentationRegistry.getInstrumentation().targetContext
-            try {
+            if (android.os.Build.VERSION.SDK_INT >= 37) {
                 InstrumentationRegistry.getInstrumentation().uiAutomation.grantRuntimePermission(
-                    context.packageName,
-                    "android.permission.ACCESS_LOCAL_NETWORK",
-                )
-            } catch (_: Exception) {
-                // Ignore runtime permission grant fallback on platforms where not enforced
+                    context.packageName, "android.permission.ACCESS_LOCAL_NETWORK")
             }
             val initialized = FirebaseConfig.setupDebugEmulatorConnection(context, true)
             assertTrue("Firebase debug emulator connection must succeed for tests", initialized)
@@ -46,8 +43,10 @@ class FirebaseEmulatorIntegrationTest {
     }
 
     @get:Rule
-    val grantLocalNetworkPermissionRule: GrantPermissionRule =
-        GrantPermissionRule.grant("android.permission.ACCESS_LOCAL_NETWORK")
+    val grantLocalNetworkPermissionRule: TestRule =
+        if (android.os.Build.VERSION.SDK_INT >= 37) {
+            GrantPermissionRule.grant("android.permission.ACCESS_LOCAL_NETWORK")
+        } else TestRule { statement, _ -> statement }
 
     private lateinit var auth: FirebaseAuth
     private lateinit var firestore: FirebaseFirestore
