@@ -1,7 +1,7 @@
 # Agent Log – Week 3 (11/22/2026 – 11/24/2026)
 
 - Name / Student ID: Junwon (User J)
-- Model(s) used: Android Studio Agent Mode (Gemini Flash 3.8)
+- Model(s) used: Android Studio Agent Mode (Gemini Flash 3.6)
 - My changes to the team's Agent Tools this week: Added bounded review corrections, string updates, and deterministic coroutine race test suite for Issue #13 original photo handling.
 
 ## Feature or task: Issue #13 Code Review Corrections
@@ -11,7 +11,7 @@
 - **Issue and PR:** [Issue #13](https://github.com/theguardianofthebed/Time-Capsule/issues/13), [PR #39](https://github.com/theguardianofthebed/Time-Capsule/pull/39) (`feature/13-original-photo`).
 - **Requirement/design references:** FR-04, FR-08, FR-12; ARC-02, ARC-06, ARC-07; DD-04, DD-18, DD-25; AC-02, AC-13, AC-14.
 - **Agent environment:** Android Studio Agent Mode.
-- **Model used:** Gemini Flash 3.8.
+- **Model used:** Gemini Flash 3.6.
 
 ### Goal
 
