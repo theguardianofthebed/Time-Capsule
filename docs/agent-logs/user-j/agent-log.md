@@ -222,3 +222,29 @@ Automatic approval review rejected uploading the full private Atlas r55 snapshot
 
 User J confirmed task ownership and execution. Independent teammate PR review by User G or User F and human merge into `main` remain for the team to complete. PR #35 remains in Draft state until review.
 
+
+## 2026-11-22-issue13-code-review-corrections — Original Photo Support Review Corrections
+
+- **Owner / scope / period:** User J (Junwon), explicitly confirmed as correction owner for Issue #13 based on User G's original implementation. Period: November 22–24, 2026. MVP Scope.
+- **Environment/model:** Android Studio Agent Mode (Gemini Flash 3.8).
+- **GitHub:** [Issue #13](https://github.com/theguardianofthebed/Time-Capsule/issues/13); [PR #39](https://github.com/theguardianofthebed/Time-Capsule/pull/39); branch `feature/13-original-photo`.
+- **References:** FR-04, FR-08, FR-12; ARC-02, ARC-06, ARC-07; DD-04, DD-18, DD-25; AC-02, AC-13, AC-14.
+
+### Work performed
+
+1. **Correction A (Unnecessary Session-Generation Changes):** Fixed `restoreSessionIfAuthenticated()` in `AccountSessionManager.kt` to check `sessionTracker.currentSession().uid != activeUid` before calling `startSession()`. Exposed `currentSession()` for UI state checks. Prevents repeated same-account foreground auth checks from incrementing session generation and invalidating in-flight photo uploads.
+2. **Correction B (Photo Selection, Cancellation & Journal Race):** Added thread safety (`synchronized(access)`) to `PhotoDraftJournal.kt` and preserved PR #40's `replaceIfCurrent` and `clearIfCurrent` methods. Refactored `selectPhoto()`, `removePhoto()`, `discardDraft()`, `persistPhotoDraft()`, and `restorePhotoDraft()` in `CapsuleDraftViewModel.kt` to revalidate `isCurrentPhotoOp()` across suspension boundaries (including `photoSaveMutex.withLock`), remove abandoned temporary photo files, prevent obsolete selections from overwriting active drafts, preserve valid previous photos on failed selections, and prevent late draft restores from overwriting user edits.
+3. **Correction C (Frozen-Copy Cleanup on Failed Journal Save):** Updated `freeze()` in `OriginalPhotoUploads.kt` to track newly created frozen copies and, on journal save failure or cancellation, inspect the authoritative journal and delete only unreferenced un-adopted copies while preserving previous valid frozen copies and remote objects.
+4. **Unit Test Suite:** Added 3 session restoration tests, 1 same-account upload ack test, 1 journal save failure cleanup test, and 6 deterministic coroutine race tests using `CompletableDeferred` in `CapsuleDraftViewModelTest.kt`.
+
+### Checks and verification
+
+- `./gradlew :app:testDebugUnitTest`: PASS (114 JVM unit tests passed, 0 failed)
+- `./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors)
+- `git diff --check`: PASS (clean)
+
+### Human input and remaining work
+
+User J confirmed task ownership and execution. Independent teammate PR review by User G or User F and manual testing follow separately.
+
+

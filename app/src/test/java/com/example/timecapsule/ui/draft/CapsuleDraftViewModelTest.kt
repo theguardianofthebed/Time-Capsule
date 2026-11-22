@@ -405,6 +405,170 @@ class CapsuleDraftViewModelTest {
         assertTrue(state.text.isBlank())
         assertTrue(state.capsuleId != initialId)
     }
+
+    // --- Correction B Race & Lifecycle Tests ---
+
+    @Test
+    fun `discardWhilePhotoRetentionUnfinished - removes abandoned photo and resets state`() {
+        val retainGate = CompletableDeferred<Unit>()
+        val storage = TestablePhotoStorage(retainGate = retainGate)
+
+        viewModel.selectPhoto(storage, "slow-uri")
+        testDispatcher.scheduler.runCurrent()
+        assertTrue(viewModel.uiState.value.photoBusy)
+
+        val oldCapsuleId = viewModel.uiState.value.capsuleId
+        viewModel.discardDraft()
+
+        retainGate.complete(Unit)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertNull(state.originalPhoto)
+        assertFalse(state.photoBusy)
+        assertTrue(state.capsuleId != oldCapsuleId)
+        assertEquals(1, storage.removedPhotos.size)
+        assertEquals("file-slow-uri.original", storage.removedPhotos.first().privateFileName)
+    }
+
+    @Test
+    fun `discardOrRemovalWhileJournalSaveIsSuspended - cleans up photo and preserves discarded state`() {
+        val saveGate = CompletableDeferred<Unit>()
+        val storage = TestablePhotoStorage(saveGate = saveGate)
+
+        viewModel.selectPhoto(storage, "slow-save-uri")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Photo retained, now suspended waiting on saveGate
+        viewModel.removePhoto()
+
+        saveGate.complete(Unit)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertNull(state.originalPhoto)
+        assertFalse(state.photoBusy)
+        assertTrue(storage.removedPhotos.any { it.privateFileName == "file-slow-save-uri.original" })
+    }
+
+    @Test
+    fun `accountSwitchDuringPendingPhotoPersistence - invalidates selection and cleans up`() {
+        val saveGate = CompletableDeferred<Unit>()
+        val storage = TestablePhotoStorage(saveGate = saveGate)
+
+        viewModel.selectPhoto(storage, "pending-account-uri")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        mockAuthAdapter.setUid("new-user")
+        sessionTracker.startSession("new-user")
+        viewModel.syncSessionState()
+
+        saveGate.complete(Unit)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals("new-user", state.activeSessionUid)
+        assertNull(state.originalPhoto)
+        assertTrue(storage.removedPhotos.any { it.privateFileName == "file-pending-account-uri.original" })
+    }
+
+    @Test
+    fun `obsoletePhotoSelectionCompletingAfterNewerSelection - is ignored and cleaned up`() {
+        val retainGate1 = CompletableDeferred<Unit>()
+        val storage1 = TestablePhotoStorage(retainGate = retainGate1)
+
+        viewModel.selectPhoto(storage1, "photo-1")
+        testDispatcher.scheduler.runCurrent()
+
+        val storage2 = TestablePhotoStorage()
+        viewModel.selectPhoto(storage2, "photo-2")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Now photo 1 completes late
+        retainGate1.complete(Unit)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertNotNull(state.originalPhoto)
+        assertEquals("file-photo-2.original", state.originalPhoto?.privateFileName)
+        assertTrue(storage1.removedPhotos.any { it.privateFileName == "file-photo-1.original" })
+    }
+
+    @Test
+    fun `lateDraftRestorationAfterStateChanges - does not overwrite user edits`() {
+        val restoreGate = CompletableDeferred<PhotoDraftRecord?>()
+        val storage = TestablePhotoStorage(restoreGate = restoreGate)
+
+        viewModel.configurePhotos(storage)
+        testDispatcher.scheduler.runCurrent()
+
+        // User edits text while restore is in flight
+        viewModel.updateText("New User Text")
+
+        val savedRecord = PhotoDraftRecord(
+            capsuleId = viewModel.uiState.value.capsuleId,
+            title = "Old Saved Title",
+            text = "Old Saved Text",
+            photo = RetainedOriginalPhoto("sender-uid", viewModel.uiState.value.capsuleId, "old.original", OriginalPhotoFormat.JPEG, 1024L, "hash")
+        )
+        restoreGate.complete(savedRecord)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals("New User Text", state.text)
+    }
+
+    @Test
+    fun `recoveryAfterSavingReplacementPhoto - restores newer photo and removes previous`() {
+        val storage = TestablePhotoStorage()
+
+        viewModel.selectPhoto(storage, "photo-original")
+        testDispatcher.scheduler.advanceUntilIdle()
+        val photo1 = viewModel.uiState.value.originalPhoto
+
+        viewModel.selectPhoto(storage, "photo-replacement")
+        testDispatcher.scheduler.advanceUntilIdle()
+        val photo2 = viewModel.uiState.value.originalPhoto
+
+        assertNotNull(photo1)
+        assertNotNull(photo2)
+        assertTrue(photo1 != photo2)
+        assertEquals("file-photo-replacement.original", photo2?.privateFileName)
+        assertTrue(storage.removedPhotos.contains(photo1))
+    }
+}
+
+// --- Fakes for Test Isolation ---
+
+/** Testable photo storage implementation for coroutine race assertions. */
+private class TestablePhotoStorage(
+    val retainGate: CompletableDeferred<Unit>? = null,
+    val saveGate: CompletableDeferred<Unit>? = null,
+    val restoreGate: CompletableDeferred<PhotoDraftRecord?>? = null
+) : PhotoDraftStorage {
+    val removedPhotos = mutableListOf<RetainedOriginalPhoto>()
+    val savedRecords = mutableListOf<PhotoDraftRecord>()
+
+    override suspend fun retain(uid: String, capsuleId: String, uri: String): RetainedOriginalPhoto {
+        retainGate?.await()
+        return RetainedOriginalPhoto(uid, capsuleId, "file-$uri.original", OriginalPhotoFormat.JPEG, 1024L, "hash-$uri")
+    }
+
+    override fun file(photo: RetainedOriginalPhoto): File = File("/private/${photo.privateFileName}")
+
+    override suspend fun remove(photo: RetainedOriginalPhoto) {
+        removedPhotos.add(photo)
+    }
+
+    override suspend fun save(uid: String, draft: PhotoDraftRecord) {
+        saveGate?.await()
+        savedRecords.add(draft)
+    }
+
+    override suspend fun restore(uid: String): PhotoDraftRecord? {
+        val gate = restoreGate
+        return if (gate != null) gate.await() else savedRecords.lastOrNull()
+    }
 }
 
 // --- Fakes for Test Isolation ---

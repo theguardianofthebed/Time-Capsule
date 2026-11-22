@@ -24,17 +24,24 @@ class AccountSessionManager(
 
     private val authMutex = Mutex()
 
+    /** Exposes immutable identity/generation evidence for rejecting stale foreground UI callbacks. */
+    fun currentSession(): SessionSnapshot = sessionTracker.currentSession()
+
     /**
      * Restores active user session from [authAdapter] on application restart or container recreation.
-     * Updates [sessionTracker] with active UID if authenticated, or clears session if unauthenticated.
+     * Changes generation only on an identity transition; foreground checks preserve in-flight work.
      */
     fun restoreSessionIfAuthenticated(): String? {
         val activeUid = authAdapter.activeUid()
         if (!activeUid.isNullOrBlank()) {
-            sessionTracker.startSession(activeUid)
+            if (sessionTracker.currentSession().uid != activeUid) {
+                sessionTracker.startSession(activeUid)
+            }
             return activeUid
         } else {
-            sessionTracker.clearSession()
+            if (sessionTracker.currentSession().isAuthenticated) {
+                sessionTracker.clearSession()
+            }
             return null
         }
     }

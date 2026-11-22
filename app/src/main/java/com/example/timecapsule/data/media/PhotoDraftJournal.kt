@@ -8,6 +8,7 @@ import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import java.util.Properties
+import java.util.UUID
 
 /** Private draft fields needed to resume the same original after process death. */
 data class PhotoDraftRecord(
@@ -19,8 +20,12 @@ data class PhotoDraftRecord(
 
 /** Atomically replaces one UID-scoped draft record; callers serialize access and use I/O threads. */
 class PhotoDraftJournal(private val root: File) {
+    companion object {
+        private val access = Any()
+    }
+
     /** Persists a draft before old original bytes are eligible for local cleanup. */
-    fun save(uid: String, draft: PhotoDraftRecord) {
+    fun save(uid: String, draft: PhotoDraftRecord): Unit = synchronized(access) {
         require(uid.isNotBlank())
         require(draft.photo == null || (draft.photo.ownerUid == uid &&
             draft.photo.capsuleId == draft.capsuleId))
@@ -50,9 +55,9 @@ class PhotoDraftJournal(private val root: File) {
     }
 
     /** Loads only the requested UID's fields; malformed records fail visibly instead of disappearing. */
-    fun load(uid: String): PhotoDraftRecord? {
+    fun load(uid: String): PhotoDraftRecord? = synchronized(access) {
         val file = target(uid)
-        if (!file.exists()) return null
+        if (!file.exists()) return@synchronized null
         val properties = Properties().apply { file.inputStream().use { load(it) } }
         val id = properties.getProperty("capsuleId") ?: throw IOException("Draft is incomplete.")
         val name = properties.getProperty("file")
@@ -63,8 +68,31 @@ class PhotoDraftJournal(private val root: File) {
         } catch (error: RuntimeException) {
             throw IOException("Saved photo information is invalid.", error)
         }
-        return PhotoDraftRecord(id, properties.getProperty("title", ""),
+        PhotoDraftRecord(id, properties.getProperty("title", ""),
             properties.getProperty("text", ""), photo)
+    }
+
+    /** Replaces only the expected old draft; an already-created replacement keeps all later edits. */
+    fun replaceIfCurrent(
+        uid: String,
+        expectedId: String,
+        replacement: PhotoDraftRecord
+    ): PhotoDraftRecord = synchronized(access) {
+        val current = load(uid)
+        if (current?.capsuleId == replacement.capsuleId) return@synchronized current
+        if (current != null && current.capsuleId != expectedId) {
+            throw IOException("A different editable draft already exists.")
+        }
+        save(uid, replacement)
+        replacement
+    }
+
+    /** Clears a completed compose buffer without removing a newer independent draft. */
+    fun clearIfCurrent(uid: String, capsuleId: String): PhotoDraftRecord? = synchronized(access) {
+        val current = load(uid) ?: return@synchronized null
+        if (current.capsuleId != capsuleId) return@synchronized null
+        save(uid, PhotoDraftRecord(UUID.randomUUID().toString(), "", "", null))
+        current
     }
 
     /** Hashes the UID to isolate journals without putting account identifiers in file names. */

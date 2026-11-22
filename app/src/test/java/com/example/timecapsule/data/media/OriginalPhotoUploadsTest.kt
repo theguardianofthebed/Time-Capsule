@@ -1,8 +1,13 @@
 package com.example.timecapsule.data.media
 
+import com.example.timecapsule.data.AccountSessionManager
+import com.example.timecapsule.data.adapter.AuthAdapter
+import com.example.timecapsule.data.adapter.FirestoreAdapter
+import com.example.timecapsule.data.session.DefaultSessionTracker
 import com.example.timecapsule.domain.model.FrozenPhotoUpload
 import com.example.timecapsule.domain.model.OriginalPhotoFormat
 import com.example.timecapsule.domain.model.PhotoUploadAcknowledgment
+import com.example.timecapsule.domain.model.RecipientProfile
 import com.example.timecapsule.domain.model.RetainedOriginalPhoto
 import com.example.timecapsule.domain.result.OperationResult
 import com.example.timecapsule.domain.session.SessionSnapshot
@@ -158,6 +163,63 @@ class OriginalPhotoUploadsTest {
         try { service.upload(frozen) } catch (_: CancellationException) { cancelled = true }
         assertTrue(cancelled)
         assertTrue(store.file(frozen.original).exists())
+    }
+
+    /** Repeated same-account foreground auth checks preserve session generation and permit upload. */
+    @Test fun repeatedForegroundAuthCheckDoesNotRejectUploadAck() = runBlocking {
+        val authAdapter = object : AuthAdapter {
+            override fun activeUid(): String = "sender"
+            override fun activeEmail(): String = "sender@example.com"
+            override fun activeDisplayName(): String = "Sender"
+            override suspend fun signIn(email: String, password: String) = OperationResult.Success("sender")
+            override suspend fun signUp(email: String, password: String, displayName: String) = OperationResult.Success("sender")
+            override suspend fun updateDisplayName(displayName: String) = OperationResult.Success(Unit)
+            override fun signOut() {}
+        }
+        val tracker = DefaultSessionTracker()
+        val manager = AccountSessionManager(
+            authAdapter,
+            object : FirestoreAdapter {
+                override fun isAvailable(): Boolean = true
+                override fun firestoreInstance() = null
+                override suspend fun getRecipientProfile(uid: String) = OperationResult.Success(
+                    RecipientProfile(uid, "Name")
+                )
+                override suspend fun saveRecipientProfile(profile: RecipientProfile) = OperationResult.Success(Unit)
+            },
+            tracker
+        )
+        manager.restoreSessionIfAuthenticated()
+        val serviceWithManager = OriginalPhotoUploads(store, journals, backend) { tracker.currentSession() }
+        val original = selected()
+        val frozen = (serviceWithManager.freeze(original) as OperationResult.Success).data
+
+        // Simulate repeated foreground auth checks
+        manager.restoreSessionIfAuthenticated()
+        manager.restoreSessionIfAuthenticated()
+
+        val uploadRes = serviceWithManager.upload(frozen)
+        assertTrue("Upload must succeed after repeated same-account checks", uploadRes is OperationResult.Success)
+    }
+
+    /** Failure during journal save after creating private copy cleans up the new unreferenced copy. */
+    @Test fun failedJournalSaveCleansUpNewlyCreatedCopy() = runBlocking {
+        // Create a journals directory containing a file named "capsule-fail" so journal(id) cannot create its directory
+        val invalidJournals = temporary.newFolder()
+        File(invalidJournals, "capsule-fail").createNewFile()
+
+        val failingService = OriginalPhotoUploads(store, invalidJournals, backend) { session }
+        val original = store.retain("sender", "capsule-fail", "image/png", byteArrayOf(10, 20).inputStream())
+
+        val freezeRes = failingService.freeze(original)
+        assertTrue("Freeze must return failure when journal save fails", freezeRes is OperationResult.Unavailable)
+
+        // The newly created copy in store must have been deleted, leaving only the original selection
+        val origFile = store.file(original)
+        assertTrue(origFile.exists())
+        val dir = origFile.parentFile
+        val remainingFiles = dir?.listFiles()?.filter { it.name != origFile.name } ?: emptyList()
+        assertTrue("Newly created frozen copy must be deleted on journal failure", remainingFiles.isEmpty())
     }
 
     /** Backend fixture exposes the exact bytes/path and explicit failure/publication scenarios. */
