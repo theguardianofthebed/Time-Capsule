@@ -6,6 +6,48 @@ Weekly coursework remains in `agent-log-w1.md`–`agent-log-w4.md`.
 
 ## Entries
 
+## 2026-11-22-issue15-utc-schedules-server-unlock — UTC schedules & server-authorized one-way unlock
+
+- **Owner:** User J, explicitly confirmed as implementation owner for Issue #15. Reviewer: User G.
+- **Environment/model:** Android Studio Agent Mode (Gemini Flash 3.6).
+- **Status:** Implemented, verified with unit tests and Firebase Emulator security rules tests, clean assemble & lint, task branch `feature/15-utc-schedule-unlock` prepared for PR.
+- **Requested outcome:** Store UTC schedules using an IANA ZoneId, convert local date/time to absolute UTC Instant, reject Daylight Saving Time (DST) spring-forward gaps, handle DST fall-back overlaps with explicit offset selection, display creation zone and offset coherently during review, keep submitted schedule immutable, and enforce online recipient unlock transaction with server-authorized `FieldValue.serverTimestamp()` timestamp in `firestore.rules` and `DefaultCapsuleRepository`. Device clock changes cannot unlock capsules; already-unlocked capsules yield idempotent success; offline or denied requests remain locked.
+- **References:** [Issue #15](https://github.com/theguardianofthebed/Time-Capsule/issues/15); FR-05, NFR-04; ARC-02, ARC-03, ARC-05; DD-13, DD-17, DD-23; AC-04, AC-06, AC-12; T-13, T-14, T-15, T-23, T-41.
+
+### Work performed
+
+- **Time Conversion Engine & DST Validation (`TimeConversionHelper.kt`):**
+  - Created domain utility `TimeConversionHelper.kt` converting local date (`LocalDate`) + local time (`LocalTime`) + IANA `ZoneId` into an absolute UTC `Instant`.
+  - Implemented DST gap detection (`rules.getValidOffsets(localDateTime).isEmpty()`), rejecting nonexistent times with `OperationResult.Invalid("Selected local time does not exist due to daylight saving transition: ...")`.
+  - Implemented DST overlap handling (`validOffsets.size > 1`), returning `isAmbiguousOverlap = true` with available offsets and applying preferred or default offset.
+  - Implemented coherent timezone string formatting (`formatZonedDateTime(instant, zoneId)` -> `"2026-11-25 09:00 (Asia/Seoul, UTC+09:00)"`).
+- **Server-Authorized One-Way Unlock Transaction (`DefaultCapsuleRepository.kt` & `DefaultFirestoreAdapter.kt`):**
+  - Updated `FirestoreAdapter` interface and implemented `verifyRecipientUnlock(capsuleId, recipientUid)` in `DefaultFirestoreAdapter.kt` using `Source.SERVER`.
+  - Enforced recipient check (`docRecipientId == recipientUid`), returning `OperationResult.Denied` for non-recipients.
+  - Enforced server authority by sending `mapOf("unlocked" to true, "unlockedAt" to FieldValue.serverTimestamp())`, evaluated against `request.time >= resource.data.unlockAt` in `firestore.rules`.
+  - Implemented idempotent success: already-unlocked capsules return `OperationResult.Success(Availability.AVAILABLE)` without redundant network updates.
+  - Implemented fail-closed behavior on offline, network error, or permission denied (`OperationResult.Unavailable` / `OperationResult.Denied`).
+  - Deferred `LOCATION` and `TIME_AND_LOCATION` unlock conditions to Issue #17 with explicit fail-closed notices.
+- **UI Integration & Timezone Formatting (`S05RecipientLockFragment.kt` & `S06ConfirmSendFragment.kt`):**
+  - Updated `CapsuleDraftViewModel.kt` to preserve `creationZone` in `DraftUiState` and `updateUnlockAt(instant, zoneId)`.
+  - Integrated `TimeConversionHelper` into `S05RecipientLockFragment.kt`'s date & time pickers to validate DST gaps before setting state, and format UI buttons with date, time, zone, and offset.
+  - Updated `S06ConfirmSendFragment.kt` to display formatted target UTC date/time, creation zone, and offset in the review card.
+- **Automated Verification Suite:**
+  - Written `TimeConversionHelperTest.kt` (5 unit tests covering UTC conversion, DST spring-forward gap rejection, DST fall-back overlap resolution, timezone formatting, and offset formatting).
+  - Written `DefaultCapsuleRepositoryUnlockTest.kt` (8 unit tests covering unauthenticated denial, blank ID validation, non-recipient denial, early unlock denial, server deadline unlock success, idempotent unlock, device clock manipulation safety, and offline network failure handling).
+  - Updated `CapsuleDraftViewModelTest.kt` with timezone preservation tests (53 unit tests passing in suite).
+
+### Checks and verification
+
+- `./gradlew :app:testDebugUnitTest`: PASS (214 JVM unit tests passed across project, 0 failed).
+- `npx firebase emulators:exec --project demo-timecapsule "npm test"`: PASS (42 security rules tests passed, 0 failed).
+- `./gradlew :app:assembleDebug :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors).
+- `git diff --check`: PASS (clean).
+
+### Human input and remaining work
+
+User J confirmed task ownership and implementation review. Personal reflections, teammate PR review by User G, manual testing, and human merge into `main` remain for the students to complete.
+
 ## 2026-11-13-issue37-ui-design-correction — S-01, S-02, S-08 Stitch UI design correction & review fixes
 
 - **Owner:** User J, explicitly confirmed as implementation owner for Issue #37. Reviewer: User G.

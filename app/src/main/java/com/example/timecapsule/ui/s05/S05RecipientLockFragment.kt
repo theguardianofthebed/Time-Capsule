@@ -19,12 +19,15 @@ import com.example.timecapsule.databinding.FragmentS05RecipientLockBinding
 import com.example.timecapsule.domain.model.LocationTarget
 import com.example.timecapsule.domain.model.LockMode
 import com.example.timecapsule.domain.result.OperationResult
+import com.example.timecapsule.domain.time.TimeConversionHelper
 import com.example.timecapsule.ui.ViewModelFactory
 import com.example.timecapsule.ui.draft.CapsuleDraftViewModel
 import com.example.timecapsule.ui.draft.RecipientLookupStatus
 import com.example.timecapsule.ui.draft.RecipientMode
 import java.time.Instant
+import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Calendar
@@ -172,9 +175,18 @@ class S05RecipientLockFragment : Fragment() {
             val minute = calendar.get(Calendar.MINUTE)
 
             val timePickerDialog = TimePickerDialog(requireContext(), { _, selectedHour, selectedMinute ->
-                val localDateTime = LocalDateTime.of(selectedYear, selectedMonth + 1, selectedDay, selectedHour, selectedMinute)
-                val instant = localDateTime.atZone(ZoneId.systemDefault()).toInstant()
-                viewModel.updateUnlockAt(instant)
+                val localDate = LocalDate.of(selectedYear, selectedMonth + 1, selectedDay)
+                val localTime = LocalTime.of(selectedHour, selectedMinute)
+                val zoneId = ZoneId.systemDefault()
+                val conversionRes = TimeConversionHelper.toUtcInstant(localDate, localTime, zoneId)
+                if (conversionRes is OperationResult.Success) {
+                    val data = conversionRes.data
+                    viewModel.updateUnlockAt(data.instant, data.zoneId.id)
+                    binding.tvS05Error.visibility = View.GONE
+                } else if (conversionRes is OperationResult.Invalid) {
+                    binding.tvS05Error.text = conversionRes.message
+                    binding.tvS05Error.visibility = View.VISIBLE
+                }
             }, hour, minute, true)
 
             timePickerDialog.show()
@@ -296,9 +308,8 @@ class S05RecipientLockFragment : Fragment() {
 
                     // Date & Time display
                     if (state.unlockAt != null) {
-                        val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm z")
-                            .withZone(ZoneId.systemDefault())
-                        binding.btnSelectDateTime.text = formatter.format(state.unlockAt)
+                        val zoneId = try { ZoneId.of(state.creationZone) } catch (_: Exception) { ZoneId.systemDefault() }
+                        binding.btnSelectDateTime.text = TimeConversionHelper.formatZonedDateTime(state.unlockAt, zoneId)
                     } else {
                         binding.btnSelectDateTime.text = "Select future date & time"
                     }

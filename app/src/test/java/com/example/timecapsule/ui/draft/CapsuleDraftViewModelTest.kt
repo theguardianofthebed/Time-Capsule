@@ -395,6 +395,16 @@ class CapsuleDraftViewModelTest {
         assertEquals(futureTime, draft.lock.unlockAt)
     }
 
+    @Test
+    fun `updateUnlockAt preserves explicit creationZone in uiState`() {
+        val futureTime = Instant.now().plusSeconds(3600)
+        viewModel.updateUnlockAt(futureTime, "America/New_York")
+
+        val state = viewModel.uiState.value
+        assertEquals(futureTime, state.unlockAt)
+        assertEquals("America/New_York", state.creationZone)
+    }
+
     /** Controlled repository keeps UI race tests separate from the coordinator's disk/network tests. */
     private inner class PublicationRepository : CapsuleRepository by
         DefaultCapsuleRepository(sessionTracker, mockAuthAdapter, mockFirestoreAdapter) {

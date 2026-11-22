@@ -30,6 +30,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import java.time.ZoneId
 
 /** Recipient target mode selection for S-05 recipient step. */
 enum class RecipientMode {
@@ -67,6 +68,7 @@ data class CapsuleDraftUiState(
     val isRecipientConfirmed: Boolean = false,
     val lockMode: LockMode = LockMode.TIME,
     val unlockAt: Instant? = null,
+    val creationZone: String = ZoneId.systemDefault().id,
     val locationTarget: LocationTarget? = null,
     val locationName: String? = null,
     val activeSessionUid: String? = null,
@@ -580,10 +582,10 @@ class CapsuleDraftViewModel(
         _uiState.update { it.copy(lockMode = mode) }
     }
 
-    /** Updates target unlock date/time instant. */
-    fun updateUnlockAt(instant: Instant?) {
+    /** Updates target unlock date/time instant and optional creation timezone. */
+    fun updateUnlockAt(instant: Instant?, zoneId: String = ZoneId.systemDefault().id) {
         if (!_uiState.value.editable) return
-        _uiState.update { it.copy(unlockAt = instant) }
+        _uiState.update { it.copy(unlockAt = instant, creationZone = zoneId) }
     }
 
     /** Updates target location coordinates and location name. */

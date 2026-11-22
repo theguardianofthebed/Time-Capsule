@@ -14,10 +14,10 @@ import com.example.timecapsule.R
 import com.example.timecapsule.domain.model.PublicationPhase
 import com.example.timecapsule.databinding.FragmentS06ConfirmSendBinding
 import com.example.timecapsule.domain.model.LockMode
+import com.example.timecapsule.domain.time.TimeConversionHelper
 import com.example.timecapsule.ui.ViewModelFactory
 import com.example.timecapsule.ui.draft.CapsuleDraftViewModel
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.launch
 
 /**
@@ -157,9 +157,9 @@ class S06ConfirmSendFragment : Fragment() {
 
                     // Unlock Time
                     if (state.unlockAt != null) {
-                        val formatter = DateTimeFormatter.ofPattern("MMM dd, yyyy · HH:mm z")
-                            .withZone(ZoneId.systemDefault())
-                        binding.tvReviewUnlockAt.text = "Meant to open: ${formatter.format(state.unlockAt)}"
+                        val zoneId = try { ZoneId.of(state.creationZone) } catch (_: Exception) { ZoneId.systemDefault() }
+                        val formattedTime = TimeConversionHelper.formatZonedDateTime(state.unlockAt, zoneId)
+                        binding.tvReviewUnlockAt.text = "Meant to open: $formattedTime"
                     } else {
                         binding.tvReviewUnlockAt.text = "Meant to open: Instant unlock"
                     }
