@@ -8,6 +8,7 @@ import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import java.util.Properties
+import java.util.UUID
 
 /** Private draft fields needed to resume the same original after process death. */
 data class PhotoDraftRecord(
@@ -90,7 +91,7 @@ class PhotoDraftJournal(private val root: File) {
     fun clearIfCurrent(uid: String, capsuleId: String): PhotoDraftRecord? = synchronized(access) {
         val current = load(uid) ?: return@synchronized null
         if (current.capsuleId != capsuleId) return@synchronized null
-        save(uid, PhotoDraftRecord(java.util.UUID.randomUUID().toString(), "", "", null))
+        save(uid, PhotoDraftRecord(UUID.randomUUID().toString(), "", "", null))
         current
     }
 

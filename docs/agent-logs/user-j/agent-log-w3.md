@@ -1,47 +1,54 @@
-# Agent Log – Week 3 (MM/DD – MM/DD)
+# Agent Log – Week 3 (11/22/2026 – 11/24/2026)
 
-- Name / Student ID:
-- Model(s) used:
-- My changes to the team's Agent Tools this week:
+- Name / Student ID: Junwon (User J)
+- Model(s) used: Android Studio Agent Mode (Gemini Flash 3.6)
+- My changes to the team's Agent Tools this week: Added bounded review corrections, string updates, and deterministic coroutine race test suite for Issue #13 original photo handling.
 
-The planned submission date is **27 November 2026**; follow any later professor announcement. Add one feature/task section for each piece of work. Describe your own contribution and use real prompts, results, and examples. If you did not use an agent this week, say so honestly.
+## Feature or task: Issue #13 Code Review Corrections
 
-Follow [the shared workflow](../../agent-tools/WORKFLOW.md) and [AGENTS.md](../../../AGENTS.md). Remove credentials and private data from any quoted material.
+- **Task and purpose:** Bounded code review corrections for Issue #13 (Original Photo Support), based on User G's original implementation in PR #39 (`feature/13-original-photo`), with User J as correction owner.
+- **Session date(s):** November 22–24, 2026.
+- **Issue and PR:** [Issue #13](https://github.com/theguardianofthebed/Time-Capsule/issues/13), [PR #39](https://github.com/theguardianofthebed/Time-Capsule/pull/39) (`feature/13-original-photo`).
+- **Requirement/design references:** FR-04, FR-08, FR-12; ARC-02, ARC-06, ARC-07; DD-04, DD-18, DD-25; AC-02, AC-13, AC-14.
+- **Agent environment:** Android Studio Agent Mode.
+- **Model used:** Gemini Flash 3.6.
 
-## Feature or task
+### Goal
 
-- **Task and purpose:** [What you worked on and why.]
-- **Session date(s):** [Actual dates.]
-- **Issue and PR:** [Real links, or the publication blocker.]
-- **Requirement/design references:** [Relevant IDs or paths, if applicable.]
-- **Agent environment:** [Actual environment; project coding must use Android Studio Agent Mode.]
-- **Model used:** [Exact displayed model name, including any switch during the task.]
+Perform final review corrections for Issue #13 to eliminate unnecessary session-generation increments, resolve asynchronous photo selection/cancellation/journal races in `CapsuleDraftViewModel`, separate photo adoption from previous-photo cleanup errors, fail closed on unreadable frozen journals in `OriginalPhotoUploads.freeze()`, preserve retained bytes on failed journal rollbacks, and update outdated photo UI string resources in `strings.xml`.
 
-**Goal**
-
-[What help did you need? What did you decide or do yourself?]
-
-**Requests and prompts**
+### Requests and prompts
 
 | # | Request summary | Actual prompt (key part) | Why it worked (or didn't) |
 |---|-----------------|--------------------------|---------------------------|
-| 1 | | | |
-| 2 | | | |
-
-[Include the important prompts and corrections. Mark redacted or paraphrased text.]
+| 1 | Bounded review corrections for Issue #13 | "Perform bounded review corrections for Issue #13, based on User G's existing implementation... Correction A (Session generation), Correction B (Selection/cancellation race), Correction C (Frozen copy cleanup on journal failure)." | Clear task instructions with exact target files, problem statements, PR #40 alignment instructions, and required test cases. |
+| 2 | Final review corrections & UI text update | "Perform the final targeted corrections for Issue #13 / PR #39... Problem A1, Problem A2, Correction B, Correction C (Outdated Photo UI Text)." | Specific failure scenarios (e.g. previous photo cleanup throwing IOException) and clear string update instructions. |
+| 3 | Final data-integrity corrections | "Review the latest Issue #13 PR #39 code at HEAD c0b0186... 1. OriginalPhotoUploads.freeze() fail closed, 2. CapsuleDraftViewModel.selectPhoto() rollback safety." | Targeted data-integrity requirements with explicit failure-injection test constraints. |
 
 ### What the agent changed and verified
 
-- **Changes:** [Relevant files or behavior.]
-- **Checks and results:** [Actual commands or actions, environment, observed result, and evidence.]
-- **Remaining checks:** [Anything not run, failed, or blocked, and why.]
+- **Correction A (Session Generation Stability & Selection/Persistence Consistency):**
+  - Updated `restoreSessionIfAuthenticated()` in `AccountSessionManager.kt` to check `sessionTracker.currentSession().uid != activeUid` before calling `startSession()`, preventing unnecessary generation increments on repeated same-account checks.
+  - Refactored `CapsuleDraftViewModel.kt` (`selectPhoto`, `removePhoto`, `discardDraft`, `persistPhotoDraft`, `restorePhotoDraft`) to validate operations using `isCurrentPhotoOp()` across suspension boundaries (including `photoSaveMutex.withLock`), reconcile journals when an operation becomes obsolete after persistence, and prevent stale operations from overwriting newer drafts.
+  - Separated new photo adoption from previous-photo cleanup in `selectPhoto()` so that an `IOException` during cleanup of an old photo does not delete the newly adopted photo or report false errors.
+  - Ensured `selectPhoto()` never deletes retained bytes when journal reference status is uncertain due to a rollback save failure.
+- **Correction B (Frozen Photo Journal Failure Handling):**
+  - Updated `PhotoDraftJournal.kt` to enforce thread-safe access with `synchronized(access)` and preserved PR #40's `replaceIfCurrent` and `clearIfCurrent` methods.
+  - Updated `freeze()` in `OriginalPhotoUploads.kt` to fail closed when an existing frozen journal is unreadable/malformed, returning a typed failure (`OperationResult.Unavailable`) without overwriting or replacing an uncertain frozen identity.
+- **Correction C (Photo UI Text Update):**
+  - Updated `s04_subtext_photo` and `s04_photo_notice` in `app/src/main/res/values/strings.xml` to `"Attach one JPEG or PNG photo (up to 5 MiB)."` accurately describing active photo attachment support.
+- **Checks and results:**
+  - `./gradlew :app:testDebugUnitTest`: PASS (119 unit tests passed, 0 failed).
+  - `./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors).
+  - `npx firebase emulators:exec --project demo-timecapsule "npm test"`: PASS (40 security rules tests passed, 0 failed).
+  - `git diff --check`: PASS (clean).
 
 ### Errors and manual fixes
 
-[Describe any error and how it was corrected. Separate the agent's correction from your own manual work. Say that no fix was needed only if that is true.]
+No manual fixes were needed for the implementation. All changes were applied through Android Studio Agent Mode and verified with Gradle build, unit tests, lint, and Firebase Emulator security rules.
 
 ### My review and understanding
 
-- **What I reviewed:** [The changes you inspected before accepting them.]
-- **What I can explain:** [A mechanism, data flow, or failure case you understand.]
-- **Feedback and next step:** [Reviewer feedback, unresolved questions, and the next owner/action.]
+- **What I reviewed:** Inspected the diffs in `AccountSessionManager.kt`, `OriginalPhotoUploads.kt`, `PhotoDraftJournal.kt`, `CapsuleDraftViewModel.kt`, `strings.xml`, `SessionRestorationTest.kt`, `OriginalPhotoUploadsTest.kt`, and `CapsuleDraftViewModelTest.kt`.
+- **What I can explain:** How `isCurrentPhotoOp()` and token checks across suspension boundaries (`photoSaveMutex.withLock`) prevent race conditions between asynchronous provider reads, journal writes, account switches, and user UI actions (discard/removal/edits).
+- **Feedback and next step:** Teammate code review and manual testing by a teammate before merging PR #39 into `main`.

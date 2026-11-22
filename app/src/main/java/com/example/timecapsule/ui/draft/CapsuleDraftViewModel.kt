@@ -110,23 +110,42 @@ class CapsuleDraftViewModel(
         recoverPublicationState(restoreEditable = true)
     }
 
+    /** Re-evaluates whether a pending photo operation matches current token, session, and capsule ID. */
+    private fun isCurrentPhotoOp(token: Long, uid: String, capsuleId: String): Boolean {
+        val state = _uiState.value
+        return token == photoToken &&
+            state.activeSessionUid == uid &&
+            accountSessionManager.restoreSessionIfAuthenticated() == uid &&
+            accountSessionManager.currentSession() == observedSession &&
+            state.capsuleId == capsuleId
+    }
+
     /** Restores only the still-active account; recipient confirmation must be established again. */
     private fun restorePhotoDraft() {
         val input = photoInput ?: return
         val uid = _uiState.value.activeSessionUid ?: return
+        val capsuleId = _uiState.value.capsuleId
         val token = ++photoToken
         _uiState.update { it.copy(photoBusy = true) }
         viewModelScope.launch {
             try {
                 val record = input.restore(uid)
-                if (token != photoToken || _uiState.value.activeSessionUid != uid) return@launch
+                if (!isCurrentPhotoOp(token, uid, capsuleId)) return@launch
                 _uiState.update { state ->
-                    if (record == null) state.copy(photoBusy = false) else state.copy(
-                        capsuleId = record.capsuleId, title = record.title, text = record.text,
-                        originalPhoto = record.photo,
-                        localPhotoUri = record.photo?.let { input.file(it).toURI().toString() },
-                        photoName = record.photo?.let { "Photo" },
-                        photoSizeBytes = record.photo?.sizeBytes, photoBusy = false)
+                    if (record == null) {
+                        state.copy(photoBusy = false)
+                    } else {
+                        state.copy(
+                            capsuleId = record.capsuleId,
+                            title = if (state.title.isBlank()) record.title else state.title,
+                            text = if (state.text.isBlank()) record.text else state.text,
+                            originalPhoto = record.photo,
+                            localPhotoUri = record.photo?.let { input.file(it).toURI().toString() },
+                            photoName = record.photo?.let { "Photo" },
+                            photoSizeBytes = record.photo?.sizeBytes,
+                            photoBusy = false
+                        )
+                    }
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -143,12 +162,25 @@ class CapsuleDraftViewModel(
         val input = photoInput ?: return
         val state = _uiState.value
         val uid = state.activeSessionUid ?: return
-        val record = PhotoDraftRecord(state.capsuleId, state.title, state.text, state.originalPhoto)
+        val capsuleId = state.capsuleId
+        val record = PhotoDraftRecord(capsuleId, state.title, state.text, state.originalPhoto)
         viewModelScope.launch {
             try {
                 photoSaveMutex.withLock {
+                    if (_uiState.value.activeSessionUid != uid ||
+                        accountSessionManager.restoreSessionIfAuthenticated() != uid ||
+                        accountSessionManager.currentSession() != observedSession ||
+                        _uiState.value.capsuleId != capsuleId) {
+                        return@withLock
+                    }
                     input.save(uid, record)
-                    if (released != null && released != record.photo) input.remove(released)
+                    if (released != null && released != record.photo) {
+                        try {
+                            input.remove(released)
+                        } catch (_: Exception) {
+                            // Cleanup failure of released photo does not invalidate saved draft
+                        }
+                    }
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -165,35 +197,86 @@ class CapsuleDraftViewModel(
         if (!_uiState.value.editable) return
         val state = _uiState.value
         val uid = state.activeSessionUid ?: return
+        val capsuleId = state.capsuleId
         val token = ++photoToken
         _uiState.update { it.copy(photoBusy = true, photoError = null) }
         viewModelScope.launch {
+            var retainedPhoto: RetainedOriginalPhoto? = null
             try {
-                val photo = input.retain(uid, state.capsuleId, uri)
-                if (token != photoToken || _uiState.value.activeSessionUid != uid ||
-                    accountSessionManager.restoreSessionIfAuthenticated() != uid ||
-                    _uiState.value.capsuleId != state.capsuleId) {
+                val photo = input.retain(uid, capsuleId, uri)
+                retainedPhoto = photo
+                if (!isCurrentPhotoOp(token, uid, capsuleId)) {
                     input.remove(photo)
+                    retainedPhoto = null
                     return@launch
                 }
-                val previous = _uiState.value.originalPhoto
-                // Persist the new pointer before releasing the old bytes; failure keeps both recoverable.
-                val current = _uiState.value
+                var saveSuccess = false
+                var writtenToJournal = false
+                var rollbackSuccess = false
+                var previousPhoto: RetainedOriginalPhoto? = null
                 photoSaveMutex.withLock {
-                    input.save(uid, PhotoDraftRecord(current.capsuleId, current.title, current.text, photo))
+                    if (!isCurrentPhotoOp(token, uid, capsuleId)) {
+                        return@withLock
+                    }
+                    val latestState = _uiState.value
+                    previousPhoto = latestState.originalPhoto
+                    val record = PhotoDraftRecord(capsuleId, latestState.title, latestState.text, photo)
+                    try {
+                        input.save(uid, record)
+                        writtenToJournal = true
+                    } catch (_: Exception) {
+                        return@withLock
+                    }
+                    if (isCurrentPhotoOp(token, uid, capsuleId)) {
+                        saveSuccess = true
+                    } else {
+                        // Operation became obsolete while saving to journal (e.g. account switch or discard during save).
+                        // Reconcile journal to previous state so journal does not reference the photo being removed.
+                        try {
+                            input.save(uid, PhotoDraftRecord(capsuleId, latestState.title, latestState.text, previousPhoto))
+                            rollbackSuccess = true
+                        } catch (_: Exception) {
+                            rollbackSuccess = false
+                        }
+                    }
                 }
-                if (token != photoToken || _uiState.value.activeSessionUid != uid) return@launch
-                _uiState.update { it.copy(originalPhoto = photo,
-                    localPhotoUri = input.file(photo).toURI().toString(),
-                    photoName = "Photo", photoSizeBytes = photo.sizeBytes, photoBusy = false) }
-                if (previous != null) input.remove(previous)
+                if (!saveSuccess || !isCurrentPhotoOp(token, uid, capsuleId)) {
+                    if (!writtenToJournal || rollbackSuccess) {
+                        try { input.remove(photo) } catch (_: Exception) {}
+                    }
+                    retainedPhoto = null
+                    return@launch
+                }
+                _uiState.update {
+                    it.copy(
+                        originalPhoto = photo,
+                        localPhotoUri = input.file(photo).toURI().toString(),
+                        photoName = "Photo",
+                        photoSizeBytes = photo.sizeBytes,
+                        photoBusy = false
+                    )
+                }
+                // Photo is now durably adopted in UI state and journal; clear candidate reference so error handlers won't delete it
+                retainedPhoto = null
+
+                if (previousPhoto != null && previousPhoto != photo) {
+                    try {
+                        input.remove(previousPhoto)
+                    } catch (_: Exception) {
+                        // Previous photo cleanup failure does not invalidate the newly adopted photo
+                    }
+                }
             } catch (cancelled: CancellationException) {
+                retainedPhoto?.let { try { input.remove(it) } catch (_: Exception) {} }
                 throw cancelled
             } catch (error: SecurityException) {
+                retainedPhoto?.let { try { input.remove(it) } catch (_: Exception) {} }
                 photoFailed(token, R.string.photo_access_denied)
             } catch (error: InvalidOriginalPhotoException) {
+                retainedPhoto?.let { try { input.remove(it) } catch (_: Exception) {} }
                 photoFailed(token, R.string.photo_invalid)
             } catch (error: IOException) {
+                retainedPhoto?.let { try { input.remove(it) } catch (_: Exception) {} }
                 photoFailed(token, R.string.photo_io_failure)
             }
         }

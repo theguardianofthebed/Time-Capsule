@@ -222,3 +222,28 @@ Automatic approval review rejected uploading the full private Atlas r55 snapshot
 
 User J confirmed task ownership and execution. Independent teammate PR review by User G or User F and human merge into `main` remain for the team to complete. PR #35 remains in Draft state until review.
 
+
+## 2026-11-22-issue13-code-review-corrections — Original Photo Support Review Corrections
+
+- **Owner / scope / period:** User J (Junwon), explicitly confirmed as correction owner for Issue #13 based on User G's original implementation. Period: November 22–24, 2026. MVP Scope.
+- **Environment/model:** Android Studio Agent Mode (Gemini Flash 3.8).
+- **GitHub:** [Issue #13](https://github.com/theguardianofthebed/Time-Capsule/issues/13); [PR #39](https://github.com/theguardianofthebed/Time-Capsule/pull/39); branch `feature/13-original-photo`.
+- **References:** FR-04, FR-08, FR-12; ARC-02, ARC-06, ARC-07; DD-04, DD-18, DD-25; AC-02, AC-13, AC-14.
+
+### Work performed
+
+1. **Correction A (Session-Generation Stability & Selection/Persistence Consistency):** Fixed `restoreSessionIfAuthenticated()` in `AccountSessionManager.kt` to check `sessionTracker.currentSession().uid != activeUid` before calling `startSession()`. Refactored `selectPhoto()`, `removePhoto()`, `discardDraft()`, `persistPhotoDraft()`, and `restorePhotoDraft()` in `CapsuleDraftViewModel.kt` to revalidate `isCurrentPhotoOp()` across suspension boundaries (including `photoSaveMutex.withLock`), reconcile journals when an operation becomes obsolete after persistence, prevent stale operations from overwriting newer drafts, and preserve retained bytes when journal rollback status is uncertain. Separated new photo adoption from previous-photo cleanup errors.
+2. **Correction B (Frozen-Photo Journal Failure Handling):** Added thread safety (`synchronized(access)`) to `PhotoDraftJournal.kt` and preserved PR #40's `replaceIfCurrent` and `clearIfCurrent` methods. Updated `freeze()` in `OriginalPhotoUploads.kt` to fail closed on malformed/unreadable journals, returning typed failure (`OperationResult.Unavailable`) without overwriting or replacing an uncertain frozen identity.
+3. **Correction C (Photo UI Text Update):** Updated `s04_subtext_photo` and `s04_photo_notice` in `app/src/main/res/values/strings.xml` to `"Attach one JPEG or PNG photo (up to 5 MiB)."` accurately describing active photo attachment support.
+4. **Unit Test Suite:** Added 3 session restoration tests, 1 same-account upload ack test, 2 fail-closed/corrupted journal freeze tests, and 10 deterministic coroutine race tests using `CompletableDeferred` in `CapsuleDraftViewModelTest.kt`.
+
+### Checks and verification
+
+- `./gradlew :app:testDebugUnitTest`: PASS (119 JVM unit tests passed, 0 failed)
+- `./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors)
+- `npx firebase emulators:exec --project demo-timecapsule "npm test"`: PASS (40 security rules tests passed, 0 failed)
+- `git diff --check`: PASS (clean)
+
+### Human input and remaining work
+
+User J confirmed task ownership and execution. Independent teammate PR review by User G or User F and manual testing follow separately.

@@ -39,7 +39,9 @@ class AccountSessionManager(
             }
             return activeUid
         } else {
-            if (sessionTracker.currentSession().isAuthenticated) sessionTracker.clearSession()
+            if (sessionTracker.currentSession().isAuthenticated) {
+                sessionTracker.clearSession()
+            }
             return null
         }
     }
