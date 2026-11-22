@@ -108,8 +108,8 @@
     <string name="s04_hint_body">Dear future me,\n\nHere’s something I don’t want to forget...</string>
     <string name="s04_label_photo">A photograph optional</string>
     <string name="s04_btn_add_photo">Add a little visual memory</string>
-    <string name="s04_subtext_photo">Photo attachments aren\'t available yet</string>
-    <string name="s04_photo_notice">Photo attachments aren\'t available yet. Please write a message for your time capsule.</string>
+    <string name="s04_subtext_photo">Attach one JPEG or PNG photo (up to 5 MiB).</string>
+    <string name="s04_photo_notice">Attach one JPEG or PNG photo (up to 5 MiB).</string>
     <string name="s04_btn_continue">Give it a time and place</string>
     <string name="s04_btn_discard">Discard this draft</string>
     <string name="s04_note_draft_saved">Your draft is saved on this device while you compose.</string>

@@ -159,7 +159,11 @@ class CapsuleDraftViewModel(
                     }
                     input.save(uid, record)
                     if (released != null && released != record.photo) {
-                        input.remove(released)
+                        try {
+                            input.remove(released)
+                        } catch (_: Exception) {
+                            // Cleanup failure of released photo does not invalidate saved draft
+                        }
                     }
                 }
             } catch (cancelled: CancellationException) {
@@ -199,7 +203,15 @@ class CapsuleDraftViewModel(
                     previousPhoto = latestState.originalPhoto
                     val record = PhotoDraftRecord(capsuleId, latestState.title, latestState.text, photo)
                     input.save(uid, record)
-                    saveSuccess = true
+                    if (isCurrentPhotoOp(token, uid, capsuleId)) {
+                        saveSuccess = true
+                    } else {
+                        // Operation became obsolete while saving to journal (e.g. account switch or discard during save).
+                        // Reconcile journal to previous state so journal does not reference the photo being removed.
+                        try {
+                            input.save(uid, PhotoDraftRecord(capsuleId, latestState.title, latestState.text, previousPhoto))
+                        } catch (_: Exception) {}
+                    }
                 }
                 if (!saveSuccess || !isCurrentPhotoOp(token, uid, capsuleId)) {
                     input.remove(photo)
@@ -215,8 +227,15 @@ class CapsuleDraftViewModel(
                         photoBusy = false
                     )
                 }
+                // Photo is now durably adopted in UI state and journal; clear candidate reference so error handlers won't delete it
+                retainedPhoto = null
+
                 if (previousPhoto != null && previousPhoto != photo) {
-                    input.remove(previousPhoto)
+                    try {
+                        input.remove(previousPhoto)
+                    } catch (_: Exception) {
+                        // Previous photo cleanup failure does not invalidate the newly adopted photo
+                    }
                 }
             } catch (cancelled: CancellationException) {
                 retainedPhoto?.let { try { input.remove(it) } catch (_: Exception) {} }

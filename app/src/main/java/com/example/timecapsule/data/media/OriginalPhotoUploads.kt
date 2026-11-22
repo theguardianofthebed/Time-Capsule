@@ -48,18 +48,22 @@ class OriginalPhotoUploads(
             attempts.withLock {
                 val captured = session()
                 if (captured.uid != photo.ownerUid) return@withLock denied()
-                val journal = journal(photo.capsuleId)
-                val old = journal.load(photo.ownerUid)?.photo
-                if (old != null) {
-                    if (old.sha256 != photo.sha256 || old.sizeBytes != photo.sizeBytes) {
-                        return@withLock OperationResult.Invalid("This operation already has a frozen photo.")
-                    }
-                    store.verify(old)
-                    return@withLock OperationResult.Success(frozen(old))
-                }
                 var createdCopy: RetainedOriginalPhoto? = null
                 var savedDurably = false
                 try {
+                    val journal = journal(photo.capsuleId)
+                    val old = try {
+                        journal.load(photo.ownerUid)?.photo
+                    } catch (_: Exception) {
+                        null
+                    }
+                    if (old != null) {
+                        if (old.sha256 != photo.sha256 || old.sizeBytes != photo.sizeBytes) {
+                            return@withLock OperationResult.Invalid("This operation already has a frozen photo.")
+                        }
+                        store.verify(old)
+                        return@withLock OperationResult.Success(frozen(old))
+                    }
                     val original = store.verify(photo)
                     val copy = store.retain(photo.ownerUid, photo.capsuleId, photo.format.mimeType,
                         original.inputStream())
@@ -75,24 +79,24 @@ class OriginalPhotoUploads(
                     // On cancellation or ambiguous state, inspect authoritative journal before deleting.
                     if (createdCopy != null && !savedDurably) {
                         try {
-                            val verifiedRecord = journal.load(photo.ownerUid)?.photo
+                            val verifiedRecord = journal(photo.capsuleId).load(photo.ownerUid)?.photo
                             if (verifiedRecord != createdCopy) {
                                 store.file(createdCopy).delete()
                             }
                         } catch (_: Exception) {
-                            store.file(createdCopy).delete()
+                            // Status is uncertain due to journal read error; preserve copy rather than deleting a potentially valid record.
                         }
                     }
                     throw cancelled
                 } catch (error: Exception) {
                     if (createdCopy != null && !savedDurably) {
                         try {
-                            val verifiedRecord = journal.load(photo.ownerUid)?.photo
+                            val verifiedRecord = journal(photo.capsuleId).load(photo.ownerUid)?.photo
                             if (verifiedRecord != createdCopy) {
                                 store.file(createdCopy).delete()
                             }
                         } catch (_: Exception) {
-                            store.file(createdCopy).delete()
+                            // Status is uncertain due to journal read error; preserve copy rather than deleting a potentially valid record.
                         }
                     }
                     failure(error)

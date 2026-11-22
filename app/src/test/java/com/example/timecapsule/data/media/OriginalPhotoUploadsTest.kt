@@ -23,6 +23,7 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import java.security.MessageDigest
 
 /** Exercises real private files/journals with a deterministic backend, not Firebase integration. */
 class OriginalPhotoUploadsTest {
@@ -220,6 +221,23 @@ class OriginalPhotoUploadsTest {
         val dir = origFile.parentFile
         val remainingFiles = dir?.listFiles()?.filter { it.name != origFile.name } ?: emptyList()
         assertTrue("Newly created frozen copy must be deleted on journal failure", remainingFiles.isEmpty())
+    }
+
+    /** Journal load errors during freeze check return safe OperationResult without crashing. */
+    @Test fun journalReadErrorDuringFreezeReturnsTypedFailure() = runBlocking {
+        val corruptedJournals = temporary.newFolder()
+        val journalDir = File(corruptedJournals, "capsule-corrupt")
+        journalDir.mkdirs()
+        // Create a directory where the properties file should be to force an IOException on load/save
+        val key = MessageDigest.getInstance("SHA-256").digest("sender".toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }
+        File(journalDir, "$key.properties").mkdirs()
+
+        val failingService = OriginalPhotoUploads(store, corruptedJournals, backend) { session }
+        val original = store.retain("sender", "capsule-corrupt", "image/png", byteArrayOf(5, 6).inputStream())
+
+        val res = failingService.freeze(original)
+        assertTrue("Freeze must return typed failure on corrupted journal read/write", res is OperationResult.Unavailable)
     }
 
     /** Backend fixture exposes the exact bytes/path and explicit failure/publication scenarios. */

@@ -232,19 +232,20 @@ User J confirmed task ownership and execution. Independent teammate PR review by
 
 ### Work performed
 
-1. **Correction A (Unnecessary Session-Generation Changes):** Fixed `restoreSessionIfAuthenticated()` in `AccountSessionManager.kt` to check `sessionTracker.currentSession().uid != activeUid` before calling `startSession()`. Exposed `currentSession()` for UI state checks. Prevents repeated same-account foreground auth checks from incrementing session generation and invalidating in-flight photo uploads.
-2. **Correction B (Photo Selection, Cancellation & Journal Race):** Added thread safety (`synchronized(access)`) to `PhotoDraftJournal.kt` and preserved PR #40's `replaceIfCurrent` and `clearIfCurrent` methods. Refactored `selectPhoto()`, `removePhoto()`, `discardDraft()`, `persistPhotoDraft()`, and `restorePhotoDraft()` in `CapsuleDraftViewModel.kt` to revalidate `isCurrentPhotoOp()` across suspension boundaries (including `photoSaveMutex.withLock`), remove abandoned temporary photo files, prevent obsolete selections from overwriting active drafts, preserve valid previous photos on failed selections, and prevent late draft restores from overwriting user edits.
-3. **Correction C (Frozen-Copy Cleanup on Failed Journal Save):** Updated `freeze()` in `OriginalPhotoUploads.kt` to track newly created frozen copies and, on journal save failure or cancellation, inspect the authoritative journal and delete only unreferenced un-adopted copies while preserving previous valid frozen copies and remote objects.
-4. **Unit Test Suite:** Added 3 session restoration tests, 1 same-account upload ack test, 1 journal save failure cleanup test, and 6 deterministic coroutine race tests using `CompletableDeferred` in `CapsuleDraftViewModelTest.kt`.
+1. **Correction A (Session-Generation Stability & Selection/Persistence Consistency):** Fixed `restoreSessionIfAuthenticated()` in `AccountSessionManager.kt` to check `sessionTracker.currentSession().uid != activeUid` before calling `startSession()`. Refactored `selectPhoto()`, `removePhoto()`, `discardDraft()`, `persistPhotoDraft()`, and `restorePhotoDraft()` in `CapsuleDraftViewModel.kt` to revalidate `isCurrentPhotoOp()` across suspension boundaries (including `photoSaveMutex.withLock`), reconcile journals when an operation becomes obsolete after persistence, and prevent stale operations from overwriting newer drafts. Separated new photo adoption from previous-photo cleanup errors.
+2. **Correction B (Frozen-Photo Journal Failure Handling):** Added thread safety (`synchronized(access)`) to `PhotoDraftJournal.kt` and preserved PR #40's `replaceIfCurrent` and `clearIfCurrent` methods. Updated `freeze()` in `OriginalPhotoUploads.kt` to handle journal read/verification errors within typed `OperationResult` bounds and delete only newly created copies that are definitely unreferenced while preserving copies whose durable reference status is uncertain.
+3. **Correction C (Photo UI Text Update):** Updated `s04_subtext_photo` and `s04_photo_notice` in `app/src/main/res/values/strings.xml` to `"Attach one JPEG or PNG photo (up to 5 MiB)."` accurately describing active photo attachment support.
+4. **Unit Test Suite:** Added 3 session restoration tests, 1 same-account upload ack test, 2 journal failure/corruption cleanup tests, and 8 deterministic coroutine race tests using `CompletableDeferred` in `CapsuleDraftViewModelTest.kt`.
 
 ### Checks and verification
 
-- `./gradlew :app:testDebugUnitTest`: PASS (114 JVM unit tests passed, 0 failed)
+- `./gradlew :app:testDebugUnitTest`: PASS (117 JVM unit tests passed, 0 failed)
 - `./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors)
 - `git diff --check`: PASS (clean)
 
 ### Human input and remaining work
 
 User J confirmed task ownership and execution. Independent teammate PR review by User G or User F and manual testing follow separately.
+
 
 

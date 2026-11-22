@@ -30,6 +30,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import java.io.IOException
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class CapsuleDraftViewModelTest {
@@ -536,6 +537,62 @@ class CapsuleDraftViewModelTest {
         assertEquals("file-photo-replacement.original", photo2?.privateFileName)
         assertTrue(storage.removedPhotos.contains(photo1))
     }
+
+    @Test
+    fun `previousPhotoCleanupFailure - does not delete newly adopted photo or report error`() {
+        val storage = TestablePhotoStorage(throwOnRemovePhotoName = "file-photo-1.original")
+
+        viewModel.selectPhoto(storage, "photo-1")
+        testDispatcher.scheduler.advanceUntilIdle()
+        val photo1 = viewModel.uiState.value.originalPhoto
+        assertNotNull(photo1)
+
+        // Select replacement photo-2; removal of photo-1 will throw an IOException
+        viewModel.selectPhoto(storage, "photo-2")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertNotNull("Newly adopted photo must remain set in UI state", state.originalPhoto)
+        assertEquals("file-photo-2.original", state.originalPhoto?.privateFileName)
+        assertNull("Photo error must not be reported when adoption succeeded", state.photoError)
+        assertEquals("file-photo-2.original", storage.savedRecords["sender-uid"]?.photo?.privateFileName)
+    }
+
+    @Test
+    fun `accountSwitchAndReturn - preserves original journal and photo consistency`() {
+        val storage = TestablePhotoStorage()
+        viewModel.configurePhotos(storage)
+
+        viewModel.selectPhoto(storage, "photo-account-a")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.updateText("Text from Account A")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val photoA = viewModel.uiState.value.originalPhoto
+        assertNotNull(photoA)
+
+        // Switch to Account B
+        mockAuthAdapter.setUid("account-b")
+        sessionTracker.startSession("account-b")
+        viewModel.syncSessionState()
+
+        val stateB = viewModel.uiState.value
+        assertEquals("account-b", stateB.activeSessionUid)
+        assertNull(stateB.originalPhoto)
+
+        // Switch back to Account A
+        mockAuthAdapter.setUid("sender-uid")
+        sessionTracker.startSession("sender-uid")
+        viewModel.syncSessionState()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val stateA = viewModel.uiState.value
+        assertEquals("sender-uid", stateA.activeSessionUid)
+        assertEquals("Text from Account A", stateA.text)
+        assertNotNull(stateA.originalPhoto)
+        assertEquals(photoA, stateA.originalPhoto)
+    }
 }
 
 // --- Fakes for Test Isolation ---
@@ -544,10 +601,11 @@ class CapsuleDraftViewModelTest {
 private class TestablePhotoStorage(
     val retainGate: CompletableDeferred<Unit>? = null,
     val saveGate: CompletableDeferred<Unit>? = null,
-    val restoreGate: CompletableDeferred<PhotoDraftRecord?>? = null
+    val restoreGate: CompletableDeferred<PhotoDraftRecord?>? = null,
+    val throwOnRemovePhotoName: String? = null
 ) : PhotoDraftStorage {
     val removedPhotos = mutableListOf<RetainedOriginalPhoto>()
-    val savedRecords = mutableListOf<PhotoDraftRecord>()
+    val savedRecords = mutableMapOf<String, PhotoDraftRecord>()
 
     override suspend fun retain(uid: String, capsuleId: String, uri: String): RetainedOriginalPhoto {
         retainGate?.await()
@@ -557,17 +615,20 @@ private class TestablePhotoStorage(
     override fun file(photo: RetainedOriginalPhoto): File = File("/private/${photo.privateFileName}")
 
     override suspend fun remove(photo: RetainedOriginalPhoto) {
+        if (throwOnRemovePhotoName != null && photo.privateFileName == throwOnRemovePhotoName) {
+            throw IOException("Simulated cleanup failure for previous photo")
+        }
         removedPhotos.add(photo)
     }
 
     override suspend fun save(uid: String, draft: PhotoDraftRecord) {
         saveGate?.await()
-        savedRecords.add(draft)
+        savedRecords[uid] = draft
     }
 
     override suspend fun restore(uid: String): PhotoDraftRecord? {
         val gate = restoreGate
-        return if (gate != null) gate.await() else savedRecords.lastOrNull()
+        return if (gate != null) gate.await() else savedRecords[uid]
     }
 }
 
