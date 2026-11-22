@@ -259,13 +259,13 @@ User J confirmed task ownership and execution. Independent teammate PR review by
 ### Work performed
 
 1. **Main Branch Integration & Conflict Resolution:** Safely integrated latest `main` (`bb5fcf2`, including PR #39 merge) into `feature/14-capsule-publication` via merge commit `0f8a055`. Resolved conflicts in `AccountSessionManager.kt`, `PhotoDraftJournal.kt`, and `CapsuleDraftViewModel.kt` without losing Issue #13's session/photo safety fixes or Issue #14's publication/recovery contracts.
-2. **Replacement-Draft Safety Corrections:** Updated `PrivatePublicationDrafts.replacement()` in `PrivatePublicationDrafts.kt` to inspect `drafts.load()` on cancellation or error before deleting photo copies. Preserves photo copies when the journal saved them or when journal status is unreadable/uncertain, preventing dangling references in `PhotoDraftJournal`.
-3. **Deterministic Failure-Injection Tests:** Added unit tests in `PublicationDraftRecoveryTest.kt`: `replacementFailsSafelyOnJournalWriteFailure`, `interruptedReplacementPreservesCopiedPhotoIfJournalSavedIt`, and `journalReadFailureDuringRecoveryFailsClosed`.
-4. **Contract Verification:** Verified all 13 required publication/recovery properties across `CapsulePublicationCoordinator`, `FrozenOperationJournal`, `FirestoreCapsulePublication`, `CapsulePublicationPayload`, `FrozenCapsuleOperation`, and `CapsuleDraftViewModel`.
+2. **Cancellation Safety & Replacement Recovery Enhancements:** Refactored `selectPhoto()` in `CapsuleDraftViewModel.kt` to propagate `CancellationException` and revalidate journal references before photo deletion. Updated `PrivatePublicationDrafts.replacement()` in `PrivatePublicationDrafts.kt` to inspect `drafts.load()` on cancellation or error before deleting photo copies, preventing dangling file references in `PhotoDraftJournal`.
+3. **Deterministic Failure-Injection Tests:** Added cancellation test `cancellationAfterJournalSave_preservesRetainedPhotoAndJournalRecord` in `CapsuleDraftViewModelTest.kt` and failure-injection tests in `PublicationDraftRecoveryTest.kt`: `replacementFailsSafelyOnJournalWriteFailure`, `interruptedReplacementPreservesCopiedPhotoIfJournalSavedIt`, `restartRecoveryResumesSameReplacementIdWithoutDuplicateCopy`, `recoveryPreservesUnrelatedNewerDraft`, and `journalReadFailureDuringRecoveryFailsClosed`.
+4. **Contract Verification:** Verified all 13 required publication/recovery contract properties across `CapsulePublicationCoordinator`, `FrozenOperationJournal`, `FirestoreCapsulePublication`, `CapsulePublicationPayload`, `FrozenCapsuleOperation`, and `CapsuleDraftViewModel`.
 
 ### Checks and verification
 
-- `./gradlew :app:testDebugUnitTest`: PASS (195 JVM unit tests passed, 0 failed)
+- `./gradlew :app:testDebugUnitTest`: PASS (198 JVM unit tests passed, 0 failed)
 - `./gradlew :app:assembleDebug`: PASS (`BUILD SUCCESSFUL`)
 - `./gradlew :app:assembleDebugAndroidTest`: PASS (`BUILD SUCCESSFUL`)
 - `./gradlew :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors)
@@ -275,4 +275,5 @@ User J confirmed task ownership and execution. Independent teammate PR review by
 ### Human input and remaining work
 
 User J confirmed task ownership and execution. Independent teammate PR review by User G or User F and manual testing follow separately.
+
 

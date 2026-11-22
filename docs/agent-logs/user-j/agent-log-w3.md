@@ -77,14 +77,20 @@ Safely integrate latest `main` into PR #40 branch `feature/14-capsule-publicatio
 - **Main Branch Integration & Conflict Resolution:**
   - Safely merged `main` (merge commit `bb5fcf2`) into `feature/14-capsule-publication` via non-destructive merge commit `0f8a055`.
   - Resolved conflicts in `AccountSessionManager.kt`, `PhotoDraftJournal.kt`, and `CapsuleDraftViewModel.kt`, preserving Issue #13's session-generation stability, photo persistence, and journal rollback safety alongside Issue #14's frozen publication tokens, recovery, and replacement functionality.
-- **Replacement-Draft Safety Corrections:**
-  - Updated `PrivatePublicationDrafts.replacement()` in `PrivatePublicationDrafts.kt` to handle `CancellationException` and `Exception` by verifying whether the journal durably saved the new photo copy before deleting it. Preserves photo copies when the journal saved them or when journal status is unreadable/uncertain, preventing dangling references in `PhotoDraftJournal`.
-- **Deterministic Failure-Injection Tests:**
-  - Added unit tests in `PublicationDraftRecoveryTest.kt`: `replacementFailsSafelyOnJournalWriteFailure`, `interruptedReplacementPreservesCopiedPhotoIfJournalSavedIt`, and `journalReadFailureDuringRecoveryFailsClosed`.
+- **Cancellation Safety & Replacement Recovery Enhancements:**
+  - Refactored `selectPhoto()` in `CapsuleDraftViewModel.kt` to prevent `CancellationException` from being swallowed during `withLock` draft saves, revalidating journal reference status (`restore(uid)?.photo != p`) before photo cleanup on error/cancellation so retained bytes are never deleted while referenced in the journal.
+  - Updated `PhotoDraftJournal.kt` to `open` class and methods for test double injection.
+  - Added deterministic test `cancellationAfterJournalSave_preservesRetainedPhotoAndJournalRecord` in `CapsuleDraftViewModelTest.kt` verifying that cancellation after journal save preserves both journal records and retained photo files.
+  - Enhanced failure-injection coverage in `PublicationDraftRecoveryTest.kt`:
+    - `replacementFailsSafelyOnJournalWriteFailure`: Verifies that a journal save failure cleans up unreferenced photo copy files without corrupting original photos.
+    - `interruptedReplacementPreservesCopiedPhotoIfJournalSavedIt`: Injects post-commit cancellation after replacement journal commit, verifying that copied photo files and replacement records are preserved.
+    - `restartRecoveryResumesSameReplacementIdWithoutDuplicateCopy`: Verifies that process restart recovery resumes the existing replacement draft ID without creating duplicate photo copies.
+    - `recoveryPreservesUnrelatedNewerDraft`: Verifies that recovery preserves an unrelated newer draft without overwriting it.
+    - `journalReadFailureDuringRecoveryFailsClosed`: Verifies unreadable operation journals fail closed.
 - **Contract Verification:**
-  - Verified the 13 required publication/recovery contract properties across `CapsulePublicationCoordinator`, `FrozenOperationJournal`, `FirestoreCapsulePublication`, `CapsulePublicationPayload`, `FrozenCapsuleOperation`, and `CapsuleDraftViewModel`.
+  - Verified all 13 required publication/recovery contract properties across `CapsulePublicationCoordinator`, `FrozenOperationJournal`, `FirestoreCapsulePublication`, `CapsulePublicationPayload`, `FrozenCapsuleOperation`, and `CapsuleDraftViewModel`.
 - **Checks and results:**
-  - `./gradlew :app:testDebugUnitTest`: PASS (195 JVM unit tests passed, 0 failed).
+  - `./gradlew :app:testDebugUnitTest`: PASS (198 JVM unit tests passed, 0 failed).
   - `./gradlew :app:assembleDebug`: PASS (`BUILD SUCCESSFUL`).
   - `./gradlew :app:assembleDebugAndroidTest`: PASS (`BUILD SUCCESSFUL`).
   - `./gradlew :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors).
@@ -98,6 +104,7 @@ No manual code fixes were needed. Merge conflicts and safety enhancements were h
 ### My review and understanding
 
 - **What I reviewed:** Inspected integrated diffs across `AccountSessionManager.kt`, `PhotoDraftJournal.kt`, `CapsuleDraftViewModel.kt`, `PrivatePublicationDrafts.kt`, `PublicationDraftRecoveryTest.kt`, `CapsuleDraftViewModelTest.kt`, `CapsulePublicationCoordinator.kt`, `FirestoreCapsulePublication.kt`, and `FrozenCapsuleOperation.kt`.
-- **What I can explain:** How `PrivatePublicationDrafts.replacement()` ensures a newly copied photo is preserved if the durable journal references it, how `CapsulePublicationCoordinator` enforces one stable capsule ID per publication attempt, and how `FirestoreCapsulePublication` commits metadata and protected content atomically while rejecting pending/cached writes.
+- **What I can explain:** How `selectPhoto()` and `PrivatePublicationDrafts.replacement()` ensure a retained or copied photo is preserved if the durable journal references it, how `CapsulePublicationCoordinator` enforces one stable capsule ID per publication attempt, and how `FirestoreCapsulePublication` commits metadata and protected content atomically while rejecting pending/cached writes.
 - **Feedback and next step:** Code review and manual testing by team members before human merge of PR #40 into `main`.
+
 
