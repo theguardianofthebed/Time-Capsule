@@ -1009,28 +1009,32 @@ class CapsuleDraftViewModelTest {
     @Test
     fun `obsoleteOperationDuringSave_doesNotOverwriteNewerDraft`() {
         val saveGate1 = CompletableDeferred<Unit>()
-        val storage = TestablePhotoStorage(saveGate = saveGate1)
+        val sharedStorage = TestablePhotoStorage(
+            saveGatePredicate = { draft ->
+                if (draft.photo?.privateFileName == "file-photo-1.original") saveGate1 else null
+            }
+        )
 
-        // Photo 1 starts saving and suspends on saveGate1
-        viewModel.selectPhoto(storage, "photo-1")
+        // Photo 1 starts saving on sharedStorage and suspends on saveGate1
+        viewModel.selectPhoto(sharedStorage, "photo-1")
         testDispatcher.scheduler.runCurrent()
 
-        // Photo 2 is selected and completes immediately
-        val storage2 = TestablePhotoStorage()
-        viewModel.selectPhoto(storage2, "photo-2")
-        testDispatcher.scheduler.advanceUntilIdle()
+        // Photo 2 is selected on the SAME sharedStorage and completes immediately
+        viewModel.selectPhoto(sharedStorage, "photo-2")
+        testDispatcher.scheduler.runCurrent()
 
         // Now photo 1's save finishes
         saveGate1.complete(Unit)
         testDispatcher.scheduler.advanceUntilIdle()
 
-        // Verify that photo 1 did NOT overwrite photo 2 in UI or storage2
+        // Verify that photo 1 did NOT overwrite photo 2 in UI or in the shared storage journal
         val state = viewModel.uiState.value
         assertEquals("file-photo-2.original", state.originalPhoto?.privateFileName)
-        assertEquals("file-photo-2.original", storage2.savedRecords["sender-uid"]?.photo?.privateFileName)
+        assertEquals("file-photo-2.original", sharedStorage.savedRecords["sender-uid"]?.photo?.privateFileName)
 
-        // Verify photo 1 was cleaned up
-        assertTrue(storage.removedPhotos.any { it.privateFileName == "file-photo-1.original" })
+        // Verify photo 1 was cleaned up and photo 2 was preserved in sharedStorage
+        assertTrue(sharedStorage.removedPhotos.any { it.privateFileName == "file-photo-1.original" })
+        assertFalse(sharedStorage.removedPhotos.any { it.privateFileName == "file-photo-2.original" })
     }
 }
 
@@ -1040,6 +1044,7 @@ class CapsuleDraftViewModelTest {
 private class TestablePhotoStorage(
     val retainGate: CompletableDeferred<Unit>? = null,
     val saveGate: CompletableDeferred<Unit>? = null,
+    val saveGatePredicate: ((draft: PhotoDraftRecord) -> CompletableDeferred<Unit>?)? = null,
     val restoreGate: CompletableDeferred<PhotoDraftRecord?>? = null,
     val throwOnRemovePhotoName: String? = null,
     val failSavePredicate: ((uid: String, draft: PhotoDraftRecord) -> Boolean)? = null,
@@ -1067,6 +1072,7 @@ private class TestablePhotoStorage(
 
     override suspend fun save(uid: String, draft: PhotoDraftRecord) {
         saveGate?.await()
+        saveGatePredicate?.invoke(draft)?.await()
         if (failSavePredicate?.invoke(uid, draft) == true) {
             throw IOException("Simulated save failure")
         }

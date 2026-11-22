@@ -188,25 +188,45 @@ class PublicationDraftRecoveryTest {
 
     /** Journal write failure during replacement cleans up unreferenced photo copy without corrupting existing state. */
     @Test fun replacementFailsSafelyOnJournalWriteFailure() = runBlocking {
-        val originals = OriginalPhotoStore(temporary.newFolder()) { OriginalPhotoFormat.JPEG }
+        val photoRootDir = temporary.newFolder()
+        val originals = OriginalPhotoStore(photoRootDir) { OriginalPhotoFormat.JPEG }
         val bytes = byteArrayOf(5, 6, 7, 8)
         val photo = originals.retain("sender", "old", "image/jpeg", bytes.inputStream())
         val draft = CapsuleDraft("old", "recipient", "test text", null, operation().lock,
             isRecipientConfirmed = true, originalPhoto = photo)
         val frozen = FrozenCapsuleOperation.freeze(draft, "sender", "UTC", now)
+
+        fun digest(value: String): String = MessageDigest.getInstance("SHA-256")
+            .digest(value.toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }
+
+        val replacementDir = File(File(photoRootDir, digest("sender")), digest("new"))
+        // Verify replacement directory is empty before replacement attempt
+        assertTrue(replacementDir.listFiles().isNullOrEmpty())
+
+        var copyExistedDuringFailure = false
         val badJournalFolder = temporary.newFile("unwritable-file")
-        val badJournal = PhotoDraftJournal(badJournalFolder)
+        val badJournal = object : PhotoDraftJournal(badJournalFolder) {
+            override fun replaceIfCurrent(uid: String, expectedId: String, replacement: PhotoDraftRecord): PhotoDraftRecord {
+                // Verify that the replacement photo copy WAS created in replacementDir before journal write fails
+                if (replacementDir.listFiles()?.isNotEmpty() == true) {
+                    copyExistedDuringFailure = true
+                }
+                return super.replaceIfCurrent(uid, expectedId, replacement)
+            }
+        }
         val store = PrivatePublicationDrafts(originals, badJournal)
 
         try {
             store.replacement(frozen, "new")
             fail("Expected replacement to fail due to unwritable journal.")
         } catch (expected: Exception) {
+            // Verify replacement copy was created before failure
+            assertTrue("Replacement copy should exist prior to journal failure", copyExistedDuringFailure)
             // Original frozen photo must remain intact
             assertTrue(originals.verify(photo).exists())
-            // Replacement photo copy must be cleaned up since journal save failed
-            val replacementFiles = originals.file(photo).parentFile?.listFiles { _, name -> name.contains("new") }
-            assertTrue(replacementFiles.isNullOrEmpty())
+            // Replacement photo copy must be cleaned up from replacementDir since journal save failed
+            assertTrue(replacementDir.listFiles().isNullOrEmpty())
         }
     }
 
