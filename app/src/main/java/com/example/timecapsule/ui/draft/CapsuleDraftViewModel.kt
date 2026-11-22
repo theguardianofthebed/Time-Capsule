@@ -224,6 +224,8 @@ class CapsuleDraftViewModel(
                     try {
                         input.save(uid, record)
                         writtenToJournal = true
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
                     } catch (_: Exception) {
                         return@withLock
                     }
@@ -232,9 +234,15 @@ class CapsuleDraftViewModel(
                     } else {
                         // Operation became obsolete while saving to journal (e.g. account switch or discard during save).
                         // Reconcile journal to previous state so journal does not reference the photo being removed.
+                        // Only roll back if journal still references this photo to avoid overwriting a newer draft.
                         try {
-                            input.save(uid, PhotoDraftRecord(capsuleId, latestState.title, latestState.text, previousPhoto))
-                            rollbackSuccess = true
+                            val currentInJournal = input.restore(uid)
+                            if (currentInJournal?.capsuleId == capsuleId && currentInJournal.photo == photo) {
+                                input.save(uid, PhotoDraftRecord(capsuleId, latestState.title, latestState.text, previousPhoto))
+                                rollbackSuccess = true
+                            }
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
                         } catch (_: Exception) {
                             rollbackSuccess = false
                         }
@@ -267,16 +275,52 @@ class CapsuleDraftViewModel(
                     }
                 }
             } catch (cancelled: CancellationException) {
-                retainedPhoto?.let { try { input.remove(it) } catch (_: Exception) {} }
+                retainedPhoto?.let { p ->
+                    try {
+                        val currentInJournal = input.restore(uid)
+                        if (currentInJournal?.photo != p) {
+                            try { input.remove(p) } catch (_: Exception) {}
+                        }
+                    } catch (_: Exception) {
+                        // On journal read error, preserve photo bytes to prevent dangling reference.
+                    }
+                }
                 throw cancelled
             } catch (error: SecurityException) {
-                retainedPhoto?.let { try { input.remove(it) } catch (_: Exception) {} }
+                retainedPhoto?.let { p ->
+                    try {
+                        val currentInJournal = input.restore(uid)
+                        if (currentInJournal?.photo != p) {
+                            try { input.remove(p) } catch (_: Exception) {}
+                        }
+                    } catch (_: Exception) {
+                        // On journal read error, preserve photo bytes to prevent dangling reference.
+                    }
+                }
                 photoFailed(token, R.string.photo_access_denied)
             } catch (error: InvalidOriginalPhotoException) {
-                retainedPhoto?.let { try { input.remove(it) } catch (_: Exception) {} }
+                retainedPhoto?.let { p ->
+                    try {
+                        val currentInJournal = input.restore(uid)
+                        if (currentInJournal?.photo != p) {
+                            try { input.remove(p) } catch (_: Exception) {}
+                        }
+                    } catch (_: Exception) {
+                        // On journal read error, preserve photo bytes to prevent dangling reference.
+                    }
+                }
                 photoFailed(token, R.string.photo_invalid)
             } catch (error: IOException) {
-                retainedPhoto?.let { try { input.remove(it) } catch (_: Exception) {} }
+                retainedPhoto?.let { p ->
+                    try {
+                        val currentInJournal = input.restore(uid)
+                        if (currentInJournal?.photo != p) {
+                            try { input.remove(p) } catch (_: Exception) {}
+                        }
+                    } catch (_: Exception) {
+                        // On journal read error, preserve photo bytes to prevent dangling reference.
+                    }
+                }
                 photoFailed(token, R.string.photo_io_failure)
             }
         }

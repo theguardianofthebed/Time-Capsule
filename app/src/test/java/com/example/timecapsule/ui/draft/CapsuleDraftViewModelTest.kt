@@ -22,9 +22,13 @@ import com.example.timecapsule.domain.model.RecipientProfile
 import com.example.timecapsule.domain.result.OperationResult
 import com.google.firebase.firestore.FirebaseFirestore
 import java.time.Instant
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
@@ -944,6 +948,29 @@ class CapsuleDraftViewModelTest {
         assertNull(storage.savedRecords["sender-uid"]?.photo)
         assertTrue(storage.removedPhotos.any { it.privateFileName == "file-photo-failed-initial.original" })
     }
+
+    @Test
+    fun `cancellationAfterJournalSave_preservesRetainedPhotoAndJournalRecord`() {
+        var jobToCancel: Job? = null
+        val storage = TestablePhotoStorage()
+        storage.onAfterSave = {
+            jobToCancel?.cancel(CancellationException("Simulated cancellation after journal save"))
+        }
+
+        jobToCancel = viewModel.viewModelScope.launch {
+            viewModel.selectPhoto(storage, "cancel-after-save-uri")
+        }
+
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Verify that the journal contains the record
+        val saved = storage.savedRecords["sender-uid"]
+        assertNotNull(saved)
+        assertEquals("file-cancel-after-save-uri.original", saved?.photo?.privateFileName)
+
+        // Verify that the retained photo was NOT deleted
+        assertFalse(storage.removedPhotos.any { it.privateFileName == "file-cancel-after-save-uri.original" })
+    }
 }
 
 // --- Fakes for Test Isolation ---
@@ -954,7 +981,8 @@ private class TestablePhotoStorage(
     val saveGate: CompletableDeferred<Unit>? = null,
     val restoreGate: CompletableDeferred<PhotoDraftRecord?>? = null,
     val throwOnRemovePhotoName: String? = null,
-    val failSavePredicate: ((uid: String, draft: PhotoDraftRecord) -> Boolean)? = null
+    val failSavePredicate: ((uid: String, draft: PhotoDraftRecord) -> Boolean)? = null,
+    var onAfterSave: (() -> Unit)? = null
 ) : PhotoDraftStorage {
     val removedPhotos = mutableListOf<RetainedOriginalPhoto>()
     val savedRecords = mutableMapOf<String, PhotoDraftRecord>()
@@ -979,6 +1007,7 @@ private class TestablePhotoStorage(
             throw IOException("Simulated save failure")
         }
         savedRecords[uid] = draft
+        onAfterSave?.invoke()
     }
 
     override suspend fun restore(uid: String): PhotoDraftRecord? {

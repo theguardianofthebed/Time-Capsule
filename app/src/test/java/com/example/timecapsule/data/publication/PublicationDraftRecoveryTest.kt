@@ -13,12 +13,14 @@ import com.example.timecapsule.domain.model.OriginalPhotoFormat
 import com.example.timecapsule.domain.model.PublicationPhase
 import com.example.timecapsule.domain.result.OperationResult
 import com.example.timecapsule.domain.session.SessionSnapshot
+import kotlinx.coroutines.CancellationException
 import java.io.IOException
 import java.time.Instant
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
@@ -192,7 +194,6 @@ class PublicationDraftRecoveryTest {
         val draft = CapsuleDraft("old", "recipient", "test text", null, operation().lock,
             isRecipientConfirmed = true, originalPhoto = photo)
         val frozen = FrozenCapsuleOperation.freeze(draft, "sender", "UTC", now)
-        // Point journal to a non-existent unwritable directory file so save fails
         val badJournalFolder = temporary.newFile("unwritable-file")
         val badJournal = PhotoDraftJournal(badJournalFolder)
         val store = PrivatePublicationDrafts(originals, badJournal)
@@ -203,10 +204,13 @@ class PublicationDraftRecoveryTest {
         } catch (expected: Exception) {
             // Original frozen photo must remain intact
             assertTrue(originals.verify(photo).exists())
+            // Replacement photo copy must be cleaned up since journal save failed
+            val replacementFiles = originals.file(photo).parentFile?.listFiles { _, name -> name.contains("new") }
+            assertTrue(replacementFiles.isNullOrEmpty())
         }
     }
 
-    /** Interrupted replacement preserves the copied photo if the journal durably saved it. */
+    /** Interrupted replacement preserves the copied photo if the journal durably saved it before interruption. */
     @Test fun interruptedReplacementPreservesCopiedPhotoIfJournalSavedIt() = runBlocking {
         val originals = OriginalPhotoStore(temporary.newFolder()) { OriginalPhotoFormat.JPEG }
         val bytes = byteArrayOf(9, 10, 11, 12)
@@ -215,17 +219,95 @@ class PublicationDraftRecoveryTest {
             isRecipientConfirmed = true, originalPhoto = photo)
         val frozen = FrozenCapsuleOperation.freeze(draft, "sender", "UTC", now)
         val draftRoot = temporary.newFolder()
-        val journal = PhotoDraftJournal(draftRoot)
+        val journal = object : PhotoDraftJournal(draftRoot) {
+            override fun replaceIfCurrent(uid: String, expectedId: String, replacement: PhotoDraftRecord): PhotoDraftRecord {
+                super.replaceIfCurrent(uid, expectedId, replacement)
+                // Inject post-commit cancellation after replacement record has been committed to disk
+                throw CancellationException("Simulated interruption after commit")
+            }
+        }
         val store = PrivatePublicationDrafts(originals, journal)
 
-        // Perform normal replacement
-        val replacement = store.replacement(frozen, "new")
-        val copiedPhoto = replacement.originalPhoto!!
+        try {
+            store.replacement(frozen, "new")
+            fail("Expected cancellation exception")
+        } catch (expected: CancellationException) {
+            // Verified that post-commit interruption occurred
+        }
 
-        // Verify the copied photo file exists and is referenced by the journal
+        // Verify the copied photo file exists and is durably referenced by the journal
+        val savedRecord = journal.load("sender")
+        assertNotNull(savedRecord)
+        assertEquals("new", savedRecord?.capsuleId)
+        val copiedPhoto = savedRecord!!.photo!!
         assertTrue(originals.verify(copiedPhoto).exists())
-        assertEquals("new", journal.load("sender")?.capsuleId)
-        assertEquals(copiedPhoto, journal.load("sender")?.photo)
+        assertTrue(originals.verify(photo).exists())
+    }
+
+    /** Restart recovery uses the existing replacement draft and ID without duplicating photo copies. */
+    @Test fun restartRecoveryResumesSameReplacementIdWithoutDuplicateCopy() = runBlocking {
+        val originals = OriginalPhotoStore(temporary.newFolder()) { OriginalPhotoFormat.JPEG }
+        val bytes = byteArrayOf(13, 14, 15, 16)
+        val photo = originals.retain("sender", "old", "image/jpeg", bytes.inputStream())
+        val draft = CapsuleDraft("old", "recipient", "text", null, operation().lock,
+            isRecipientConfirmed = true, originalPhoto = photo)
+        val frozen = FrozenCapsuleOperation.freeze(draft, "sender", "UTC", now)
+
+        val opJournal = FrozenOperationJournal(temporary.newFolder())
+        opJournal.save(FrozenOperationRecord(frozen, PublicationPhase.FAILED))
+
+        val draftJournal = PhotoDraftJournal(temporary.newFolder())
+        draftJournal.save("sender", PhotoDraftRecord("old", "", "text", photo))
+
+        val store = PrivatePublicationDrafts(originals, draftJournal)
+        val coord = CapsulePublicationCoordinator(opJournal, backend(PublicationInspection.ABSENT), null,
+            { SessionSnapshot("sender", 1) }, { now }, { "UTC" }, drafts = store, newId = { "new-1" })
+
+        // First call creates replacement "new-1"
+        val firstRes = coord.abandonForNewDraft("old") as OperationResult.Success
+        assertEquals("new-1", firstRes.data.capsuleId)
+        val firstCopiedPhoto = firstRes.data.originalPhoto!!
+        assertTrue(originals.verify(firstCopiedPhoto).exists())
+
+        // Simulate process restart: create a new coordinator instance
+        val restartedCoord = CapsulePublicationCoordinator(opJournal, backend(PublicationInspection.ABSENT), null,
+            { SessionSnapshot("sender", 1) }, { now }, { "UTC" }, drafts = store, newId = { "new-2" })
+
+        val recoveryRes = restartedCoord.recoverPublications()
+        assertTrue(recoveryRes is OperationResult.Success)
+
+        val secondRes = restartedCoord.abandonForNewDraft("old") as OperationResult.Success
+        assertEquals("new-1", secondRes.data.capsuleId) // Resumes "new-1", not "new-2"
+        assertEquals(firstCopiedPhoto, secondRes.data.originalPhoto)
+        assertTrue(originals.verify(photo).exists())
+        assertTrue(originals.verify(firstCopiedPhoto).exists())
+    }
+
+    /** Recovery preserves an unrelated newer draft without overwriting it. */
+    @Test fun recoveryPreservesUnrelatedNewerDraft() = runBlocking {
+        val originals = OriginalPhotoStore(temporary.newFolder()) { OriginalPhotoFormat.JPEG }
+        val bytes = byteArrayOf(17, 18, 19, 20)
+        val photo = originals.retain("sender", "unrelated-newer", "image/jpeg", bytes.inputStream())
+
+        val opJournal = FrozenOperationJournal(temporary.newFolder())
+        opJournal.save(FrozenOperationRecord(operation(), PublicationPhase.ABANDONED,
+            replacementDraftId = "new", replacementPrepared = true))
+
+        val draftJournal = PhotoDraftJournal(temporary.newFolder())
+        draftJournal.save("sender", PhotoDraftRecord("unrelated-newer", "Newer Title", "keep this text", photo))
+
+        val store = PrivatePublicationDrafts(originals, draftJournal)
+        val coord = CapsulePublicationCoordinator(opJournal, backend(PublicationInspection.ABSENT), null,
+            { SessionSnapshot("sender", 1) }, { now }, { "UTC" }, drafts = store)
+
+        val result = coord.recoverPublications()
+        assertTrue(result is OperationResult.Success)
+
+        val currentDraft = draftJournal.load("sender")
+        assertNotNull(currentDraft)
+        assertEquals("unrelated-newer", currentDraft?.capsuleId)
+        assertEquals("keep this text", currentDraft?.text)
+        assertTrue(originals.verify(photo).exists())
     }
 
     /** Unreadable operation journal during recovery fails safely without abandoning or corrupting operations. */
