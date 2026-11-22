@@ -247,3 +247,32 @@ User J confirmed task ownership and execution. Independent teammate PR review by
 ### Human input and remaining work
 
 User J confirmed task ownership and execution. Independent teammate PR review by User G or User F and manual testing follow separately.
+
+
+## 2026-11-22-issue14-code-review-corrections — Capsule Publication & Recovery Review Corrections
+
+- **Owner / scope / period:** User J (Junwon), explicitly confirmed as correction owner for Issue #14 based on User G's original implementation. Period: November 22–24, 2026. MVP Scope.
+- **Environment/model:** Android Studio Agent Mode (Gemini Flash 3.6).
+- **GitHub:** [Issue #14](https://github.com/theguardianofthebed/Time-Capsule/issues/14); [PR #40](https://github.com/theguardianofthebed/Time-Capsule/pull/40); branch `feature/14-capsule-publication`.
+- **References:** FR-02, FR-03, FR-08, FR-09, FR-11, FR-12; ARC-04, ARC-06; DD-14, DD-15, DD-16, DD-21; AC-02, AC-03, AC-14.
+
+### Work performed
+
+1. **Main Branch Integration & Conflict Resolution:** Safely integrated latest `main` (`bb5fcf2`, including PR #39 merge) into `feature/14-capsule-publication` via merge commit `0f8a055`. Resolved conflicts in `AccountSessionManager.kt`, `PhotoDraftJournal.kt`, and `CapsuleDraftViewModel.kt` without losing Issue #13's session/photo safety fixes or Issue #14's publication/recovery contracts.
+2. **Replacement-Draft Safety Corrections:** Updated `PrivatePublicationDrafts.replacement()` in `PrivatePublicationDrafts.kt` to inspect `drafts.load()` on cancellation or error before deleting photo copies. Preserves photo copies when the journal saved them or when journal status is unreadable/uncertain, preventing dangling references in `PhotoDraftJournal`.
+3. **Deterministic Failure-Injection Tests:** Added unit tests in `PublicationDraftRecoveryTest.kt`: `replacementFailsSafelyOnJournalWriteFailure`, `interruptedReplacementPreservesCopiedPhotoIfJournalSavedIt`, and `journalReadFailureDuringRecoveryFailsClosed`.
+4. **Contract Verification:** Verified all 13 required publication/recovery properties across `CapsulePublicationCoordinator`, `FrozenOperationJournal`, `FirestoreCapsulePublication`, `CapsulePublicationPayload`, `FrozenCapsuleOperation`, and `CapsuleDraftViewModel`.
+
+### Checks and verification
+
+- `./gradlew :app:testDebugUnitTest`: PASS (195 JVM unit tests passed, 0 failed)
+- `./gradlew :app:assembleDebug`: PASS (`BUILD SUCCESSFUL`)
+- `./gradlew :app:assembleDebugAndroidTest`: PASS (`BUILD SUCCESSFUL`)
+- `./gradlew :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors)
+- `npx firebase emulators:exec --project demo-timecapsule "npm test"`: PASS (42 security rules tests passed, 0 failed)
+- `git diff --check`: PASS (clean)
+
+### Human input and remaining work
+
+User J confirmed task ownership and execution. Independent teammate PR review by User G or User F and manual testing follow separately.
+
