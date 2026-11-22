@@ -27,6 +27,18 @@ interface CapsuleRepository {
     /** Reconciles the authoritative outcome for [capsuleId]. */
     suspend fun reconcile(capsuleId: String): OperationResult<SendStatus>
 
+    /** Checks the server and retries only the same durably saved publication identity/content. */
+    suspend fun retryPublication(capsuleId: String): OperationResult<String> =
+        OperationResult.Unavailable("Publication retry is unavailable.")
+
+    /** Restores account-scoped saved outcomes without automatically sending again. */
+    suspend fun recoverPublications(): OperationResult<List<com.example.timecapsule.domain.model.RecoveredPublication>> =
+        OperationResult.Unavailable("Publication recovery is unavailable.")
+
+    /** Creates a new editable identity only after definite unpublished failure. */
+    suspend fun abandonPublication(capsuleId: String): OperationResult<CapsuleDraft> =
+        OperationResult.Unavailable("Publication replacement is unavailable.")
+
     /** Retrieves participant-scoped Sent and Received capsule lists for active user [uid]. */
     suspend fun lists(uid: String): OperationResult<CapsuleListsSnapshot>
 

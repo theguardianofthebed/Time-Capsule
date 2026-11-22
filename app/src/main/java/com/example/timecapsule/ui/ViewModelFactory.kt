@@ -15,7 +15,8 @@ import com.example.timecapsule.ui.s08.S08AccountSettingsViewModel
  */
 class ViewModelFactory(
     private val accountSessionManager: AccountSessionManager,
-    private val context: Context? = null
+    private val context: Context? = null,
+    private val repository: com.example.timecapsule.data.CapsuleRepository? = null
 ) : ViewModelProvider.Factory {
 
     @Suppress("UNCHECKED_CAST")
@@ -32,7 +33,7 @@ class ViewModelFactory(
                 S08AccountSettingsViewModel(accountSessionManager) as T
             }
             modelClass.isAssignableFrom(CapsuleDraftViewModel::class.java) -> {
-                CapsuleDraftViewModel(accountSessionManager).also { model ->
+                CapsuleDraftViewModel(accountSessionManager, repository).also { model ->
                     context?.let { model.configurePhotos(AndroidPhotoInput(it)) }
                 } as T
             }

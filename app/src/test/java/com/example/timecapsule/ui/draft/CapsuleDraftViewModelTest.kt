@@ -1,6 +1,13 @@
 package com.example.timecapsule.ui.draft
 
+import com.example.timecapsule.R
 import com.example.timecapsule.data.AccountSessionManager
+import com.example.timecapsule.data.CapsuleRepository
+import com.example.timecapsule.data.DefaultCapsuleRepository
+import com.example.timecapsule.domain.model.CapsuleDraft
+import com.example.timecapsule.domain.model.FrozenCapsuleOperation
+import com.example.timecapsule.domain.model.PublicationPhase
+import com.example.timecapsule.domain.model.RecoveredPublication
 import com.example.timecapsule.data.media.PhotoDraftStorage
 import com.example.timecapsule.data.media.PhotoDraftRecord
 import com.example.timecapsule.data.media.InvalidOriginalPhotoException
@@ -16,9 +23,13 @@ import com.example.timecapsule.domain.model.RecipientProfile
 import com.example.timecapsule.domain.result.OperationResult
 import com.google.firebase.firestore.FirebaseFirestore
 import java.time.Instant
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
@@ -384,13 +395,318 @@ class CapsuleDraftViewModelTest {
         assertEquals(futureTime, draft.lock.unlockAt)
     }
 
-    @Test
-    fun `triggerSendNotice - sets user-facing notice that sending is unavailable`() {
-        viewModel.triggerSendNotice()
+    /** Controlled repository keeps UI race tests separate from the coordinator's disk/network tests. */
+    private inner class PublicationRepository : CapsuleRepository by
+        DefaultCapsuleRepository(sessionTracker, mockAuthAdapter, mockFirestoreAdapter) {
+        var published = mutableListOf<CapsuleDraft>()
+        var retried = mutableListOf<String>()
+        var recovered: OperationResult<List<RecoveredPublication>> = OperationResult.Success(emptyList())
+        var onPublish: suspend (CapsuleDraft) -> OperationResult<String> = {
+            OperationResult.OutcomeUnknown(it.capsuleId, "Uncertain")
+        }
+        var onRecover: (suspend () -> OperationResult<List<RecoveredPublication>>)? = null
+        var replacement: CapsuleDraft? = null
 
-        val notice = viewModel.uiState.value.sendNotice
-        assertNotNull(notice)
-        assertTrue(notice!!.contains("Sending isn't available yet"))
+        /** Records submitted values and allows a delayed acknowledgment. */
+        override suspend fun publish(frozenOperation: CapsuleDraft): OperationResult<String> {
+            published.add(frozenOperation)
+            return onPublish(frozenOperation)
+        }
+        /** Returns independently controlled recovery evidence. */
+        override suspend fun recoverPublications() = onRecover?.invoke() ?: recovered
+        /** Records unchanged retry identity without creating a second UI snapshot. */
+        override suspend fun retryPublication(capsuleId: String): OperationResult<String> {
+            retried.add(capsuleId)
+            return OperationResult.OutcomeUnknown(capsuleId, "Uncertain")
+        }
+        /** Returns a coordinator-approved replacement fixture. */
+        override suspend fun abandonPublication(capsuleId: String): OperationResult<CapsuleDraft> =
+            replacement?.let { OperationResult.Success(it) } ?: OperationResult.Unavailable("No copy")
+    }
+
+    /** Creates a valid location-only draft without dependence on the wall clock. */
+    private fun publicationModel(repository: PublicationRepository): CapsuleDraftViewModel =
+        CapsuleDraftViewModel(accountSessionManager, repository).also {
+            it.updateText("Frozen message")
+            it.updateLockMode(LockMode.LOCATION)
+            it.updateLocation(LocationTarget(37.0, 127.0), "Place")
+        }
+
+    /** Uses a real frozen snapshot as recovery evidence for ViewModel state assertions. */
+    private fun recovered(model: CapsuleDraftViewModel, phase: PublicationPhase,
+        canAbandon: Boolean = false): RecoveredPublication {
+        if (phase == PublicationPhase.SENT) {
+            return RecoveredPublication(model.uiState.value.capsuleId, phase, null, false)
+        }
+        val operation = FrozenCapsuleOperation.freeze(model.buildCapsuleDraft(),
+            "sender-uid", "UTC", Instant.now())
+        return RecoveredPublication(operation.capsuleId, phase,
+            if (phase == PublicationPhase.SENT) null else operation, canAbandon)
+    }
+
+    /** Double taps, discard and editing cannot mutate a submission while the backend is waiting. */
+    @Test fun submissionFreezesBeforeSuspensionAndRejectsDuplicateTaps() {
+        val repository = PublicationRepository()
+        val ack = CompletableDeferred<OperationResult<String>>()
+        repository.onPublish = { ack.await() }
+        val model = publicationModel(repository)
+        val id = model.uiState.value.capsuleId
+        model.sendCapsule()
+        model.sendCapsule()
+        model.updateText("Changed")
+        model.updateTitle("Changed")
+        model.removePhoto()
+        model.discardDraft()
+        model.updateRecipientUidInput("another")
+        testDispatcher.scheduler.runCurrent()
+        assertEquals(1, repository.published.size)
+        assertEquals(id, repository.published.single().capsuleId)
+        assertEquals("Frozen message", model.uiState.value.text)
+        assertTrue(model.uiState.value.publicationBusy)
+        repository.recovered = OperationResult.Success(listOf(
+            recovered(model, PublicationPhase.OUTCOME_UNKNOWN)))
+        ack.complete(OperationResult.OutcomeUnknown(id, "Uncertain"))
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertFalse(model.uiState.value.editable)
+    }
+
+    /** Confirmed publication removes protected compose values and only then allows a new ID. */
+    @Test fun confirmedSuccessClearsContentAndAllowsBlankNewDraft() {
+        val repository = PublicationRepository()
+        val model = publicationModel(repository)
+        val id = model.uiState.value.capsuleId
+        repository.onPublish = { OperationResult.Success(id) }
+        repository.recovered = OperationResult.Success(listOf(recovered(model, PublicationPhase.SENT)))
+        model.sendCapsule()
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals("", model.uiState.value.text)
+        assertNull(model.uiState.value.localPhotoUri)
+        assertEquals(PublicationPhase.SENT, model.uiState.value.publicationPhase)
+        model.updateText("Not editable")
+        assertEquals("", model.uiState.value.text)
+        model.startNewAfterSent()
+        assertTrue(model.uiState.value.editable)
+        assertTrue(id != model.uiState.value.capsuleId)
+    }
+
+    /** Foreground recovery restores immutable content; retries pass only the saved identity. */
+    @Test fun recoveredUnknownCanRetryButCannotEditOrDiscard() {
+        val repository = PublicationRepository()
+        val model = publicationModel(repository)
+        val record = recovered(model, PublicationPhase.OUTCOME_UNKNOWN)
+        repository.recovered = OperationResult.Success(listOf(record))
+        model.recoverPublicationState()
+        testDispatcher.scheduler.advanceUntilIdle()
+        model.updateText("Changed")
+        model.discardDraft()
+        assertEquals(record.capsuleId, model.uiState.value.capsuleId)
+        assertEquals("Frozen message", model.uiState.value.text)
+        assertFalse(model.uiState.value.canAbandon)
+        model.retryPublication()
+        model.retryPublication()
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals(listOf(record.capsuleId), repository.retried)
+    }
+
+    /** A definite failed record may produce a new editable copy with no recipient confirmation. */
+    @Test fun failedReplacementResetsRecipientConfirmation() {
+        val repository = PublicationRepository()
+        val model = publicationModel(repository)
+        repository.recovered = OperationResult.Success(listOf(recovered(model, PublicationPhase.FAILED, true)))
+        repository.replacement = model.buildCapsuleDraft().copy(capsuleId = "new-copy",
+            isRecipientConfirmed = false)
+        model.recoverPublicationState()
+        testDispatcher.scheduler.advanceUntilIdle()
+        model.replaceFailedPublication()
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals("new-copy", model.uiState.value.capsuleId)
+        assertEquals("Frozen message", model.uiState.value.text)
+        assertTrue(model.uiState.value.editable)
+        assertFalse(model.uiState.value.isRecipientConfirmed)
+    }
+
+    /** Failed startup recovery cannot silently fall back to a fresh send. */
+    @Test fun unavailableRecoveryBlocksEditingAndPublication() {
+        val repository = PublicationRepository()
+        repository.recovered = OperationResult.Unavailable("Offline")
+        val model = publicationModel(repository)
+        model.recoverPublicationState()
+        testDispatcher.scheduler.advanceUntilIdle()
+        model.sendCapsule()
+        model.updateText("Changed")
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertTrue(model.uiState.value.recoveryBlocked)
+        assertFalse(model.uiState.value.editable)
+        assertTrue(repository.published.isEmpty())
+    }
+
+    /** A hung read reaches the explicit blocked state rather than trapping the screen forever. */
+    @Test fun recoveryTimeoutPreservesFrozenState() {
+        val repository = PublicationRepository()
+        val never = CompletableDeferred<OperationResult<List<RecoveredPublication>>>()
+        repository.onRecover = { never.await() }
+        val model = publicationModel(repository)
+        model.recoverPublicationState()
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertFalse(model.uiState.value.recoveryBusy)
+        assertTrue(model.uiState.value.recoveryBlocked)
+        assertEquals("Frozen message", model.uiState.value.text)
+        never.complete(OperationResult.Success(emptyList()))
+    }
+
+    /** Foreground checks of the same account preserve the session generation of an active send. */
+    @Test fun foregroundCheckDoesNotInvalidateCurrentSend() {
+        val repository = PublicationRepository()
+        val ack = CompletableDeferred<OperationResult<String>>()
+        repository.onPublish = { ack.await() }
+        val model = publicationModel(repository)
+        val session = sessionTracker.currentSession()
+        model.sendCapsule()
+        testDispatcher.scheduler.runCurrent()
+        model.syncSessionState()
+        assertEquals(session, sessionTracker.currentSession())
+        repository.recovered = OperationResult.Success(listOf(recovered(model, PublicationPhase.SENT)))
+        ack.complete(OperationResult.Success(model.uiState.value.capsuleId))
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals(PublicationPhase.SENT, model.uiState.value.publicationPhase)
+    }
+
+    /** Reauthentication to the same UID is still a new generation; old callbacks must be ignored. */
+    @Test fun oldAcknowledgmentCannotRepaintReauthenticatedAccount() {
+        val repository = PublicationRepository()
+        val ack = CompletableDeferred<OperationResult<String>>()
+        repository.onPublish = { ack.await() }
+        val model = publicationModel(repository)
+        model.sendCapsule()
+        testDispatcher.scheduler.runCurrent()
+        sessionTracker.clearSession()
+        sessionTracker.startSession("sender-uid")
+        model.syncSessionState()
+        testDispatcher.scheduler.runCurrent()
+        ack.complete(OperationResult.Success("old-id"))
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertNull(model.uiState.value.publicationPhase)
+        assertEquals("", model.uiState.value.text)
+    }
+
+    /** Validation rejected before any saved operation leaves the draft editable after recovery. */
+    @Test fun rejectedPreflightWithoutSavedSendCanBeEdited() {
+        val repository = PublicationRepository()
+        repository.onPublish = { OperationResult.Invalid("Preflight") }
+        val model = publicationModel(repository)
+        model.sendCapsule()
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertTrue(model.uiState.value.editable)
+        assertEquals("Frozen message", model.uiState.value.text)
+    }
+
+    /** A completed send stays locked while compose cleanup is still awaiting recovery. */
+    @Test fun newDraftIsBlockedUntilPostSendRecoveryReturns() {
+        val repository = PublicationRepository()
+        val cleanup = CompletableDeferred<OperationResult<List<RecoveredPublication>>>()
+        repository.onRecover = { cleanup.await() }
+        val model = publicationModel(repository)
+        val id = model.uiState.value.capsuleId
+        repository.onPublish = { OperationResult.Success(id) }
+        model.sendCapsule()
+        testDispatcher.scheduler.runCurrent()
+        model.startNewAfterSent()
+        assertEquals(id, model.uiState.value.capsuleId)
+        assertTrue(model.uiState.value.publicationBusy)
+        cleanup.complete(OperationResult.Success(listOf(recovered(model, PublicationPhase.SENT))))
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertFalse(model.uiState.value.publicationBusy)
+    }
+
+    /** Startup must not briefly load raw sent text from the editable journal before reconciliation. */
+    @Test fun sentRecoveryDoesNotReadOldEditableContent() {
+        val repository = PublicationRepository()
+        val model = publicationModel(repository)
+        var reads = 0
+        val storage = object : PhotoDraftStorage by FakePhotoStorage(1L) {
+            override suspend fun restore(uid: String): PhotoDraftRecord {
+                reads++
+                return PhotoDraftRecord("old", "", "must stay hidden", null)
+            }
+        }
+        repository.recovered = OperationResult.Success(listOf(recovered(model, PublicationPhase.SENT)))
+        model.configurePhotos(storage)
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals(0, reads)
+        assertEquals("", model.uiState.value.text)
+        assertFalse(model.uiState.value.editable)
+    }
+
+    /** When recovery becomes available, retrying startup restores the existing draft, not a blank one. */
+    @Test fun failedStartupCanRecoverOriginalEditableDraft() {
+        val repository = PublicationRepository()
+        val model = CapsuleDraftViewModel(accountSessionManager, repository)
+        val storage = object : PhotoDraftStorage by FakePhotoStorage(1L) {
+            override suspend fun restore(uid: String) =
+                PhotoDraftRecord("saved-draft", "Title", "kept locally", null)
+        }
+        repository.recovered = OperationResult.Unavailable("Offline")
+        model.configurePhotos(storage)
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertTrue(model.uiState.value.recoveryBlocked)
+        repository.recovered = OperationResult.Success(emptyList())
+        model.recoverPublicationState(restoreEditable = true)
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals("saved-draft", model.uiState.value.capsuleId)
+        assertEquals("kept locally", model.uiState.value.text)
+        assertTrue(model.uiState.value.editable)
+    }
+
+    /** Recovery of an elapsed time lock must retry its old ID rather than demand an edited date. */
+    @Test fun elapsedFrozenTimeDoesNotBlockUnchangedRetry() {
+        val repository = PublicationRepository()
+        val model = publicationModel(repository)
+        val oldTime = Instant.parse("2020-01-02T00:00:00Z")
+        val operation = FrozenCapsuleOperation.freeze(model.buildCapsuleDraft().copy(
+            lock = com.example.timecapsule.domain.model.CapsuleLock(LockMode.TIME, oldTime)),
+            "sender-uid", "UTC", Instant.parse("2020-01-01T00:00:00Z"))
+        repository.recovered = OperationResult.Success(listOf(RecoveredPublication(
+            operation.capsuleId, PublicationPhase.OUTCOME_UNKNOWN, operation, false)))
+        model.recoverPublicationState()
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertTrue(model.validateS05RecipientAndLocks() is OperationResult.Success)
+        model.retryPublication()
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals(listOf(operation.capsuleId), repository.retried)
+        assertEquals(oldTime, model.uiState.value.unlockAt)
+    }
+
+    /** A foreground recovery result for the previous account cannot leak a frozen message. */
+    @Test fun accountSwitchDiscardsDelayedRecovery() {
+        val repository = PublicationRepository()
+        val model = publicationModel(repository)
+        val oldRecord = recovered(model, PublicationPhase.OUTCOME_UNKNOWN)
+        val delayed = CompletableDeferred<OperationResult<List<RecoveredPublication>>>()
+        repository.onRecover = { delayed.await() }
+        model.recoverPublicationState()
+        testDispatcher.scheduler.runCurrent()
+        mockAuthAdapter.setUid("other-user")
+        repository.onRecover = null
+        model.syncSessionState()
+        testDispatcher.scheduler.runCurrent()
+        delayed.complete(OperationResult.Success(listOf(oldRecord)))
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals("other-user", model.uiState.value.activeSessionUid)
+        assertEquals("", model.uiState.value.text)
+        assertNull(model.uiState.value.publicationPhase)
+    }
+
+    /** A local cleanup/read exception cannot revoke a publication acknowledgment already received. */
+    @Test fun cleanupFailureDoesNotDowngradeConfirmedSuccess() {
+        val repository = PublicationRepository()
+        val model = publicationModel(repository)
+        repository.onPublish = { OperationResult.Success(it.capsuleId) }
+        repository.onRecover = { throw java.io.IOException("Cleanup unavailable") }
+        model.sendCapsule()
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals(PublicationPhase.SENT, model.uiState.value.publicationPhase)
+        assertEquals("", model.uiState.value.text)
+        assertFalse(model.uiState.value.publicationBusy)
     }
 
     @Test
@@ -633,6 +949,93 @@ class CapsuleDraftViewModelTest {
         assertNull(storage.savedRecords["sender-uid"]?.photo)
         assertTrue(storage.removedPhotos.any { it.privateFileName == "file-photo-failed-initial.original" })
     }
+
+    @Test
+    fun `commitToJournalFollowedByIOException_preservesJournalRecordAndRetainedPhoto`() {
+        val storage = TestablePhotoStorage(
+            postSaveException = IOException("Simulated post-commit I/O failure")
+        )
+
+        viewModel.selectPhoto(storage, "post-commit-io-uri")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Verify that the error message was set
+        assertEquals(R.string.photo_io_failure, viewModel.uiState.value.photoError)
+
+        // Verify that the journal still contains the record written before the exception
+        val saved = storage.savedRecords["sender-uid"]
+        assertNotNull(saved)
+        assertEquals("file-post-commit-io-uri.original", saved?.photo?.privateFileName)
+
+        // Verify that candidate bytes were NOT removed
+        assertFalse(storage.removedPhotos.any { it.privateFileName == "file-post-commit-io-uri.original" })
+    }
+
+    @Test
+    fun `commitToJournalFollowedByCancellation_entersCancellationHandlerAndPreservesPhoto`() {
+        val storage = TestablePhotoStorage(
+            postSaveException = CancellationException("Simulated post-commit cancellation")
+        )
+
+        viewModel.selectPhoto(storage, "post-commit-cancel-uri")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Verify that the cancellation handler was genuinely entered by checking restoreCount
+        assertTrue("Cancellation handler must enter restore() to check journal state", storage.restoreCount > 0)
+
+        // Verify that the journal contains the record
+        val saved = storage.savedRecords["sender-uid"]
+        assertNotNull(saved)
+        assertEquals("file-post-commit-cancel-uri.original", saved?.photo?.privateFileName)
+
+        // Verify that the retained photo was NOT deleted
+        assertFalse(storage.removedPhotos.any { it.privateFileName == "file-post-commit-cancel-uri.original" })
+    }
+
+    @Test
+    fun `failedJournalReadDuringCleanupSafetyCheck_failsClosedAndPreservesPhoto`() {
+        val storage = TestablePhotoStorage(
+            failSavePredicate = { _, draft -> draft.photo != null },
+            failRestore = true
+        )
+
+        viewModel.selectPhoto(storage, "failed-read-uri")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // On restore failure, selectPhoto fails closed and does NOT delete candidate bytes
+        assertFalse(storage.removedPhotos.any { it.privateFileName == "file-failed-read-uri.original" })
+    }
+
+    @Test
+    fun `obsoleteOperationDuringSave_doesNotOverwriteNewerDraft`() {
+        val saveGate1 = CompletableDeferred<Unit>()
+        val sharedStorage = TestablePhotoStorage(
+            saveGatePredicate = { draft ->
+                if (draft.photo?.privateFileName == "file-photo-1.original") saveGate1 else null
+            }
+        )
+
+        // Photo 1 starts saving on sharedStorage and suspends on saveGate1
+        viewModel.selectPhoto(sharedStorage, "photo-1")
+        testDispatcher.scheduler.runCurrent()
+
+        // Photo 2 is selected on the SAME sharedStorage and completes immediately
+        viewModel.selectPhoto(sharedStorage, "photo-2")
+        testDispatcher.scheduler.runCurrent()
+
+        // Now photo 1's save finishes
+        saveGate1.complete(Unit)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Verify that photo 1 did NOT overwrite photo 2 in UI or in the shared storage journal
+        val state = viewModel.uiState.value
+        assertEquals("file-photo-2.original", state.originalPhoto?.privateFileName)
+        assertEquals("file-photo-2.original", sharedStorage.savedRecords["sender-uid"]?.photo?.privateFileName)
+
+        // Verify photo 1 was cleaned up and photo 2 was preserved in sharedStorage
+        assertTrue(sharedStorage.removedPhotos.any { it.privateFileName == "file-photo-1.original" })
+        assertFalse(sharedStorage.removedPhotos.any { it.privateFileName == "file-photo-2.original" })
+    }
 }
 
 // --- Fakes for Test Isolation ---
@@ -641,12 +1044,17 @@ class CapsuleDraftViewModelTest {
 private class TestablePhotoStorage(
     val retainGate: CompletableDeferred<Unit>? = null,
     val saveGate: CompletableDeferred<Unit>? = null,
+    val saveGatePredicate: ((draft: PhotoDraftRecord) -> CompletableDeferred<Unit>?)? = null,
     val restoreGate: CompletableDeferred<PhotoDraftRecord?>? = null,
     val throwOnRemovePhotoName: String? = null,
-    val failSavePredicate: ((uid: String, draft: PhotoDraftRecord) -> Boolean)? = null
+    val failSavePredicate: ((uid: String, draft: PhotoDraftRecord) -> Boolean)? = null,
+    var postSaveException: Exception? = null,
+    var failRestore: Boolean = false,
+    var onAfterSave: (() -> Unit)? = null
 ) : PhotoDraftStorage {
     val removedPhotos = mutableListOf<RetainedOriginalPhoto>()
     val savedRecords = mutableMapOf<String, PhotoDraftRecord>()
+    var restoreCount = 0
 
     override suspend fun retain(uid: String, capsuleId: String, uri: String): RetainedOriginalPhoto {
         retainGate?.await()
@@ -664,13 +1072,18 @@ private class TestablePhotoStorage(
 
     override suspend fun save(uid: String, draft: PhotoDraftRecord) {
         saveGate?.await()
+        saveGatePredicate?.invoke(draft)?.await()
         if (failSavePredicate?.invoke(uid, draft) == true) {
             throw IOException("Simulated save failure")
         }
         savedRecords[uid] = draft
+        onAfterSave?.invoke()
+        postSaveException?.let { throw it }
     }
 
     override suspend fun restore(uid: String): PhotoDraftRecord? {
+        restoreCount++
+        if (failRestore) throw IOException("Simulated restore failure")
         val gate = restoreGate
         return if (gate != null) gate.await() else savedRecords[uid]
     }

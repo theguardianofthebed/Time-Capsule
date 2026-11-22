@@ -142,8 +142,20 @@
     <string name="s06_headline">Ready for a future moment?</string>
     <string name="s06_subtitle">Once sent, this little moment can\'t be edited.</string>
     <string name="s06_btn_send">Seal &amp; send capsule</string>
-    <string name="s06_disclaimer">(Sending isn\'t available yet — draft saved on device)</string>
-    <string name="s06_send_notice">Sending isn\'t available yet. Your draft has been saved safely on this device.</string>
+    <string name="s06_disclaimer">Sending freezes this capsule. An uncertain result can be checked or retried.</string>
+    <string name="publication_sending">Sending capsule. Keep this submission unchanged.</string>
+    <string name="publication_sent">Capsule sent. Its protected content stays hidden until unlock.</string>
+    <string name="publication_unknown">The result is not confirmed. Check the result or retry this same capsule.</string>
+    <string name="publication_failed">Sending failed before publication. Retry unchanged or create an editable copy.</string>
+    <string name="publication_invalid">Check the content, recipient confirmation and future unlock conditions.</string>
+    <string name="publication_recovery_failure">Cannot recover the saved send now. Check your connection and try recovery again.</string>
+    <string name="publication_replacement_ready">Editable copy ready. Confirm the recipient and check unlock conditions again.</string>
+    <string name="publication_recovering">Checking saved sends…</string>
+    <string name="publication_check">Check result</string>
+    <string name="publication_retry">Retry same capsule</string>
+    <string name="publication_replace">Create editable copy</string>
+    <string name="publication_new">Create another capsule</string>
+    <string name="publication_recover">Recover saved sends</string>
     <string name="s06_unlock_rule_notice">Unlock Rule: Both Time and Place conditions must be satisfied simultaneously during a live online check to unlock.</string>
 
     <!-- Bottom Nav -->

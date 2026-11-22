@@ -37,6 +37,27 @@ class FakeFirestoreAdapterForSession : FirestoreAdapter {
 
 class SessionRestorationTest {
 
+    /** Repeated foreground authentication checks preserve active work's generation evidence. */
+    @Test fun repeatedRestorationDoesNotCreateNewSession() {
+        val tracker = DefaultSessionTracker()
+        val manager = AccountSessionManager(FakeAuthAdapterWithActiveUid("same"),
+            FakeFirestoreAdapterForSession(), tracker)
+        manager.restoreSessionIfAuthenticated()
+        val before = tracker.currentSession()
+        repeat(3) { manager.restoreSessionIfAuthenticated() }
+        assertEquals(before, tracker.currentSession())
+    }
+
+    /** An already-signed-out foreground check does not invalidate the same empty session repeatedly. */
+    @Test fun repeatedSignedOutChecksPreserveGeneration() {
+        val tracker = DefaultSessionTracker()
+        val manager = AccountSessionManager(FakeAuthAdapterWithActiveUid(null),
+            FakeFirestoreAdapterForSession(), tracker)
+        val before = tracker.currentSession()
+        repeat(3) { manager.restoreSessionIfAuthenticated() }
+        assertEquals(before, tracker.currentSession())
+    }
+
     @Test
     fun restoredSessionPopulatesSessionTrackerAndActiveUid() {
         val authAdapter = FakeAuthAdapterWithActiveUid("user-restored-123")

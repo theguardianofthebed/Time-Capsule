@@ -247,3 +247,36 @@ User J confirmed task ownership and execution. Independent teammate PR review by
 ### Human input and remaining work
 
 User J confirmed task ownership and execution. Independent teammate PR review by User G or User F and manual testing follow separately.
+
+
+## 2026-11-22-issue14-code-review-corrections — Capsule Publication & Recovery Review Corrections
+
+- **Owner / scope / period:** User J (Junwon), explicitly confirmed as correction owner for Issue #14 based on User G's original implementation. Period: November 22–24, 2026. MVP Scope.
+- **Environment/model:** Android Studio Agent Mode (Gemini Flash 3.6).
+- **GitHub:** [Issue #14](https://github.com/theguardianofthebed/Time-Capsule/issues/14); [PR #40](https://github.com/theguardianofthebed/Time-Capsule/pull/40); branch `feature/14-capsule-publication`.
+- **References:** FR-02, FR-03, FR-08, FR-09, FR-11, FR-12; ARC-04, ARC-06; DD-14, DD-15, DD-16, DD-21; AC-02, AC-03, AC-14.
+
+### Work performed
+
+1. **Main Branch Integration & Conflict Resolution:** Safely integrated latest `main` (`bb5fcf2`, including PR #39 merge) into `feature/14-capsule-publication` via merge commit `0f8a055`. Resolved conflicts in `AccountSessionManager.kt`, `PhotoDraftJournal.kt`, and `CapsuleDraftViewModel.kt` without losing Issue #13's session/photo safety fixes or Issue #14's publication/recovery contracts.
+2. **Ambiguous Photo Save & Cancellation Safety Corrections:** Refactored `selectPhoto()` in `CapsuleDraftViewModel.kt` so every uncertain save outcome inspects `input.restore(uid)` before releasing bytes, preventing candidate photo deletion if the journal on disk references the photo. Replaced cancellation test in `CapsuleDraftViewModelTest.kt` with `commitToJournalFollowedByCancellation_entersCancellationHandlerAndPreservesPhoto` throwing `CancellationException` inside the persistence coroutine and asserting `restoreCount > 0`. Added `commitToJournalFollowedByIOException_preservesJournalRecordAndRetainedPhoto`, `failedJournalReadDuringCleanupSafetyCheck_failsClosedAndPreservesPhoto`, and updated `obsoleteOperationDuringSave_doesNotOverwriteNewerDraft` to use a single shared storage instance to prove competing operations over the same logical journal do not overwrite newer drafts.
+3. **Replacement Cleanup Directory Assertion Fix:** Updated `replacementFailsSafelyOnJournalWriteFailure()` in `PublicationDraftRecoveryTest.kt` to compute and inspect the real replacement directory (`digest("sender")` / `digest("new")`), verifying candidate copy creation prior to failure, candidate deletion after failure, original photo preservation, and journal integrity.
+4. **Contract Verification:** Verified all 13 required publication/recovery contract properties across `CapsulePublicationCoordinator`, `FrozenOperationJournal`, `FirestoreCapsulePublication`, `CapsulePublicationPayload`, `FrozenCapsuleOperation`, and `CapsuleDraftViewModel`.
+
+### Checks and verification
+
+- `./gradlew :app:testDebugUnitTest`: PASS (201 JVM unit tests passed, 0 failed)
+- `./gradlew :app:assembleDebug`: PASS (`BUILD SUCCESSFUL`)
+- `./gradlew :app:assembleDebugAndroidTest`: PASS (`BUILD SUCCESSFUL` — compiled test APK)
+- `./gradlew :app:connectedDebugAndroidTest`: NOT RUN (0 devices connected; `No connected devices!`)
+- `./gradlew :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors)
+- `npx firebase emulators:exec --project demo-timecapsule "npm test"`: PASS (42 security rules tests passed, 0 failed)
+- `git diff --check`: PASS (clean)
+
+### Human input and remaining work
+
+User J confirmed task ownership and execution. Independent teammate PR review by User G or User F and manual testing follow separately.
+
+
+
+
