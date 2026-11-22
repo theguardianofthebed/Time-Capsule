@@ -1,6 +1,9 @@
 package com.example.timecapsule.ui.s04
 
 import android.os.Bundle
+import android.os.Build
+import androidx.activity.result.PickVisualMediaRequest
+import com.example.timecapsule.data.media.AndroidPhotoInput
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.LayoutInflater
@@ -19,6 +22,7 @@ import com.example.timecapsule.domain.result.OperationResult
 import com.example.timecapsule.ui.ViewModelFactory
 import com.example.timecapsule.ui.draft.CapsuleDraftViewModel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.collectLatest
 
 /**
  * S-04 Content Creation ScreenFragment using native Android Views and ViewBinding.
@@ -37,28 +41,21 @@ class S04ContentDraftFragment : Fragment() {
     var onNavigateToAccountListener: (() -> Unit)? = null
 
     private var isSyncingText = false
+    private lateinit var photoInput: AndroidPhotoInput
 
     private val photoPickerLauncher = registerForActivityResult(
-        ActivityResultContracts.GetContent()
+        ActivityResultContracts.PickVisualMedia()
     ) { uri ->
-        if (uri != null) {
-            val contentResolver = requireContext().contentResolver
-            val size = try {
-                contentResolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: 0L
-            } catch (e: Exception) {
-                0L
-            }
-            val fileName = uri.lastPathSegment ?: "photo.jpg"
-            val result = viewModel.attachPhoto(uri.toString(), fileName, size)
-            if (result is OperationResult.Invalid) {
-                binding.tvS04Error.text = result.message
-                binding.tvS04Error.visibility = View.VISIBLE
-            } else {
-                binding.tvS04Error.visibility = View.GONE
-            }
-        }
+        if (uri != null) viewModel.selectPhoto(photoInput, uri.toString())
     }
 
+    private val documentLauncher = registerForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) viewModel.selectPhoto(photoInput, uri.toString())
+    }
+
+    /** Inflates the content form and selected-photo preview. */
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -68,13 +65,15 @@ class S04ContentDraftFragment : Fragment() {
         return binding.root
     }
 
+    /** Connects the shared draft to private media storage and lifecycle-bound rendering. */
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        photoInput = AndroidPhotoInput(requireContext())
 
         val mainActivity = requireActivity() as MainActivity
         viewModel = ViewModelProvider(
             requireActivity(),
-            ViewModelFactory(mainActivity.container.accountSessionManager)
+            ViewModelFactory(mainActivity.container.accountSessionManager, requireContext().applicationContext)
         )[CapsuleDraftViewModel::class.java]
 
         viewModel.syncSessionState()
@@ -111,10 +110,15 @@ class S04ContentDraftFragment : Fragment() {
         })
     }
 
+    /** Launches one-image selection and handles editable draft actions without publishing. */
     private fun setupClickListeners() {
         binding.btnAttachPhoto.setOnClickListener {
-            binding.tvS04Error.text = getString(R.string.s04_photo_notice)
-            binding.tvS04Error.visibility = View.VISIBLE
+            // Older devices use OPEN_DOCUMENT; the private copy removes future URI dependency.
+            if (Build.VERSION.SDK_INT >= 33) {
+                photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+            } else {
+                documentLauncher.launch(arrayOf("image/jpeg", "image/png"))
+            }
         }
 
         binding.btnRemovePhoto.setOnClickListener {
@@ -146,10 +150,24 @@ class S04ContentDraftFragment : Fragment() {
         }
     }
 
+    /** Cancels obsolete previews and observes state only while this view is started. */
     private fun observeViewModelState() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.uiState.collect { state ->
+                var previewedPhoto: com.example.timecapsule.domain.model.RetainedOriginalPhoto? = null
+                viewModel.uiState.collectLatest { state ->
+                    binding.btnAttachPhoto.isEnabled = !state.photoBusy
+                    binding.btnContinue.isEnabled = !state.photoBusy
+                    binding.etCapsuleTitle.isEnabled = !state.photoBusy
+                    binding.etCapsuleBody.isEnabled = !state.photoBusy
+                    binding.tvS04Error.text = state.photoError?.let { getString(it) }
+                    binding.tvS04Error.visibility = if (state.photoError == null) View.GONE else View.VISIBLE
+                    val photo = state.originalPhoto
+                    if (photo != previewedPhoto) {
+                        val preview = if (photo != null) photoInput.preview(photo) else null
+                        binding.ivPhotoPreview.setImageBitmap(preview)
+                        previewedPhoto = photo
+                    }
                     isSyncingText = true
                     if (binding.etCapsuleTitle.text.toString() != state.title) {
                         binding.etCapsuleTitle.setText(state.title)
@@ -172,6 +190,7 @@ class S04ContentDraftFragment : Fragment() {
         }
     }
 
+    /** Releases view references; draft work remains owned by the activity ViewModel. */
     override fun onDestroyView() {
         super.onDestroyView()
         _binding = null

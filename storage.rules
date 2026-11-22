@@ -37,7 +37,8 @@ service firebase.storage {
     }
 
     function validImageUpload() {
-      return request.resource.size <= 5 * 1024 * 1024
+      return request.resource.size > 0
+        && request.resource.size <= 5 * 1024 * 1024
         && request.resource.contentType in [
           'image/jpeg',
           'image/png'
@@ -61,8 +62,11 @@ service firebase.storage {
           || (request.auth.uid == senderUid && !capsuleExists(capsuleId))
         );
 
-      // Published photos cannot be replaced or deleted by clients.
-      allow delete: if false;
+      // Foreground cleanup can remove only the sender's unreferenced upload.
+      // The official client additionally requires a definite abandoned outcome and no pending write.
+      allow delete: if signedIn()
+        && request.auth.uid == senderUid
+        && !capsuleExists(capsuleId);
     }
 
     // Everything else is denied by default.

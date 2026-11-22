@@ -1,6 +1,12 @@
 package com.example.timecapsule.ui.draft
 
 import com.example.timecapsule.data.AccountSessionManager
+import com.example.timecapsule.data.media.PhotoDraftStorage
+import com.example.timecapsule.data.media.PhotoDraftRecord
+import com.example.timecapsule.data.media.InvalidOriginalPhotoException
+import com.example.timecapsule.domain.model.RetainedOriginalPhoto
+import com.example.timecapsule.domain.model.OriginalPhotoFormat
+import java.io.File
 import com.example.timecapsule.data.adapter.AuthAdapter
 import com.example.timecapsule.data.adapter.FirestoreAdapter
 import com.example.timecapsule.data.session.DefaultSessionTracker
@@ -11,6 +17,7 @@ import com.example.timecapsule.domain.result.OperationResult
 import com.google.firebase.firestore.FirebaseFirestore
 import java.time.Instant
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -23,6 +30,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import java.io.IOException
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class CapsuleDraftViewModelTest {
@@ -62,7 +70,7 @@ class CapsuleDraftViewModelTest {
 
     @Test
     fun `photoOnlyIsAccepted - attached photo without text passes validation`() {
-        val attachRes = viewModel.attachPhoto("content://media/photo.jpg", "photo.jpg", 1024L)
+        val attachRes = attachPhoto(1024L)
         assertTrue(attachRes is OperationResult.Success)
 
         val res = viewModel.validateS04Content()
@@ -72,7 +80,7 @@ class CapsuleDraftViewModelTest {
     @Test
     fun `textAndPhotoAccepted - both text and photo pass validation`() {
         viewModel.updateText("A message with photo")
-        viewModel.attachPhoto("content://media/photo.jpg", "photo.jpg", 2048L)
+        attachPhoto(2048L)
 
         val res = viewModel.validateS04Content()
         assertTrue(res is OperationResult.Success)
@@ -97,7 +105,7 @@ class CapsuleDraftViewModelTest {
     @Test
     fun `oversizedPhotoRejected - photo over 5 MiB is rejected`() {
         val oversized = 5 * 1024 * 1024 + 1L
-        val res = viewModel.attachPhoto("content://media/large.png", "large.png", oversized)
+        val res = attachPhoto(oversized)
 
         assertTrue(res is OperationResult.Invalid)
         assertNull(viewModel.uiState.value.localPhotoUri)
@@ -106,11 +114,61 @@ class CapsuleDraftViewModelTest {
     @Test
     fun `validPhotoAccepted - photo under 5 MiB is attached successfully`() {
         val validSize = 5 * 1024 * 1024L
-        val res = viewModel.attachPhoto("content://media/valid.jpg", "valid.jpg", validSize)
+        val res = attachPhoto(validSize)
 
         assertTrue(res is OperationResult.Success)
-        assertEquals("content://media/valid.jpg", viewModel.uiState.value.localPhotoUri)
-        assertEquals("valid.jpg", viewModel.uiState.value.photoName)
+        assertEquals(File("/private/photo.jpg").toURI().toString(), viewModel.uiState.value.localPhotoUri)
+        assertEquals(validSize, viewModel.uiState.value.originalPhoto?.sizeBytes)
+    }
+
+    /** Supplies a validated-storage fixture; real byte limits are tested by OriginalPhotoStoreTest. */
+    private fun attachPhoto(size: Long): OperationResult<Unit> {
+        viewModel.selectPhoto(FakePhotoStorage(size), "content://fixture")
+        testDispatcher.scheduler.advanceUntilIdle()
+        return if (viewModel.uiState.value.originalPhoto != null) OperationResult.Success(Unit)
+            else OperationResult.Invalid("Rejected by photo storage")
+    }
+
+    /** Removing a selection while its provider is reading prevents a late photo from reappearing. */
+    @Test fun removingPhotoInvalidatesPendingSelection() {
+        val gate = CompletableDeferred<Unit>()
+        val delegate = FakePhotoStorage(3)
+        val storage = object : PhotoDraftStorage by delegate {
+            /** Waits for a simulated slow provider before returning the validated fixture. */
+            override suspend fun retain(uid: String, capsuleId: String, uri: String): RetainedOriginalPhoto {
+                gate.await()
+                return delegate.retain(uid, capsuleId, uri)
+            }
+        }
+        viewModel.selectPhoto(storage, "content://slow")
+        testDispatcher.scheduler.runCurrent()
+        assertTrue(viewModel.uiState.value.photoBusy)
+        viewModel.removePhoto()
+        gate.complete(Unit)
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertNull(viewModel.uiState.value.originalPhoto)
+        assertFalse(viewModel.uiState.value.photoBusy)
+    }
+
+    /** An old account's pending photo never becomes visible in a new account draft. */
+    @Test fun accountChangeInvalidatesPendingPhoto() {
+        val gate = CompletableDeferred<Unit>()
+        val delegate = FakePhotoStorage(3)
+        val storage = object : PhotoDraftStorage by delegate {
+            /** Holds the old account's selection until after account switching. */
+            override suspend fun retain(uid: String, capsuleId: String, uri: String): RetainedOriginalPhoto {
+                gate.await()
+                return delegate.retain(uid, capsuleId, uri)
+            }
+        }
+        viewModel.selectPhoto(storage, "content://slow")
+        testDispatcher.scheduler.runCurrent()
+        mockAuthAdapter.setUid("another-user")
+        viewModel.syncSessionState()
+        gate.complete(Unit)
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals("another-user", viewModel.uiState.value.activeSessionUid)
+        assertNull(viewModel.uiState.value.originalPhoto)
     }
 
     // --- S-05 Recipient Lookup & Explicit Confirmation Tests ---
@@ -308,7 +366,7 @@ class CapsuleDraftViewModelTest {
     fun `buildCapsuleDraft - creates complete CapsuleDraft matching all inputs`() {
         viewModel.updateTitle("Graduation Letter")
         viewModel.updateText("Dear future self")
-        viewModel.attachPhoto("content://media/1.jpg", "1.jpg", 500000L)
+        attachPhoto(500000L)
         viewModel.selectFutureMe("sender-uid")
         viewModel.updateLockMode(LockMode.TIME)
         val futureTime = Instant.parse("2027-10-16T09:59:00Z")
@@ -318,7 +376,8 @@ class CapsuleDraftViewModelTest {
 
         assertEquals("Graduation Letter", draft.title)
         assertEquals("Dear future self", draft.text)
-        assertEquals("content://media/1.jpg", draft.localPhotoUri)
+        assertEquals(File("/private/photo.jpg").toURI().toString(), draft.localPhotoUri)
+        assertNotNull(draft.originalPhoto)
         assertEquals("sender-uid", draft.recipientUid)
         assertTrue(draft.isRecipientConfirmed)
         assertEquals(LockMode.TIME, draft.lock.mode)
@@ -347,9 +406,295 @@ class CapsuleDraftViewModelTest {
         assertTrue(state.text.isBlank())
         assertTrue(state.capsuleId != initialId)
     }
+
+    // --- Correction B Race & Lifecycle Tests ---
+
+    @Test
+    fun `discardWhilePhotoRetentionUnfinished - removes abandoned photo and resets state`() {
+        val retainGate = CompletableDeferred<Unit>()
+        val storage = TestablePhotoStorage(retainGate = retainGate)
+
+        viewModel.selectPhoto(storage, "slow-uri")
+        testDispatcher.scheduler.runCurrent()
+        assertTrue(viewModel.uiState.value.photoBusy)
+
+        val oldCapsuleId = viewModel.uiState.value.capsuleId
+        viewModel.discardDraft()
+
+        retainGate.complete(Unit)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertNull(state.originalPhoto)
+        assertFalse(state.photoBusy)
+        assertTrue(state.capsuleId != oldCapsuleId)
+        assertEquals(1, storage.removedPhotos.size)
+        assertEquals("file-slow-uri.original", storage.removedPhotos.first().privateFileName)
+    }
+
+    @Test
+    fun `discardOrRemovalWhileJournalSaveIsSuspended - cleans up photo and preserves discarded state`() {
+        val saveGate = CompletableDeferred<Unit>()
+        val storage = TestablePhotoStorage(saveGate = saveGate)
+
+        viewModel.selectPhoto(storage, "slow-save-uri")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Photo retained, now suspended waiting on saveGate
+        viewModel.removePhoto()
+
+        saveGate.complete(Unit)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertNull(state.originalPhoto)
+        assertFalse(state.photoBusy)
+        assertTrue(storage.removedPhotos.any { it.privateFileName == "file-slow-save-uri.original" })
+    }
+
+    @Test
+    fun `accountSwitchDuringPendingPhotoPersistence - invalidates selection and cleans up`() {
+        val saveGate = CompletableDeferred<Unit>()
+        val storage = TestablePhotoStorage(saveGate = saveGate)
+
+        viewModel.selectPhoto(storage, "pending-account-uri")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        mockAuthAdapter.setUid("new-user")
+        sessionTracker.startSession("new-user")
+        viewModel.syncSessionState()
+
+        saveGate.complete(Unit)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals("new-user", state.activeSessionUid)
+        assertNull(state.originalPhoto)
+        assertTrue(storage.removedPhotos.any { it.privateFileName == "file-pending-account-uri.original" })
+    }
+
+    @Test
+    fun `obsoletePhotoSelectionCompletingAfterNewerSelection - is ignored and cleaned up`() {
+        val retainGate1 = CompletableDeferred<Unit>()
+        val storage1 = TestablePhotoStorage(retainGate = retainGate1)
+
+        viewModel.selectPhoto(storage1, "photo-1")
+        testDispatcher.scheduler.runCurrent()
+
+        val storage2 = TestablePhotoStorage()
+        viewModel.selectPhoto(storage2, "photo-2")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Now photo 1 completes late
+        retainGate1.complete(Unit)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertNotNull(state.originalPhoto)
+        assertEquals("file-photo-2.original", state.originalPhoto?.privateFileName)
+        assertTrue(storage1.removedPhotos.any { it.privateFileName == "file-photo-1.original" })
+    }
+
+    @Test
+    fun `lateDraftRestorationAfterStateChanges - does not overwrite user edits`() {
+        val restoreGate = CompletableDeferred<PhotoDraftRecord?>()
+        val storage = TestablePhotoStorage(restoreGate = restoreGate)
+
+        viewModel.configurePhotos(storage)
+        testDispatcher.scheduler.runCurrent()
+
+        // User edits text while restore is in flight
+        viewModel.updateText("New User Text")
+
+        val savedRecord = PhotoDraftRecord(
+            capsuleId = viewModel.uiState.value.capsuleId,
+            title = "Old Saved Title",
+            text = "Old Saved Text",
+            photo = RetainedOriginalPhoto("sender-uid", viewModel.uiState.value.capsuleId, "old.original", OriginalPhotoFormat.JPEG, 1024L, "hash")
+        )
+        restoreGate.complete(savedRecord)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals("New User Text", state.text)
+    }
+
+    @Test
+    fun `recoveryAfterSavingReplacementPhoto - restores newer photo and removes previous`() {
+        val storage = TestablePhotoStorage()
+
+        viewModel.selectPhoto(storage, "photo-original")
+        testDispatcher.scheduler.advanceUntilIdle()
+        val photo1 = viewModel.uiState.value.originalPhoto
+
+        viewModel.selectPhoto(storage, "photo-replacement")
+        testDispatcher.scheduler.advanceUntilIdle()
+        val photo2 = viewModel.uiState.value.originalPhoto
+
+        assertNotNull(photo1)
+        assertNotNull(photo2)
+        assertTrue(photo1 != photo2)
+        assertEquals("file-photo-replacement.original", photo2?.privateFileName)
+        assertTrue(storage.removedPhotos.contains(photo1))
+    }
+
+    @Test
+    fun `previousPhotoCleanupFailure - does not delete newly adopted photo or report error`() {
+        val storage = TestablePhotoStorage(throwOnRemovePhotoName = "file-photo-1.original")
+
+        viewModel.selectPhoto(storage, "photo-1")
+        testDispatcher.scheduler.advanceUntilIdle()
+        val photo1 = viewModel.uiState.value.originalPhoto
+        assertNotNull(photo1)
+
+        // Select replacement photo-2; removal of photo-1 will throw an IOException
+        viewModel.selectPhoto(storage, "photo-2")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertNotNull("Newly adopted photo must remain set in UI state", state.originalPhoto)
+        assertEquals("file-photo-2.original", state.originalPhoto?.privateFileName)
+        assertNull("Photo error must not be reported when adoption succeeded", state.photoError)
+        assertEquals("file-photo-2.original", storage.savedRecords["sender-uid"]?.photo?.privateFileName)
+    }
+
+    @Test
+    fun `accountSwitchAndReturn - preserves original journal and photo consistency`() {
+        val storage = TestablePhotoStorage()
+        viewModel.configurePhotos(storage)
+
+        viewModel.selectPhoto(storage, "photo-account-a")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.updateText("Text from Account A")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val photoA = viewModel.uiState.value.originalPhoto
+        assertNotNull(photoA)
+
+        // Switch to Account B
+        mockAuthAdapter.setUid("account-b")
+        sessionTracker.startSession("account-b")
+        viewModel.syncSessionState()
+
+        val stateB = viewModel.uiState.value
+        assertEquals("account-b", stateB.activeSessionUid)
+        assertNull(stateB.originalPhoto)
+
+        // Switch back to Account A
+        mockAuthAdapter.setUid("sender-uid")
+        sessionTracker.startSession("sender-uid")
+        viewModel.syncSessionState()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val stateA = viewModel.uiState.value
+        assertEquals("sender-uid", stateA.activeSessionUid)
+        assertEquals("Text from Account A", stateA.text)
+        assertNotNull(stateA.originalPhoto)
+        assertEquals(photoA, stateA.originalPhoto)
+    }
+
+    @Test
+    fun `failedRollback - does not delete retained bytes while journal reference uncertain`() {
+        val storage = TestablePhotoStorage(
+            failSavePredicate = { _, draft -> draft.photo == null }
+        )
+
+        // Select photo-1; initial save succeeds
+        viewModel.selectPhoto(storage, "photo-1")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val photo1 = viewModel.uiState.value.originalPhoto
+        assertNotNull(photo1)
+        assertEquals("file-photo-1.original", storage.savedRecords["sender-uid"]?.photo?.privateFileName)
+
+        // Now removePhoto() triggers persistPhotoDraft(previousPhoto), setting photo=null
+        // failSavePredicate throws IOException during rollback save!
+        viewModel.removePhoto()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Rollback save failed! Verify that file-photo-1.original was NOT deleted from storage.removedPhotos
+        assertFalse("Retained bytes must NOT be deleted while journal reference remains uncertain",
+            storage.removedPhotos.any { it.privateFileName == "file-photo-1.original" })
+        assertEquals("file-photo-1.original", storage.savedRecords["sender-uid"]?.photo?.privateFileName)
+    }
+
+    @Test
+    fun `interruptedInitialSave - cleans up retained candidate photo and does not update journal`() {
+        val storage = TestablePhotoStorage(
+            failSavePredicate = { _, draft -> draft.photo != null }
+        )
+
+        viewModel.selectPhoto(storage, "photo-failed-initial")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertNull(state.originalPhoto)
+        assertNull(storage.savedRecords["sender-uid"]?.photo)
+        assertTrue(storage.removedPhotos.any { it.privateFileName == "file-photo-failed-initial.original" })
+    }
 }
 
 // --- Fakes for Test Isolation ---
+
+/** Testable photo storage implementation for coroutine race assertions. */
+private class TestablePhotoStorage(
+    val retainGate: CompletableDeferred<Unit>? = null,
+    val saveGate: CompletableDeferred<Unit>? = null,
+    val restoreGate: CompletableDeferred<PhotoDraftRecord?>? = null,
+    val throwOnRemovePhotoName: String? = null,
+    val failSavePredicate: ((uid: String, draft: PhotoDraftRecord) -> Boolean)? = null
+) : PhotoDraftStorage {
+    val removedPhotos = mutableListOf<RetainedOriginalPhoto>()
+    val savedRecords = mutableMapOf<String, PhotoDraftRecord>()
+
+    override suspend fun retain(uid: String, capsuleId: String, uri: String): RetainedOriginalPhoto {
+        retainGate?.await()
+        return RetainedOriginalPhoto(uid, capsuleId, "file-$uri.original", OriginalPhotoFormat.JPEG, 1024L, "hash-$uri")
+    }
+
+    override fun file(photo: RetainedOriginalPhoto): File = File("/private/${photo.privateFileName}")
+
+    override suspend fun remove(photo: RetainedOriginalPhoto) {
+        if (throwOnRemovePhotoName != null && photo.privateFileName == throwOnRemovePhotoName) {
+            throw IOException("Simulated cleanup failure for previous photo")
+        }
+        removedPhotos.add(photo)
+    }
+
+    override suspend fun save(uid: String, draft: PhotoDraftRecord) {
+        saveGate?.await()
+        if (failSavePredicate?.invoke(uid, draft) == true) {
+            throw IOException("Simulated save failure")
+        }
+        savedRecords[uid] = draft
+    }
+
+    override suspend fun restore(uid: String): PhotoDraftRecord? {
+        val gate = restoreGate
+        return if (gate != null) gate.await() else savedRecords[uid]
+    }
+}
+
+// --- Fakes for Test Isolation ---
+
+/** Emulates validated input without requiring Android's URI implementation. */
+private class FakePhotoStorage(private val size: Long) : PhotoDraftStorage {
+    /** Rejects invalid fixtures or returns retained metadata for the requested identity. */
+    override suspend fun retain(uid: String, capsuleId: String, uri: String): RetainedOriginalPhoto {
+        if (size !in 1L..5_242_880L) throw InvalidOriginalPhotoException("Invalid size")
+        return RetainedOriginalPhoto(uid, capsuleId, "fixture.original", OriginalPhotoFormat.JPEG,
+            size, "fixture-hash")
+    }
+    /** Supplies a stable private path for mapping assertions. */
+    override fun file(photo: RetainedOriginalPhoto): File = File("/private/photo.jpg")
+    /** This fixture owns no actual files. */
+    override suspend fun remove(photo: RetainedOriginalPhoto) {}
+    /** Persistence has separate real-filesystem tests. */
+    override suspend fun save(uid: String, draft: PhotoDraftRecord) {}
+    /** Starts without a saved draft. */
+    override suspend fun restore(uid: String): PhotoDraftRecord? = null
+}
 
 private class FakeAuthAdapter(initialUid: String?) : AuthAdapter {
     private var currentUid: String? = initialUid

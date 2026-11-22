@@ -37,7 +37,11 @@ data class ProtectedCapsuleContent(
     val photoObjectPath: String?,
 )
 
-/** Stable capsuleId must be reused across retries, never regenerated for the same send. */
+/**
+ * Stable capsuleId must be reused across retries, never regenerated for the same send.
+ * [originalPhoto] carries validated private bytes for #13's freeze/upload handoff; a URI alone
+ * does not establish photo validity or upload acknowledgment. Publication remains owned by #14.
+ */
 data class CapsuleDraft(
     val capsuleId: String,
     val recipientUid: String,
@@ -48,6 +52,7 @@ data class CapsuleDraft(
     val recipientDisplayName: String? = null,
     val isRecipientConfirmed: Boolean = false,
     val locationName: String? = null,
+    val originalPhoto: RetainedOriginalPhoto? = null,
 ) {
     fun hasAnyContent(): Boolean = text.isNotBlank() || !localPhotoUri.isNullOrBlank()
 }

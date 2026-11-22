@@ -74,4 +74,58 @@ class SessionRestorationTest {
         assertNull(authAdapter.activeUid())
         assertFalse(sessionTracker.currentSession().isAuthenticated)
     }
+
+    @Test
+    fun repeatedRestorePreservesSessionGeneration() {
+        val authAdapter = FakeAuthAdapterWithActiveUid("user-restored-123")
+        val sessionTracker = DefaultSessionTracker()
+        val manager = AccountSessionManager(authAdapter, FakeFirestoreAdapterForSession(), sessionTracker)
+
+        val firstUid = manager.restoreSessionIfAuthenticated()
+        val initialGen = sessionTracker.currentSession().sessionGeneration
+
+        val secondUid = manager.restoreSessionIfAuthenticated()
+        val secondGen = sessionTracker.currentSession().sessionGeneration
+
+        assertEquals("user-restored-123", firstUid)
+        assertEquals("user-restored-123", secondUid)
+        assertEquals(initialGen, secondGen)
+    }
+
+    @Test
+    fun repeatedUnauthenticatedRestorePreservesGeneration() {
+        val authAdapter = FakeAuthAdapterWithActiveUid(null)
+        val sessionTracker = DefaultSessionTracker()
+        val manager = AccountSessionManager(authAdapter, FakeFirestoreAdapterForSession(), sessionTracker)
+
+        manager.restoreSessionIfAuthenticated()
+        val initialGen = sessionTracker.currentSession().sessionGeneration
+
+        manager.restoreSessionIfAuthenticated()
+        val secondGen = sessionTracker.currentSession().sessionGeneration
+
+        assertEquals(initialGen, secondGen)
+        assertFalse(sessionTracker.currentSession().isAuthenticated)
+    }
+
+    @Test
+    fun accountTransitionIncrementsGenerationAndInvalidatesPreviousSession() {
+        val authAdapter = FakeAuthAdapterWithActiveUid("user-1")
+        val sessionTracker = DefaultSessionTracker()
+        val manager = AccountSessionManager(authAdapter, FakeFirestoreAdapterForSession(), sessionTracker)
+
+        manager.restoreSessionIfAuthenticated()
+        val snapshot1 = sessionTracker.currentSession()
+
+        // Account changes to user-2
+        val newAdapter = FakeAuthAdapterWithActiveUid("user-2")
+        val manager2 = AccountSessionManager(newAdapter, FakeFirestoreAdapterForSession(), sessionTracker)
+        manager2.restoreSessionIfAuthenticated()
+        val snapshot2 = sessionTracker.currentSession()
+
+        assertEquals("user-1", snapshot1.uid)
+        assertEquals("user-2", snapshot2.uid)
+        assertTrue(snapshot2.sessionGeneration > snapshot1.sessionGeneration)
+        assertFalse(sessionTracker.isSessionValid(snapshot1))
+    }
 }

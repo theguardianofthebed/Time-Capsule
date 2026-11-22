@@ -2,6 +2,15 @@ package com.example.timecapsule.ui.draft
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.timecapsule.R
+import com.example.timecapsule.data.media.InvalidOriginalPhotoException
+import com.example.timecapsule.data.media.PhotoDraftStorage
+import com.example.timecapsule.data.media.PhotoDraftRecord
+import com.example.timecapsule.domain.model.RetainedOriginalPhoto
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import java.io.IOException
 import com.example.timecapsule.data.AccountSessionManager
 import com.example.timecapsule.domain.model.CapsuleDraft
 import com.example.timecapsule.domain.model.CapsuleLock
@@ -43,6 +52,9 @@ data class CapsuleDraftUiState(
     val localPhotoUri: String? = null,
     val photoName: String? = null,
     val photoSizeBytes: Long? = null,
+    val originalPhoto: RetainedOriginalPhoto? = null,
+    val photoBusy: Boolean = false,
+    val photoError: Int? = null,
     val recipientMode: RecipientMode = RecipientMode.FUTURE_ME,
     val recipientUidInput: String = "",
     val lookupStatus: RecipientLookupStatus = RecipientLookupStatus.IDLE,
@@ -70,9 +82,197 @@ class CapsuleDraftViewModel(
     val uiState: StateFlow<CapsuleDraftUiState> = _uiState.asStateFlow()
 
     private var activeLookupToken: Long = 0L
+    private var photoToken = 0L
+    private var photoInput: PhotoDraftStorage? = null
+    private val photoSaveMutex = Mutex()
+    private var observedSession = accountSessionManager.currentSession()
+
+    /** Configures account-private persistence once for this activity-scoped ViewModel. */
+    fun configurePhotos(input: PhotoDraftStorage) {
+        if (photoInput != null) return
+        photoInput = input
+        restorePhotoDraft()
+    }
+
+    /** Re-evaluates whether a pending photo operation matches current token, session, and capsule ID. */
+    private fun isCurrentPhotoOp(token: Long, uid: String, capsuleId: String): Boolean {
+        val state = _uiState.value
+        return token == photoToken &&
+            state.activeSessionUid == uid &&
+            accountSessionManager.restoreSessionIfAuthenticated() == uid &&
+            accountSessionManager.currentSession() == observedSession &&
+            state.capsuleId == capsuleId
+    }
+
+    /** Restores only the still-active account; recipient confirmation must be established again. */
+    private fun restorePhotoDraft() {
+        val input = photoInput ?: return
+        val uid = _uiState.value.activeSessionUid ?: return
+        val capsuleId = _uiState.value.capsuleId
+        val token = ++photoToken
+        _uiState.update { it.copy(photoBusy = true) }
+        viewModelScope.launch {
+            try {
+                val record = input.restore(uid)
+                if (!isCurrentPhotoOp(token, uid, capsuleId)) return@launch
+                _uiState.update { state ->
+                    if (record == null) {
+                        state.copy(photoBusy = false)
+                    } else {
+                        state.copy(
+                            capsuleId = record.capsuleId,
+                            title = if (state.title.isBlank()) record.title else state.title,
+                            text = if (state.text.isBlank()) record.text else state.text,
+                            originalPhoto = record.photo,
+                            localPhotoUri = record.photo?.let { input.file(it).toURI().toString() },
+                            photoName = record.photo?.let { "Photo" },
+                            photoSizeBytes = record.photo?.sizeBytes,
+                            photoBusy = false
+                        )
+                    }
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: IOException) {
+                photoFailed(token, R.string.photo_restore_failure)
+            } catch (error: IllegalArgumentException) {
+                photoFailed(token, R.string.photo_restore_failure)
+            }
+        }
+    }
+
+    /** Captures editable fields now and queues their atomic save in UI event order. */
+    private fun persistPhotoDraft(released: RetainedOriginalPhoto? = null) {
+        val input = photoInput ?: return
+        val state = _uiState.value
+        val uid = state.activeSessionUid ?: return
+        val capsuleId = state.capsuleId
+        val record = PhotoDraftRecord(capsuleId, state.title, state.text, state.originalPhoto)
+        viewModelScope.launch {
+            try {
+                photoSaveMutex.withLock {
+                    if (_uiState.value.activeSessionUid != uid ||
+                        accountSessionManager.restoreSessionIfAuthenticated() != uid ||
+                        accountSessionManager.currentSession() != observedSession ||
+                        _uiState.value.capsuleId != capsuleId) {
+                        return@withLock
+                    }
+                    input.save(uid, record)
+                    if (released != null && released != record.photo) {
+                        try {
+                            input.remove(released)
+                        } catch (_: Exception) {
+                            // Cleanup failure of released photo does not invalidate saved draft
+                        }
+                    }
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: IOException) {
+                if (_uiState.value.activeSessionUid == uid) {
+                    _uiState.update { it.copy(photoError = R.string.photo_save_failure) }
+                }
+            }
+        }
+    }
+
+    /** Retains provider content asynchronously and ignores obsolete selections or accounts. */
+    fun selectPhoto(input: PhotoDraftStorage, uri: String) {
+        val state = _uiState.value
+        val uid = state.activeSessionUid ?: return
+        val capsuleId = state.capsuleId
+        val token = ++photoToken
+        _uiState.update { it.copy(photoBusy = true, photoError = null) }
+        viewModelScope.launch {
+            var retainedPhoto: RetainedOriginalPhoto? = null
+            try {
+                val photo = input.retain(uid, capsuleId, uri)
+                retainedPhoto = photo
+                if (!isCurrentPhotoOp(token, uid, capsuleId)) {
+                    input.remove(photo)
+                    retainedPhoto = null
+                    return@launch
+                }
+                var saveSuccess = false
+                var writtenToJournal = false
+                var rollbackSuccess = false
+                var previousPhoto: RetainedOriginalPhoto? = null
+                photoSaveMutex.withLock {
+                    if (!isCurrentPhotoOp(token, uid, capsuleId)) {
+                        return@withLock
+                    }
+                    val latestState = _uiState.value
+                    previousPhoto = latestState.originalPhoto
+                    val record = PhotoDraftRecord(capsuleId, latestState.title, latestState.text, photo)
+                    try {
+                        input.save(uid, record)
+                        writtenToJournal = true
+                    } catch (_: Exception) {
+                        return@withLock
+                    }
+                    if (isCurrentPhotoOp(token, uid, capsuleId)) {
+                        saveSuccess = true
+                    } else {
+                        // Operation became obsolete while saving to journal (e.g. account switch or discard during save).
+                        // Reconcile journal to previous state so journal does not reference the photo being removed.
+                        try {
+                            input.save(uid, PhotoDraftRecord(capsuleId, latestState.title, latestState.text, previousPhoto))
+                            rollbackSuccess = true
+                        } catch (_: Exception) {
+                            rollbackSuccess = false
+                        }
+                    }
+                }
+                if (!saveSuccess || !isCurrentPhotoOp(token, uid, capsuleId)) {
+                    if (!writtenToJournal || rollbackSuccess) {
+                        try { input.remove(photo) } catch (_: Exception) {}
+                    }
+                    retainedPhoto = null
+                    return@launch
+                }
+                _uiState.update {
+                    it.copy(
+                        originalPhoto = photo,
+                        localPhotoUri = input.file(photo).toURI().toString(),
+                        photoName = "Photo",
+                        photoSizeBytes = photo.sizeBytes,
+                        photoBusy = false
+                    )
+                }
+                // Photo is now durably adopted in UI state and journal; clear candidate reference so error handlers won't delete it
+                retainedPhoto = null
+
+                if (previousPhoto != null && previousPhoto != photo) {
+                    try {
+                        input.remove(previousPhoto)
+                    } catch (_: Exception) {
+                        // Previous photo cleanup failure does not invalidate the newly adopted photo
+                    }
+                }
+            } catch (cancelled: CancellationException) {
+                retainedPhoto?.let { try { input.remove(it) } catch (_: Exception) {} }
+                throw cancelled
+            } catch (error: SecurityException) {
+                retainedPhoto?.let { try { input.remove(it) } catch (_: Exception) {} }
+                photoFailed(token, R.string.photo_access_denied)
+            } catch (error: InvalidOriginalPhotoException) {
+                retainedPhoto?.let { try { input.remove(it) } catch (_: Exception) {} }
+                photoFailed(token, R.string.photo_invalid)
+            } catch (error: IOException) {
+                retainedPhoto?.let { try { input.remove(it) } catch (_: Exception) {} }
+                photoFailed(token, R.string.photo_io_failure)
+            }
+        }
+    }
+
+    /** Updates only the current request's error without replacing a previous valid selection. */
+    private fun photoFailed(token: Long, message: Int) {
+        if (token == photoToken) _uiState.update { it.copy(photoBusy = false, photoError = message) }
+    }
 
     init {
         val currentUid = accountSessionManager.restoreSessionIfAuthenticated()
+        observedSession = accountSessionManager.currentSession()
         _uiState.update { it.copy(activeSessionUid = currentUid) }
         if (!currentUid.isNullOrBlank()) {
             selectFutureMe(currentUid)
@@ -85,11 +285,15 @@ class CapsuleDraftViewModel(
      */
     fun syncSessionState() {
         val activeUid = accountSessionManager.restoreSessionIfAuthenticated()
-        if (activeUid != _uiState.value.activeSessionUid) {
+        val currentSession = accountSessionManager.currentSession()
+        if (activeUid != _uiState.value.activeSessionUid || currentSession != observedSession) {
+            observedSession = currentSession
+            photoToken++
             activeLookupToken++
             _uiState.value = CapsuleDraftUiState(activeSessionUid = activeUid)
             if (!activeUid.isNullOrBlank()) {
                 selectFutureMe(activeUid)
+                restorePhotoDraft()
             }
         }
     }
@@ -97,39 +301,28 @@ class CapsuleDraftViewModel(
     /** Updates optional capsule title. */
     fun updateTitle(newTitle: String) {
         _uiState.update { it.copy(title = newTitle) }
+        persistPhotoDraft()
     }
 
     /** Updates message body text. */
     fun updateText(newText: String) {
         _uiState.update { it.copy(text = newText) }
-    }
-
-    /**
-     * Attaches one photo boundary URI and enforces maximum 5 MiB size validation.
-     */
-    fun attachPhoto(uri: String, fileName: String, sizeBytes: Long): OperationResult<Unit> {
-        if (sizeBytes > 5 * 1024 * 1024) {
-            return OperationResult.Invalid("Photo exceeds maximum size of 5 MiB (5,242,880 bytes).")
-        }
-        _uiState.update {
-            it.copy(
-                localPhotoUri = uri,
-                photoName = fileName,
-                photoSizeBytes = sizeBytes
-            )
-        }
-        return OperationResult.Success(Unit)
+        persistPhotoDraft()
     }
 
     /** Removes attached photo. */
     fun removePhoto() {
+        val previous = _uiState.value.originalPhoto
+        photoToken++
         _uiState.update {
             it.copy(
                 localPhotoUri = null,
                 photoName = null,
-                photoSizeBytes = null
+                photoSizeBytes = null,
+                originalPhoto = null, photoBusy = false, photoError = null
             )
         }
+        persistPhotoDraft(previous)
     }
 
     /** Selects recipient mode: Future Me or Someone Else. */
@@ -328,8 +521,9 @@ class CapsuleDraftViewModel(
     /** Validates S-04 content requirements: message body or photo required. Title alone is invalid. */
     fun validateS04Content(): OperationResult<Unit> {
         val state = _uiState.value
+        if (state.photoBusy) return OperationResult.Invalid("Please wait for the photo to finish.")
         val hasText = state.text.isNotBlank()
-        val hasPhoto = !state.localPhotoUri.isNullOrBlank()
+        val hasPhoto = state.originalPhoto != null
         return if (hasText || hasPhoto) {
             OperationResult.Success(Unit)
         } else {
@@ -390,7 +584,8 @@ class CapsuleDraftViewModel(
             title = state.title.ifBlank { null },
             recipientDisplayName = state.resolvedProfile?.displayName,
             isRecipientConfirmed = state.isRecipientConfirmed,
-            locationName = state.locationName
+            locationName = state.locationName,
+            originalPhoto = state.originalPhoto
         )
     }
 
@@ -408,10 +603,13 @@ class CapsuleDraftViewModel(
 
     /** Resets draft state with a new unique capsule ID. */
     fun discardDraft() {
+        val previous = _uiState.value.originalPhoto
+        photoToken++
         val activeUid = accountSessionManager.restoreSessionIfAuthenticated()
         _uiState.value = CapsuleDraftUiState(activeSessionUid = activeUid)
         if (!activeUid.isNullOrBlank()) {
             selectFutureMe(activeUid)
         }
+        persistPhotoDraft(previous)
     }
 }
