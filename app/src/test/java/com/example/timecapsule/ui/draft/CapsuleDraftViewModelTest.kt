@@ -593,6 +593,46 @@ class CapsuleDraftViewModelTest {
         assertNotNull(stateA.originalPhoto)
         assertEquals(photoA, stateA.originalPhoto)
     }
+
+    @Test
+    fun `failedRollback - does not delete retained bytes while journal reference uncertain`() {
+        val storage = TestablePhotoStorage(
+            failSavePredicate = { _, draft -> draft.photo == null }
+        )
+
+        // Select photo-1; initial save succeeds
+        viewModel.selectPhoto(storage, "photo-1")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val photo1 = viewModel.uiState.value.originalPhoto
+        assertNotNull(photo1)
+        assertEquals("file-photo-1.original", storage.savedRecords["sender-uid"]?.photo?.privateFileName)
+
+        // Now removePhoto() triggers persistPhotoDraft(previousPhoto), setting photo=null
+        // failSavePredicate throws IOException during rollback save!
+        viewModel.removePhoto()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Rollback save failed! Verify that file-photo-1.original was NOT deleted from storage.removedPhotos
+        assertFalse("Retained bytes must NOT be deleted while journal reference remains uncertain",
+            storage.removedPhotos.any { it.privateFileName == "file-photo-1.original" })
+        assertEquals("file-photo-1.original", storage.savedRecords["sender-uid"]?.photo?.privateFileName)
+    }
+
+    @Test
+    fun `interruptedInitialSave - cleans up retained candidate photo and does not update journal`() {
+        val storage = TestablePhotoStorage(
+            failSavePredicate = { _, draft -> draft.photo != null }
+        )
+
+        viewModel.selectPhoto(storage, "photo-failed-initial")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertNull(state.originalPhoto)
+        assertNull(storage.savedRecords["sender-uid"]?.photo)
+        assertTrue(storage.removedPhotos.any { it.privateFileName == "file-photo-failed-initial.original" })
+    }
 }
 
 // --- Fakes for Test Isolation ---
@@ -602,7 +642,8 @@ private class TestablePhotoStorage(
     val retainGate: CompletableDeferred<Unit>? = null,
     val saveGate: CompletableDeferred<Unit>? = null,
     val restoreGate: CompletableDeferred<PhotoDraftRecord?>? = null,
-    val throwOnRemovePhotoName: String? = null
+    val throwOnRemovePhotoName: String? = null,
+    val failSavePredicate: ((uid: String, draft: PhotoDraftRecord) -> Boolean)? = null
 ) : PhotoDraftStorage {
     val removedPhotos = mutableListOf<RetainedOriginalPhoto>()
     val savedRecords = mutableMapOf<String, PhotoDraftRecord>()
@@ -623,6 +664,9 @@ private class TestablePhotoStorage(
 
     override suspend fun save(uid: String, draft: PhotoDraftRecord) {
         saveGate?.await()
+        if (failSavePredicate?.invoke(uid, draft) == true) {
+            throw IOException("Simulated save failure")
+        }
         savedRecords[uid] = draft
     }
 

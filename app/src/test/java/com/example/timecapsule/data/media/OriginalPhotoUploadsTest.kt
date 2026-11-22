@@ -223,21 +223,24 @@ class OriginalPhotoUploadsTest {
         assertTrue("Newly created frozen copy must be deleted on journal failure", remainingFiles.isEmpty())
     }
 
-    /** Journal load errors during freeze check return safe OperationResult without crashing. */
-    @Test fun journalReadErrorDuringFreezeReturnsTypedFailure() = runBlocking {
+    /** Malformed journal file returns typed failure and is NOT overwritten or replaced by freeze. */
+    @Test fun malformedJournalReadErrorFailsClosedWithoutOverwriting() = runBlocking {
         val corruptedJournals = temporary.newFolder()
         val journalDir = File(corruptedJournals, "capsule-corrupt")
         journalDir.mkdirs()
-        // Create a directory where the properties file should be to force an IOException on load/save
         val key = MessageDigest.getInstance("SHA-256").digest("sender".toByteArray(Charsets.UTF_8))
             .joinToString("") { "%02x".format(it) }
-        File(journalDir, "$key.properties").mkdirs()
+        val targetFile = File(journalDir, "$key.properties")
+        // Write invalid corrupted properties content (missing capsuleId property)
+        targetFile.writeText("invalid_key_value_no_capsule_id\nformat=JPEG\n")
+        val initialContent = targetFile.readText()
 
         val failingService = OriginalPhotoUploads(store, corruptedJournals, backend) { session }
         val original = store.retain("sender", "capsule-corrupt", "image/png", byteArrayOf(5, 6).inputStream())
 
         val res = failingService.freeze(original)
-        assertTrue("Freeze must return typed failure on corrupted journal read/write", res is OperationResult.Unavailable)
+        assertTrue("Freeze must fail closed on malformed journal", res is OperationResult.Unavailable)
+        assertEquals("Malformed journal file must not be overwritten", initialContent, targetFile.readText())
     }
 
     /** Backend fixture exposes the exact bytes/path and explicit failure/publication scenarios. */

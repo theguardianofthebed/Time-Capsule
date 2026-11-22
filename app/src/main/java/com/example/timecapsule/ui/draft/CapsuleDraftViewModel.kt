@@ -194,6 +194,8 @@ class CapsuleDraftViewModel(
                     return@launch
                 }
                 var saveSuccess = false
+                var writtenToJournal = false
+                var rollbackSuccess = false
                 var previousPhoto: RetainedOriginalPhoto? = null
                 photoSaveMutex.withLock {
                     if (!isCurrentPhotoOp(token, uid, capsuleId)) {
@@ -202,7 +204,12 @@ class CapsuleDraftViewModel(
                     val latestState = _uiState.value
                     previousPhoto = latestState.originalPhoto
                     val record = PhotoDraftRecord(capsuleId, latestState.title, latestState.text, photo)
-                    input.save(uid, record)
+                    try {
+                        input.save(uid, record)
+                        writtenToJournal = true
+                    } catch (_: Exception) {
+                        return@withLock
+                    }
                     if (isCurrentPhotoOp(token, uid, capsuleId)) {
                         saveSuccess = true
                     } else {
@@ -210,11 +217,16 @@ class CapsuleDraftViewModel(
                         // Reconcile journal to previous state so journal does not reference the photo being removed.
                         try {
                             input.save(uid, PhotoDraftRecord(capsuleId, latestState.title, latestState.text, previousPhoto))
-                        } catch (_: Exception) {}
+                            rollbackSuccess = true
+                        } catch (_: Exception) {
+                            rollbackSuccess = false
+                        }
                     }
                 }
                 if (!saveSuccess || !isCurrentPhotoOp(token, uid, capsuleId)) {
-                    input.remove(photo)
+                    if (!writtenToJournal || rollbackSuccess) {
+                        try { input.remove(photo) } catch (_: Exception) {}
+                    }
                     retainedPhoto = null
                     return@launch
                 }

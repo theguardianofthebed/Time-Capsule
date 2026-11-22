@@ -52,11 +52,13 @@ class OriginalPhotoUploads(
                 var savedDurably = false
                 try {
                     val journal = journal(photo.capsuleId)
-                    val old = try {
-                        journal.load(photo.ownerUid)?.photo
-                    } catch (_: Exception) {
-                        null
+                    val oldRecord = try {
+                        journal.load(photo.ownerUid)
+                    } catch (error: Exception) {
+                        // Fail closed: Do NOT treat an unreadable existing journal as null/absent.
+                        return@withLock failure(error)
                     }
+                    val old = oldRecord?.photo
                     if (old != null) {
                         if (old.sha256 != photo.sha256 || old.sizeBytes != photo.sizeBytes) {
                             return@withLock OperationResult.Invalid("This operation already has a frozen photo.")
