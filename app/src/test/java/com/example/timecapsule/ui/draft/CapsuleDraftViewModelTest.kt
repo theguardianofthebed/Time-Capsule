@@ -635,7 +635,7 @@ class CapsuleDraftViewModelTest {
     /** When recovery becomes available, retrying startup restores the existing draft, not a blank one. */
     @Test fun failedStartupCanRecoverOriginalEditableDraft() {
         val repository = PublicationRepository()
-        val model = publicationModel(repository)
+        val model = CapsuleDraftViewModel(accountSessionManager, repository)
         val storage = object : PhotoDraftStorage by FakePhotoStorage(1L) {
             override suspend fun restore(uid: String) =
                 PhotoDraftRecord("saved-draft", "Title", "kept locally", null)

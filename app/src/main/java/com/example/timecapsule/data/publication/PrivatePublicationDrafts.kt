@@ -6,6 +6,7 @@ import com.example.timecapsule.data.media.PhotoDraftRecord
 import com.example.timecapsule.domain.model.CapsuleDraft
 import com.example.timecapsule.domain.model.FrozenCapsuleOperation
 import java.io.IOException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -40,8 +41,29 @@ class PrivatePublicationDrafts(
             val candidate = PhotoDraftRecord(newId, operation.title ?: "", operation.text, copy)
             val saved = try {
                 drafts.replaceIfCurrent(operation.senderUid, operation.capsuleId, candidate)
+            } catch (cancelled: CancellationException) {
+                if (copy != null) {
+                    try {
+                        val verified = drafts.load(operation.senderUid)?.photo
+                        if (verified != copy) {
+                            originals.file(copy).delete()
+                        }
+                    } catch (_: Exception) {
+                        // Preserve copy if journal status is unreadable/uncertain to prevent a dangling reference.
+                    }
+                }
+                throw cancelled
             } catch (error: Exception) {
-                copy?.let { originals.file(it).delete() }
+                if (copy != null) {
+                    try {
+                        val verified = drafts.load(operation.senderUid)?.photo
+                        if (verified != copy) {
+                            originals.file(copy).delete()
+                        }
+                    } catch (_: Exception) {
+                        // Preserve copy if journal status is unreadable/uncertain to prevent a dangling reference.
+                    }
+                }
                 throw error
             }
             if (copy != null && saved.photo != copy) originals.file(copy).delete()

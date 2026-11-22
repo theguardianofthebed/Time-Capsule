@@ -25,6 +25,8 @@ import org.junit.Assert.fail
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import java.io.File
+import java.security.MessageDigest
 
 /** Real private journals exercise restart recovery without requiring a Firebase server. */
 class PublicationDraftRecoveryTest {
@@ -180,5 +182,64 @@ class PublicationDraftRecoveryTest {
         assertNotEquals(photo.privateFileName, copied.privateFileName)
         assertTrue(bytes.contentEquals(originals.verify(copied).readBytes()))
         assertTrue(originals.verify(photo).exists())
+    }
+
+    /** Journal write failure during replacement cleans up unreferenced photo copy without corrupting existing state. */
+    @Test fun replacementFailsSafelyOnJournalWriteFailure() = runBlocking {
+        val originals = OriginalPhotoStore(temporary.newFolder()) { OriginalPhotoFormat.JPEG }
+        val bytes = byteArrayOf(5, 6, 7, 8)
+        val photo = originals.retain("sender", "old", "image/jpeg", bytes.inputStream())
+        val draft = CapsuleDraft("old", "recipient", "test text", null, operation().lock,
+            isRecipientConfirmed = true, originalPhoto = photo)
+        val frozen = FrozenCapsuleOperation.freeze(draft, "sender", "UTC", now)
+        // Point journal to a non-existent unwritable directory file so save fails
+        val badJournalFolder = temporary.newFile("unwritable-file")
+        val badJournal = PhotoDraftJournal(badJournalFolder)
+        val store = PrivatePublicationDrafts(originals, badJournal)
+
+        try {
+            store.replacement(frozen, "new")
+            fail("Expected replacement to fail due to unwritable journal.")
+        } catch (expected: Exception) {
+            // Original frozen photo must remain intact
+            assertTrue(originals.verify(photo).exists())
+        }
+    }
+
+    /** Interrupted replacement preserves the copied photo if the journal durably saved it. */
+    @Test fun interruptedReplacementPreservesCopiedPhotoIfJournalSavedIt() = runBlocking {
+        val originals = OriginalPhotoStore(temporary.newFolder()) { OriginalPhotoFormat.JPEG }
+        val bytes = byteArrayOf(9, 10, 11, 12)
+        val photo = originals.retain("sender", "old", "image/jpeg", bytes.inputStream())
+        val draft = CapsuleDraft("old", "recipient", "text", null, operation().lock,
+            isRecipientConfirmed = true, originalPhoto = photo)
+        val frozen = FrozenCapsuleOperation.freeze(draft, "sender", "UTC", now)
+        val draftRoot = temporary.newFolder()
+        val journal = PhotoDraftJournal(draftRoot)
+        val store = PrivatePublicationDrafts(originals, journal)
+
+        // Perform normal replacement
+        val replacement = store.replacement(frozen, "new")
+        val copiedPhoto = replacement.originalPhoto!!
+
+        // Verify the copied photo file exists and is referenced by the journal
+        assertTrue(originals.verify(copiedPhoto).exists())
+        assertEquals("new", journal.load("sender")?.capsuleId)
+        assertEquals(copiedPhoto, journal.load("sender")?.photo)
+    }
+
+    /** Unreadable operation journal during recovery fails safely without abandoning or corrupting operations. */
+    @Test fun journalReadFailureDuringRecoveryFailsClosed() = runBlocking {
+        val root = temporary.newFolder()
+        val key = MessageDigest.getInstance("SHA-256").digest("sender".toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }
+        // Create account directory as a file so directory.listFiles() fails closed
+        File(root, key).createNewFile()
+        val journal = FrozenOperationJournal(root)
+        val service = CapsulePublicationCoordinator(journal, backend(PublicationInspection.ABSENT),
+            null, { SessionSnapshot("sender", 1) })
+
+        val result = service.recoverPublications()
+        assertTrue(result is OperationResult.Unavailable)
     }
 }
