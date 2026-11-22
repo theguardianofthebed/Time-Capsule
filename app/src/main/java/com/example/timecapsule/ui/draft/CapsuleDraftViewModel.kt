@@ -211,8 +211,6 @@ class CapsuleDraftViewModel(
                     return@launch
                 }
                 var saveSuccess = false
-                var writtenToJournal = false
-                var rollbackSuccess = false
                 var previousPhoto: RetainedOriginalPhoto? = null
                 photoSaveMutex.withLock {
                     if (!isCurrentPhotoOp(token, uid, capsuleId)) {
@@ -223,7 +221,6 @@ class CapsuleDraftViewModel(
                     val record = PhotoDraftRecord(capsuleId, latestState.title, latestState.text, photo)
                     try {
                         input.save(uid, record)
-                        writtenToJournal = true
                     } catch (cancelled: CancellationException) {
                         throw cancelled
                     } catch (_: Exception) {
@@ -239,20 +236,27 @@ class CapsuleDraftViewModel(
                             val currentInJournal = input.restore(uid)
                             if (currentInJournal?.capsuleId == capsuleId && currentInJournal.photo == photo) {
                                 input.save(uid, PhotoDraftRecord(capsuleId, latestState.title, latestState.text, previousPhoto))
-                                rollbackSuccess = true
                             }
                         } catch (cancelled: CancellationException) {
                             throw cancelled
                         } catch (_: Exception) {
-                            rollbackSuccess = false
+                            // Rollback failed
                         }
                     }
                 }
                 if (!saveSuccess || !isCurrentPhotoOp(token, uid, capsuleId)) {
-                    if (!writtenToJournal || rollbackSuccess) {
+                    val removePhoto = try {
+                        val currentInJournal = input.restore(uid)
+                        currentInJournal?.photo != photo
+                    } catch (_: Exception) {
+                        // On journal read failure, fail closed and preserve bytes to prevent dangling reference.
+                        false
+                    }
+                    if (removePhoto) {
                         try { input.remove(photo) } catch (_: Exception) {}
                     }
                     retainedPhoto = null
+                    photoFailed(token, R.string.photo_io_failure)
                     return@launch
                 }
                 _uiState.update {

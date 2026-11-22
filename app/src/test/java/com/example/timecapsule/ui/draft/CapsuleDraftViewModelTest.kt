@@ -1,5 +1,6 @@
 package com.example.timecapsule.ui.draft
 
+import com.example.timecapsule.R
 import com.example.timecapsule.data.AccountSessionManager
 import com.example.timecapsule.data.CapsuleRepository
 import com.example.timecapsule.data.DefaultCapsuleRepository
@@ -950,26 +951,86 @@ class CapsuleDraftViewModelTest {
     }
 
     @Test
-    fun `cancellationAfterJournalSave_preservesRetainedPhotoAndJournalRecord`() {
-        var jobToCancel: Job? = null
-        val storage = TestablePhotoStorage()
-        storage.onAfterSave = {
-            jobToCancel?.cancel(CancellationException("Simulated cancellation after journal save"))
-        }
+    fun `commitToJournalFollowedByIOException_preservesJournalRecordAndRetainedPhoto`() {
+        val storage = TestablePhotoStorage(
+            postSaveException = IOException("Simulated post-commit I/O failure")
+        )
 
-        jobToCancel = viewModel.viewModelScope.launch {
-            viewModel.selectPhoto(storage, "cancel-after-save-uri")
-        }
-
+        viewModel.selectPhoto(storage, "post-commit-io-uri")
         testDispatcher.scheduler.advanceUntilIdle()
+
+        // Verify that the error message was set
+        assertEquals(R.string.photo_io_failure, viewModel.uiState.value.photoError)
+
+        // Verify that the journal still contains the record written before the exception
+        val saved = storage.savedRecords["sender-uid"]
+        assertNotNull(saved)
+        assertEquals("file-post-commit-io-uri.original", saved?.photo?.privateFileName)
+
+        // Verify that candidate bytes were NOT removed
+        assertFalse(storage.removedPhotos.any { it.privateFileName == "file-post-commit-io-uri.original" })
+    }
+
+    @Test
+    fun `commitToJournalFollowedByCancellation_entersCancellationHandlerAndPreservesPhoto`() {
+        val storage = TestablePhotoStorage(
+            postSaveException = CancellationException("Simulated post-commit cancellation")
+        )
+
+        viewModel.selectPhoto(storage, "post-commit-cancel-uri")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Verify that the cancellation handler was genuinely entered by checking restoreCount
+        assertTrue("Cancellation handler must enter restore() to check journal state", storage.restoreCount > 0)
 
         // Verify that the journal contains the record
         val saved = storage.savedRecords["sender-uid"]
         assertNotNull(saved)
-        assertEquals("file-cancel-after-save-uri.original", saved?.photo?.privateFileName)
+        assertEquals("file-post-commit-cancel-uri.original", saved?.photo?.privateFileName)
 
         // Verify that the retained photo was NOT deleted
-        assertFalse(storage.removedPhotos.any { it.privateFileName == "file-cancel-after-save-uri.original" })
+        assertFalse(storage.removedPhotos.any { it.privateFileName == "file-post-commit-cancel-uri.original" })
+    }
+
+    @Test
+    fun `failedJournalReadDuringCleanupSafetyCheck_failsClosedAndPreservesPhoto`() {
+        val storage = TestablePhotoStorage(
+            failSavePredicate = { _, draft -> draft.photo != null },
+            failRestore = true
+        )
+
+        viewModel.selectPhoto(storage, "failed-read-uri")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // On restore failure, selectPhoto fails closed and does NOT delete candidate bytes
+        assertFalse(storage.removedPhotos.any { it.privateFileName == "file-failed-read-uri.original" })
+    }
+
+    @Test
+    fun `obsoleteOperationDuringSave_doesNotOverwriteNewerDraft`() {
+        val saveGate1 = CompletableDeferred<Unit>()
+        val storage = TestablePhotoStorage(saveGate = saveGate1)
+
+        // Photo 1 starts saving and suspends on saveGate1
+        viewModel.selectPhoto(storage, "photo-1")
+        testDispatcher.scheduler.runCurrent()
+
+        // Photo 2 is selected and completes immediately
+        val storage2 = TestablePhotoStorage()
+        viewModel.selectPhoto(storage2, "photo-2")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Now photo 1's save finishes
+        saveGate1.complete(Unit)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Verify that photo 1 did NOT overwrite photo 2 in UI or storage2
+        val state = viewModel.uiState.value
+        assertEquals("file-photo-2.original", state.originalPhoto?.privateFileName)
+        assertEquals("file-photo-2.original", storage2.savedRecords["sender-uid"]?.photo?.privateFileName)
+
+        // Verify photo 1 was cleaned up
+        assertTrue(storage.removedPhotos.any { it.privateFileName == "file-photo-1.original" })
     }
 }
 
@@ -982,10 +1043,13 @@ private class TestablePhotoStorage(
     val restoreGate: CompletableDeferred<PhotoDraftRecord?>? = null,
     val throwOnRemovePhotoName: String? = null,
     val failSavePredicate: ((uid: String, draft: PhotoDraftRecord) -> Boolean)? = null,
+    var postSaveException: Exception? = null,
+    var failRestore: Boolean = false,
     var onAfterSave: (() -> Unit)? = null
 ) : PhotoDraftStorage {
     val removedPhotos = mutableListOf<RetainedOriginalPhoto>()
     val savedRecords = mutableMapOf<String, PhotoDraftRecord>()
+    var restoreCount = 0
 
     override suspend fun retain(uid: String, capsuleId: String, uri: String): RetainedOriginalPhoto {
         retainGate?.await()
@@ -1008,9 +1072,12 @@ private class TestablePhotoStorage(
         }
         savedRecords[uid] = draft
         onAfterSave?.invoke()
+        postSaveException?.let { throw it }
     }
 
     override suspend fun restore(uid: String): PhotoDraftRecord? {
+        restoreCount++
+        if (failRestore) throw IOException("Simulated restore failure")
         val gate = restoreGate
         return if (gate != null) gate.await() else savedRecords[uid]
     }
