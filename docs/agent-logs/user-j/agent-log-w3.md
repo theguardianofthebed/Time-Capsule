@@ -1,7 +1,7 @@
 # Agent Log – Week 3 (11/22/2026 – 11/24/2026)
 
 - Name / Student ID: Junwon (User J)
-- Model(s) used: Android Studio Agent Mode (Gemini Flash 3.8)
+- Model(s) used: Android Studio Agent Mode (Gemini Flash 3.6)
 - My changes to the team's Agent Tools this week: Added bounded review corrections, string updates, and deterministic coroutine race test suite for Issue #13 original photo handling.
 
 ## Feature or task: Issue #13 Code Review Corrections
