@@ -80,15 +80,16 @@ Safely integrate latest `main` into PR #40 branch `feature/14-capsule-publicatio
 - **Ambiguous Photo Save & Cancellation Safety Corrections:**
   - Refactored `selectPhoto()` in `CapsuleDraftViewModel.kt` so every uncertain save outcome checks `input.restore(uid)` before releasing bytes, preventing candidate photo deletion if the journal on disk references the photo.
   - Replaced the cancellation test in `CapsuleDraftViewModelTest.kt` with `commitToJournalFollowedByCancellation_entersCancellationHandlerAndPreservesPhoto`, injecting `CancellationException` inside the persistence coroutine and asserting `restoreCount > 0` to verify that `selectPhoto()`'s cancellation handler was genuinely entered and executed.
-  - Added deterministic unit tests in `CapsuleDraftViewModelTest.kt`: `commitToJournalFollowedByIOException_preservesJournalRecordAndRetainedPhoto`, `failedJournalReadDuringCleanupSafetyCheck_failsClosedAndPreservesPhoto`, and `obsoleteOperationDuringSave_doesNotOverwriteNewerDraft`.
+  - Added deterministic unit tests in `CapsuleDraftViewModelTest.kt`: `commitToJournalFollowedByIOException_preservesJournalRecordAndRetainedPhoto`, `failedJournalReadDuringCleanupSafetyCheck_failsClosedAndPreservesPhoto`, and updated `obsoleteOperationDuringSave_doesNotOverwriteNewerDraft` to use a single shared storage instance to prove competing operations over the same logical journal do not overwrite newer drafts.
 - **Replacement Cleanup Directory Assertion Fix:**
-  - Updated `replacementFailsSafelyOnJournalWriteFailure()` in `PublicationDraftRecoveryTest.kt` to calculate the real replacement directory path (`digestName("sender")` / `digestName("new")`) and verify that it contains no remaining photo files after failure, without depending on generated filenames.
+  - Updated `replacementFailsSafelyOnJournalWriteFailure()` in `PublicationDraftRecoveryTest.kt` to calculate and inspect the real replacement directory path (`digest("sender")` / `digest("new")`), verifying candidate copy creation prior to failure, candidate deletion after failure, original photo preservation, and journal integrity.
 - **Contract Verification:**
   - Verified all 13 required publication/recovery contract properties across `CapsulePublicationCoordinator`, `FrozenOperationJournal`, `FirestoreCapsulePublication`, `CapsulePublicationPayload`, `FrozenCapsuleOperation`, and `CapsuleDraftViewModel`.
 - **Checks and results:**
   - `./gradlew :app:testDebugUnitTest`: PASS (201 JVM unit tests passed, 0 failed).
   - `./gradlew :app:assembleDebug`: PASS (`BUILD SUCCESSFUL`).
-  - `./gradlew :app:assembleDebugAndroidTest`: PASS (`BUILD SUCCESSFUL`).
+  - `./gradlew :app:assembleDebugAndroidTest`: PASS (`BUILD SUCCESSFUL` — compiled test APK).
+  - `./gradlew :app:connectedDebugAndroidTest`: NOT RUN (0 devices connected; `No connected devices!`).
   - `./gradlew :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors).
   - `npx firebase emulators:exec --project demo-timecapsule "npm test"`: PASS (42 security rules tests passed, 0 failed).
   - `git diff --check`: PASS (clean).
@@ -102,6 +103,7 @@ No manual code fixes were needed. Merge conflicts and safety enhancements were h
 - **What I reviewed:** Inspected integrated diffs across `AccountSessionManager.kt`, `PhotoDraftJournal.kt`, `CapsuleDraftViewModel.kt`, `PrivatePublicationDrafts.kt`, `PublicationDraftRecoveryTest.kt`, `CapsuleDraftViewModelTest.kt`, `CapsulePublicationCoordinator.kt`, `FirestoreCapsulePublication.kt`, and `FrozenCapsuleOperation.kt`.
 - **What I can explain:** How `selectPhoto()` and `PrivatePublicationDrafts.replacement()` ensure a retained or copied photo is preserved if the durable journal references it, how `CapsulePublicationCoordinator` enforces one stable capsule ID per publication attempt, and how `FirestoreCapsulePublication` commits metadata and protected content atomically while rejecting pending/cached writes.
 - **Feedback and next step:** Code review and manual testing by team members before human merge of PR #40 into `main`.
+
 
 
 
