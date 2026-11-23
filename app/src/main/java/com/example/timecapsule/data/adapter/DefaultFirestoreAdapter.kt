@@ -166,6 +166,17 @@ class DefaultFirestoreAdapter(
                 }
             }
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            try {
+                val checkDoc = instance.collection("capsules").document(cleanCapsuleId).get(Source.SERVER).await()
+                if (checkDoc.exists() &&
+                    checkDoc.getString("recipientId") == cleanRecipientUid &&
+                    checkDoc.getBoolean("unlocked") == true) {
+                    return OperationResult.Success(Availability.AVAILABLE)
+                }
+            } catch (_: Exception) {
+                // Fall back to original mapped exception if verification check fails
+            }
             mapFirestoreUnlockException(e)
         }
     }

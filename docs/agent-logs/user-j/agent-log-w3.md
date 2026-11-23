@@ -171,7 +171,7 @@ No manual code fixes were needed. All changes were applied through Android Studi
 - **Correction 3 (Firebase Emulator Android Transaction Integration Tests):** Added `FirebaseEmulatorUnlockIntegrationTest.kt` executing against live Firebase Auth & Firestore Emulators. Covered server-authorized TIME unlock, early unlock denial, idempotent repeat unlock, unauthorized caller denial, and metadata immutability during unlock.
 - **Correction 4 (Creation Zone Survival & 2027 DST Boundary Fixtures):** Added `creationZoneSurvivesPublicationAndRecovery` test in `CapsulePublicationCoordinatorTest.kt`. Added approved 2027 DST boundary fixtures (March 14, 2027 spring-forward gap and November 7, 2027 fall-back overlap) to `TimeConversionHelperTest.kt`.
 - **Correction 5 (KDoc & Cleanup):** Corrected DST overlap KDoc in `TimeConversionHelper.kt`, removed unused imports, and updated PR #41 documentation.
-- **Checks & Results:** `./gradlew :app:testDebugUnitTest`: PASS (221 JVM unit tests passed, 0 failed). `npx firebase emulators:exec --project demo-timecapsule "npm test"`: PASS (42 security rules tests passed, 0 failed). `./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors).
+- **Checks & Results:** `./gradlew :app:testDebugUnitTest`: PASS (221 JVM unit tests passed, 0 failed). `npm test`: PASS (42 security rules tests passed, 0 failed). `./gradlew :app:connectedDebugAndroidTest`: PASS (25 Android instrumentation tests passed on live emulator-5554 with Firebase Emulators, 0 failed, including 7 in `FirebaseEmulatorUnlockIntegrationTest`). `./gradlew :app:assembleDebug :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors).
 
 
 

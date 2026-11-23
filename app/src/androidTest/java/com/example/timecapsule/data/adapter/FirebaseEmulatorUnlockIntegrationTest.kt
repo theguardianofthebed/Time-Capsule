@@ -13,6 +13,9 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.tasks.await
 import org.junit.Assert.assertEquals
@@ -25,11 +28,13 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TestRule
 import org.junit.runner.RunWith
+import java.util.UUID
 
 /**
  * Android Instrumentation Integration tests executing against live Firebase Auth & Firestore Emulators.
  * Verifies Issue #15 server-authorized TIME unlock transactions, early unlock denial,
- * concurrent unlock idempotency, non-recipient authorization denial, and metadata immutability.
+ * concurrent unlock idempotency, non-recipient authorization denial, protected content access rules,
+ * and metadata immutability.
  */
 @RunWith(AndroidJUnit4::class)
 class FirebaseEmulatorUnlockIntegrationTest {
@@ -84,13 +89,29 @@ class FirebaseEmulatorUnlockIntegrationTest {
     private suspend fun seedTestCapsule(
         capsuleId: String,
         senderUid: String,
+        senderEmail: String,
+        senderName: String,
         recipientUid: String,
-        unlockAtMillis: Long,
+        recipientEmail: String,
+        recipientName: String,
+        futureUnlockSeconds: Long = 3L,
         lockMode: String = "TIME"
     ) {
-        // Ensure recipient directory profiles exist for rules validMetadata / create constraints
-        firestoreAdapter.saveRecipientProfile(RecipientProfile(senderUid, "Sender User"))
-        firestoreAdapter.saveRecipientProfile(RecipientProfile(recipientUid, "Recipient User"))
+        // 1. Save recipient directory profile while authenticated as sender owner
+        createAndSignInUser(senderEmail, senderName)
+        val saveSenderRes = firestoreAdapter.saveRecipientProfile(RecipientProfile(senderUid, senderName))
+        assertTrue("Sender profile save must succeed", saveSenderRes is OperationResult.Success)
+
+        // 2. Save recipient directory profile while authenticated as recipient owner
+        createAndSignInUser(recipientEmail, recipientName)
+        val saveRecipientRes = firestoreAdapter.saveRecipientProfile(RecipientProfile(recipientUid, recipientName))
+        assertTrue("Recipient profile save must succeed", saveRecipientRes is OperationResult.Success)
+
+        // 3. Re-authenticate as sender to perform capsule metadata and content creation
+        createAndSignInUser(senderEmail, senderName)
+
+        // Set unlockAt in near future (e.g. 3s) so firestore.rules creation constraint (unlockAt > request.time) passes
+        val unlockAtTimestamp = Timestamp(System.currentTimeMillis() / 1000 + futureUnlockSeconds, 0)
 
         val metadata = mapOf(
             "capsuleId" to capsuleId,
@@ -98,7 +119,7 @@ class FirebaseEmulatorUnlockIntegrationTest {
             "recipientId" to recipientUid,
             "title" to "Test Capsule Title",
             "lockMode" to lockMode,
-            "unlockAt" to Timestamp(unlockAtMillis / 1000, 0),
+            "unlockAt" to unlockAtTimestamp,
             "location" to null,
             "hasPhoto" to false,
             "photoPath" to null,
@@ -123,16 +144,20 @@ class FirebaseEmulatorUnlockIntegrationTest {
 
     @Test
     fun test1_serverAuthorizedTimeUnlockSucceedsAtOrAfterDeadline() = runBlocking {
-        val senderUid = createAndSignInUser("sender_unlock_t1@example.com", "Sender 1")
-        val recipientUid = createAndSignInUser("recipient_unlock_t1@example.com", "Recipient 1")
+        val testId = UUID.randomUUID().toString().take(8)
+        val senderEmail = "sender_t1_$testId@example.com"
+        val recipientEmail = "recipient_t1_$testId@example.com"
+        val capsuleId = "capsule-t1-$testId"
 
-        val capsuleId = "capsule-unlock-t1"
-        val pastUnlockMillis = System.currentTimeMillis() - 60_000L
+        val senderUid = createAndSignInUser(senderEmail, "Sender 1")
+        val recipientUid = createAndSignInUser(recipientEmail, "Recipient 1")
 
-        createAndSignInUser("sender_unlock_t1@example.com", "Sender 1")
-        seedTestCapsule(capsuleId, senderUid, recipientUid, pastUnlockMillis)
+        seedTestCapsule(capsuleId, senderUid, senderEmail, "Sender 1", recipientUid, recipientEmail, "Recipient 1", futureUnlockSeconds = 3L)
 
-        createAndSignInUser("recipient_unlock_t1@example.com", "Recipient 1")
+        // Wait for unlock deadline to elapse on server
+        delay(3500L)
+
+        createAndSignInUser(recipientEmail, "Recipient 1")
         val result = firestoreAdapter.verifyRecipientUnlock(capsuleId, recipientUid)
 
         assertTrue("Recipient unlock must succeed after deadline", result is OperationResult.Success)
@@ -145,16 +170,17 @@ class FirebaseEmulatorUnlockIntegrationTest {
 
     @Test
     fun test2_earlyUnlockDeniedBeforeDeadline() = runBlocking {
-        val senderUid = createAndSignInUser("sender_unlock_t2@example.com", "Sender 2")
-        val recipientUid = createAndSignInUser("recipient_unlock_t2@example.com", "Recipient 2")
+        val testId = UUID.randomUUID().toString().take(8)
+        val senderEmail = "sender_t2_$testId@example.com"
+        val recipientEmail = "recipient_t2_$testId@example.com"
+        val capsuleId = "capsule-t2-$testId"
 
-        val capsuleId = "capsule-unlock-t2"
-        val futureUnlockMillis = System.currentTimeMillis() + 3_600_000L
+        val senderUid = createAndSignInUser(senderEmail, "Sender 2")
+        val recipientUid = createAndSignInUser(recipientEmail, "Recipient 2")
 
-        createAndSignInUser("sender_unlock_t2@example.com", "Sender 2")
-        seedTestCapsule(capsuleId, senderUid, recipientUid, futureUnlockMillis)
+        seedTestCapsule(capsuleId, senderUid, senderEmail, "Sender 2", recipientUid, recipientEmail, "Recipient 2", futureUnlockSeconds = 3600L)
 
-        createAndSignInUser("recipient_unlock_t2@example.com", "Recipient 2")
+        createAndSignInUser(recipientEmail, "Recipient 2")
         val result = firestoreAdapter.verifyRecipientUnlock(capsuleId, recipientUid)
 
         assertTrue("Early unlock before deadline must be denied", result is OperationResult.Denied)
@@ -162,56 +188,75 @@ class FirebaseEmulatorUnlockIntegrationTest {
 
     @Test
     fun test3_repeatedAndConcurrentUnlockIsIdempotent() = runBlocking {
-        val senderUid = createAndSignInUser("sender_unlock_t3@example.com", "Sender 3")
-        val recipientUid = createAndSignInUser("recipient_unlock_t3@example.com", "Recipient 3")
+        val testId = UUID.randomUUID().toString().take(8)
+        val senderEmail = "sender_t3_$testId@example.com"
+        val recipientEmail = "recipient_t3_$testId@example.com"
+        val capsuleId = "capsule-t3-$testId"
 
-        val capsuleId = "capsule-unlock-t3"
-        val pastUnlockMillis = System.currentTimeMillis() - 60_000L
+        val senderUid = createAndSignInUser(senderEmail, "Sender 3")
+        val recipientUid = createAndSignInUser(recipientEmail, "Recipient 3")
 
-        createAndSignInUser("sender_unlock_t3@example.com", "Sender 3")
-        seedTestCapsule(capsuleId, senderUid, recipientUid, pastUnlockMillis)
+        seedTestCapsule(capsuleId, senderUid, senderEmail, "Sender 3", recipientUid, recipientEmail, "Recipient 3", futureUnlockSeconds = 3L)
 
-        createAndSignInUser("recipient_unlock_t3@example.com", "Recipient 3")
+        delay(3500L)
 
-        val result1 = firestoreAdapter.verifyRecipientUnlock(capsuleId, recipientUid)
-        assertTrue(result1 is OperationResult.Success)
+        createAndSignInUser(recipientEmail, "Recipient 3")
 
-        val result2 = firestoreAdapter.verifyRecipientUnlock(capsuleId, recipientUid)
-        assertTrue(result2 is OperationResult.Success)
-        assertEquals(Availability.AVAILABLE, (result2 as OperationResult.Success).data)
+        val job1 = async { firestoreAdapter.verifyRecipientUnlock(capsuleId, recipientUid) }
+        val job2 = async { firestoreAdapter.verifyRecipientUnlock(capsuleId, recipientUid) }
+        val results = awaitAll(job1, job2)
+
+        assertTrue("First concurrent unlock must succeed", results[0] is OperationResult.Success)
+        assertTrue("Second concurrent unlock must succeed", results[1] is OperationResult.Success)
+        assertEquals(Availability.AVAILABLE, (results[0] as OperationResult.Success).data)
+        assertEquals(Availability.AVAILABLE, (results[1] as OperationResult.Success).data)
+
+        val doc = firestore.collection("capsules").document(capsuleId).get().await()
+        assertEquals(true, doc.getBoolean("unlocked"))
+        assertNotNull(doc.getTimestamp("unlockedAt"))
     }
 
     @Test
     fun test4_unauthorizedCallerDenied() = runBlocking {
-        val senderUid = createAndSignInUser("sender_unlock_t4@example.com", "Sender 4")
-        val recipientUid = createAndSignInUser("recipient_unlock_t4@example.com", "Recipient 4")
+        val testId = UUID.randomUUID().toString().take(8)
+        val senderEmail = "sender_t4_$testId@example.com"
+        val recipientEmail = "recipient_t4_$testId@example.com"
+        val outsiderEmail = "outsider_t4_$testId@example.com"
+        val capsuleId = "capsule-t4-$testId"
 
-        val capsuleId = "capsule-unlock-t4"
-        val pastUnlockMillis = System.currentTimeMillis() - 60_000L
+        val senderUid = createAndSignInUser(senderEmail, "Sender 4")
+        val recipientUid = createAndSignInUser(recipientEmail, "Recipient 4")
 
-        createAndSignInUser("sender_unlock_t4@example.com", "Sender 4")
-        seedTestCapsule(capsuleId, senderUid, recipientUid, pastUnlockMillis)
+        seedTestCapsule(capsuleId, senderUid, senderEmail, "Sender 4", recipientUid, recipientEmail, "Recipient 4", futureUnlockSeconds = 3L)
 
+        delay(3500L)
+
+        // Sender attempting recipient unlock -> denied
+        createAndSignInUser(senderEmail, "Sender 4")
         val senderAttempt = firestoreAdapter.verifyRecipientUnlock(capsuleId, senderUid)
         assertTrue(senderAttempt is OperationResult.Denied)
 
-        createAndSignInUser("outsider_unlock_t4@example.com", "Outsider 4")
+        // Outsider attempting recipient unlock -> denied
+        createAndSignInUser(outsiderEmail, "Outsider 4")
         val outsiderAttempt = firestoreAdapter.verifyRecipientUnlock(capsuleId, recipientUid)
         assertTrue(outsiderAttempt is OperationResult.Denied)
     }
 
     @Test
     fun test5_metadataMutationDuringUnlockDenied() = runBlocking {
-        val senderUid = createAndSignInUser("sender_unlock_t5@example.com", "Sender 5")
-        val recipientUid = createAndSignInUser("recipient_unlock_t5@example.com", "Recipient 5")
+        val testId = UUID.randomUUID().toString().take(8)
+        val senderEmail = "sender_t5_$testId@example.com"
+        val recipientEmail = "recipient_t5_$testId@example.com"
+        val capsuleId = "capsule-t5-$testId"
 
-        val capsuleId = "capsule-unlock-t5"
-        val pastUnlockMillis = System.currentTimeMillis() - 60_000L
+        val senderUid = createAndSignInUser(senderEmail, "Sender 5")
+        val recipientUid = createAndSignInUser(recipientEmail, "Recipient 5")
 
-        createAndSignInUser("sender_unlock_t5@example.com", "Sender 5")
-        seedTestCapsule(capsuleId, senderUid, recipientUid, pastUnlockMillis)
+        seedTestCapsule(capsuleId, senderUid, senderEmail, "Sender 5", recipientUid, recipientEmail, "Recipient 5", futureUnlockSeconds = 3L)
 
-        createAndSignInUser("recipient_unlock_t5@example.com", "Recipient 5")
+        delay(3500L)
+
+        createAndSignInUser(recipientEmail, "Recipient 5")
 
         try {
             firestore.collection("capsules").document(capsuleId).update(mapOf(
@@ -223,5 +268,44 @@ class FirebaseEmulatorUnlockIntegrationTest {
         } catch (e: FirebaseFirestoreException) {
             assertEquals(FirebaseFirestoreException.Code.PERMISSION_DENIED, e.code)
         }
+    }
+
+    @Test
+    fun test6_protectedContentAccessDeniedBeforeUnlockAndAllowedAfter() = runBlocking {
+        val testId = UUID.randomUUID().toString().take(8)
+        val senderEmail = "sender_t6_$testId@example.com"
+        val recipientEmail = "recipient_t6_$testId@example.com"
+        val capsuleId = "capsule-t6-$testId"
+
+        val senderUid = createAndSignInUser(senderEmail, "Sender 6")
+        val recipientUid = createAndSignInUser(recipientEmail, "Recipient 6")
+
+        seedTestCapsule(capsuleId, senderUid, senderEmail, "Sender 6", recipientUid, recipientEmail, "Recipient 6", futureUnlockSeconds = 3L)
+
+        // 1. Recipient attempts protectedContent read BEFORE unlock -> denied
+        createAndSignInUser(recipientEmail, "Recipient 6")
+        try {
+            firestore.collection("protectedContent").document(capsuleId).get().await()
+            fail("Protected content read before unlock must be denied by firestore.rules")
+        } catch (e: FirebaseFirestoreException) {
+            assertEquals(FirebaseFirestoreException.Code.PERMISSION_DENIED, e.code)
+        }
+
+        // 2. Wait for deadline and perform recipient unlock
+        delay(3500L)
+        val unlockRes = firestoreAdapter.verifyRecipientUnlock(capsuleId, recipientUid)
+        assertTrue("Recipient unlock must succeed after deadline", unlockRes is OperationResult.Success)
+
+        // 3. Recipient reads protectedContent AFTER unlock -> succeeds
+        val protectedDoc = firestore.collection("protectedContent").document(capsuleId).get().await()
+        assertTrue(protectedDoc.exists())
+        assertEquals("Protected message text", protectedDoc.getString("text"))
+    }
+
+    @Test
+    fun test7_unauthenticatedUnlockRequestFailsClosed() = runBlocking {
+        auth.signOut()
+        val result = firestoreAdapter.verifyRecipientUnlock("missing-capsule-id", "missing-recipient-uid")
+        assertTrue("Unauthenticated unlock request must fail closed", result !is OperationResult.Success)
     }
 }

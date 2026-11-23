@@ -46,8 +46,9 @@ Weekly coursework remains in `agent-log-w1.md`–`agent-log-w4.md`.
 ### Checks and verification
 
 - `./gradlew :app:testDebugUnitTest`: PASS (221 JVM unit tests passed across project, 0 failed).
-- `npx firebase emulators:exec --project demo-timecapsule "npm test"`: PASS (42 security rules tests passed, 0 failed).
-- `./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors).
+- `npm test`: PASS (42 security rules tests passed, 0 failed).
+- `./gradlew :app:connectedDebugAndroidTest`: PASS (25 Android instrumentation tests passed on live emulator-5554 with Firebase Emulators, 0 failed, including 7 in `FirebaseEmulatorUnlockIntegrationTest`).
+- `./gradlew :app:assembleDebug :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors).
 - `git diff --check`: PASS (clean).
 
 ### Human input and remaining work
