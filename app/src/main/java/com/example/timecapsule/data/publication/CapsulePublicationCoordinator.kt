@@ -84,7 +84,7 @@ class CapsulePublicationCoordinator(
                     "An abandoned operation cannot be submitted again."
                 }
                 val candidate = if (previous == null) {
-                    FrozenCapsuleOperation.freeze(draft, uid, zone(), now())
+                    FrozenCapsuleOperation.freeze(draft, uid, draft.creationZone.ifBlank { zone() }, now())
                 } else {
                     FrozenCapsuleOperation.fromConfirmedDraft(draft, uid, previous.operation.creationZone)
                 }

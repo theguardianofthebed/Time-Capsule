@@ -63,7 +63,21 @@ class DefaultCapsuleRepository(
     }
 
     override suspend fun verifyUnlock(capsuleId: String): OperationResult<Availability> {
-        return OperationResult.Invalid("Verification requires Issue #15 implementation.")
+        val cleanId = capsuleId.trim()
+        if (cleanId.isBlank()) {
+            return OperationResult.Invalid("Capsule ID must not be blank for unlock verification.")
+        }
+        val initialSession = sessionTracker.currentSession()
+        if (!initialSession.isAuthenticated || initialSession.uid.isNullOrBlank()) {
+            return OperationResult.Denied("Authentication required to verify capsule unlock.")
+        }
+        val activeUid = initialSession.uid
+        val result = firestoreAdapter.verifyRecipientUnlock(cleanId, activeUid)
+        val postSession = sessionTracker.currentSession()
+        if (!postSession.isAuthenticated || postSession != initialSession) {
+            return OperationResult.Denied("Account session changed during unlock verification.")
+        }
+        return result
     }
 
     override suspend fun readContent(capsuleId: String): OperationResult<ProtectedCapsuleContent> {

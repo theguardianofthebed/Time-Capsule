@@ -1,5 +1,6 @@
 package com.example.timecapsule.data.adapter
 
+import com.example.timecapsule.domain.model.Availability
 import com.example.timecapsule.domain.model.RecipientProfile
 import com.example.timecapsule.domain.result.OperationResult
 import com.google.firebase.firestore.FirebaseFirestore
@@ -42,4 +43,12 @@ interface FirestoreAdapter {
 
     /** Creates or updates public recipient profile in `recipientDirectory/{uid}`. */
     suspend fun saveRecipientProfile(profile: RecipientProfile): OperationResult<Unit>
+
+    /** Requests server-authoritative recipient unlock verification for [capsuleId]. */
+    suspend fun verifyRecipientUnlock(
+        capsuleId: String,
+        recipientUid: String
+    ): OperationResult<Availability> {
+        return OperationResult.Unavailable("Unlock verification is not implemented in this adapter.")
+    }
 }

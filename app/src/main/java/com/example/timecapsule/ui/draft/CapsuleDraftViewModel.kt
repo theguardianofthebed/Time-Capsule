@@ -30,6 +30,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import java.time.ZoneId
 
 /** Recipient target mode selection for S-05 recipient step. */
 enum class RecipientMode {
@@ -67,6 +68,7 @@ data class CapsuleDraftUiState(
     val isRecipientConfirmed: Boolean = false,
     val lockMode: LockMode = LockMode.TIME,
     val unlockAt: Instant? = null,
+    val creationZone: String = ZoneId.systemDefault().id,
     val locationTarget: LocationTarget? = null,
     val locationName: String? = null,
     val activeSessionUid: String? = null,
@@ -580,10 +582,10 @@ class CapsuleDraftViewModel(
         _uiState.update { it.copy(lockMode = mode) }
     }
 
-    /** Updates target unlock date/time instant. */
-    fun updateUnlockAt(instant: Instant?) {
+    /** Updates target unlock date/time instant and optional creation timezone. */
+    fun updateUnlockAt(instant: Instant?, zoneId: String = ZoneId.systemDefault().id) {
         if (!_uiState.value.editable) return
-        _uiState.update { it.copy(unlockAt = instant) }
+        _uiState.update { it.copy(unlockAt = instant, creationZone = zoneId) }
     }
 
     /** Updates target location coordinates and location name. */
@@ -669,7 +671,8 @@ class CapsuleDraftViewModel(
             recipientDisplayName = state.resolvedProfile?.displayName,
             isRecipientConfirmed = state.isRecipientConfirmed,
             locationName = state.locationName,
-            originalPhoto = state.originalPhoto
+            originalPhoto = state.originalPhoto,
+            creationZone = state.creationZone
         )
     }
 
@@ -735,7 +738,8 @@ class CapsuleDraftViewModel(
                 photoBusy = false, recipientUidInput = operation.recipientUid,
                 resolvedProfile = RecipientProfile(operation.recipientUid, operation.recipientUid),
                 isRecipientConfirmed = true, lockMode = operation.lock.mode,
-                unlockAt = operation.lock.unlockAt, locationTarget = operation.lock.location,
+                unlockAt = operation.lock.unlockAt, creationZone = operation.creationZone,
+                locationTarget = operation.lock.location,
                 publicationPhase = recovered.phase, canAbandon = recovered.canAbandon,
                 publicationBusy = false, recoveryBusy = false, recoveryBlocked = false,
                 publicationMessage = if (recovered.canAbandon) R.string.publication_failed
@@ -840,6 +844,7 @@ class CapsuleDraftViewModel(
                         recipientUidInput = draft.recipientUid,
                         recipientMode = RecipientMode.SOMEONE_ELSE,
                         lockMode = draft.lock.mode, unlockAt = draft.lock.unlockAt,
+                        creationZone = draft.creationZone,
                         locationTarget = draft.lock.location,
                         publicationMessage = R.string.publication_replacement_ready)
                 } else {

@@ -104,6 +104,78 @@ No manual code fixes were needed. Merge conflicts and safety enhancements were h
 - **What I can explain:** How `selectPhoto()` and `PrivatePublicationDrafts.replacement()` ensure a retained or copied photo is preserved if the durable journal references it, how `CapsulePublicationCoordinator` enforces one stable capsule ID per publication attempt, and how `FirestoreCapsulePublication` commits metadata and protected content atomically while rejecting pending/cached writes.
 - **Feedback and next step:** Code review and manual testing by team members before human merge of PR #40 into `main`.
 
+## Feature or task: Issue #15 UTC Schedules & Server-Authorized One-Way Unlock
+
+- **Task and purpose:** Implementation of Issue #15 (Store UTC schedules and enforce server-authorized one-way unlock), with User J as acting implementation owner and User G as reviewer.
+- **Session date(s):** November 22, 2026.
+- **Issue and PR:** [Issue #15](https://github.com/theguardianofthebed/Time-Capsule/issues/15), task branch `feature/15-utc-schedule-unlock`.
+- **Requirement/design references:** FR-05, NFR-04; ARC-02, ARC-03, ARC-05; DD-13, DD-17, DD-23; AC-04, AC-06, AC-12; T-13, T-14, T-15, T-23, T-41.
+- **Agent environment:** Android Studio Agent Mode.
+- **Model used:** Gemini Flash 3.6.
+
+### Goal
+
+Convert selected local date/time using an IANA `ZoneId` to an absolute UTC `Instant`, reject nonexistent local times during DST gaps, handle DST overlaps with explicit offset selection, display creation zone and offset coherently during review, preserve submitted schedules as immutable, enforce online recipient unlock transactions with server timestamp authority in `firestore.rules` and `DefaultCapsuleRepository`, treat already-unlocked capsules as idempotent success, and keep content locked on offline or denied outcomes.
+
+### Requests and prompts
+
+| # | Request summary | Actual prompt (key part) | Why it worked (or didn't) |
+|---|-----------------|--------------------------|---------------------------|
+| 1 | Complete readiness preflight & implementation plan | "Start Issue #15 — Store UTC schedules and enforce server-authorized one-way unlock... Complete eight-gate preflight, report readiness, and generate plan." | Thorough preflight gates and explicit plan requirement enabled smooth transition to execution. |
+| 2 | Execute Issue #15 implementation | "Proceed with the approved implementation plan." | Clear approval allowed immediate branch creation (`feature/15-utc-schedule-unlock`), domain logic creation, repository wiring, UI updates, and automated test execution. |
+
+### What the agent changed and verified
+
+- **Time Conversion Engine (`TimeConversionHelper.kt`):**
+  - Added pure domain utility `TimeConversionHelper.kt` converting local date + local time + `ZoneId` into an absolute UTC `Instant`.
+  - Rejects DST spring-forward gaps with `OperationResult.Invalid`.
+  - Handles DST fall-back overlaps with valid offsets list and optional preferred offset selection.
+  - Formats date, time, creation zone, and UTC offset coherently (`"2026-11-25 09:00 (Asia/Seoul, UTC+09:00)"`).
+- **Server-Authorized Recipient Unlock Transaction (`DefaultCapsuleRepository.kt` & `DefaultFirestoreAdapter.kt`):**
+  - Updated `FirestoreAdapter` interface and implemented `verifyRecipientUnlock()` in `DefaultFirestoreAdapter.kt` using `Source.SERVER`.
+  - Enforces recipient authentication and authorization check (`docRecipientId == recipientUid`).
+  - Sends `FieldValue.serverTimestamp()` in update payload, matching `canRecipientUnlock()` in `firestore.rules` (`request.time >= resource.data.unlockAt`).
+  - Implemented idempotent success for already-unlocked capsules.
+  - Returns `OperationResult.Unavailable` on offline/network errors and `OperationResult.Denied` on early unlock attempts.
+- **UI Integration (`S05RecipientLockFragment.kt` & `S06ConfirmSendFragment.kt`):**
+  - Updated `CapsuleDraftViewModel.kt` to preserve `creationZone` in `DraftUiState` and `updateUnlockAt(instant, zoneId)`.
+  - Updated S-05 date & time pickers to validate DST gaps before setting draft state.
+  - Updated S-05 and S-06 to format unlock dates using creation zone and UTC offset.
+- **Automated Verification Suite:**
+  - Written `TimeConversionHelperTest.kt` (5 unit tests).
+  - Written `DefaultCapsuleRepositoryUnlockTest.kt` (8 unit tests).
+  - Updated `CapsuleDraftViewModelTest.kt` (53 unit tests).
+  - Executed Firebase Emulator security rules test suite `tests/capsule.rules.test.js` (42 tests passed).
+
+### Checks and results
+
+- `./gradlew :app:testDebugUnitTest`: PASS (214 JVM unit tests passed, 0 failed).
+- `npx firebase emulators:exec --project demo-timecapsule "npm test"`: PASS (42 security rules tests passed, 0 failed).
+- `./gradlew :app:assembleDebug :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors).
+- `git diff --check`: PASS (clean).
+
+### Errors and manual fixes
+
+No manual code fixes were needed. All changes were applied through Android Studio Agent Mode and verified with Gradle unit tests, lint, assemble, and Firebase Emulator security rules.
+
+### My review and understanding
+
+- **What I reviewed:** Inspected diffs across `TimeConversionHelper.kt`, `DefaultCapsuleRepository.kt`, `FirestoreAdapter.kt`, `DefaultFirestoreAdapter.kt`, `CapsuleDraftViewModel.kt`, `S05RecipientLockFragment.kt`, `S06ConfirmSendFragment.kt`, `TimeConversionHelperTest.kt`, `DefaultCapsuleRepositoryUnlockTest.kt`, and `CapsuleDraftViewModelTest.kt`.
+- **What I can explain:** How `TimeConversionHelper` detects DST gaps via `ZoneId.rules.getValidOffsets(localDateTime)` and requires explicit offset choices for overlaps, how `DefaultFirestoreAdapter.verifyRecipientUnlock` uses `runTransaction` with `FieldValue.serverTimestamp()` for atomic server-authorized unlocking, and how `canRecipientUnlock()` in `firestore.rules` enforces one-way recipient unlock transitions.
+- **Feedback and next step:** Teammate code re-review by User G on PR #41 before manual testing.
+
+### PR #41 Focused Review Corrections & Integration Tests (November 23, 2026)
+
+- **Correction 1 (Session Generation Validation & Same-UID Relogin Race):** Updated `DefaultCapsuleRepository.verifyUnlock` to compare full `SessionSnapshot` (`postSession != initialSession`), validating `sessionGeneration` in addition to `uid`. Added regression unit test `verifyUnlock rejects result if same UID is relogged in mid flight`.
+- **Correction 2 (CancellationException Propagation):** Updated `DefaultFirestoreAdapter` (`mapFirestoreUnlockException`, `mapFirestoreException`, and nested fallback check) to rethrow `kotlinx.coroutines.CancellationException` (`if (e is CancellationException) throw e`), preserving coroutine cancellation semantics.
+- **Correction 3 (Firebase Emulator Android Transaction Integration Tests):** Added `FirebaseEmulatorUnlockIntegrationTest.kt` executing against live Firebase Auth & Firestore Emulators. Covered server-authorized TIME unlock, early unlock denial, idempotent repeat/concurrent unlock, unauthorized caller denial, protected content access rules, and metadata immutability during unlock.
+- **Correction 4 (Creation Zone Survival & 2027 DST Boundary Fixtures):** Added `creationZoneSurvivesPublicationAndRecovery` test in `CapsulePublicationCoordinatorTest.kt`. Added approved 2027 DST boundary fixtures (March 14, 2027 spring-forward gap and November 7, 2027 fall-back overlap) to `TimeConversionHelperTest.kt`.
+- **Correction 5 (KDoc & Cleanup):** Corrected DST overlap KDoc in `TimeConversionHelper.kt`, removed unused imports, added ambiguous lost-response test in `DefaultCapsuleRepositoryUnlockTest.kt`, and updated PR #41 documentation.
+- **Checks & Results:** `./gradlew :app:testDebugUnitTest`: PASS (222 JVM unit tests passed, 0 failed). `npm test`: PASS (42 security rules tests passed, 0 failed). `./gradlew :app:connectedDebugAndroidTest`: PASS (25 Android instrumentation tests passed on live emulator-5554 with Firebase Emulators, 0 failed, including 7 in `FirebaseEmulatorUnlockIntegrationTest`). `./gradlew :app:assembleDebug :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors).
+
+
+
+
 
 
 
