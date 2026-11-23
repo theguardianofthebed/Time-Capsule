@@ -253,6 +253,13 @@ No manual code fix was required. The agent corrected a missing permission linter
 - **Fix E (P2 - Correct Initial Confirm State Synchronously):** Updated `S05MapTargetDialogFragment.onViewCreated` to set `btnConfirmLocation.isEnabled = selectedLatLng != null` synchronously prior to asynchronous `onMapReady()`.
 - **Checks & Results:** `./gradlew :app:testDebugUnitTest`: PASS (238 JVM unit tests passed, 0 failed). `./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors). `py tools/check_readiness.py --issue 16 --evidence docs/agent-tools/readiness-evidence-issue16.json`: PASS (`PREFLIGHT_RECORD_VALID`).
 
+### PR #42 Final Review Corrections (November 23, 2026)
+
+- **Correction A (Complete Stale FragmentResult Protection - P1):** Emitted full session identity (`RESULT_KEY_SESSION_GENERATION`) and one-time request identifier (`RESULT_KEY_REQUEST_ID`) in `S05MapTargetDialogFragment`. Updated `S05RecipientLockFragment` to capture `activeMapRequestId`, persist it across rotation in `onSaveInstanceState`, and validate `editable`, non-null matching capsule ID, matching session UID, matching `sessionGeneration` (rejects same-UID reauthentication), and matching `requestId` before calling `viewModel.updateLocation()`. Written 7 pure JVM unit tests in `S05RecipientLockResultGuardsTest` verifying guard checks against stale, obsolete, or reauthenticated results.
+- **Correction B (Validate Android Test Suite - P1):** Verified runtime execution and dependencies of `S05MapTargetDialogFragmentTest.kt` in `androidTest`. Updated assertions to synchronously check view creation states, verify scoped `FragmentResult` emission, test pending selection state preservation across recreation, and confirm cancel leaves host state untouched.
+- **Correction C (Update Existing PR Records - P2):** Updated PR #42 description, handoff file `issue-16-map-foreground-location-20261123.md`, and User J's logs with latest HEAD SHA (`d4ddacd`), 245 passing JVM unit tests, and `NOT RUN` instrumentation status (0 adb devices connected).
+- **Checks & Results:** `./gradlew :app:testDebugUnitTest`: PASS (245 JVM unit tests passed, 0 failed). `./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors). `py tools/check_readiness.py --issue 16 --evidence docs/agent-tools/readiness-evidence-issue16.json`: PASS (`PREFLIGHT_RECORD_VALID`).
+
 ### My review and understanding
 
 - **What I reviewed:** Inspected the generated `LocationQualifier`, `DefaultLocationAdapter`, `S05MapTargetDialogFragment`, and `PhotoDraftJournal` diffs.

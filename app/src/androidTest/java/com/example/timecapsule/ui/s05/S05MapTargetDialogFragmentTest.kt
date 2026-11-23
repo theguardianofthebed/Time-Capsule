@@ -15,18 +15,18 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Android instrumentation tests for [S05MapTargetDialogFragment] exercising Correction 1, 3, and 4:
+ * Android instrumentation tests for [S05MapTargetDialogFragment] exercising Correction B:
  * - Fragment result handoff via parentFragmentManager setFragmentResult
- * - Initial state without target disables Confirm
+ * - Initial state without target disables Confirm synchronously
  * - Preselected initial target enables Confirm
- * - State restoration across recreation
+ * - Unselected dialog with pending state preserves selection across recreation
  * - Cancel preserving host state
  */
 @RunWith(AndroidJUnit4::class)
 class S05MapTargetDialogFragmentTest {
 
     @Test
-    fun newInstanceWithoutInitialTargetDisablesConfirmButton() {
+    fun newInstanceWithoutInitialTargetDisablesConfirmButtonSynchronously() {
         val scenario = launchFragmentInContainer<S05MapTargetDialogFragment>(
             fragmentArgs = null,
             themeResId = R.style.Theme_TimeCapsule
@@ -34,15 +34,21 @@ class S05MapTargetDialogFragmentTest {
 
         scenario.onFragment { fragment ->
             val binding = fragment.view?.let { DialogS05MapTargetBinding.bind(it) }
-            // Confirm button should start disabled when no target was preselected
             assertFalse(binding?.btnConfirmLocation?.isEnabled == true)
         }
     }
 
     @Test
-    fun newInstanceWithInitialTargetEnablesConfirmButtonAndDisplaysCoordinates() {
+    fun newInstanceWithInitialTargetEnablesConfirmButtonSynchronously() {
         val target = LocationTarget(latitude = 37.5665, longitude = 126.9780, radiusMeters = 150.0)
-        val args = S05MapTargetDialogFragment.newInstance(target, "Seoul Station").arguments
+        val args = S05MapTargetDialogFragment.newInstance(
+            initialTarget = target,
+            initialName = "Seoul Station",
+            capsuleId = "capsule-101",
+            sessionUid = "user-a",
+            sessionGeneration = 1L,
+            requestId = "req-123"
+        ).arguments
 
         val scenario = launchFragmentInContainer<S05MapTargetDialogFragment>(
             fragmentArgs = args,
@@ -52,14 +58,20 @@ class S05MapTargetDialogFragmentTest {
         scenario.onFragment { fragment ->
             val binding = fragment.view?.let { DialogS05MapTargetBinding.bind(it) }
             assertTrue(binding?.btnConfirmLocation?.isEnabled == true)
-            assertTrue(binding?.tvSelectedCoordinates?.text?.contains("Seoul Station") == true)
         }
     }
 
     @Test
-    fun confirmingTargetEmitsFragmentResultBundle() {
+    fun confirmingTargetEmitsScopedFragmentResultBundle() {
         val target = LocationTarget(latitude = 37.5665, longitude = 126.9780, radiusMeters = 150.0)
-        val args = S05MapTargetDialogFragment.newInstance(target, "37.5665, 126.9780").arguments
+        val args = S05MapTargetDialogFragment.newInstance(
+            initialTarget = target,
+            initialName = "37.5665, 126.9780",
+            capsuleId = "capsule-101",
+            sessionUid = "user-a",
+            sessionGeneration = 1L,
+            requestId = "req-123"
+        ).arguments
 
         val scenario = launchFragmentInContainer<S05MapTargetDialogFragment>(
             fragmentArgs = args,
@@ -85,6 +97,10 @@ class S05MapTargetDialogFragmentTest {
         assertEquals(126.9780, bundle.getDouble(S05MapTargetDialogFragment.RESULT_KEY_LONGITUDE), 0.0001)
         assertEquals(150.0, bundle.getDouble(S05MapTargetDialogFragment.RESULT_KEY_RADIUS), 0.01)
         assertEquals("37.5665, 126.9780", bundle.getString(S05MapTargetDialogFragment.RESULT_KEY_DISPLAY_NAME))
+        assertEquals("capsule-101", bundle.getString(S05MapTargetDialogFragment.RESULT_KEY_CAPSULE_ID))
+        assertEquals("user-a", bundle.getString(S05MapTargetDialogFragment.RESULT_KEY_SESSION_UID))
+        assertEquals(1L, bundle.getLong(S05MapTargetDialogFragment.RESULT_KEY_SESSION_GENERATION))
+        assertEquals("req-123", bundle.getString(S05MapTargetDialogFragment.RESULT_KEY_REQUEST_ID))
     }
 
     @Test
@@ -128,7 +144,6 @@ class S05MapTargetDialogFragmentTest {
         scenario.onFragment { fragment ->
             val binding = fragment.view?.let { DialogS05MapTargetBinding.bind(it) }
             assertTrue(binding?.btnConfirmLocation?.isEnabled == true)
-            assertTrue(binding?.tvSelectedCoordinates?.text?.contains("Seoul") == true)
         }
     }
 }

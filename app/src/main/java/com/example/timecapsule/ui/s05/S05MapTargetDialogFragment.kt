@@ -48,24 +48,30 @@ class S05MapTargetDialogFragment : DialogFragment(), OnMapReadyCallback {
         const val RESULT_KEY_DISPLAY_NAME = "key_display_name"
         const val RESULT_KEY_CAPSULE_ID = "key_capsule_id"
         const val RESULT_KEY_SESSION_UID = "key_session_uid"
+        const val RESULT_KEY_SESSION_GENERATION = "key_session_generation"
+        const val RESULT_KEY_REQUEST_ID = "key_request_id"
 
         private const val ARG_INITIAL_LAT = "arg_initial_lat"
         private const val ARG_INITIAL_LNG = "arg_initial_lng"
         private const val ARG_INITIAL_NAME = "arg_initial_name"
         private const val ARG_CAPSULE_ID = "arg_capsule_id"
         private const val ARG_SESSION_UID = "arg_session_uid"
+        private const val ARG_SESSION_GENERATION = "arg_session_generation"
+        private const val ARG_REQUEST_ID = "arg_request_id"
 
         private const val KEY_PENDING_LAT = "key_pending_lat"
         private const val KEY_PENDING_LNG = "key_pending_lng"
         private const val KEY_HAS_PENDING = "key_has_pending"
         private const val KEY_PENDING_NAME = "key_pending_name"
 
-        /** Constructs a new dialog fragment with initial target, capsule ID, and session arguments. */
+        /** Constructs a new dialog fragment with initial target, capsule ID, session, and request ID. */
         fun newInstance(
             initialTarget: LocationTarget?,
             initialName: String?,
             capsuleId: String? = null,
-            sessionUid: String? = null
+            sessionUid: String? = null,
+            sessionGeneration: Long = -1L,
+            requestId: String? = null
         ): S05MapTargetDialogFragment {
             return S05MapTargetDialogFragment().apply {
                 arguments = Bundle().apply {
@@ -76,6 +82,8 @@ class S05MapTargetDialogFragment : DialogFragment(), OnMapReadyCallback {
                     }
                     if (capsuleId != null) putString(ARG_CAPSULE_ID, capsuleId)
                     if (sessionUid != null) putString(ARG_SESSION_UID, sessionUid)
+                    putLong(ARG_SESSION_GENERATION, sessionGeneration)
+                    if (requestId != null) putString(ARG_REQUEST_ID, requestId)
                 }
             }
         }
@@ -196,6 +204,10 @@ class S05MapTargetDialogFragment : DialogFragment(), OnMapReadyCallback {
                     putString(RESULT_KEY_DISPLAY_NAME, name)
                     args?.getString(ARG_CAPSULE_ID)?.let { putString(RESULT_KEY_CAPSULE_ID, it) }
                     args?.getString(ARG_SESSION_UID)?.let { putString(RESULT_KEY_SESSION_UID, it) }
+                    if (args != null && args.containsKey(ARG_SESSION_GENERATION)) {
+                        putLong(RESULT_KEY_SESSION_GENERATION, args.getLong(ARG_SESSION_GENERATION))
+                    }
+                    args?.getString(ARG_REQUEST_ID)?.let { putString(RESULT_KEY_REQUEST_ID, it) }
                 }
                 parentFragmentManager.setFragmentResult(REQUEST_KEY_MAP_TARGET, result)
                 dismiss()

@@ -20,6 +20,7 @@ import com.example.timecapsule.databinding.FragmentS05RecipientLockBinding
 import com.example.timecapsule.domain.model.LocationTarget
 import com.example.timecapsule.domain.model.LockMode
 import com.example.timecapsule.domain.result.OperationResult
+import com.example.timecapsule.domain.session.SessionSnapshot
 import com.example.timecapsule.domain.time.TimeConversionHelper
 import com.example.timecapsule.ui.ViewModelFactory
 import com.example.timecapsule.ui.draft.CapsuleDraftViewModel
@@ -32,6 +33,7 @@ import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Calendar
+import java.util.UUID
 import kotlinx.coroutines.launch
 
 /**
@@ -40,6 +42,10 @@ import kotlinx.coroutines.launch
  * and lock condition configuration (Time, Location, Both).
  */
 class S05RecipientLockFragment : Fragment() {
+
+    companion object {
+        private const val KEY_ACTIVE_MAP_REQUEST_ID = "key_active_map_request_id"
+    }
 
     private var _binding: FragmentS05RecipientLockBinding? = null
     private val binding get() = _binding!!
@@ -50,6 +56,9 @@ class S05RecipientLockFragment : Fragment() {
     var onNextToConfirmSendListener: (() -> Unit)? = null
     var onNavigateToMomentsListener: (() -> Unit)? = null
     var onNavigateToAccountListener: (() -> Unit)? = null
+
+    /** Active map dialog request ID for matching result bundles. */
+    var activeMapRequestId: String? = null
 
     private var isSyncingText = false
 
@@ -64,6 +73,10 @@ class S05RecipientLockFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        if (savedInstanceState != null) {
+            activeMapRequestId = savedInstanceState.getString(KEY_ACTIVE_MAP_REQUEST_ID)
+        }
 
         val mainActivity = requireActivity() as MainActivity
         viewModel = ViewModelProvider(
@@ -83,13 +96,23 @@ class S05RecipientLockFragment : Fragment() {
 
             val resultCapsuleId = bundle.getString(S05MapTargetDialogFragment.RESULT_KEY_CAPSULE_ID)
             val resultSessionUid = bundle.getString(S05MapTargetDialogFragment.RESULT_KEY_SESSION_UID)
+            val resultSessionGen = if (bundle.containsKey(S05MapTargetDialogFragment.RESULT_KEY_SESSION_GENERATION)) {
+                bundle.getLong(S05MapTargetDialogFragment.RESULT_KEY_SESSION_GENERATION)
+            } else null
+            val resultRequestId = bundle.getString(S05MapTargetDialogFragment.RESULT_KEY_REQUEST_ID)
 
-            if (resultCapsuleId != null && resultCapsuleId != currentState.capsuleId) return@setFragmentResultListener
-            if (resultSessionUid != null && resultSessionUid != currentState.activeSessionUid) return@setFragmentResultListener
+            val currentSession = (activity as? MainActivity)?.container?.sessionTracker?.currentSession()
+                ?: SessionSnapshot(currentState.activeSessionUid ?: "", -1)
+
+            // Strict guards checking capsule ID, UID, session generation, and one-time request ID
+            if (resultCapsuleId.isNullOrBlank() || resultCapsuleId != currentState.capsuleId) return@setFragmentResultListener
+            if (resultSessionUid.isNullOrBlank() || resultSessionUid != currentSession.uid) return@setFragmentResultListener
+            if (resultSessionGen == null || resultSessionGen != currentSession.sessionGeneration) return@setFragmentResultListener
+            if (resultRequestId.isNullOrBlank() || resultRequestId != activeMapRequestId) return@setFragmentResultListener
 
             val lat = bundle.getDouble(S05MapTargetDialogFragment.RESULT_KEY_LATITUDE, Double.NaN)
             val lng = bundle.getDouble(S05MapTargetDialogFragment.RESULT_KEY_LONGITUDE, Double.NaN)
-            val radius = bundle.getDouble(S05MapTargetDialogFragment.RESULT_KEY_RADIUS, 150.0)
+            val radius = bundle.getDouble(S05MapTargetDialogFragment.RESULT_KEY_RADIUS, Double.NaN)
 
             if (lat.isFinite() && lat in -90.0..90.0 &&
                 lng.isFinite() && lng in -180.0..180.0 &&
@@ -104,6 +127,11 @@ class S05RecipientLockFragment : Fragment() {
         setupClickListeners()
         setupTextWatcher()
         observeViewModelState()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        activeMapRequestId?.let { outState.putString(KEY_ACTIVE_MAP_REQUEST_ID, it) }
     }
 
     override fun onResume() {
@@ -165,11 +193,17 @@ class S05RecipientLockFragment : Fragment() {
 
         binding.btnSelectPlace.setOnClickListener {
             val state = viewModel.uiState.value
+            val requestId = UUID.randomUUID().toString()
+            activeMapRequestId = requestId
+            val sessionGen = (activity as? MainActivity)?.container?.sessionTracker?.currentSession()?.sessionGeneration ?: -1L
+
             val dialog = S05MapTargetDialogFragment.newInstance(
                 state.locationTarget,
                 state.locationName,
                 state.capsuleId,
-                state.activeSessionUid
+                state.activeSessionUid,
+                sessionGen,
+                requestId
             )
             dialog.show(parentFragmentManager, "S05MapTargetDialog")
         }
