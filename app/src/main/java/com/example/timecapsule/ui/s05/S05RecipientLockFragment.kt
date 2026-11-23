@@ -74,6 +74,18 @@ class S05RecipientLockFragment : Fragment() {
 
         viewModel.syncSessionState()
 
+        parentFragmentManager.setFragmentResultListener(
+            S05MapTargetDialogFragment.REQUEST_KEY_MAP_TARGET,
+            viewLifecycleOwner
+        ) { _, bundle ->
+            val lat = bundle.getDouble(S05MapTargetDialogFragment.RESULT_KEY_LATITUDE)
+            val lng = bundle.getDouble(S05MapTargetDialogFragment.RESULT_KEY_LONGITUDE)
+            val name = bundle.getString(S05MapTargetDialogFragment.RESULT_KEY_DISPLAY_NAME)
+            val target = LocationTarget(latitude = lat, longitude = lng, radiusMeters = LocationTarget.FIXED_RADIUS_METERS)
+            viewModel.updateLocation(target, name)
+            binding.tvS05Error.visibility = View.GONE
+        }
+
         setupClickListeners()
         setupTextWatcher()
         observeViewModelState()
@@ -138,13 +150,8 @@ class S05RecipientLockFragment : Fragment() {
 
         binding.btnSelectPlace.setOnClickListener {
             val currentTarget = viewModel.uiState.value.locationTarget
-            val dialog = S05MapTargetDialogFragment().apply {
-                initialTarget = currentTarget
-                onLocationConfirmed = { target, displayName ->
-                    viewModel.updateLocation(target, displayName)
-                    binding.tvS05Error.visibility = View.GONE
-                }
-            }
+            val currentName = viewModel.uiState.value.locationName
+            val dialog = S05MapTargetDialogFragment.newInstance(currentTarget, currentName)
             dialog.show(parentFragmentManager, "S05MapTargetDialog")
         }
 

@@ -117,4 +117,28 @@ class DraftLocationPersistenceTest {
         assertNotNull(restored.locationTarget)
         assertEquals(37.5665, restored.locationTarget!!.latitude, 0.0001)
     }
+
+    @Test
+    fun malformedOrOutOfBoundsCoordinatesSafelyInvalidatesLocationTarget() {
+        val root = tempFolder.newFolder("photo-drafts")
+        val journal = PhotoDraftJournal(root)
+
+        val corruptRecord = PhotoDraftRecord(
+            capsuleId = "capsule-corrupt",
+            title = "Corrupt Title",
+            text = "Keep this text intact",
+            photo = null,
+            locationTarget = LocationTarget(latitude = 999.0, longitude = 126.9780, radiusMeters = 500.0),
+            locationName = "Invalid Location"
+        )
+
+        journal.save("user-corrupt", corruptRecord)
+
+        val restored = journal.load("user-corrupt")
+        assertNotNull(restored)
+        assertEquals("Corrupt Title", restored!!.title)
+        assertEquals("Keep this text intact", restored.text)
+        assertNull(restored.locationTarget)
+        assertNull(restored.locationName)
+    }
 }

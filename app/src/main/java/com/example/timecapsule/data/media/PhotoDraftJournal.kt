@@ -81,23 +81,22 @@ open class PhotoDraftJournal(private val root: File) {
         }
         val latStr = properties.getProperty("locLat")
         val lngStr = properties.getProperty("locLng")
-        val radiusStr = properties.getProperty("locRadius")
         val locName = properties.getProperty("locName")
         val locationTarget = if (latStr != null && lngStr != null) {
             try {
                 val lat = latStr.toDouble()
                 val lng = lngStr.toDouble()
-                val radius = radiusStr?.toDoubleOrNull() ?: 150.0
-                if (lat.isFinite() && lat in -90.0..90.0 && lng.isFinite() && lng in -180.0..180.0 && radius.isFinite() && radius > 0) {
-                    LocationTarget(latitude = lat, longitude = lng, radiusMeters = radius)
+                if (lat.isFinite() && lat in -90.0..90.0 && lng.isFinite() && lng in -180.0..180.0) {
+                    LocationTarget(latitude = lat, longitude = lng, radiusMeters = LocationTarget.FIXED_RADIUS_METERS)
                 } else null
             } catch (_: Exception) {
                 null
             }
         } else null
+        val restoredName = if (locationTarget != null) locName else null
 
         PhotoDraftRecord(id, properties.getProperty("title", ""),
-            properties.getProperty("text", ""), photo, locationTarget, locName)
+            properties.getProperty("text", ""), photo, locationTarget, restoredName)
     }
 
     /** Replaces only the expected old draft; an already-created replacement keeps all later edits. */

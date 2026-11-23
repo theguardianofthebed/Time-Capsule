@@ -4,7 +4,6 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.location.LocationManager
-import android.os.SystemClock
 import androidx.core.content.ContextCompat
 import com.example.timecapsule.domain.model.ForegroundLocationSample
 import com.example.timecapsule.domain.model.LocationSampleResult
@@ -96,22 +95,29 @@ class DefaultLocationAdapter(
                         fusedLocationClient.getCurrentLocation(request, cancellationTokenSource.token)
                             .addOnSuccessListener { androidLocation ->
                                 if (androidLocation != null) {
-                                    val nowNanos = SystemClock.elapsedRealtimeNanos()
                                     val sampleNanos = androidLocation.elapsedRealtimeNanos
-                                    val accuracy = if (androidLocation.hasAccuracy()) androidLocation.accuracy else null
-
-                                    val sample = ForegroundLocationSample(
-                                        latitude = androidLocation.latitude,
-                                        longitude = androidLocation.longitude,
-                                        elapsedRealtimeNanos = if (sampleNanos > 0) sampleNanos else nowNanos,
-                                        horizontalAccuracyMeters = accuracy
-                                    )
-                                    continuation.resume(
-                                        LocationSampleResult(
-                                            status = LocationSampleStatus.SUCCESS,
-                                            sample = sample
+                                    if (sampleNanos <= 0L) {
+                                        continuation.resume(
+                                            LocationSampleResult(
+                                                status = LocationSampleStatus.TIMEOUT_OR_NULL,
+                                                errorMessage = "Location fix is missing a valid monotonic timestamp."
+                                            )
                                         )
-                                    )
+                                    } else {
+                                        val accuracy = if (androidLocation.hasAccuracy()) androidLocation.accuracy else null
+                                        val sample = ForegroundLocationSample(
+                                            latitude = androidLocation.latitude,
+                                            longitude = androidLocation.longitude,
+                                            elapsedRealtimeNanos = sampleNanos,
+                                            horizontalAccuracyMeters = accuracy
+                                        )
+                                        continuation.resume(
+                                            LocationSampleResult(
+                                                status = LocationSampleStatus.SUCCESS,
+                                                sample = sample
+                                            )
+                                        )
+                                    }
                                 } else {
                                     continuation.resume(
                                         LocationSampleResult(

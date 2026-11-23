@@ -54,4 +54,20 @@ class DefaultLocationAdapterTest {
         assertEquals(LocationSampleStatus.PERMISSION_DENIED, deniedRes.status)
         assertNull(deniedRes.sample)
     }
+
+    @Test
+    fun invalidNonPositiveTimestampResultFailsClosed() = runBlocking {
+        val adapterWithInvalidTimestamp = FakeLocationAdapter(
+            fineGranted = true,
+            mockResult = LocationSampleResult(
+                status = LocationSampleStatus.TIMEOUT_OR_NULL,
+                errorMessage = "Location fix is missing a valid monotonic timestamp."
+            )
+        )
+
+        val res = adapterWithInvalidTimestamp.getCurrentLocation()
+        assertEquals(LocationSampleStatus.TIMEOUT_OR_NULL, res.status)
+        assertNull(res.sample)
+        assertEquals("Location fix is missing a valid monotonic timestamp.", res.errorMessage)
+    }
 }

@@ -2,6 +2,7 @@ package com.example.timecapsule.ui.s05
 
 import android.Manifest
 import android.os.Bundle
+import android.os.SystemClock
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -12,8 +13,10 @@ import com.example.timecapsule.MainActivity
 import com.example.timecapsule.R
 import com.example.timecapsule.data.adapter.LocationAdapter
 import com.example.timecapsule.databinding.DialogS05MapTargetBinding
+import com.example.timecapsule.domain.location.LocationQualifier
 import com.example.timecapsule.domain.model.LocationSampleStatus
 import com.example.timecapsule.domain.model.LocationTarget
+import com.example.timecapsule.domain.model.QualificationFailureReason
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
@@ -29,11 +32,42 @@ import java.util.Locale
  * DialogFragment embedding Google Maps SDK for selecting a WGS84 target coordinate
  * with a fixed 150m radius boundary.
  *
- * Manual pin selection works without any location permissions.
- * Tapping "Use current location" explicitly checks/requests ACCESS_FINE_LOCATION
- * and fetches a fresh fix via [LocationAdapter].
+ * Communicates result back to host fragment via lifecycle-safe [setFragmentResult].
+ * Persists pending selection in savedInstanceState across activity rotation/recreation.
+ * Manual pin selection works without location permissions.
+ * "Use current location" validates sample freshness and accuracy before selection.
  */
 class S05MapTargetDialogFragment : DialogFragment(), OnMapReadyCallback {
+
+    companion object {
+        const val REQUEST_KEY_MAP_TARGET = "S05MapTargetResult"
+        const val RESULT_KEY_LATITUDE = "key_latitude"
+        const val RESULT_KEY_LONGITUDE = "key_longitude"
+        const val RESULT_KEY_RADIUS = "key_radius"
+        const val RESULT_KEY_DISPLAY_NAME = "key_display_name"
+
+        private const val ARG_INITIAL_LAT = "arg_initial_lat"
+        private const val ARG_INITIAL_LNG = "arg_initial_lng"
+        private const val ARG_INITIAL_NAME = "arg_initial_name"
+
+        private const val KEY_PENDING_LAT = "key_pending_lat"
+        private const val KEY_PENDING_LNG = "key_pending_lng"
+        private const val KEY_HAS_PENDING = "key_has_pending"
+        private const val KEY_PENDING_NAME = "key_pending_name"
+
+        /** Constructs a new dialog fragment with initial target arguments. */
+        fun newInstance(initialTarget: LocationTarget?, initialName: String?): S05MapTargetDialogFragment {
+            return S05MapTargetDialogFragment().apply {
+                arguments = Bundle().apply {
+                    if (initialTarget != null) {
+                        putDouble(ARG_INITIAL_LAT, initialTarget.latitude)
+                        putDouble(ARG_INITIAL_LNG, initialTarget.longitude)
+                        if (initialName != null) putString(ARG_INITIAL_NAME, initialName)
+                    }
+                }
+            }
+        }
+    }
 
     private var _binding: DialogS05MapTargetBinding? = null
     private val binding get() = _binding!!
@@ -41,15 +75,11 @@ class S05MapTargetDialogFragment : DialogFragment(), OnMapReadyCallback {
     private var googleMap: GoogleMap? = null
     private var currentMarker: Marker? = null
     private var currentCircle: Circle? = null
+
     private var selectedLatLng: LatLng? = null
+    private var selectedLocationName: String? = null
 
     private lateinit var locationAdapter: LocationAdapter
-
-    /** Initial target coordinates if re-editing an existing draft selection. */
-    var initialTarget: LocationTarget? = null
-
-    /** Callback invoked only upon explicit user tap on "Confirm Location". */
-    var onLocationConfirmed: ((target: LocationTarget, displayName: String) -> Unit)? = null
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -84,6 +114,22 @@ class S05MapTargetDialogFragment : DialogFragment(), OnMapReadyCallback {
         val mainActivity = requireActivity() as MainActivity
         locationAdapter = mainActivity.container.locationAdapter
 
+        // Restore pending selection from savedInstanceState or arguments
+        if (savedInstanceState != null && savedInstanceState.getBoolean(KEY_HAS_PENDING, false)) {
+            val lat = savedInstanceState.getDouble(KEY_PENDING_LAT)
+            val lng = savedInstanceState.getDouble(KEY_PENDING_LNG)
+            selectedLatLng = LatLng(lat, lng)
+            selectedLocationName = savedInstanceState.getString(KEY_PENDING_NAME)
+        } else {
+            val args = arguments
+            if (args != null && args.containsKey(ARG_INITIAL_LAT) && args.containsKey(ARG_INITIAL_LNG)) {
+                val lat = args.getDouble(ARG_INITIAL_LAT)
+                val lng = args.getDouble(ARG_INITIAL_LNG)
+                selectedLatLng = LatLng(lat, lng)
+                selectedLocationName = args.getString(ARG_INITIAL_NAME)
+            }
+        }
+
         binding.mapView.onCreate(savedInstanceState)
         binding.mapView.getMapAsync(this)
 
@@ -112,14 +158,14 @@ class S05MapTargetDialogFragment : DialogFragment(), OnMapReadyCallback {
         binding.btnConfirmLocation.setOnClickListener {
             val latLng = selectedLatLng
             if (latLng != null) {
-                val radius = initialTarget?.radiusMeters ?: 150.0
-                val target = LocationTarget(
-                    latitude = latLng.latitude,
-                    longitude = latLng.longitude,
-                    radiusMeters = radius
-                )
-                val displayName = String.format(Locale.US, "%.4f, %.4f", latLng.latitude, latLng.longitude)
-                onLocationConfirmed?.invoke(target, displayName)
+                val name = selectedLocationName ?: String.format(Locale.US, "%.4f, %.4f", latLng.latitude, latLng.longitude)
+                val result = Bundle().apply {
+                    putDouble(RESULT_KEY_LATITUDE, latLng.latitude)
+                    putDouble(RESULT_KEY_LONGITUDE, latLng.longitude)
+                    putDouble(RESULT_KEY_RADIUS, LocationTarget.FIXED_RADIUS_METERS)
+                    putString(RESULT_KEY_DISPLAY_NAME, name)
+                }
+                parentFragmentManager.setFragmentResult(REQUEST_KEY_MAP_TARGET, result)
                 dismiss()
             } else {
                 binding.tvMapStatus.text = getString(R.string.s05_map_hint_tap)
@@ -133,19 +179,24 @@ class S05MapTargetDialogFragment : DialogFragment(), OnMapReadyCallback {
         map.uiSettings.isZoomControlsEnabled = true
         map.uiSettings.isMyLocationButtonEnabled = false
 
-        // Default initial location: initialTarget or Seoul default
-        val initialLatLng = if (initialTarget != null) {
-            LatLng(initialTarget!!.latitude, initialTarget!!.longitude)
+        val initialPos = selectedLatLng
+        if (initialPos != null) {
+            updatePinAndCircle(initialPos)
+            map.moveCamera(CameraUpdateFactory.newLatLngZoom(initialPos, 15f))
+            binding.btnConfirmLocation.isEnabled = true
         } else {
-            LatLng(37.5665, 126.9780)
+            // Default camera view without an active marker or confirmed pin
+            val defaultSeoul = LatLng(37.5665, 126.9780)
+            map.moveCamera(CameraUpdateFactory.newLatLngZoom(defaultSeoul, 12f))
+            binding.tvSelectedCoordinates.text = getString(R.string.s05_map_hint_tap)
+            binding.btnConfirmLocation.isEnabled = false
         }
-
-        updatePinAndCircle(initialLatLng)
-        map.moveCamera(CameraUpdateFactory.newLatLngZoom(initialLatLng, 15f))
 
         map.setOnMapClickListener { latLng ->
             binding.tvMapStatus.visibility = View.GONE
+            selectedLocationName = String.format(Locale.US, "%.4f, %.4f", latLng.latitude, latLng.longitude)
             updatePinAndCircle(latLng)
+            binding.btnConfirmLocation.isEnabled = true
         }
     }
 
@@ -156,7 +207,7 @@ class S05MapTargetDialogFragment : DialogFragment(), OnMapReadyCallback {
         currentMarker?.remove()
         currentCircle?.remove()
 
-        val radiusMeters = initialTarget?.radiusMeters ?: 150.0
+        val radiusMeters = LocationTarget.FIXED_RADIUS_METERS
 
         currentMarker = map.addMarker(
             MarkerOptions()
@@ -174,35 +225,42 @@ class S05MapTargetDialogFragment : DialogFragment(), OnMapReadyCallback {
                 .strokeWidth(4f)
         )
 
-        binding.tvSelectedCoordinates.text = String.format(
-            Locale.US,
-            "Lat: %.6f, Lon: %.6f (%d m radius)",
-            latLng.latitude,
-            latLng.longitude,
-            radiusMeters.toInt()
-        )
+        val displayName = selectedLocationName ?: String.format(Locale.US, "%.4f, %.4f", latLng.latitude, latLng.longitude)
+        binding.tvSelectedCoordinates.text = "$displayName (150 m radius)"
     }
 
     private fun fetchAndMoveToCurrentLocation() {
         binding.mapProgressBar.visibility = View.VISIBLE
         binding.btnUseCurrentLocation.isEnabled = false
-        binding.btnConfirmLocation.isEnabled = false
 
         viewLifecycleOwner.lifecycleScope.launch {
             val result = locationAdapter.getCurrentLocation()
             binding.mapProgressBar.visibility = View.GONE
             binding.btnUseCurrentLocation.isEnabled = true
-            binding.btnConfirmLocation.isEnabled = true
 
             when (result.status) {
                 LocationSampleStatus.SUCCESS -> {
                     val sample = result.sample
-                    if (sample != null) {
+                    val nowNanos = SystemClock.elapsedRealtimeNanos()
+                    val quality = LocationQualifier.validateSampleQuality(sample, nowNanos)
+
+                    if (sample != null && quality == QualificationFailureReason.NONE) {
                         val currentLatLng = LatLng(sample.latitude, sample.longitude)
+                        selectedLocationName = String.format(Locale.US, "%.4f, %.4f", sample.latitude, sample.longitude)
                         updatePinAndCircle(currentLatLng)
                         googleMap?.animateCamera(CameraUpdateFactory.newLatLngZoom(currentLatLng, 16f))
+                        binding.btnConfirmLocation.isEnabled = true
+                        binding.tvMapStatus.visibility = View.GONE
                     } else {
-                        binding.tvMapStatus.text = getString(R.string.s05_map_acquisition_failed)
+                        val errorMsg = when (quality) {
+                            QualificationFailureReason.POOR_ACCURACY -> {
+                                val acc = sample?.horizontalAccuracyMeters?.toInt() ?: 0
+                                "Location accuracy too low (${acc} m > 100 m required). Select manually on the map."
+                            }
+                            QualificationFailureReason.STALE_SAMPLE -> "Location fix is stale. Select manually on the map."
+                            else -> getString(R.string.s05_map_acquisition_failed)
+                        }
+                        binding.tvMapStatus.text = errorMsg
                         binding.tvMapStatus.visibility = View.VISIBLE
                     }
                 }
@@ -255,6 +313,13 @@ class S05MapTargetDialogFragment : DialogFragment(), OnMapReadyCallback {
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
+        val pos = selectedLatLng
+        if (pos != null) {
+            outState.putBoolean(KEY_HAS_PENDING, true)
+            outState.putDouble(KEY_PENDING_LAT, pos.latitude)
+            outState.putDouble(KEY_PENDING_LNG, pos.longitude)
+            selectedLocationName?.let { outState.putString(KEY_PENDING_NAME, it) }
+        }
         _binding?.mapView?.onSaveInstanceState(outState)
     }
 }

@@ -102,7 +102,7 @@ object LocationQualifier {
             )
         }
 
-        if (!isValidCoordinate(sample.latitude, sample.longitude)) {
+        if (!isValidCoordinate(sample.latitude, sample.longitude) || sample.elapsedRealtimeNanos <= 0L) {
             return LocationQualificationResult(
                 isQualifying = false,
                 reason = QualificationFailureReason.INVALID_COORDINATES
@@ -176,6 +176,31 @@ object LocationQualifier {
             distanceMeters = distance,
             sampleAgeNanos = ageNanos
         )
+    }
+
+    /**
+     * Validates acquisition-only quality for a candidate device location fix
+     * (coordinate bounds, positive monotonic timestamp, freshness <= 60s, and accuracy <= 100m).
+     */
+    fun validateSampleQuality(
+        sample: ForegroundLocationSample?,
+        nowElapsedRealtimeNanos: Long
+    ): QualificationFailureReason {
+        if (sample == null) return QualificationFailureReason.MISSING_SAMPLE
+        if (!isValidCoordinate(sample.latitude, sample.longitude) || sample.elapsedRealtimeNanos <= 0L) {
+            return QualificationFailureReason.INVALID_COORDINATES
+        }
+
+        val ageNanos = nowElapsedRealtimeNanos - sample.elapsedRealtimeNanos
+        if (ageNanos < 0L) return QualificationFailureReason.FUTURE_TIMESTAMP
+        if (ageNanos > MAX_AGE_NANOS) return QualificationFailureReason.STALE_SAMPLE
+
+        val accuracy = sample.horizontalAccuracyMeters
+        if (accuracy == null || !accuracy.isFinite() || accuracy < 0f || accuracy > MAX_ACCURACY_METERS) {
+            return QualificationFailureReason.POOR_ACCURACY
+        }
+
+        return QualificationFailureReason.NONE
     }
 
     /** Helper checking if latitude in [-90, 90] and longitude in [-180, 180] and both finite. */

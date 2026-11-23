@@ -230,6 +230,20 @@ Deliver MVP S-05 Google Maps target selection and fresh foreground location adap
 
 No manual code fix was required. The agent corrected a missing permission linter annotation by adding `@Suppress("MissingPermission")` to `DefaultLocationAdapter.getCurrentLocation()`, added missing string resources for map UI strings, and fixed an unnecessary non-null assertion warning in unit tests.
 
+### PR #42 Review Corrections (November 23, 2026)
+
+- **Correction 1 (Fragment Recreation & FragmentResult Handoff - P0):** Replaced ordinary property callbacks in `S05MapTargetDialogFragment` with lifecycle-safe `setFragmentResult(REQUEST_KEY_MAP_TARGET, bundle)` and registered `setFragmentResultListener` in `S05RecipientLockFragment`. Saved and restored pending pin selection (`KEY_PENDING_LAT`, `KEY_PENDING_LNG`, `KEY_PENDING_NAME`) in `onSaveInstanceState`.
+- **Correction 2 (Reject Invalid GPS Timestamps - P0):** Removed `nowNanos` substitution in `DefaultLocationAdapter` when `androidLocation.elapsedRealtimeNanos <= 0L`, failing closed with `LocationSampleStatus.TIMEOUT_OR_NULL` ("Location fix is missing a valid monotonic timestamp."). Added `sample.elapsedRealtimeNanos <= 0L` validation check in `LocationQualifier`.
+- **Correction 3 (Require Actual Pin Selection - P1):** When opening map without an existing target (`initialTarget == null`), map camera opens at default Seoul view without placing a pin or circle, and `btnConfirmLocation` starts disabled until user explicitly taps map or fetches a valid current-location fix. Cancel preserves host selection.
+- **Correction 4 (Qualify Current-Location Selection - P1):** Added `LocationQualifier.validateSampleQuality(sample, nowElapsedRealtimeNanos)`. Tapping "Use current location" validates coordinates, positive monotonic timestamp, freshness ($\le 60\text{ s}$), and reported accuracy ($\le 100\text{ m}$) before adopting pin, displaying specific error guidance on poor accuracy ($> 100\text{ m}$) or stale fixes.
+- **Correction 5 (Enforce Fixed 150m Radius - P1):** Enforced fixed $150.0\text{ m}$ radius (`LocationTarget.FIXED_RADIUS_METERS = 150.0`). Normalized non-150m or malformed radius values in `PhotoDraftJournal.load()` to $150.0\text{ m}$, and safely invalidated corrupt coordinates (`NaN`, out-of-bounds) to `null` without corrupting title, text, photo, or recipient fields.
+- **Correction 6 (Expanded Test Suite):**
+  - Updated `LocationQualifierTest` with `validateSampleQuality` tests and non-positive timestamp rejection tests.
+  - Updated `DefaultLocationAdapterTest` with `invalidNonPositiveTimestampResultFailsClosed` test.
+  - Updated `DraftLocationPersistenceTest` with `malformedOrOutOfBoundsCoordinatesSafelyInvalidatesLocationTarget` test.
+  - Added Android instrumentation tests in `S05MapTargetDialogFragmentTest` (5 tests covering `FragmentResult` emission, recreation state preservation, preselection, and cancel behavior).
+- **Checks & Results:** `./gradlew :app:testDebugUnitTest`: PASS (236 JVM unit tests passed, 0 failed). `./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors). `py tools/check_readiness.py --issue 16 --evidence docs/agent-tools/readiness-evidence-issue16.json`: PASS (`PREFLIGHT_RECORD_VALID`).
+
 ### My review and understanding
 
 - **What I reviewed:** Inspected the generated `LocationQualifier`, `DefaultLocationAdapter`, `S05MapTargetDialogFragment`, and `PhotoDraftJournal` diffs.

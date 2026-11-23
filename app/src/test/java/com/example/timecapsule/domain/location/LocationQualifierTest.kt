@@ -174,4 +174,19 @@ class LocationQualifierTest {
         assertFalse(recheckRes.isQualifying)
         assertEquals(QualificationFailureReason.STALE_SAMPLE, recheckRes.reason)
     }
+
+    @Test
+    fun validateSampleQualityRejectsInvalidOrStaleOrInaccurateFixes() {
+        val validSample = ForegroundLocationSample(targetLat, targetLng, baseNowNanos - 5_000_000_000L, 10f)
+        assertEquals(QualificationFailureReason.NONE, LocationQualifier.validateSampleQuality(validSample, baseNowNanos))
+
+        val zeroTimestamp = ForegroundLocationSample(targetLat, targetLng, 0L, 10f)
+        assertEquals(QualificationFailureReason.INVALID_COORDINATES, LocationQualifier.validateSampleQuality(zeroTimestamp, baseNowNanos))
+
+        val staleSample = ForegroundLocationSample(targetLat, targetLng, baseNowNanos - 65_000_000_000L, 10f)
+        assertEquals(QualificationFailureReason.STALE_SAMPLE, LocationQualifier.validateSampleQuality(staleSample, baseNowNanos))
+
+        val poorAccSample = ForegroundLocationSample(targetLat, targetLng, baseNowNanos - 5_000_000_000L, 150f)
+        assertEquals(QualificationFailureReason.POOR_ACCURACY, LocationQualifier.validateSampleQuality(poorAccSample, baseNowNanos))
+    }
 }
