@@ -37,9 +37,15 @@ Weekly coursework remains in `agent-log-w1.md`–`agent-log-w4.md`.
   - Written `DefaultCapsuleRepositoryUnlockTest.kt` (8 unit tests covering unauthenticated denial, blank ID validation, non-recipient denial, early unlock denial, server deadline unlock success, idempotent unlock, device clock manipulation safety, and offline network failure handling).
   - Updated `CapsuleDraftViewModelTest.kt` with timezone preservation tests (53 unit tests passing in suite).
 
+- **PR #41 Code Review Corrections (2026-11-23):**
+  - **Correction A (Real Firestore Transaction):** Refactored `DefaultFirestoreAdapter.verifyRecipientUnlock` to use genuine atomic `runTransaction<TransactionUnlockResult> { transaction -> transaction.get(docRef) ... transaction.update(...) }`. Added session isolation check in `DefaultCapsuleRepository.verifyUnlock` after async execution.
+  - **Correction B (Preserve Creation Zone End-to-End):** Added `creationZone` to `CapsuleDraft`, updated `CapsulePublicationCoordinator` to pass `draft.creationZone` when freezing new operations, and preserved `creationZone` through `PrivatePublicationDrafts.asDraft()` and draft restoration/replacement.
+  - **Correction C (Explicit DST Overlap Selection):** Updated `TimeConversionHelper.toUtcInstant` to reject ambiguous DST overlap times with `OperationResult.Invalid` unless an explicit `preferredOffset` in `validOffsets` is supplied. Updated `S05RecipientLockFragment` to display an offset selection dialog when a DST overlap is selected.
+  - **Correction D (Lock Mode Consistency):** Aligned lock mode string mappings (`"TIME"`, `"LOCATION"`, `"BOTH"`, `"TIME_AND_LOCATION"`). Updated `DefaultCapsuleRepositoryUnlockTest` to verify `"BOTH"` lock mode fail-closed behavior.
+
 ### Checks and verification
 
-- `./gradlew :app:testDebugUnitTest`: PASS (214 JVM unit tests passed across project, 0 failed).
+- `./gradlew :app:testDebugUnitTest`: PASS (217 JVM unit tests passed across project, 0 failed).
 - `npx firebase emulators:exec --project demo-timecapsule "npm test"`: PASS (42 security rules tests passed, 0 failed).
 - `./gradlew :app:assembleDebug :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors).
 - `git diff --check`: PASS (clean).
@@ -47,6 +53,7 @@ Weekly coursework remains in `agent-log-w1.md`–`agent-log-w4.md`.
 ### Human input and remaining work
 
 User J confirmed task ownership and implementation review. Personal reflections, teammate PR review by User G, manual testing, and human merge into `main` remain for the students to complete.
+
 
 ## 2026-11-13-issue37-ui-design-correction — S-01, S-02, S-08 Stitch UI design correction & review fixes
 

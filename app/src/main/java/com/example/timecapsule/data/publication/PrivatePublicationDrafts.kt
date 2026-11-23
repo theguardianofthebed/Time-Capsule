@@ -90,6 +90,6 @@ class PrivatePublicationDrafts(
         return CapsuleDraft(saved.capsuleId, operation.recipientUid, saved.text,
             saved.photo?.let { originals.file(it).toURI().toString() }, operation.lock,
             title = saved.title.ifBlank { null }, isRecipientConfirmed = false,
-            originalPhoto = saved.photo)
+            originalPhoto = saved.photo, creationZone = operation.creationZone)
     }
 }

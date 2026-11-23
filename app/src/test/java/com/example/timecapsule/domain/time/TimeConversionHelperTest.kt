@@ -50,28 +50,40 @@ class TimeConversionHelperTest {
     }
 
     @Test
-    fun `toUtcInstant detects DST fall-back overlap and allows preferred offset`() {
+    fun `toUtcInstant requires explicit offset choice during DST fall-back overlap`() {
         // Clocks in US/Eastern fall back from 02:00 to 01:00 on November 1, 2026.
         // 01:30 AM occurs twice: first at UTC-4 (EDT), then at UTC-5 (EST).
         val date = LocalDate.of(2026, 11, 1)
         val time = LocalTime.of(1, 30)
         val zoneId = ZoneId.of("America/New_York")
 
-        // 1. Without preferred offset: returns valid offsets and defaults to earlier offset (EDT, UTC-4)
-        val resultDefault = TimeConversionHelper.toUtcInstant(date, time, zoneId)
-        assertTrue(resultDefault is OperationResult.Success)
-        val dataDefault = (resultDefault as OperationResult.Success).data
-        assertTrue(dataDefault.isAmbiguousOverlap)
-        assertEquals(2, dataDefault.validOffsets.size)
-        assertEquals(ZoneOffset.ofHours(-4), dataDefault.offset)
+        // 1. Without preferred offset: rejected with OperationResult.Invalid requesting explicit offset
+        val resultNoOffset = TimeConversionHelper.toUtcInstant(date, time, zoneId)
+        assertTrue(resultNoOffset is OperationResult.Invalid)
+        val message = (resultNoOffset as OperationResult.Invalid).message
+        assertTrue(message.contains("ambiguous"))
 
-        // 2. With preferred offset (EST, UTC-5): uses explicit preferred offset
+        // 2. With explicit preferred offset EDT (UTC-4): succeeds
+        val resultEdt = TimeConversionHelper.toUtcInstant(
+            date, time, zoneId, preferredOffset = ZoneOffset.ofHours(-4)
+        )
+        assertTrue(resultEdt is OperationResult.Success)
+        val dataEdt = (resultEdt as OperationResult.Success).data
+        assertEquals(ZoneOffset.ofHours(-4), dataEdt.offset)
+
+        // 3. With explicit preferred offset EST (UTC-5): succeeds
         val resultEst = TimeConversionHelper.toUtcInstant(
             date, time, zoneId, preferredOffset = ZoneOffset.ofHours(-5)
         )
         assertTrue(resultEst is OperationResult.Success)
         val dataEst = (resultEst as OperationResult.Success).data
         assertEquals(ZoneOffset.ofHours(-5), dataEst.offset)
+
+        // 4. With invalid offset (UTC+9): rejected
+        val resultInvalidOffset = TimeConversionHelper.toUtcInstant(
+            date, time, zoneId, preferredOffset = ZoneOffset.ofHours(9)
+        )
+        assertTrue(resultInvalidOffset is OperationResult.Invalid)
     }
 
     @Test

@@ -170,6 +170,42 @@ class DefaultCapsuleRepositoryUnlockTest {
         assertTrue((resultBoth as OperationResult.Denied).message.contains("Issue #17"))
     }
 
+    @Test
+    fun `verifyUnlock denies BOTH lock mode with Issue 17 notice`() = runBlocking {
+        sessionTracker.startSession("recipient-uid-1")
+        fakeFirestoreAdapter.seedCapsule(
+            capsuleId = "capsule-canonical-both",
+            recipientUid = "recipient-uid-1",
+            unlocked = false,
+            lockMode = "BOTH",
+            deadlineReached = true
+        )
+
+        val resultBoth = repository.verifyUnlock("capsule-canonical-both")
+        assertTrue(resultBoth is OperationResult.Denied)
+        assertTrue((resultBoth as OperationResult.Denied).message.contains("Issue #17"))
+    }
+
+    @Test
+    fun `verifyUnlock rejects result if account session changes during verification`() = runBlocking {
+        sessionTracker.startSession("recipient-uid-1")
+        fakeFirestoreAdapter.seedCapsule(
+            capsuleId = "capsule-session-race",
+            recipientUid = "recipient-uid-1",
+            unlocked = false,
+            lockMode = "TIME",
+            deadlineReached = true
+        )
+
+        fakeFirestoreAdapter.onUnlockCallback = {
+            sessionTracker.clearSession()
+        }
+
+        val result = repository.verifyUnlock("capsule-session-race")
+        assertTrue(result is OperationResult.Denied)
+        assertTrue((result as OperationResult.Denied).message.contains("session"))
+    }
+
     private class FakeAuthAdapterForUnlock(private val tracker: DefaultSessionTracker) : AuthAdapter {
         override fun activeUid(): String? = tracker.currentSession().uid
         override fun activeEmail(): String? = "test@example.com"
@@ -182,6 +218,7 @@ class DefaultCapsuleRepositoryUnlockTest {
 
     private class FakeFirestoreAdapterForUnlock : FirestoreAdapter {
         var simulateNetworkError = false
+        var onUnlockCallback: (() -> Unit)? = null
         private val capsules = mutableMapOf<String, TestCapsuleRecord>()
 
         data class TestCapsuleRecord(
@@ -220,6 +257,7 @@ class DefaultCapsuleRepositoryUnlockTest {
             capsuleId: String,
             recipientUid: String
         ): OperationResult<Availability> {
+            onUnlockCallback?.invoke()
             if (simulateNetworkError) {
                 return OperationResult.Unavailable("Network unavailable during unlock verification.")
             }
@@ -246,7 +284,7 @@ class DefaultCapsuleRepositoryUnlockTest {
                 "LOCATION" -> {
                     OperationResult.Denied("Location unlock condition requires Issue #17 implementation.")
                 }
-                "TIME_AND_LOCATION" -> {
+                "TIME_AND_LOCATION", "BOTH" -> {
                     OperationResult.Denied("Combined time and location unlock condition requires Issue #17 implementation.")
                 }
                 else -> OperationResult.Invalid("Unsupported lock mode")

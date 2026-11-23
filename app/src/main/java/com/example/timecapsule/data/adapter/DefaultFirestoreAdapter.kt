@@ -12,6 +12,14 @@ import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Source
 import kotlinx.coroutines.tasks.await
 
+private sealed interface TransactionUnlockResult {
+    object AlreadyUnlocked : TransactionUnlockResult
+    object UnlockedSuccess : TransactionUnlockResult
+    object NotFound : TransactionUnlockResult
+    object NotRecipient : TransactionUnlockResult
+    data class UnsupportedMode(val mode: String) : TransactionUnlockResult
+}
+
 /**
  * Production implementation of [FirestoreAdapter] bound to [FirebaseConfig.getMemoryOnlyFirestore].
  * Enforces memory-only cache configuration before returning the Firestore SDK instance.
@@ -96,43 +104,64 @@ class DefaultFirestoreAdapter(
 
         return try {
             val docRef = instance.collection("capsules").document(cleanCapsuleId)
-            val snapshot = docRef.get(Source.SERVER).await()
 
-            if (!snapshot.exists()) {
-                return OperationResult.Invalid("Capsule not found with ID: $cleanCapsuleId")
-            }
-
-            val docRecipientId = snapshot.getString("recipientId")
-            if (docRecipientId != cleanRecipientUid) {
-                return OperationResult.Denied("Only the designated recipient can unlock this capsule.")
-            }
-
-            val unlocked = snapshot.getBoolean("unlocked") ?: false
-            if (unlocked) {
-                // Server-confirmed unlocked state is idempotent success (DD-17/DD-23)
-                return OperationResult.Success(Availability.AVAILABLE)
-            }
-
-            val lockModeStr = snapshot.getString("lockMode") ?: "TIME"
-
-            when (lockModeStr) {
-                "TIME" -> {
-                    // Update unlocked=true with serverTimestamp() as required by canRecipientUnlock() in firestore.rules
-                    val updateData = mapOf(
-                        "unlocked" to true,
-                        "unlockedAt" to FieldValue.serverTimestamp()
-                    )
-                    docRef.update(updateData).await()
-                    OperationResult.Success(Availability.AVAILABLE)
+            /**
+             * Atomic Firestore transaction for recipient unlock verification (Correction A).
+             * Atomically reads, verifies, and updates the capsule document within [runTransaction]:
+             * 1. Reads current capsule document inside transaction via [Transaction.get].
+             * 2. Idempotency: Returns [TransactionUnlockResult.AlreadyUnlocked] if `unlocked == true`.
+             * 3. Authorization: Verifies `recipientId == recipientUid`.
+             * 4. Lock mode: Only `"TIME"` mode is permitted for first unlock in Issue #15 (`"LOCATION"`, `"BOTH"`,
+             *    and `"TIME_AND_LOCATION"` fail-closed with Issue #17 notice).
+             * 5. Atomicity & Server Timestamp: Updates `unlocked = true` and `unlockedAt = FieldValue.serverTimestamp()`
+             *    inside the transaction.
+             *
+             * Firestore Transaction Retries & SDK Behavior:
+             * Firestore SDK automatically retries the transaction if a concurrent edit occurs before commit.
+             * Server timestamp evaluation and `request.time >= resource.data.unlockAt` deadline validation are
+             * evaluated atomically on the server by `canRecipientUnlock()` in `firestore.rules`. Unconfirmed
+             * local write overlays are never treated as successful remote authorization.
+             */
+            val result = instance.runTransaction<TransactionUnlockResult> { transaction ->
+                val snapshot = transaction.get(docRef)
+                if (!snapshot.exists()) {
+                    return@runTransaction TransactionUnlockResult.NotFound
                 }
-                "LOCATION" -> {
-                    OperationResult.Denied("Location unlock condition requires Issue #17 implementation.")
+
+                val docRecipientId = snapshot.getString("recipientId")
+                if (docRecipientId != cleanRecipientUid) {
+                    return@runTransaction TransactionUnlockResult.NotRecipient
                 }
-                "TIME_AND_LOCATION" -> {
-                    OperationResult.Denied("Combined time and location unlock condition requires Issue #17 implementation.")
+
+                val unlocked = snapshot.getBoolean("unlocked") ?: false
+                if (unlocked) {
+                    return@runTransaction TransactionUnlockResult.AlreadyUnlocked
                 }
-                else -> {
-                    OperationResult.Invalid("Unsupported lock mode: $lockModeStr")
+
+                val lockModeStr = snapshot.getString("lockMode") ?: "TIME"
+                if (lockModeStr != "TIME") {
+                    return@runTransaction TransactionUnlockResult.UnsupportedMode(lockModeStr)
+                }
+
+                transaction.update(docRef, mapOf(
+                    "unlocked" to true,
+                    "unlockedAt" to FieldValue.serverTimestamp()
+                ))
+
+                TransactionUnlockResult.UnlockedSuccess
+            }.await()
+
+            when (result) {
+                is TransactionUnlockResult.AlreadyUnlocked,
+                is TransactionUnlockResult.UnlockedSuccess -> OperationResult.Success(Availability.AVAILABLE)
+                is TransactionUnlockResult.NotFound -> OperationResult.Invalid("Capsule not found with ID: $cleanCapsuleId")
+                is TransactionUnlockResult.NotRecipient -> OperationResult.Denied("Only the designated recipient can unlock this capsule.")
+                is TransactionUnlockResult.UnsupportedMode -> {
+                    if (result.mode == "LOCATION" || result.mode == "BOTH" || result.mode == "TIME_AND_LOCATION") {
+                        OperationResult.Denied("Location and combined unlock conditions require Issue #17 implementation.")
+                    } else {
+                        OperationResult.Invalid("Unsupported lock mode: ${result.mode}")
+                    }
                 }
             }
         } catch (e: Exception) {

@@ -1,6 +1,7 @@
 package com.example.timecapsule.domain.model
 
 import java.time.Instant
+import java.time.ZoneId
 
 /** Prototype domain contract only. Schema/serialization must be team-reviewed. */
 enum class LockMode { TIME, LOCATION, TIME_AND_LOCATION }
@@ -53,6 +54,7 @@ data class CapsuleDraft(
     val isRecipientConfirmed: Boolean = false,
     val locationName: String? = null,
     val originalPhoto: RetainedOriginalPhoto? = null,
+    val creationZone: String = ZoneId.systemDefault().id,
 ) {
     fun hasAnyContent(): Boolean = text.isNotBlank() || !localPhotoUri.isNullOrBlank()
 }

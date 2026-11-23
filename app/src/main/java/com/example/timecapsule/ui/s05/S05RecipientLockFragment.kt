@@ -8,6 +8,7 @@ import android.text.TextWatcher
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
@@ -178,14 +179,35 @@ class S05RecipientLockFragment : Fragment() {
                 val localDate = LocalDate.of(selectedYear, selectedMonth + 1, selectedDay)
                 val localTime = LocalTime.of(selectedHour, selectedMinute)
                 val zoneId = ZoneId.systemDefault()
-                val conversionRes = TimeConversionHelper.toUtcInstant(localDate, localTime, zoneId)
-                if (conversionRes is OperationResult.Success) {
-                    val data = conversionRes.data
-                    viewModel.updateUnlockAt(data.instant, data.zoneId.id)
-                    binding.tvS05Error.visibility = View.GONE
-                } else if (conversionRes is OperationResult.Invalid) {
-                    binding.tvS05Error.text = conversionRes.message
-                    binding.tvS05Error.visibility = View.VISIBLE
+                val localDateTime = LocalDateTime.of(localDate, localTime)
+                val validOffsets = zoneId.rules.getValidOffsets(localDateTime)
+
+                if (validOffsets.size > 1) {
+                    val offsetItems = validOffsets.map { TimeConversionHelper.formatOffset(it) }.toTypedArray()
+                    AlertDialog.Builder(requireContext())
+                        .setTitle("Select Daylight Saving Offset")
+                        .setSingleChoiceItems(offsetItems, 0) { dialog, which ->
+                            val chosenOffset = validOffsets[which]
+                            val conversionRes = TimeConversionHelper.toUtcInstant(localDate, localTime, zoneId, chosenOffset)
+                            if (conversionRes is OperationResult.Success) {
+                                val data = conversionRes.data
+                                viewModel.updateUnlockAt(data.instant, data.zoneId.id)
+                                binding.tvS05Error.visibility = View.GONE
+                            }
+                            dialog.dismiss()
+                        }
+                        .setNegativeButton("Cancel", null)
+                        .show()
+                } else {
+                    val conversionRes = TimeConversionHelper.toUtcInstant(localDate, localTime, zoneId)
+                    if (conversionRes is OperationResult.Success) {
+                        val data = conversionRes.data
+                        viewModel.updateUnlockAt(data.instant, data.zoneId.id)
+                        binding.tvS05Error.visibility = View.GONE
+                    } else if (conversionRes is OperationResult.Invalid) {
+                        binding.tvS05Error.text = conversionRes.message
+                        binding.tvS05Error.visibility = View.VISIBLE
+                    }
                 }
             }, hour, minute, true)
 

@@ -161,8 +161,17 @@ No manual code fixes were needed. All changes were applied through Android Studi
 ### My review and understanding
 
 - **What I reviewed:** Inspected diffs across `TimeConversionHelper.kt`, `DefaultCapsuleRepository.kt`, `FirestoreAdapter.kt`, `DefaultFirestoreAdapter.kt`, `CapsuleDraftViewModel.kt`, `S05RecipientLockFragment.kt`, `S06ConfirmSendFragment.kt`, `TimeConversionHelperTest.kt`, `DefaultCapsuleRepositoryUnlockTest.kt`, and `CapsuleDraftViewModelTest.kt`.
-- **What I can explain:** How `TimeConversionHelper` detects DST gaps via `ZoneId.rules.getValidOffsets(localDateTime)`, how `DefaultFirestoreAdapter.verifyRecipientUnlock` uses `Source.SERVER` and `FieldValue.serverTimestamp()` to ensure device clock changes cannot fake unlock authority, and how `canRecipientUnlock()` in `firestore.rules` enforces one-way recipient unlock transitions.
-- **Feedback and next step:** Teammate code review by User G and manual testing before merging task branch `feature/15-utc-schedule-unlock` into `main`.
+- **What I can explain:** How `TimeConversionHelper` detects DST gaps via `ZoneId.rules.getValidOffsets(localDateTime)` and requires explicit offset choices for overlaps, how `DefaultFirestoreAdapter.verifyRecipientUnlock` uses `runTransaction` with `FieldValue.serverTimestamp()` for atomic server-authorized unlocking, and how `canRecipientUnlock()` in `firestore.rules` enforces one-way recipient unlock transitions.
+- **Feedback and next step:** Teammate code re-review by User G on PR #41 before manual testing.
+
+### PR #41 Code Review Corrections (November 23, 2026)
+
+- **Correction A (Real Firestore Transaction):** Refactored `DefaultFirestoreAdapter.verifyRecipientUnlock` to use genuine atomic `runTransaction<TransactionUnlockResult> { transaction -> transaction.get(docRef) ... transaction.update(...) }`. Added session isolation check in `DefaultCapsuleRepository.verifyUnlock` after async execution.
+- **Correction B (Preserve Creation Zone End-to-End):** Added `creationZone` to `CapsuleDraft`, updated `CapsulePublicationCoordinator` to pass `draft.creationZone` when freezing new operations, and preserved `creationZone` through `PrivatePublicationDrafts.asDraft()` and draft restoration/replacement.
+- **Correction C (Explicit DST Overlap Selection):** Updated `TimeConversionHelper.toUtcInstant` to reject ambiguous DST overlap times with `OperationResult.Invalid` unless an explicit `preferredOffset` in `validOffsets` is supplied. Updated `S05RecipientLockFragment` to display an offset selection dialog when a DST overlap is selected.
+- **Correction D (Lock Mode Consistency):** Aligned lock mode string mappings (`"TIME"`, `"LOCATION"`, `"BOTH"`, `"TIME_AND_LOCATION"`). Updated `DefaultCapsuleRepositoryUnlockTest` to verify `"BOTH"` lock mode fail-closed behavior.
+- **Checks & Results:** `./gradlew :app:testDebugUnitTest`: PASS (217 JVM unit tests passed, 0 failed). `npx firebase emulators:exec --project demo-timecapsule "npm test"`: PASS (42 security rules tests passed, 0 failed).
+
 
 
 

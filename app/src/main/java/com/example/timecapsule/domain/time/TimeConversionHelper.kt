@@ -78,10 +78,20 @@ object TimeConversionHelper {
             return OperationResult.Invalid("Selected local time does not exist due to daylight saving transition: $detail")
         }
 
+        if (validOffsets.size > 1 && (preferredOffset == null || preferredOffset !in validOffsets)) {
+            // DST Overlap: Sender must explicitly select one of the valid offsets.
+            val optionsStr = validOffsets.joinToString(" or ") { formatOffset(it) }
+            return OperationResult.Invalid("Selected local time is ambiguous due to daylight saving transition. Please explicitly select an offset ($optionsStr).")
+        }
+
         val chosenOffset = if (preferredOffset != null && preferredOffset in validOffsets) {
             preferredOffset
         } else {
             validOffsets[0]
+        }
+
+        if (preferredOffset != null && preferredOffset !in validOffsets) {
+            return OperationResult.Invalid("Supplied offset ${formatOffset(preferredOffset)} is not valid for $localDateTime in $zoneId.")
         }
 
         val zonedDateTime = ZonedDateTime.ofLocal(localDateTime, zoneId, chosenOffset)

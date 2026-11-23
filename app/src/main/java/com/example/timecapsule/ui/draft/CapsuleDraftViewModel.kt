@@ -671,7 +671,8 @@ class CapsuleDraftViewModel(
             recipientDisplayName = state.resolvedProfile?.displayName,
             isRecipientConfirmed = state.isRecipientConfirmed,
             locationName = state.locationName,
-            originalPhoto = state.originalPhoto
+            originalPhoto = state.originalPhoto,
+            creationZone = state.creationZone
         )
     }
 
@@ -737,7 +738,8 @@ class CapsuleDraftViewModel(
                 photoBusy = false, recipientUidInput = operation.recipientUid,
                 resolvedProfile = RecipientProfile(operation.recipientUid, operation.recipientUid),
                 isRecipientConfirmed = true, lockMode = operation.lock.mode,
-                unlockAt = operation.lock.unlockAt, locationTarget = operation.lock.location,
+                unlockAt = operation.lock.unlockAt, creationZone = operation.creationZone,
+                locationTarget = operation.lock.location,
                 publicationPhase = recovered.phase, canAbandon = recovered.canAbandon,
                 publicationBusy = false, recoveryBusy = false, recoveryBlocked = false,
                 publicationMessage = if (recovered.canAbandon) R.string.publication_failed
@@ -842,6 +844,7 @@ class CapsuleDraftViewModel(
                         recipientUidInput = draft.recipientUid,
                         recipientMode = RecipientMode.SOMEONE_ELSE,
                         lockMode = draft.lock.mode, unlockAt = draft.lock.unlockAt,
+                        creationZone = draft.creationZone,
                         locationTarget = draft.lock.location,
                         publicationMessage = R.string.publication_replacement_ready)
                 } else {
