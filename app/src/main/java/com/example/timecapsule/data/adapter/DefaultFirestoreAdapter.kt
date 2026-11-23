@@ -174,7 +174,8 @@ class DefaultFirestoreAdapter(
                     checkDoc.getBoolean("unlocked") == true) {
                     return OperationResult.Success(Availability.AVAILABLE)
                 }
-            } catch (_: Exception) {
+            } catch (nested: Exception) {
+                if (nested is CancellationException) throw nested
                 // Fall back to original mapped exception if verification check fails
             }
             mapFirestoreUnlockException(e)

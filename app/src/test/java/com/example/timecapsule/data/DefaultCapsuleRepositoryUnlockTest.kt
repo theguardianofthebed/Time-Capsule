@@ -8,6 +8,7 @@ import com.example.timecapsule.domain.model.RecipientProfile
 import com.example.timecapsule.domain.result.OperationResult
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.runBlocking
+import org.junit.Assert
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -143,6 +144,24 @@ class DefaultCapsuleRepositoryUnlockTest {
     }
 
     @Test
+    fun `verifyUnlock fails closed and returns Unavailable on lost network exception during transaction`() = runBlocking {
+        sessionTracker.startSession("recipient-uid-1")
+        fakeFirestoreAdapter.seedCapsule(
+            capsuleId = "capsule-lost-response",
+            recipientUid = "recipient-uid-1",
+            unlocked = false,
+            lockMode = "TIME",
+            deadlineReached = true
+        )
+        fakeFirestoreAdapter.simulateLostResponseError = true
+
+        val result = repository.verifyUnlock("capsule-lost-response")
+
+        assertTrue(result is OperationResult.Unavailable)
+        Assert.assertFalse(fakeFirestoreAdapter.isCapsuleUnlocked("capsule-lost-response"))
+    }
+
+    @Test
     fun `verifyUnlock denies location and combined modes with Issue 17 notice`() = runBlocking {
         sessionTracker.startSession("recipient-uid-1")
         fakeFirestoreAdapter.seedCapsule(
@@ -239,6 +258,7 @@ class DefaultCapsuleRepositoryUnlockTest {
 
     private class FakeFirestoreAdapterForUnlock : FirestoreAdapter {
         var simulateNetworkError = false
+        var simulateLostResponseError = false
         var onUnlockCallback: (() -> Unit)? = null
         private val capsules = mutableMapOf<String, TestCapsuleRecord>()
 
@@ -279,8 +299,8 @@ class DefaultCapsuleRepositoryUnlockTest {
             recipientUid: String
         ): OperationResult<Availability> {
             onUnlockCallback?.invoke()
-            if (simulateNetworkError) {
-                return OperationResult.Unavailable("Network unavailable during unlock verification.")
+            if (simulateNetworkError || simulateLostResponseError) {
+                return OperationResult.Unavailable("Network response lost during unlock verification.")
             }
             val record = capsules[capsuleId]
                 ?: return OperationResult.Invalid("Capsule not found with ID: $capsuleId")
