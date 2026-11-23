@@ -244,6 +244,15 @@ No manual code fix was required. The agent corrected a missing permission linter
   - Added Android instrumentation tests in `S05MapTargetDialogFragmentTest` (5 tests covering `FragmentResult` emission, recreation state preservation, preselection, and cancel behavior).
 - **Checks & Results:** `./gradlew :app:testDebugUnitTest`: PASS (236 JVM unit tests passed, 0 failed). `./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors). `py tools/check_readiness.py --issue 16 --evidence docs/agent-tools/readiness-evidence-issue16.json`: PASS (`PREFLIGHT_RECORD_VALID`).
 
+### PR #42 Follow-up Review Corrections (November 23, 2026)
+
+- **Fix A (P1 - Make Android Instrumentation Tests Executable):** Safely fallback to container location adapter or mock in `S05MapTargetDialogFragment` without casting host activity unconditionally to `MainActivity`. Added `debugImplementation("androidx.fragment:fragment-testing-manifest:1.6.2")` in `app/build.gradle.kts`.
+- **Fix B (P1 - Enforce Fixed 150m Domain Invariant):** Enforced `target.radiusMeters == LocationTarget.FIXED_RADIUS_METERS` in `LocationQualifier.qualify()`. Non-150m target radii (e.g. 500m) are rejected as `INVALID_TARGET`. Added regression unit test `non150mTargetRadiusIsRejectedByQualifier`.
+- **Fix C (P1 - Preserve Location Across Failed-Publication Replacement):** Updated `PrivatePublicationDrafts.replacement()` to extract and persist `operation.lock.location` in the replacement `PhotoDraftRecord` and `.properties` file. Added regression unit test `replacementDraftPreservesLocationTargetAcrossProcessRestart` verifying location target survival across process death / storage & ViewModel recreation.
+- **Fix D (P1 - Reject Obsolete Map Results):** Included `RESULT_KEY_CAPSULE_ID` and `RESULT_KEY_SESSION_UID` in `S05MapTargetDialogFragment` result bundle. Added validation in `S05RecipientLockFragment` checking `currentUiState.editable`, matching capsule ID, matching session UID, and WGS84 coordinate bounds before calling `viewModel.updateLocation()`.
+- **Fix E (P2 - Correct Initial Confirm State Synchronously):** Updated `S05MapTargetDialogFragment.onViewCreated` to set `btnConfirmLocation.isEnabled = selectedLatLng != null` synchronously prior to asynchronous `onMapReady()`.
+- **Checks & Results:** `./gradlew :app:testDebugUnitTest`: PASS (238 JVM unit tests passed, 0 failed). `./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors). `py tools/check_readiness.py --issue 16 --evidence docs/agent-tools/readiness-evidence-issue16.json`: PASS (`PREFLIGHT_RECORD_VALID`).
+
 ### My review and understanding
 
 - **What I reviewed:** Inspected the generated `LocationQualifier`, `DefaultLocationAdapter`, `S05MapTargetDialogFragment`, and `PhotoDraftJournal` diffs.

@@ -14,6 +14,7 @@ import com.example.timecapsule.R
 import com.example.timecapsule.data.adapter.LocationAdapter
 import com.example.timecapsule.databinding.DialogS05MapTargetBinding
 import com.example.timecapsule.domain.location.LocationQualifier
+import com.example.timecapsule.domain.model.LocationSampleResult
 import com.example.timecapsule.domain.model.LocationSampleStatus
 import com.example.timecapsule.domain.model.LocationTarget
 import com.example.timecapsule.domain.model.QualificationFailureReason
@@ -45,18 +46,27 @@ class S05MapTargetDialogFragment : DialogFragment(), OnMapReadyCallback {
         const val RESULT_KEY_LONGITUDE = "key_longitude"
         const val RESULT_KEY_RADIUS = "key_radius"
         const val RESULT_KEY_DISPLAY_NAME = "key_display_name"
+        const val RESULT_KEY_CAPSULE_ID = "key_capsule_id"
+        const val RESULT_KEY_SESSION_UID = "key_session_uid"
 
         private const val ARG_INITIAL_LAT = "arg_initial_lat"
         private const val ARG_INITIAL_LNG = "arg_initial_lng"
         private const val ARG_INITIAL_NAME = "arg_initial_name"
+        private const val ARG_CAPSULE_ID = "arg_capsule_id"
+        private const val ARG_SESSION_UID = "arg_session_uid"
 
         private const val KEY_PENDING_LAT = "key_pending_lat"
         private const val KEY_PENDING_LNG = "key_pending_lng"
         private const val KEY_HAS_PENDING = "key_has_pending"
         private const val KEY_PENDING_NAME = "key_pending_name"
 
-        /** Constructs a new dialog fragment with initial target arguments. */
-        fun newInstance(initialTarget: LocationTarget?, initialName: String?): S05MapTargetDialogFragment {
+        /** Constructs a new dialog fragment with initial target, capsule ID, and session arguments. */
+        fun newInstance(
+            initialTarget: LocationTarget?,
+            initialName: String?,
+            capsuleId: String? = null,
+            sessionUid: String? = null
+        ): S05MapTargetDialogFragment {
             return S05MapTargetDialogFragment().apply {
                 arguments = Bundle().apply {
                     if (initialTarget != null) {
@@ -64,6 +74,8 @@ class S05MapTargetDialogFragment : DialogFragment(), OnMapReadyCallback {
                         putDouble(ARG_INITIAL_LNG, initialTarget.longitude)
                         if (initialName != null) putString(ARG_INITIAL_NAME, initialName)
                     }
+                    if (capsuleId != null) putString(ARG_CAPSULE_ID, capsuleId)
+                    if (sessionUid != null) putString(ARG_SESSION_UID, sessionUid)
                 }
             }
         }
@@ -78,6 +90,9 @@ class S05MapTargetDialogFragment : DialogFragment(), OnMapReadyCallback {
 
     private var selectedLatLng: LatLng? = null
     private var selectedLocationName: String? = null
+
+    /** Allow injecting a mock [LocationAdapter] for testing environments. */
+    var testLocationAdapter: LocationAdapter? = null
 
     private lateinit var locationAdapter: LocationAdapter
 
@@ -111,8 +126,15 @@ class S05MapTargetDialogFragment : DialogFragment(), OnMapReadyCallback {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        val mainActivity = requireActivity() as MainActivity
-        locationAdapter = mainActivity.container.locationAdapter
+        val mainActivity = activity as? MainActivity
+        locationAdapter = testLocationAdapter
+            ?: mainActivity?.container?.locationAdapter
+            ?: object : LocationAdapter {
+                override fun isLocationAvailable(): Boolean = false
+                override fun isFineLocationGranted(): Boolean = false
+                override suspend fun getCurrentLocation(): LocationSampleResult =
+                    LocationSampleResult(LocationSampleStatus.PERMISSION_DENIED)
+            }
 
         // Restore pending selection from savedInstanceState or arguments
         if (savedInstanceState != null && savedInstanceState.getBoolean(KEY_HAS_PENDING, false)) {
@@ -128,6 +150,13 @@ class S05MapTargetDialogFragment : DialogFragment(), OnMapReadyCallback {
                 selectedLatLng = LatLng(lat, lng)
                 selectedLocationName = args.getString(ARG_INITIAL_NAME)
             }
+        }
+
+        // Synchronously set initial Confirm button state
+        val hasSelection = selectedLatLng != null
+        binding.btnConfirmLocation.isEnabled = hasSelection
+        if (!hasSelection) {
+            binding.tvSelectedCoordinates.text = getString(R.string.s05_map_hint_tap)
         }
 
         binding.mapView.onCreate(savedInstanceState)
@@ -159,11 +188,14 @@ class S05MapTargetDialogFragment : DialogFragment(), OnMapReadyCallback {
             val latLng = selectedLatLng
             if (latLng != null) {
                 val name = selectedLocationName ?: String.format(Locale.US, "%.4f, %.4f", latLng.latitude, latLng.longitude)
+                val args = arguments
                 val result = Bundle().apply {
                     putDouble(RESULT_KEY_LATITUDE, latLng.latitude)
                     putDouble(RESULT_KEY_LONGITUDE, latLng.longitude)
                     putDouble(RESULT_KEY_RADIUS, LocationTarget.FIXED_RADIUS_METERS)
                     putString(RESULT_KEY_DISPLAY_NAME, name)
+                    args?.getString(ARG_CAPSULE_ID)?.let { putString(RESULT_KEY_CAPSULE_ID, it) }
+                    args?.getString(ARG_SESSION_UID)?.let { putString(RESULT_KEY_SESSION_UID, it) }
                 }
                 parentFragmentManager.setFragmentResult(REQUEST_KEY_MAP_TARGET, result)
                 dismiss()

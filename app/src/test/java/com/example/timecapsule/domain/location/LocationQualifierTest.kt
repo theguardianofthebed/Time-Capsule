@@ -189,4 +189,19 @@ class LocationQualifierTest {
         val poorAccSample = ForegroundLocationSample(targetLat, targetLng, baseNowNanos - 5_000_000_000L, 150f)
         assertEquals(QualificationFailureReason.POOR_ACCURACY, LocationQualifier.validateSampleQuality(poorAccSample, baseNowNanos))
     }
+
+    @Test
+    fun non150mTargetRadiusIsRejectedByQualifier() {
+        val target500m = LocationTarget(latitude = targetLat, longitude = targetLng, radiusMeters = 500.0)
+        val sample200mAway = ForegroundLocationSample(
+            latitude = targetLat + 0.0018, // ~200m away
+            longitude = targetLng,
+            elapsedRealtimeNanos = baseNowNanos - 5_000_000_000L,
+            horizontalAccuracyMeters = 10f
+        )
+
+        val result = LocationQualifier.qualify(target500m, sample200mAway, baseNowNanos)
+        assertFalse(result.isQualifying)
+        assertEquals(QualificationFailureReason.INVALID_TARGET, result.reason)
+    }
 }

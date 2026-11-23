@@ -78,12 +78,27 @@ class S05RecipientLockFragment : Fragment() {
             S05MapTargetDialogFragment.REQUEST_KEY_MAP_TARGET,
             viewLifecycleOwner
         ) { _, bundle ->
-            val lat = bundle.getDouble(S05MapTargetDialogFragment.RESULT_KEY_LATITUDE)
-            val lng = bundle.getDouble(S05MapTargetDialogFragment.RESULT_KEY_LONGITUDE)
-            val name = bundle.getString(S05MapTargetDialogFragment.RESULT_KEY_DISPLAY_NAME)
-            val target = LocationTarget(latitude = lat, longitude = lng, radiusMeters = LocationTarget.FIXED_RADIUS_METERS)
-            viewModel.updateLocation(target, name)
-            binding.tvS05Error.visibility = View.GONE
+            val currentState = viewModel.uiState.value
+            if (!currentState.editable) return@setFragmentResultListener
+
+            val resultCapsuleId = bundle.getString(S05MapTargetDialogFragment.RESULT_KEY_CAPSULE_ID)
+            val resultSessionUid = bundle.getString(S05MapTargetDialogFragment.RESULT_KEY_SESSION_UID)
+
+            if (resultCapsuleId != null && resultCapsuleId != currentState.capsuleId) return@setFragmentResultListener
+            if (resultSessionUid != null && resultSessionUid != currentState.activeSessionUid) return@setFragmentResultListener
+
+            val lat = bundle.getDouble(S05MapTargetDialogFragment.RESULT_KEY_LATITUDE, Double.NaN)
+            val lng = bundle.getDouble(S05MapTargetDialogFragment.RESULT_KEY_LONGITUDE, Double.NaN)
+            val radius = bundle.getDouble(S05MapTargetDialogFragment.RESULT_KEY_RADIUS, 150.0)
+
+            if (lat.isFinite() && lat in -90.0..90.0 &&
+                lng.isFinite() && lng in -180.0..180.0 &&
+                radius == LocationTarget.FIXED_RADIUS_METERS) {
+                val name = bundle.getString(S05MapTargetDialogFragment.RESULT_KEY_DISPLAY_NAME)
+                val target = LocationTarget(latitude = lat, longitude = lng, radiusMeters = LocationTarget.FIXED_RADIUS_METERS)
+                viewModel.updateLocation(target, name)
+                binding.tvS05Error.visibility = View.GONE
+            }
         }
 
         setupClickListeners()
@@ -149,9 +164,13 @@ class S05RecipientLockFragment : Fragment() {
         }
 
         binding.btnSelectPlace.setOnClickListener {
-            val currentTarget = viewModel.uiState.value.locationTarget
-            val currentName = viewModel.uiState.value.locationName
-            val dialog = S05MapTargetDialogFragment.newInstance(currentTarget, currentName)
+            val state = viewModel.uiState.value
+            val dialog = S05MapTargetDialogFragment.newInstance(
+                state.locationTarget,
+                state.locationName,
+                state.capsuleId,
+                state.activeSessionUid
+            )
             dialog.show(parentFragmentManager, "S05MapTargetDialog")
         }
 

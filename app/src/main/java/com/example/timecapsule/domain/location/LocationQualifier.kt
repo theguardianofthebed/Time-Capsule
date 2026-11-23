@@ -58,8 +58,8 @@ object LocationQualifier {
     /** Maximum allowed horizontal accuracy radius in meters. */
     const val MAX_ACCURACY_METERS: Float = 100.0f // 100 meters
 
-    /** Default target radius threshold in meters if not specified by target. */
-    const val DEFAULT_RADIUS_METERS: Double = 150.0 // 150 meters
+    /** Target radius threshold in meters. */
+    const val DEFAULT_RADIUS_METERS: Double = LocationTarget.FIXED_RADIUS_METERS
 
     /**
      * Evaluates a location sample against a target location and monotonic timestamp.
@@ -88,7 +88,9 @@ object LocationQualifier {
             )
         }
 
-        if (!isValidCoordinate(target.latitude, target.longitude) || !target.radiusMeters.isFinite() || target.radiusMeters <= 0) {
+        if (!isValidCoordinate(target.latitude, target.longitude) ||
+            !target.radiusMeters.isFinite() ||
+            target.radiusMeters != LocationTarget.FIXED_RADIUS_METERS) {
             return LocationQualificationResult(
                 isQualifying = false,
                 reason = QualificationFailureReason.INVALID_TARGET
@@ -155,12 +157,7 @@ object LocationQualifier {
             )
         }
 
-        val allowedRadius = if (target.radiusMeters.isFinite() && target.radiusMeters > 0) {
-            target.radiusMeters
-        } else {
-            DEFAULT_RADIUS_METERS
-        }
-
+        val allowedRadius = LocationTarget.FIXED_RADIUS_METERS
         if (distance > allowedRadius) {
             return LocationQualificationResult(
                 isQualifying = false,
