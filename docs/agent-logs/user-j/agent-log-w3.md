@@ -260,6 +260,13 @@ No manual code fix was required. The agent corrected a missing permission linter
 - **Correction C (Update Existing PR Records - P2):** Updated PR #42 description, handoff file `issue-16-map-foreground-location-20261123.md`, and User J's logs with latest HEAD SHA (`d4ddacd`), 245 passing JVM unit tests, and `NOT RUN` instrumentation status (0 adb devices connected).
 - **Checks & Results:** `./gradlew :app:testDebugUnitTest`: PASS (245 JVM unit tests passed, 0 failed). `./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors). `py tools/check_readiness.py --issue 16 --evidence docs/agent-tools/readiness-evidence-issue16.json`: PASS (`PREFLIGHT_RECORD_VALID`).
 
+### PR #42 Final Test-Coverage Cleanup (November 23, 2026)
+
+- **Correction 1 (Test Actual Production Guard Logic):** Extracted `S05MapTargetResultValidator` object and `ResultPayload` container used directly by `S05RecipientLockFragment`. Updated `S05RecipientLockResultGuardsTest` so all 7 JVM tests call `S05MapTargetResultValidator.validateResult(...)` directly. Enforced one-time request ID consumption (`activeMapRequestId = null` on successful update) to prevent result replay while preserving `onSaveInstanceState` configuration-change recovery.
+- **Correction 2 (Correct Instrumentation Test Coverage):** Renamed preselected target recreation test in `S05MapTargetDialogFragmentTest.kt` to `preselectedInitialTargetPreservedAcrossRecreation` accurately reflecting its scope.
+- **Correction 3 & 4 (Final Verification & PR Records):** Updated PR #42 description, handoff file `issue-16-map-foreground-location-20261123.md`, and User J's logs with latest HEAD SHA (`6df925c`), 245 passing JVM unit tests, and `NOT RUN` instrumentation status (0 adb devices connected).
+- **Checks & Results:** `./gradlew :app:testDebugUnitTest`: PASS (245 JVM unit tests passed, 0 failed). `./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors). `py tools/check_readiness.py --issue 16 --evidence docs/agent-tools/readiness-evidence-issue16.json`: PASS (`PREFLIGHT_RECORD_VALID`).
+
 ### My review and understanding
 
 - **What I reviewed:** Inspected the generated `LocationQualifier`, `DefaultLocationAdapter`, `S05MapTargetDialogFragment`, and `PhotoDraftJournal` diffs.

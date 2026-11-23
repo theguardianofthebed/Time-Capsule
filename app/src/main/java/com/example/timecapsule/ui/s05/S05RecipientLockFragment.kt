@@ -92,34 +92,26 @@ class S05RecipientLockFragment : Fragment() {
             viewLifecycleOwner
         ) { _, bundle ->
             val currentState = viewModel.uiState.value
-            if (!currentState.editable) return@setFragmentResultListener
-
-            val resultCapsuleId = bundle.getString(S05MapTargetDialogFragment.RESULT_KEY_CAPSULE_ID)
-            val resultSessionUid = bundle.getString(S05MapTargetDialogFragment.RESULT_KEY_SESSION_UID)
-            val resultSessionGen = if (bundle.containsKey(S05MapTargetDialogFragment.RESULT_KEY_SESSION_GENERATION)) {
-                bundle.getLong(S05MapTargetDialogFragment.RESULT_KEY_SESSION_GENERATION)
-            } else null
-            val resultRequestId = bundle.getString(S05MapTargetDialogFragment.RESULT_KEY_REQUEST_ID)
-
             val currentSession = (activity as? MainActivity)?.container?.sessionTracker?.currentSession()
                 ?: SessionSnapshot(currentState.activeSessionUid ?: "", -1)
 
-            // Strict guards checking capsule ID, UID, session generation, and one-time request ID
-            if (resultCapsuleId.isNullOrBlank() || resultCapsuleId != currentState.capsuleId) return@setFragmentResultListener
-            if (resultSessionUid.isNullOrBlank() || resultSessionUid != currentSession.uid) return@setFragmentResultListener
-            if (resultSessionGen == null || resultSessionGen != currentSession.sessionGeneration) return@setFragmentResultListener
-            if (resultRequestId.isNullOrBlank() || resultRequestId != activeMapRequestId) return@setFragmentResultListener
+            val payload = S05MapTargetResultValidator.ResultPayload.fromBundle(bundle)
+            val validationContext = S05MapTargetResultValidator.ValidationContext(
+                editable = currentState.editable,
+                activeCapsuleId = currentState.capsuleId,
+                activeSession = currentSession,
+                activeRequestId = activeMapRequestId
+            )
 
-            val lat = bundle.getDouble(S05MapTargetDialogFragment.RESULT_KEY_LATITUDE, Double.NaN)
-            val lng = bundle.getDouble(S05MapTargetDialogFragment.RESULT_KEY_LONGITUDE, Double.NaN)
-            val radius = bundle.getDouble(S05MapTargetDialogFragment.RESULT_KEY_RADIUS, Double.NaN)
-
-            if (lat.isFinite() && lat in -90.0..90.0 &&
-                lng.isFinite() && lng in -180.0..180.0 &&
-                radius == LocationTarget.FIXED_RADIUS_METERS) {
-                val name = bundle.getString(S05MapTargetDialogFragment.RESULT_KEY_DISPLAY_NAME)
-                val target = LocationTarget(latitude = lat, longitude = lng, radiusMeters = LocationTarget.FIXED_RADIUS_METERS)
-                viewModel.updateLocation(target, name)
+            if (S05MapTargetResultValidator.validateResult(payload, validationContext)) {
+                // Clear active request ID on successful consumption to prevent replay attacks!
+                activeMapRequestId = null
+                val target = LocationTarget(
+                    latitude = payload.latitude,
+                    longitude = payload.longitude,
+                    radiusMeters = LocationTarget.FIXED_RADIUS_METERS
+                )
+                viewModel.updateLocation(target, payload.displayName)
                 binding.tvS05Error.visibility = View.GONE
             }
         }

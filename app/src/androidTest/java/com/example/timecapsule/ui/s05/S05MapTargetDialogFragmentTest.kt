@@ -19,7 +19,7 @@ import org.junit.runner.RunWith
  * - Fragment result handoff via parentFragmentManager setFragmentResult
  * - Initial state without target disables Confirm synchronously
  * - Preselected initial target enables Confirm
- * - Unselected dialog with pending state preserves selection across recreation
+ * - Preselected target state preserved across recreation
  * - Cancel preserving host state
  */
 @RunWith(AndroidJUnit4::class)
@@ -130,7 +130,7 @@ class S05MapTargetDialogFragmentTest {
     }
 
     @Test
-    fun stateRestorationPreservesPendingSelectionAcrossRecreation() {
+    fun preselectedInitialTargetPreservedAcrossRecreation() {
         val target = LocationTarget(latitude = 37.5665, longitude = 126.9780, radiusMeters = 150.0)
         val args = S05MapTargetDialogFragment.newInstance(target, "Seoul").arguments
 
