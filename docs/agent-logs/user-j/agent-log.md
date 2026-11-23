@@ -37,17 +37,17 @@ Weekly coursework remains in `agent-log-w1.md`–`agent-log-w4.md`.
   - Written `DefaultCapsuleRepositoryUnlockTest.kt` (8 unit tests covering unauthenticated denial, blank ID validation, non-recipient denial, early unlock denial, server deadline unlock success, idempotent unlock, device clock manipulation safety, and offline network failure handling).
   - Updated `CapsuleDraftViewModelTest.kt` with timezone preservation tests (53 unit tests passing in suite).
 
-- **PR #41 Code Review Corrections (2026-11-23):**
-  - **Correction A (Real Firestore Transaction):** Refactored `DefaultFirestoreAdapter.verifyRecipientUnlock` to use genuine atomic `runTransaction<TransactionUnlockResult> { transaction -> transaction.get(docRef) ... transaction.update(...) }`. Added session isolation check in `DefaultCapsuleRepository.verifyUnlock` after async execution.
-  - **Correction B (Preserve Creation Zone End-to-End):** Added `creationZone` to `CapsuleDraft`, updated `CapsulePublicationCoordinator` to pass `draft.creationZone` when freezing new operations, and preserved `creationZone` through `PrivatePublicationDrafts.asDraft()` and draft restoration/replacement.
+- **PR #41 Code Review Corrections & Integration Tests (2026-11-23):**
+  - **Correction A (Real Firestore Transaction & Session Validation):** Refactored `DefaultFirestoreAdapter.verifyRecipientUnlock` to use genuine atomic `runTransaction<TransactionUnlockResult> { transaction -> transaction.get(docRef) ... transaction.update(...) }`. Updated `DefaultCapsuleRepository.verifyUnlock` to compare full `SessionSnapshot` (`postSession != initialSession`), validating `sessionGeneration` across async boundaries and adding same-UID relogin race regression test.
+  - **Correction B (Preserve Creation Zone End-to-End & 2027 Fixtures):** Added `creationZone` to `CapsuleDraft`, updated `CapsulePublicationCoordinator` to pass `draft.creationZone` when freezing new operations, and preserved `creationZone` through `PrivatePublicationDrafts.asDraft()` and draft restoration/replacement. Added 2027 DST boundary fixtures (March 14, 2027 gap and November 7, 2027 overlap) and `creationZoneSurvivesPublicationAndRecovery` test.
   - **Correction C (Explicit DST Overlap Selection):** Updated `TimeConversionHelper.toUtcInstant` to reject ambiguous DST overlap times with `OperationResult.Invalid` unless an explicit `preferredOffset` in `validOffsets` is supplied. Updated `S05RecipientLockFragment` to display an offset selection dialog when a DST overlap is selected.
-  - **Correction D (Lock Mode Consistency):** Aligned lock mode string mappings (`"TIME"`, `"LOCATION"`, `"BOTH"`, `"TIME_AND_LOCATION"`). Updated `DefaultCapsuleRepositoryUnlockTest` to verify `"BOTH"` lock mode fail-closed behavior.
+  - **Correction D (Lock Mode Consistency & Cancellation Exception):** Aligned lock mode string mappings (`"TIME"`, `"LOCATION"`, `"BOTH"`, `"TIME_AND_LOCATION"`). Re-threw `kotlinx.coroutines.CancellationException` in `DefaultFirestoreAdapter` exception mappers. Added `FirebaseEmulatorUnlockIntegrationTest.kt` executing against live Firebase Auth & Firestore Emulators.
 
 ### Checks and verification
 
-- `./gradlew :app:testDebugUnitTest`: PASS (217 JVM unit tests passed across project, 0 failed).
+- `./gradlew :app:testDebugUnitTest`: PASS (221 JVM unit tests passed across project, 0 failed).
 - `npx firebase emulators:exec --project demo-timecapsule "npm test"`: PASS (42 security rules tests passed, 0 failed).
-- `./gradlew :app:assembleDebug :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors).
+- `./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors).
 - `git diff --check`: PASS (clean).
 
 ### Human input and remaining work

@@ -106,4 +106,37 @@ class TimeConversionHelperTest {
         assertEquals("UTC-05:00", TimeConversionHelper.formatOffset(ZoneOffset.ofHours(-5)))
         assertEquals("UTC+05:30", TimeConversionHelper.formatOffset(ZoneOffset.ofHoursMinutes(5, 30)))
     }
+
+    @Test
+    fun `2027 DST spring-forward gap fixture on March 14 2027 is rejected`() {
+        // US/Eastern spring forward on March 14, 2027. 02:30 AM does not exist on clock.
+        val date = LocalDate.of(2027, 3, 14)
+        val time = LocalTime.of(2, 30)
+        val zoneId = ZoneId.of("America/New_York")
+
+        val result = TimeConversionHelper.toUtcInstant(date, time, zoneId)
+
+        assertTrue(result is OperationResult.Invalid)
+        val message = (result as OperationResult.Invalid).message
+        assertTrue(message.contains("daylight saving transition"))
+    }
+
+    @Test
+    fun `2027 DST fall-back overlap fixture on November 7 2027 requires explicit offset choice`() {
+        // US/Eastern fall back on November 7, 2027. 01:30 AM occurs twice (EDT UTC-4 and EST UTC-5).
+        val date = LocalDate.of(2027, 11, 7)
+        val time = LocalTime.of(1, 30)
+        val zoneId = ZoneId.of("America/New_York")
+
+        val resultNoOffset = TimeConversionHelper.toUtcInstant(date, time, zoneId)
+        assertTrue(resultNoOffset is OperationResult.Invalid)
+
+        val resultEdt = TimeConversionHelper.toUtcInstant(date, time, zoneId, preferredOffset = ZoneOffset.ofHours(-4))
+        assertTrue(resultEdt is OperationResult.Success)
+        assertEquals(ZoneOffset.ofHours(-4), (resultEdt as OperationResult.Success).data.offset)
+
+        val resultEst = TimeConversionHelper.toUtcInstant(date, time, zoneId, preferredOffset = ZoneOffset.ofHours(-5))
+        assertTrue(resultEst is OperationResult.Success)
+        assertEquals(ZoneOffset.ofHours(-5), (resultEst as OperationResult.Success).data.offset)
+    }
 }

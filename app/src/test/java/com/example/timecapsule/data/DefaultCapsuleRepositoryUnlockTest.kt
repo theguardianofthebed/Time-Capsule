@@ -206,6 +206,27 @@ class DefaultCapsuleRepositoryUnlockTest {
         assertTrue((result as OperationResult.Denied).message.contains("session"))
     }
 
+    @Test
+    fun `verifyUnlock rejects result if same UID is relogged in mid flight`() = runBlocking {
+        sessionTracker.startSession("recipient-uid-1")
+        fakeFirestoreAdapter.seedCapsule(
+            capsuleId = "capsule-same-uid-relogin",
+            recipientUid = "recipient-uid-1",
+            unlocked = false,
+            lockMode = "TIME",
+            deadlineReached = true
+        )
+
+        fakeFirestoreAdapter.onUnlockCallback = {
+            sessionTracker.clearSession()
+            sessionTracker.startSession("recipient-uid-1")
+        }
+
+        val result = repository.verifyUnlock("capsule-same-uid-relogin")
+        assertTrue(result is OperationResult.Denied)
+        assertTrue((result as OperationResult.Denied).message.contains("session"))
+    }
+
     private class FakeAuthAdapterForUnlock(private val tracker: DefaultSessionTracker) : AuthAdapter {
         override fun activeUid(): String? = tracker.currentSession().uid
         override fun activeEmail(): String? = "test@example.com"

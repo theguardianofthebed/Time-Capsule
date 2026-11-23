@@ -20,6 +20,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import org.junit.Assert
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -134,6 +135,35 @@ class CapsulePublicationCoordinatorTest {
         assertTrue(withTimeout(5000) { first.await() } is OperationResult.Success)
         assertTrue(withTimeout(5000) { second.await() } is OperationResult.Success)
         assertEquals(1, calls.get())
+    }
+
+    /** Creation zone survives publication, journal persistence, and recovery. */
+    @Test fun creationZoneSurvivesPublicationAndRecovery() = runBlocking {
+        val customZoneDraft = draft().copy(creationZone = "America/New_York")
+        var frozenPayload: FrozenCapsuleOperation? = null
+        val backend = CapsulePublicationBackend { operation ->
+            frozenPayload = operation
+        }
+        val coordinator = coordinator(backend)
+
+        val result = coordinator.publish(customZoneDraft)
+        assertTrue(result is OperationResult.Success)
+
+        // Verify frozen operation retained the custom creation zone from draft
+        Assert.assertNotNull(frozenPayload)
+        assertEquals("America/New_York", frozenPayload?.creationZone)
+
+        // Verify journal record retained the creation zone
+        val record = journal.load("sender", customZoneDraft.capsuleId)
+        Assert.assertNotNull(record)
+        assertEquals("America/New_York", record?.operation?.creationZone)
+
+        // Verify recovery state retains creation zone
+        val recovered = coordinator.recoverPublications()
+        assertTrue(recovered is OperationResult.Success)
+        val list = (recovered as OperationResult.Success).data
+        val recoveredSent = list.first { it.capsuleId == customZoneDraft.capsuleId }
+        assertEquals(PublicationPhase.SENT, recoveredSent.phase)
     }
 
     /** An ambiguous backend response persists UNKNOWN instead of a false definite failure. */

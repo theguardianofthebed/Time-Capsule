@@ -67,14 +67,14 @@ class DefaultCapsuleRepository(
         if (cleanId.isBlank()) {
             return OperationResult.Invalid("Capsule ID must not be blank for unlock verification.")
         }
-        val currentSession = sessionTracker.currentSession()
-        if (!currentSession.isAuthenticated || currentSession.uid.isNullOrBlank()) {
+        val initialSession = sessionTracker.currentSession()
+        if (!initialSession.isAuthenticated || initialSession.uid.isNullOrBlank()) {
             return OperationResult.Denied("Authentication required to verify capsule unlock.")
         }
-        val activeUid = currentSession.uid
+        val activeUid = initialSession.uid
         val result = firestoreAdapter.verifyRecipientUnlock(cleanId, activeUid)
         val postSession = sessionTracker.currentSession()
-        if (!postSession.isAuthenticated || postSession.uid != activeUid) {
+        if (!postSession.isAuthenticated || postSession != initialSession) {
             return OperationResult.Denied("Account session changed during unlock verification.")
         }
         return result

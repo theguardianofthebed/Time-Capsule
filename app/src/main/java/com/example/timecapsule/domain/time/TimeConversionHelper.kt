@@ -54,8 +54,8 @@ object TimeConversionHelper {
      *
      * DST Overlap Handling:
      * When local time falls into a DST overlap (fall-back transition where clocks repeat an hour),
-     * `validOffsets` contains two options. If [preferredOffset] matches one, it is used; otherwise,
-     * the earlier offset (daylight time) is selected by default and all valid options are returned.
+     * `validOffsets` contains multiple choices. The sender MUST explicitly specify a valid [preferredOffset]
+     * in `validOffsets`; otherwise, conversion returns [OperationResult.Invalid] requesting explicit offset selection.
      */
     fun toUtcInstant(
         localDate: LocalDate,

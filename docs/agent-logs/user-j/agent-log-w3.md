@@ -164,13 +164,15 @@ No manual code fixes were needed. All changes were applied through Android Studi
 - **What I can explain:** How `TimeConversionHelper` detects DST gaps via `ZoneId.rules.getValidOffsets(localDateTime)` and requires explicit offset choices for overlaps, how `DefaultFirestoreAdapter.verifyRecipientUnlock` uses `runTransaction` with `FieldValue.serverTimestamp()` for atomic server-authorized unlocking, and how `canRecipientUnlock()` in `firestore.rules` enforces one-way recipient unlock transitions.
 - **Feedback and next step:** Teammate code re-review by User G on PR #41 before manual testing.
 
-### PR #41 Code Review Corrections (November 23, 2026)
+### PR #41 Focused Review Corrections & Integration Tests (November 23, 2026)
 
-- **Correction A (Real Firestore Transaction):** Refactored `DefaultFirestoreAdapter.verifyRecipientUnlock` to use genuine atomic `runTransaction<TransactionUnlockResult> { transaction -> transaction.get(docRef) ... transaction.update(...) }`. Added session isolation check in `DefaultCapsuleRepository.verifyUnlock` after async execution.
-- **Correction B (Preserve Creation Zone End-to-End):** Added `creationZone` to `CapsuleDraft`, updated `CapsulePublicationCoordinator` to pass `draft.creationZone` when freezing new operations, and preserved `creationZone` through `PrivatePublicationDrafts.asDraft()` and draft restoration/replacement.
-- **Correction C (Explicit DST Overlap Selection):** Updated `TimeConversionHelper.toUtcInstant` to reject ambiguous DST overlap times with `OperationResult.Invalid` unless an explicit `preferredOffset` in `validOffsets` is supplied. Updated `S05RecipientLockFragment` to display an offset selection dialog when a DST overlap is selected.
-- **Correction D (Lock Mode Consistency):** Aligned lock mode string mappings (`"TIME"`, `"LOCATION"`, `"BOTH"`, `"TIME_AND_LOCATION"`). Updated `DefaultCapsuleRepositoryUnlockTest` to verify `"BOTH"` lock mode fail-closed behavior.
-- **Checks & Results:** `./gradlew :app:testDebugUnitTest`: PASS (217 JVM unit tests passed, 0 failed). `npx firebase emulators:exec --project demo-timecapsule "npm test"`: PASS (42 security rules tests passed, 0 failed).
+- **Correction 1 (Session Generation Validation & Same-UID Relogin Race):** Updated `DefaultCapsuleRepository.verifyUnlock` to compare full `SessionSnapshot` (`postSession != initialSession`), validating `sessionGeneration` in addition to `uid`. Added regression unit test `verifyUnlock rejects result if same UID is relogged in mid flight`.
+- **Correction 2 (CancellationException Propagation):** Updated `DefaultFirestoreAdapter.mapFirestoreUnlockException` and `mapFirestoreException` to rethrow `kotlinx.coroutines.CancellationException` (`if (e is CancellationException) throw e`), preserving coroutine cancellation semantics.
+- **Correction 3 (Firebase Emulator Android Transaction Integration Tests):** Added `FirebaseEmulatorUnlockIntegrationTest.kt` executing against live Firebase Auth & Firestore Emulators. Covered server-authorized TIME unlock, early unlock denial, idempotent repeat unlock, unauthorized caller denial, and metadata immutability during unlock.
+- **Correction 4 (Creation Zone Survival & 2027 DST Boundary Fixtures):** Added `creationZoneSurvivesPublicationAndRecovery` test in `CapsulePublicationCoordinatorTest.kt`. Added approved 2027 DST boundary fixtures (March 14, 2027 spring-forward gap and November 7, 2027 fall-back overlap) to `TimeConversionHelperTest.kt`.
+- **Correction 5 (KDoc & Cleanup):** Corrected DST overlap KDoc in `TimeConversionHelper.kt`, removed unused imports, and updated PR #41 documentation.
+- **Checks & Results:** `./gradlew :app:testDebugUnitTest`: PASS (221 JVM unit tests passed, 0 failed). `npx firebase emulators:exec --project demo-timecapsule "npm test"`: PASS (42 security rules tests passed, 0 failed). `./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors).
+
 
 
 

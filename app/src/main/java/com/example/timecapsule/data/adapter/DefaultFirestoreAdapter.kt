@@ -10,6 +10,7 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Source
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.tasks.await
 
 private sealed interface TransactionUnlockResult {
@@ -170,6 +171,7 @@ class DefaultFirestoreAdapter(
     }
 
     private fun mapFirestoreUnlockException(e: Exception): OperationResult<Availability> {
+        if (e is CancellationException) throw e
         return when (e) {
             is FirebaseNetworkException -> {
                 OperationResult.Unavailable("Network unavailable during unlock verification.")
@@ -195,6 +197,7 @@ class DefaultFirestoreAdapter(
     }
 
     private fun <T> mapFirestoreException(e: Exception): OperationResult<T> {
+        if (e is CancellationException) throw e
         return when (e) {
             is FirebaseNetworkException -> {
                 OperationResult.Unavailable("Network unavailable during Firestore operation.")
