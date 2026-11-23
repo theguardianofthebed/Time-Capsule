@@ -11,6 +11,9 @@ import com.example.timecapsule.domain.model.Availability
 import com.example.timecapsule.domain.model.CapsuleDraft
 import com.example.timecapsule.domain.model.CapsuleListsSnapshot
 import com.example.timecapsule.domain.model.CapsuleLock
+import com.example.timecapsule.domain.model.ForegroundLocationSample
+import com.example.timecapsule.domain.model.LocationSampleResult
+import com.example.timecapsule.domain.model.LocationSampleStatus
 import com.example.timecapsule.domain.model.LockMode
 import com.example.timecapsule.domain.model.ProtectedCapsuleContent
 import com.example.timecapsule.domain.model.RecipientProfile
@@ -116,8 +119,21 @@ class FakeStorageAdapter : StorageAdapter {
     override fun isAvailable(): Boolean = true
 }
 
-class FakeLocationAdapter : LocationAdapter {
+class FakeLocationAdapter(
+    var fineGranted: Boolean = true,
+    var mockResult: LocationSampleResult = LocationSampleResult(
+        status = LocationSampleStatus.SUCCESS,
+        sample = ForegroundLocationSample(
+            latitude = 37.5665,
+            longitude = 126.9780,
+            elapsedRealtimeNanos = 1_000_000_000L,
+            horizontalAccuracyMeters = 10f
+        )
+    )
+) : LocationAdapter {
     override fun isLocationAvailable(): Boolean = true
+    override fun isFineLocationGranted(): Boolean = fineGranted
+    override suspend fun getCurrentLocation(): LocationSampleResult = mockResult
 }
 
 class FakeLocalRetentionAdapter : LocalRetentionAdapter {

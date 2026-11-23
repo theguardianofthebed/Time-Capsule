@@ -6,6 +6,52 @@ Weekly coursework remains in `agent-log-w1.md`–`agent-log-w4.md`.
 
 ## Entries
 
+## 2026-11-23-issue16-map-foreground-location — S-05 Google Maps target selection & fresh foreground location adapter
+
+- **Owner:** User J, explicitly confirmed as implementation owner for Issue #16. Reviewer: User G.
+- **Environment/model:** Android Studio Agent Mode (Gemini 3.8 Flash).
+- **Status:** Implemented, verified with 233 passing JVM unit tests, clean debug build and lint, task branch `feature/16-map-foreground-location` prepared for PR.
+- **Requested outcome:** Deliver MVP S-05 Google Maps target selection and fresh foreground location adapter with permission guidance. The adapter must never authorize capsule unlocks. Implement pin selection UI inside S-05 as a lifecycle-safe `DialogFragment`, allowing pin selection and 150m radius visualization with explicit Confirm action. Implement pure deterministic `LocationQualifier` evaluating distance <= 150m, age in 0..60s, and horizontal accuracy <= 100m. Implement `DefaultLocationAdapter` using `FusedLocationProviderClient.getCurrentLocation` with `PRIORITY_HIGH_ACCURACY`, cancellation handling, and typed failure statuses. Extend `PhotoDraftJournal` to persist confirmed location target across relaunch and activity rotation without erasing target on text/photo edits.
+- **References:** [Issue #16](https://github.com/theguardianofthebed/Time-Capsule/issues/16); FR-06, NFR-02; ARC-07; DD-12, DD-22; AC-05; T-16, T-17, T-18, T-42.
+
+### Work performed
+
+- **Domain Qualifier Engine (`LocationSample.kt`, `LocationQualifier.kt`):**
+  - Created `ForegroundLocationSample`, `LocationSampleStatus`, `LocationSampleResult`, `QualificationFailureReason`, and `LocationQualificationResult`.
+  - Implemented `LocationQualifier` evaluating `distance <= 150.0m`, `0s <= age <= 60s`, and `0m <= accuracy <= 100m` against `SystemClock.elapsedRealtimeNanos()`.
+  - Decoupled WGS84 distance calculation via `DistanceCalculator` seam and `HaversineDistanceCalculator` default implementation for pure JVM unit testing.
+- **Android Location Adapter (`LocationAdapter.kt`, `DefaultLocationAdapter.kt`):**
+  - Extended `LocationAdapter` with `isFineLocationGranted()` and `getCurrentLocation(): LocationSampleResult`.
+  - Implemented `DefaultLocationAdapter` using `FusedLocationProviderClient` with `PRIORITY_HIGH_ACCURACY`, timeout control, coroutine cancellation, and typed error responses (`PERMISSION_DENIED`, `SERVICE_DISABLED`, `TIMEOUT_OR_NULL`, `SECURITY_EXCEPTION`).
+  - Updated `MainActivity` container initialization and test double `FakeLocationAdapter`.
+- **Map Target Selection UI (`S05MapTargetDialogFragment.kt`, `dialog_s05_map_target.xml`):**
+  - Implemented `S05MapTargetDialogFragment` embedding Google Maps `MapView` with pin marker and 150m radius circle.
+  - Manual map navigation and pin selection operates without location permissions.
+  - "Use current location" button explicitly checks/requests `ACCESS_FINE_LOCATION` and moves camera/pin to current location.
+  - Explicit "Confirm Location" button commits selected target to draft; closing/canceling dialog retains prior selection.
+- **Draft Target Persistence (`PhotoDraftJournal.kt`, `CapsuleDraftViewModel.kt`):**
+  - Extended `PhotoDraftRecord` and `PhotoDraftJournal` to persist `locationTarget` and `locationName` in UID-scoped properties.
+  - Maintained 100% backward compatibility for pre-existing properties files.
+  - Verified that text/photo edits preserve confirmed location target.
+- **Manifest & Account Settings (`AndroidManifest.xml`, `S08AccountSettingsFragment.kt`):**
+  - Declared `ACCESS_FINE_LOCATION` and `ACCESS_COARSE_LOCATION`.
+  - Configured Google Maps API key meta-data with `${MAPS_API_KEY}` manifest placeholder.
+  - Updated S-08 location status badge to require `ACCESS_FINE_LOCATION` for precise qualification.
+- **Automated Verification Suite:**
+  - Written 15 new JVM unit tests (`LocationQualifierTest`, `DraftLocationPersistenceTest`, `DefaultLocationAdapterTest`). Total 233 JVM unit tests passed (`:app:testDebugUnitTest`).
+  - Clean debug build and lint (`:app:assembleDebug`, `:app:lintDebug`).
+
+### Checks and verification
+
+- `./gradlew :app:testDebugUnitTest`: PASS (233 JVM unit tests passed across project, 0 failed).
+- `./gradlew :app:assembleDebug :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors).
+- `python tools/check_readiness.py --issue 16 --evidence docs/agent-tools/readiness-evidence-issue16.json`: PASS (`PREFLIGHT_RECORD_VALID`).
+- `git status`: PASS (clean on `feature/16-map-foreground-location`).
+
+### Human input and remaining work
+
+User J confirmed task ownership and implementation review. Personal reflections, teammate PR review by User G, manual testing on device/emulator, and human merge into `main` remain for the students to complete.
+
 ## 2026-11-22-issue15-utc-schedules-server-unlock — UTC schedules & server-authorized one-way unlock
 
 - **Owner:** User J, explicitly confirmed as implementation owner for Issue #15. Reviewer: User G.

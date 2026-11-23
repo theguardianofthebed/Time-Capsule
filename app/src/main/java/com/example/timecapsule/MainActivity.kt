@@ -22,6 +22,7 @@ import com.example.timecapsule.data.AccountSessionManager
 import com.example.timecapsule.data.DefaultCapsuleRepository
 import com.example.timecapsule.data.adapter.DefaultAuthAdapter
 import com.example.timecapsule.data.adapter.DefaultFirestoreAdapter
+import com.example.timecapsule.data.adapter.DefaultLocationAdapter
 import com.example.timecapsule.data.adapter.LocalRetentionAdapter
 import com.example.timecapsule.data.adapter.LocationAdapter
 import com.example.timecapsule.data.di.AppDependencyContainer
@@ -80,9 +81,7 @@ class MainActivity : AppCompatActivity() {
         val photoUploads = OriginalPhotoUploads(
             OriginalPhotoStore(File(noBackupFilesDir, "original-photos"), AndroidOriginalImageProbe()),
             File(noBackupFilesDir, "frozen-photos"), storageAdapter, sessionTracker::currentSession)
-        val locationAdapter = object : LocationAdapter {
-            override fun isLocationAvailable(): Boolean = false
-        }
+        val locationAdapter = DefaultLocationAdapter(applicationContext)
         val retentionAdapter = object : LocalRetentionAdapter {
             override suspend fun clearAccountData(uid: String) {}
         }

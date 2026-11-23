@@ -145,6 +145,8 @@ class CapsuleDraftViewModel(
                             localPhotoUri = record.photo?.let { input.file(it).toURI().toString() },
                             photoName = record.photo?.let { "Photo" },
                             photoSizeBytes = record.photo?.sizeBytes,
+                            locationTarget = record.locationTarget ?: state.locationTarget,
+                            locationName = record.locationName ?: state.locationName,
                             photoBusy = false
                         )
                     }
@@ -165,7 +167,7 @@ class CapsuleDraftViewModel(
         val state = _uiState.value
         val uid = state.activeSessionUid ?: return
         val capsuleId = state.capsuleId
-        val record = PhotoDraftRecord(capsuleId, state.title, state.text, state.originalPhoto)
+        val record = PhotoDraftRecord(capsuleId, state.title, state.text, state.originalPhoto, state.locationTarget, state.locationName)
         viewModelScope.launch {
             try {
                 photoSaveMutex.withLock {
@@ -220,7 +222,7 @@ class CapsuleDraftViewModel(
                     }
                     val latestState = _uiState.value
                     previousPhoto = latestState.originalPhoto
-                    val record = PhotoDraftRecord(capsuleId, latestState.title, latestState.text, photo)
+                    val record = PhotoDraftRecord(capsuleId, latestState.title, latestState.text, photo, latestState.locationTarget, latestState.locationName)
                     try {
                         input.save(uid, record)
                     } catch (cancelled: CancellationException) {
@@ -237,7 +239,7 @@ class CapsuleDraftViewModel(
                         try {
                             val currentInJournal = input.restore(uid)
                             if (currentInJournal?.capsuleId == capsuleId && currentInJournal.photo == photo) {
-                                input.save(uid, PhotoDraftRecord(capsuleId, latestState.title, latestState.text, previousPhoto))
+                                input.save(uid, PhotoDraftRecord(capsuleId, latestState.title, latestState.text, previousPhoto, latestState.locationTarget, latestState.locationName))
                             }
                         } catch (cancelled: CancellationException) {
                             throw cancelled
@@ -597,6 +599,7 @@ class CapsuleDraftViewModel(
                 locationName = name
             )
         }
+        persistPhotoDraft()
     }
 
     /** Validates S-04 content requirements: message body or photo required. Title alone is invalid. */

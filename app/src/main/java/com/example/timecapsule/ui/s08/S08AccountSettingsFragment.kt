@@ -211,19 +211,25 @@ class S08AccountSettingsFragment : Fragment() {
     private fun checkAndroidPermissionsStatus() {
         val context = context ?: return
 
-        // Location permission check
-        val locationGranted = ContextCompat.checkSelfPermission(
+        // Location permission check - require ACCESS_FINE_LOCATION for precise qualification
+        val fineGranted = ContextCompat.checkSelfPermission(
             context,
             Manifest.permission.ACCESS_FINE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED || ContextCompat.checkSelfPermission(
+        ) == PackageManager.PERMISSION_GRANTED
+
+        val coarseGranted = ContextCompat.checkSelfPermission(
             context,
             Manifest.permission.ACCESS_COARSE_LOCATION
         ) == PackageManager.PERMISSION_GRANTED
 
-        if (locationGranted) {
+        if (fineGranted) {
             binding.tvLocationStatusBadge.text = getString(R.string.s08_badge_allowed)
             binding.tvLocationStatusBadge.setBackgroundResource(R.drawable.bg_badge_success)
             binding.tvLocationStatusBadge.setTextColor(ContextCompat.getColor(context, R.color.capsule_success_text))
+        } else if (coarseGranted) {
+            binding.tvLocationStatusBadge.text = getString(R.string.s08_badge_approximate)
+            binding.tvLocationStatusBadge.setBackgroundResource(R.drawable.bg_badge_neutral)
+            binding.tvLocationStatusBadge.setTextColor(ContextCompat.getColor(context, R.color.capsule_text_muted))
         } else {
             binding.tvLocationStatusBadge.text = getString(R.string.s08_badge_not_configured)
             binding.tvLocationStatusBadge.setBackgroundResource(R.drawable.bg_badge_neutral)

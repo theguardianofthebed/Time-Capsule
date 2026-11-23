@@ -86,6 +86,7 @@
     <string name="s08_perm_notifications_title">Notifications</string>
     <string name="s08_perm_notifications_desc">For reminders when a sealed capsule unlocks</string>
     <string name="s08_badge_allowed">Allowed in Android</string>
+    <string name="s08_badge_approximate">Approximate only</string>
     <string name="s08_badge_denied">Not granted</string>
     <string name="s08_badge_not_configured">Not configured</string>
     <string name="s08_link_open_settings">Open system settings →</string>
@@ -131,6 +132,7 @@
     <string name="s05_lock_both">Both</string>
     <string name="s05_label_date_time">A future date &amp; time</string>
     <string name="s05_label_place">A meaningful place</string>
+    <string name="s05_label_select_place">Select place (150 m radius)</string>
     <string name="s05_notice_both">Both conditions must be met. A fresh location check is required after the time arrives.</string>
     <string name="s05_location_notice">Location selection isn\'t available yet. You can create a time-locked draft instead.</string>
     <string name="s05_btn_review">Review your capsule</string>
@@ -162,6 +164,18 @@
     <string name="nav_moments">Moments</string>
     <string name="nav_create">Create</string>
     <string name="nav_account">Account</string>
+
+    <!-- S-05 Map Dialog Strings -->
+    <string name="s05_map_cd_close">Close map selector</string>
+    <string name="s05_map_title">Select Location Target</string>
+    <string name="s05_map_label_coordinates">TARGET LOCATION (WGS84)</string>
+    <string name="s05_map_hint_tap">Tap the map to select target coordinates</string>
+    <string name="s05_map_btn_current_location">Use current location</string>
+    <string name="s05_map_btn_confirm">Confirm Location</string>
+    <string name="s05_map_permission_denied">Precise location permission (ACCESS_FINE_LOCATION) is required to use current location.</string>
+    <string name="s05_map_service_disabled">Location services (GPS/Network) are disabled in device settings.</string>
+    <string name="s05_map_acquisition_failed">Could not acquire current location fix. Check location settings and retry.</string>
+
     <string name="photo_preview_description">Selected photo preview</string>
     <string name="photo_restore_failure">Saved photo is missing or changed. Choose it again.</string>
     <string name="photo_save_failure">Cannot save draft. Free some storage and try again.</string>

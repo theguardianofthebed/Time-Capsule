@@ -124,16 +124,12 @@ class S05RecipientLockFragment : Fragment() {
 
         binding.btnLockPlace.setOnClickListener {
             viewModel.updateLockMode(LockMode.LOCATION)
-            viewModel.updateLocation(null, null)
-            binding.tvS05Error.text = getString(R.string.s05_location_notice)
-            binding.tvS05Error.visibility = View.VISIBLE
+            binding.tvS05Error.visibility = View.GONE
         }
 
         binding.btnLockBoth.setOnClickListener {
             viewModel.updateLockMode(LockMode.TIME_AND_LOCATION)
-            viewModel.updateLocation(null, null)
-            binding.tvS05Error.text = getString(R.string.s05_location_notice)
-            binding.tvS05Error.visibility = View.VISIBLE
+            binding.tvS05Error.visibility = View.GONE
         }
 
         binding.btnSelectDateTime.setOnClickListener {
@@ -141,8 +137,15 @@ class S05RecipientLockFragment : Fragment() {
         }
 
         binding.btnSelectPlace.setOnClickListener {
-            binding.tvS05Error.text = getString(R.string.s05_location_notice)
-            binding.tvS05Error.visibility = View.VISIBLE
+            val currentTarget = viewModel.uiState.value.locationTarget
+            val dialog = S05MapTargetDialogFragment().apply {
+                initialTarget = currentTarget
+                onLocationConfirmed = { target, displayName ->
+                    viewModel.updateLocation(target, displayName)
+                    binding.tvS05Error.visibility = View.GONE
+                }
+            }
+            dialog.show(parentFragmentManager, "S05MapTargetDialog")
         }
 
         binding.btnReviewCapsule.setOnClickListener {

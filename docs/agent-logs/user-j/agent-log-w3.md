@@ -173,6 +173,73 @@ No manual code fixes were needed. All changes were applied through Android Studi
 - **Correction 5 (KDoc & Cleanup):** Corrected DST overlap KDoc in `TimeConversionHelper.kt`, removed unused imports, added ambiguous lost-response test in `DefaultCapsuleRepositoryUnlockTest.kt`, and updated PR #41 documentation.
 - **Checks & Results:** `./gradlew :app:testDebugUnitTest`: PASS (222 JVM unit tests passed, 0 failed). `npm test`: PASS (42 security rules tests passed, 0 failed). `./gradlew :app:connectedDebugAndroidTest`: PASS (25 Android instrumentation tests passed on live emulator-5554 with Firebase Emulators, 0 failed, including 7 in `FirebaseEmulatorUnlockIntegrationTest`). `./gradlew :app:assembleDebug :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors).
 
+## Feature or task: Issue #16 S-05 Map Target Selection & Foreground Location Adapter
+
+- **Task and purpose:** Implementation of S-05 Google Maps target selection UI, pure deterministic location qualifier engine, fused location provider adapter, and draft location persistence for Issue #16, with User J as acting implementation owner and User G as reviewer.
+- **Session date(s):** November 23, 2026.
+- **Issue and PR:** [Issue #16](https://github.com/theguardianofthebed/Time-Capsule/issues/16), task branch `feature/16-map-foreground-location`.
+- **Requirement/design references:** FR-06, NFR-02; ARC-07; DD-12, DD-22; AC-05; T-16, T-17, T-18, T-42 (partial).
+- **Agent environment:** Android Studio Agent Mode.
+- **Model used:** Gemini 3.8 Flash.
+
+### Goal
+
+Deliver MVP S-05 Google Maps target selection and fresh foreground location adapter with permission guidance. The adapter must never authorize capsule unlocks. Implement pin selection UI inside S-05 as a lifecycle-safe `DialogFragment`, allowing pin selection and 150m radius visualization with explicit Confirm action. Implement pure deterministic `LocationQualifier` evaluating distance <= 150m, age in 0..60s, and horizontal accuracy <= 100m. Implement `DefaultLocationAdapter` using `FusedLocationProviderClient.getCurrentLocation` with `PRIORITY_HIGH_ACCURACY`, cancellation handling, and typed failure statuses. Extend `PhotoDraftJournal` to persist confirmed location target across relaunch and activity rotation without erasing target on text/photo edits.
+
+### Requests and prompts
+
+| # | Request summary | Actual prompt (key part) | Why it worked (or didn't) |
+|---|-----------------|--------------------------|---------------------------|
+| 1 | Execute readiness preflight and implement Issue #16 | "Refer to md and follow instruction, start implementing after reading instruction. @TimeCapsule_Issue16_Gemini_Implementation_Prompt.md" | Validated all 8 readiness gates (`PREFLIGHT_RECORD_VALID`), created `feature/16-map-foreground-location` branch, and implemented domain qualifier, location adapter, map UI, and persistence. |
+
+### What the agent changed and verified
+
+- **Domain Qualifier Engine (`LocationSample.kt`, `LocationQualifier.kt`):**
+  - Created `ForegroundLocationSample`, `LocationSampleStatus`, `LocationSampleResult`, `QualificationFailureReason`, and `LocationQualificationResult`.
+  - Implemented `LocationQualifier` evaluating `distance <= 150.0m`, `0s <= age <= 60s`, and `0m <= accuracy <= 100m` against `SystemClock.elapsedRealtimeNanos()`.
+  - Decoupled WGS84 distance calculation via `DistanceCalculator` seam and `HaversineDistanceCalculator` default implementation for pure JVM unit testing.
+- **Android Location Adapter (`LocationAdapter.kt`, `DefaultLocationAdapter.kt`):**
+  - Extended `LocationAdapter` with `isFineLocationGranted()` and `getCurrentLocation(): LocationSampleResult`.
+  - Implemented `DefaultLocationAdapter` using `FusedLocationProviderClient` with `PRIORITY_HIGH_ACCURACY`, timeout control, coroutine cancellation, and typed error responses (`PERMISSION_DENIED`, `SERVICE_DISABLED`, `TIMEOUT_OR_NULL`, `SECURITY_EXCEPTION`).
+  - Updated `MainActivity` container initialization and test double `FakeLocationAdapter`.
+- **Map Target Selection UI (`S05MapTargetDialogFragment.kt`, `dialog_s05_map_target.xml`):**
+  - Implemented `S05MapTargetDialogFragment` embedding Google Maps `MapView` with pin marker and 150m radius circle.
+  - Manual map navigation and pin selection operates without location permissions.
+  - "Use current location" button explicitly checks/requests `ACCESS_FINE_LOCATION` and moves camera/pin to current location.
+  - Explicit "Confirm Location" button commits selected target to draft; closing/canceling dialog retains prior selection.
+- **Draft Target Persistence (`PhotoDraftJournal.kt`, `CapsuleDraftViewModel.kt`):**
+  - Extended `PhotoDraftRecord` and `PhotoDraftJournal` to persist `locationTarget` and `locationName` in UID-scoped properties.
+  - Maintained 100% backward compatibility for pre-existing properties files.
+  - Verified that text/photo edits preserve confirmed location target.
+- **Manifest & Account Settings (`AndroidManifest.xml`, `S08AccountSettingsFragment.kt`):**
+  - Declared `ACCESS_FINE_LOCATION` and `ACCESS_COARSE_LOCATION`.
+  - Configured Google Maps API key meta-data with `${MAPS_API_KEY}` manifest placeholder.
+  - Updated S-08 location status badge to require `ACCESS_FINE_LOCATION` for precise qualification.
+- **Automated Verification Suite:**
+  - Written 15 new JVM unit tests (`LocationQualifierTest`, `DraftLocationPersistenceTest`, `DefaultLocationAdapterTest`). Total 233 JVM unit tests passed (`:app:testDebugUnitTest`).
+  - Clean debug build and lint (`:app:assembleDebug`, `:app:lintDebug`).
+
+### Checks and results
+
+- `./gradlew :app:testDebugUnitTest`: PASS (233 JVM unit tests passed across project, 0 failed).
+- `./gradlew :app:assembleDebug :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors).
+- `python tools/check_readiness.py --issue 16 --evidence docs/agent-tools/readiness-evidence-issue16.json`: PASS (`PREFLIGHT_RECORD_VALID`).
+- `git status`: PASS (clean on `feature/16-map-foreground-location`).
+
+### Errors and manual fixes
+
+No manual code fix was required. The agent corrected a missing permission linter annotation by adding `@Suppress("MissingPermission")` to `DefaultLocationAdapter.getCurrentLocation()`, added missing string resources for map UI strings, and fixed an unnecessary non-null assertion warning in unit tests.
+
+### My review and understanding
+
+- **What I reviewed:** Inspected the generated `LocationQualifier`, `DefaultLocationAdapter`, `S05MapTargetDialogFragment`, and `PhotoDraftJournal` diffs.
+- **What I can explain:**
+  - How `LocationQualifier` checks monotonic sample age (`SystemClock.elapsedRealtimeNanos()`), reported horizontal accuracy, and WGS84 Haversine distance without caching or latching past visits.
+  - Why manual map selection requires zero permissions, while "Use current location" explicitly requests `ACCESS_FINE_LOCATION`.
+  - Why qualifying a location sample in Issue #16 does NOT grant or authorize a capsule unlock (unlock authorization belongs downstream to Issue #17).
+- **Feedback and next step:** Open Draft PR on GitHub, obtain teammate review from User G, and perform human merge into `main`.
+
+
 
 
 
