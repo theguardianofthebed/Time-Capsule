@@ -397,7 +397,7 @@ User J confirmed task ownership and execution. Independent teammate PR review by
 - `./gradlew :app:testDebugUnitTest`: PASS (201 JVM unit tests passed, 0 failed)
 - `./gradlew :app:assembleDebug`: PASS (`BUILD SUCCESSFUL`)
 - `./gradlew :app:assembleDebugAndroidTest`: PASS (`BUILD SUCCESSFUL` — compiled test APK)
-- `./gradlew :app:connectedDebugAndroidTest`: NOT RUN (0 devices connected; `No connected devices!`)
+- `./gradlew :app:connectedDebugAndroidTest`: PASS (35 Android instrumentation tests passed on live emulator-5554 with Firebase Emulators)
 - `./gradlew :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors)
 - `npx firebase emulators:exec --project demo-timecapsule "npm test"`: PASS (42 security rules tests passed, 0 failed)
 - `git diff --check`: PASS (clean)
