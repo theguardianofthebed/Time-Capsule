@@ -98,7 +98,7 @@ class MainActivity : AppCompatActivity() {
                         File(noBackupFilesDir, "photo-drafts"))))
         }
         val repository = DefaultCapsuleRepository(sessionTracker, authAdapter, firestoreAdapter,
-            publication)
+            publication, locationAdapter)
 
         container = AppDependencyContainer(
             sessionTracker = sessionTracker,
