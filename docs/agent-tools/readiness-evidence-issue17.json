@@ -1,0 +1,84 @@
+{
+  "issue": 17,
+  "checked_at": "2026-11-24T01:07:12Z",
+  "selected_base": "93b7409e871f215ea2cfc08642c1c934ddf5ec27",
+  "owner": "User J",
+  "owner_confirmation": "Confirmed User J as acting student owner for Issue #17 implementation",
+  "branch": "feature/17-current-conditions",
+  "period": "24 November 2026",
+  "scope": "MVP",
+  "reviewer": "User G",
+  "components": [
+    "app/src/main/java/com/example/timecapsule/domain/condition/ConditionEvaluator.kt",
+    "app/src/main/java/com/example/timecapsule/data/CapsuleRepository.kt",
+    "app/src/main/java/com/example/timecapsule/data/DefaultCapsuleRepository.kt",
+    "app/src/main/java/com/example/timecapsule/data/adapter/FirestoreAdapter.kt",
+    "app/src/main/java/com/example/timecapsule/data/adapter/DefaultFirestoreAdapter.kt"
+  ],
+  "deliverable": "Evaluate current time-and-location conditions without a past-visit latch",
+  "contract_approval": "FR-06, FR-07, NFR-04, ARC-05, DD-05, AC-06, T-19, T-20, T-42",
+  "blocking_failures": [],
+  "inventory": {
+    "issues": "Issue #17 evaluate current time-and-location conditions without a past-visit latch",
+    "branches": "feature/17-current-conditions based on main at 93b7409e871f215ea2cfc08642c1c934ddf5ec27",
+    "prs": "PR #42 merged for Issue 16",
+    "handoffs": "issue-17-current-conditions-20261124.md",
+    "compatible": true,
+    "compatibility_evidence": "No active competing claims or overlapping file modifications for condition evaluation and location unlock verification",
+    "active_claims": [
+      {
+        "issue": 17,
+        "owner": "User J",
+        "branch": "feature/17-current-conditions",
+        "overlaps": false,
+        "agreement": "Explicit prompt allocating Issue #17 implementation to User J"
+      }
+    ]
+  },
+  "dependencies": [
+    {
+      "issue": 15,
+      "pr": "https://github.com/theguardianofthebed/Time-Capsule/pull/41",
+      "merged": true,
+      "merge_commit": "6ccd2ffb02dde02278f8c9b30a4ae1355ea180ff",
+      "implementation_inspection": "PR #41 merged into main, contains UTC conversion and TIME unlock verification transaction",
+      "paths": [
+        "app/src/main/java/com/example/timecapsule/domain/time/TimeConversionHelper.kt",
+        "app/src/main/java/com/example/timecapsule/data/adapter/FirestoreAdapter.kt"
+      ],
+      "checks": [
+        {
+          "result": "PASS",
+          "procedure": "JVM unit tests, Firebase rules tests, and Android instrumentation tests",
+          "expected_actual": "222 JVM unit tests and 42 rules tests passed",
+          "commit": "6ccd2ffb02dde02278f8c9b30a4ae1355ea180ff",
+          "environment": "Android Studio Agent Mode, Nov 23 2026",
+          "evidence": "PR #41 verification record"
+        }
+      ],
+      "blocking_failures": []
+    },
+    {
+      "issue": 16,
+      "pr": "https://github.com/theguardianofthebed/Time-Capsule/pull/42",
+      "merged": true,
+      "merge_commit": "93b7409e871f215ea2cfc08642c1c934ddf5ec27",
+      "implementation_inspection": "PR #42 merged into main, contains LocationQualifier and DefaultLocationAdapter",
+      "paths": [
+        "app/src/main/java/com/example/timecapsule/domain/location/LocationQualifier.kt",
+        "app/src/main/java/com/example/timecapsule/data/adapter/LocationAdapter.kt"
+      ],
+      "checks": [
+        {
+          "result": "PASS",
+          "procedure": "JVM unit tests and Android emulator checks",
+          "expected_actual": "245 JVM unit tests passed",
+          "commit": "93b7409e871f215ea2cfc08642c1c934ddf5ec27",
+          "environment": "Android Studio Agent Mode, Nov 23 2026",
+          "evidence": "PR #42 verification record"
+        }
+      ],
+      "blocking_failures": []
+    }
+  ]
+}

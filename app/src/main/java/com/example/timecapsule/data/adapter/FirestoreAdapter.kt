@@ -1,7 +1,9 @@
 package com.example.timecapsule.data.adapter
 
 import com.example.timecapsule.domain.model.Availability
+import com.example.timecapsule.domain.model.ForegroundLocationSample
 import com.example.timecapsule.domain.model.RecipientProfile
+import com.example.timecapsule.domain.model.RecipientUnlockRequirements
 import com.example.timecapsule.domain.result.OperationResult
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreSettings
@@ -44,10 +46,20 @@ interface FirestoreAdapter {
     /** Creates or updates public recipient profile in `recipientDirectory/{uid}`. */
     suspend fun saveRecipientProfile(profile: RecipientProfile): OperationResult<Unit>
 
+    /** Reads authoritative server-only recipient unlock requirements for [capsuleId]. */
+    suspend fun readRecipientUnlockRequirements(
+        capsuleId: String,
+        recipientUid: String
+    ): OperationResult<RecipientUnlockRequirements> {
+        return OperationResult.Unavailable("Unlock requirements lookup is not implemented in this adapter.")
+    }
+
     /** Requests server-authoritative recipient unlock verification for [capsuleId]. */
     suspend fun verifyRecipientUnlock(
         capsuleId: String,
-        recipientUid: String
+        recipientUid: String,
+        locationSample: ForegroundLocationSample? = null,
+        clockNanosSupplier: () -> Long = { System.currentTimeMillis() * 1_000_000L }
     ): OperationResult<Availability> {
         return OperationResult.Unavailable("Unlock verification is not implemented in this adapter.")
     }

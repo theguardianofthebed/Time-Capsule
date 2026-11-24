@@ -1,13 +1,20 @@
 package com.example.timecapsule.data
 
+import android.os.SystemClock
 import com.example.timecapsule.data.adapter.AuthAdapter
 import com.example.timecapsule.data.adapter.FirestoreAdapter
+import com.example.timecapsule.data.adapter.LocationAdapter
 import com.example.timecapsule.data.publication.CapsulePublicationCoordinator
 import com.example.timecapsule.data.session.SessionTracker
+import com.example.timecapsule.domain.condition.ConditionEvaluator
 import com.example.timecapsule.domain.model.Availability
 import com.example.timecapsule.domain.model.CapsuleDraft
 import com.example.timecapsule.domain.model.CapsuleListsSnapshot
+import com.example.timecapsule.domain.model.ForegroundLocationSample
+import com.example.timecapsule.domain.model.LocationSampleStatus
+import com.example.timecapsule.domain.model.LockMode
 import com.example.timecapsule.domain.model.ProtectedCapsuleContent
+import com.example.timecapsule.domain.model.QualificationFailureReason
 import com.example.timecapsule.domain.model.RecipientProfile
 import com.example.timecapsule.domain.model.SendStatus
 import com.example.timecapsule.domain.result.OperationResult
@@ -15,12 +22,21 @@ import com.example.timecapsule.domain.session.SessionSnapshot
 
 /**
  * Default implementation of [CapsuleRepository] interacting with platform adapters and session tracker.
+ * Enforces session generation validation across suspension points and orchestrates live condition unlocking.
  */
 class DefaultCapsuleRepository(
     private val sessionTracker: SessionTracker,
     private val authAdapter: AuthAdapter,
     private val firestoreAdapter: FirestoreAdapter,
-    private val publicationCoordinator: CapsulePublicationCoordinator? = null
+    private val publicationCoordinator: CapsulePublicationCoordinator? = null,
+    private val locationAdapter: LocationAdapter? = null,
+    private val clockNanosSupplier: () -> Long = {
+        try {
+            SystemClock.elapsedRealtimeNanos()
+        } catch (_: Throwable) {
+            System.currentTimeMillis() * 1_000_000L
+        }
+    }
 ) : CapsuleRepository {
 
     override fun session(): SessionSnapshot = sessionTracker.currentSession()
@@ -62,6 +78,20 @@ class DefaultCapsuleRepository(
         return OperationResult.Unavailable("Capsule lists query requires Issue #21 implementation.")
     }
 
+    /**
+     * Orchestrates recipient unlock verification for TIME, LOCATION, and TIME_AND_LOCATION (BOTH) capsules (Issue #17).
+     *
+     * Execution Flow & Security Rules:
+     * 1. Validates authenticated session snapshot (`initialSession`).
+     * 2. Reads live server unlock requirements (`firestoreAdapter.readRecipientUnlockRequirements`).
+     * 3. Idempotency: If server record is already `unlocked == true`, returns [Availability.AVAILABLE] without requesting location.
+     * 4. For LOCATION / BOTH modes: Requests fresh ephemeral foreground location fix from [locationAdapter].
+     * 5. Revalidates session tracker across suspension boundaries (`sessionTracker.currentSession() == initialSession`).
+     * 6. Evaluates client-side sample quality, age (0..60s), accuracy (<=100m), and distance (<=150m) via [ConditionEvaluator].
+     * 7. Executes atomic Firestore transaction ([firestoreAdapter.verifyRecipientUnlock]), where server rules enforce
+     *    `request.time >= resource.data.unlockAt` for TIME and BOTH modes.
+     * 8. Never persists `locationOK` or past geofence ENTER as future authorization.
+     */
     override suspend fun verifyUnlock(capsuleId: String): OperationResult<Availability> {
         val cleanId = capsuleId.trim()
         if (cleanId.isBlank()) {
@@ -72,7 +102,77 @@ class DefaultCapsuleRepository(
             return OperationResult.Denied("Authentication required to verify capsule unlock.")
         }
         val activeUid = initialSession.uid
-        val result = firestoreAdapter.verifyRecipientUnlock(cleanId, activeUid)
+
+        // 1. Authoritative server read for lock mode, unlock target, and existing unlocked status
+        val reqResult = firestoreAdapter.readRecipientUnlockRequirements(cleanId, activeUid)
+        val postReadSession = sessionTracker.currentSession()
+        if (!postReadSession.isAuthenticated || postReadSession != initialSession) {
+            return OperationResult.Denied("Account session changed during unlock verification.")
+        }
+
+        if (reqResult !is OperationResult.Success) {
+            @Suppress("UNCHECKED_CAST")
+            return reqResult as OperationResult<Availability>
+        }
+
+        val requirements = reqResult.data
+        if (requirements.unlocked) {
+            return OperationResult.Success(Availability.AVAILABLE)
+        }
+
+        val mode = requirements.lockMode
+        val sample: ForegroundLocationSample? = if (mode == LockMode.LOCATION || mode == LockMode.TIME_AND_LOCATION) {
+            val adapter = locationAdapter
+                ?: return OperationResult.Unavailable("Location adapter is unavailable for location unlock.")
+
+            if (!adapter.isFineLocationGranted()) {
+                return OperationResult.Denied("Precise location permission is required for location unlock.")
+            }
+
+            val locResult = adapter.getCurrentLocation()
+            val postLocSession = sessionTracker.currentSession()
+            if (!postLocSession.isAuthenticated || postLocSession != initialSession) {
+                return OperationResult.Denied("Account session changed during location acquisition.")
+            }
+
+            when (locResult.status) {
+                LocationSampleStatus.SUCCESS -> {
+                    locResult.sample ?: return OperationResult.Unavailable("Location sample was null.")
+                }
+                LocationSampleStatus.PERMISSION_DENIED -> {
+                    return OperationResult.Denied(locResult.errorMessage ?: "Location permission denied.")
+                }
+                LocationSampleStatus.SERVICE_DISABLED -> {
+                    return OperationResult.Unavailable(locResult.errorMessage ?: "Location service is disabled.")
+                }
+                else -> {
+                    return OperationResult.Unavailable(locResult.errorMessage ?: "Failed to acquire location sample.")
+                }
+            }
+        } else {
+            null
+        }
+
+        // Evaluate client-side location eligibility prior to remote transaction submission
+        if (mode == LockMode.LOCATION || mode == LockMode.TIME_AND_LOCATION) {
+            val nowNanos = clockNanosSupplier()
+            val eval = ConditionEvaluator.evaluate(mode, requirements.locationTarget, sample, nowNanos)
+            if (!eval.isEligible) {
+                return when (eval.failureReason) {
+                    QualificationFailureReason.OUTSIDE_RADIUS -> OperationResult.Denied("Current location is outside target radius.")
+                    QualificationFailureReason.STALE_SAMPLE -> OperationResult.Unavailable("Location sample is stale. Please acquire a fresh location.")
+                    QualificationFailureReason.POOR_ACCURACY -> OperationResult.Unavailable("Location sample accuracy is too poor (must be <= 100m).")
+                    QualificationFailureReason.FUTURE_TIMESTAMP -> OperationResult.Unavailable("Location sample timestamp is invalid.")
+                    QualificationFailureReason.INVALID_COORDINATES -> OperationResult.Invalid("Location sample contains invalid coordinates.")
+                    QualificationFailureReason.INVALID_TARGET -> OperationResult.Invalid("Target location is invalid.")
+                    QualificationFailureReason.MISSING_SAMPLE -> OperationResult.Denied("Location sample is missing.")
+                    QualificationFailureReason.NONE -> OperationResult.Denied("Location condition not met.")
+                }
+            }
+        }
+
+        // 2. Submit transaction to Firestore with location sample and monotonic timestamp supplier
+        val result = firestoreAdapter.verifyRecipientUnlock(cleanId, activeUid, sample, clockNanosSupplier)
         val postSession = sessionTracker.currentSession()
         if (!postSession.isAuthenticated || postSession != initialSession) {
             return OperationResult.Denied("Account session changed during unlock verification.")

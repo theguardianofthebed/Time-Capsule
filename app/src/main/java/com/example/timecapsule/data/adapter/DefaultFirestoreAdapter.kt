@@ -2,8 +2,14 @@ package com.example.timecapsule.data.adapter
 
 import android.content.Context
 import com.example.timecapsule.config.FirebaseConfig
+import com.example.timecapsule.domain.location.LocationQualifier
 import com.example.timecapsule.domain.model.Availability
+import com.example.timecapsule.domain.model.ForegroundLocationSample
+import com.example.timecapsule.domain.model.LocationTarget
+import com.example.timecapsule.domain.model.LockMode
+import com.example.timecapsule.domain.model.QualificationFailureReason
 import com.example.timecapsule.domain.model.RecipientProfile
+import com.example.timecapsule.domain.model.RecipientUnlockRequirements
 import com.example.timecapsule.domain.result.OperationResult
 import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.firestore.FieldValue
@@ -18,6 +24,9 @@ private sealed interface TransactionUnlockResult {
     object UnlockedSuccess : TransactionUnlockResult
     object NotFound : TransactionUnlockResult
     object NotRecipient : TransactionUnlockResult
+    object LocationSampleMissing : TransactionUnlockResult
+    object InvalidTargetLocation : TransactionUnlockResult
+    data class LocationDisqualified(val reason: QualificationFailureReason) : TransactionUnlockResult
     data class UnsupportedMode(val mode: String) : TransactionUnlockResult
 }
 
@@ -90,9 +99,87 @@ class DefaultFirestoreAdapter(
         }
     }
 
-    override suspend fun verifyRecipientUnlock(
+    override suspend fun readRecipientUnlockRequirements(
         capsuleId: String,
         recipientUid: String
+    ): OperationResult<RecipientUnlockRequirements> {
+        val cleanCapsuleId = capsuleId.trim()
+        val cleanRecipientUid = recipientUid.trim()
+        if (cleanCapsuleId.isBlank() || cleanRecipientUid.isBlank()) {
+            return OperationResult.Invalid("Capsule ID and recipient UID must not be blank.")
+        }
+
+        val instance = firestoreInstance()
+            ?: return OperationResult.Unavailable("Firestore service is unavailable.")
+
+        return try {
+            val doc = instance.collection("capsules")
+                .document(cleanCapsuleId)
+                .get(Source.SERVER)
+                .await()
+
+            if (!doc.exists()) {
+                return OperationResult.Invalid("Capsule not found with ID: $cleanCapsuleId")
+            }
+
+            val docRecipientId = doc.getString("recipientId")
+            if (docRecipientId != cleanRecipientUid) {
+                return OperationResult.Denied("Only the designated recipient can unlock this capsule.")
+            }
+
+            val unlocked = doc.getBoolean("unlocked") ?: false
+            val lockModeStr = doc.getString("lockMode") ?: "TIME"
+            val lockMode = when (lockModeStr) {
+                "TIME" -> LockMode.TIME
+                "LOCATION" -> LockMode.LOCATION
+                "BOTH", "TIME_AND_LOCATION" -> LockMode.TIME_AND_LOCATION
+                else -> return OperationResult.Invalid("Unsupported lock mode: $lockModeStr")
+            }
+
+            val unlockAtTimestamp = doc.getTimestamp("unlockAt")
+            val unlockAtInstant = unlockAtTimestamp?.toInstant()
+
+            val locMap = doc.get("location") as? Map<*, *>
+            val locationTarget = if (locMap != null) {
+                val lat = (locMap["latitude"] as? Number)?.toDouble()
+                val lng = (locMap["longitude"] as? Number)?.toDouble()
+                val radiusM = (locMap["radiusM"] as? Number)?.toDouble() ?: 150.0
+                if (lat != null && lng != null && lat.isFinite() && lng.isFinite() && radiusM == 150.0) {
+                    LocationTarget(latitude = lat, longitude = lng, radiusMeters = radiusM)
+                } else {
+                    if (lockMode == LockMode.LOCATION || lockMode == LockMode.TIME_AND_LOCATION) {
+                        return OperationResult.Invalid("Capsule location target is malformed or invalid.")
+                    }
+                    null
+                }
+            } else {
+                if (lockMode == LockMode.LOCATION || lockMode == LockMode.TIME_AND_LOCATION) {
+                    return OperationResult.Invalid("Location lock mode requires a target location.")
+                }
+                null
+            }
+
+            OperationResult.Success(
+                RecipientUnlockRequirements(
+                    capsuleId = cleanCapsuleId,
+                    recipientUid = cleanRecipientUid,
+                    unlocked = unlocked,
+                    lockMode = lockMode,
+                    unlockAt = unlockAtInstant,
+                    locationTarget = locationTarget
+                )
+            )
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            mapFirestoreException(e)
+        }
+    }
+
+    override suspend fun verifyRecipientUnlock(
+        capsuleId: String,
+        recipientUid: String,
+        locationSample: ForegroundLocationSample?,
+        clockNanosSupplier: () -> Long
     ): OperationResult<Availability> {
         val cleanCapsuleId = capsuleId.trim()
         val cleanRecipientUid = recipientUid.trim()
@@ -107,21 +194,16 @@ class DefaultFirestoreAdapter(
             val docRef = instance.collection("capsules").document(cleanCapsuleId)
 
             /**
-             * Atomic Firestore transaction for recipient unlock verification (Correction A).
+             * Atomic Firestore transaction for recipient unlock verification.
              * Atomically reads, verifies, and updates the capsule document within [runTransaction]:
              * 1. Reads current capsule document inside transaction via [Transaction.get].
              * 2. Idempotency: Returns [TransactionUnlockResult.AlreadyUnlocked] if `unlocked == true`.
              * 3. Authorization: Verifies `recipientId == recipientUid`.
-             * 4. Lock mode: Only `"TIME"` mode is permitted for first unlock in Issue #15 (`"LOCATION"`, `"BOTH"`,
-             *    and `"TIME_AND_LOCATION"` fail-closed with Issue #17 notice).
+             * 4. For LOCATION/BOTH modes: Evaluates location sample quality, age (0..60s), accuracy (<=100m),
+             *    and target distance (<=150m) using [LocationQualifier.qualify] with fresh [clockNanosSupplier]
+             *    on EVERY callback execution retry.
              * 5. Atomicity & Server Timestamp: Updates `unlocked = true` and `unlockedAt = FieldValue.serverTimestamp()`
-             *    inside the transaction.
-             *
-             * Firestore Transaction Retries & SDK Behavior:
-             * Firestore SDK automatically retries the transaction if a concurrent edit occurs before commit.
-             * Server timestamp evaluation and `request.time >= resource.data.unlockAt` deadline validation are
-             * evaluated atomically on the server by `canRecipientUnlock()` in `firestore.rules`. Unconfirmed
-             * local write overlays are never treated as successful remote authorization.
+             *    inside the transaction. Server rules enforce `request.time >= resource.data.unlockAt` for TIME/BOTH.
              */
             val result = instance.runTransaction<TransactionUnlockResult> { transaction ->
                 val snapshot = transaction.get(docRef)
@@ -140,8 +222,34 @@ class DefaultFirestoreAdapter(
                 }
 
                 val lockModeStr = snapshot.getString("lockMode") ?: "TIME"
-                if (lockModeStr != "TIME") {
-                    return@runTransaction TransactionUnlockResult.UnsupportedMode(lockModeStr)
+                val mode = when (lockModeStr) {
+                    "TIME" -> LockMode.TIME
+                    "LOCATION" -> LockMode.LOCATION
+                    "BOTH", "TIME_AND_LOCATION" -> LockMode.TIME_AND_LOCATION
+                    else -> return@runTransaction TransactionUnlockResult.UnsupportedMode(lockModeStr)
+                }
+
+                if (mode == LockMode.LOCATION || mode == LockMode.TIME_AND_LOCATION) {
+                    if (locationSample == null) {
+                        return@runTransaction TransactionUnlockResult.LocationSampleMissing
+                    }
+
+                    val locMap = snapshot.get("location") as? Map<*, *>
+                    val lat = (locMap?.get("latitude") as? Number)?.toDouble()
+                    val lng = (locMap?.get("longitude") as? Number)?.toDouble()
+                    val radiusM = (locMap?.get("radiusM") as? Number)?.toDouble() ?: 150.0
+
+                    if (lat == null || lng == null || !lat.isFinite() || !lng.isFinite() || radiusM != 150.0) {
+                        return@runTransaction TransactionUnlockResult.InvalidTargetLocation
+                    }
+
+                    val target = LocationTarget(latitude = lat, longitude = lng, radiusMeters = radiusM)
+                    val currentMonotonicNanos = clockNanosSupplier()
+                    val qualification = LocationQualifier.qualify(target, locationSample, currentMonotonicNanos)
+
+                    if (!qualification.isQualifying) {
+                        return@runTransaction TransactionUnlockResult.LocationDisqualified(qualification.reason)
+                    }
                 }
 
                 transaction.update(docRef, mapOf(
@@ -157,13 +265,21 @@ class DefaultFirestoreAdapter(
                 is TransactionUnlockResult.UnlockedSuccess -> OperationResult.Success(Availability.AVAILABLE)
                 is TransactionUnlockResult.NotFound -> OperationResult.Invalid("Capsule not found with ID: $cleanCapsuleId")
                 is TransactionUnlockResult.NotRecipient -> OperationResult.Denied("Only the designated recipient can unlock this capsule.")
-                is TransactionUnlockResult.UnsupportedMode -> {
-                    if (result.mode == "LOCATION" || result.mode == "BOTH" || result.mode == "TIME_AND_LOCATION") {
-                        OperationResult.Denied("Location and combined unlock conditions require Issue #17 implementation.")
-                    } else {
-                        OperationResult.Invalid("Unsupported lock mode: ${result.mode}")
+                is TransactionUnlockResult.LocationSampleMissing -> OperationResult.Denied("Location sample is required to unlock location-restricted capsule.")
+                is TransactionUnlockResult.InvalidTargetLocation -> OperationResult.Invalid("Capsule location target is missing or malformed.")
+                is TransactionUnlockResult.LocationDisqualified -> {
+                    when (result.reason) {
+                        QualificationFailureReason.OUTSIDE_RADIUS -> OperationResult.Denied("Current location is outside target radius.")
+                        QualificationFailureReason.STALE_SAMPLE -> OperationResult.Unavailable("Location sample is stale. Please acquire a fresh location.")
+                        QualificationFailureReason.POOR_ACCURACY -> OperationResult.Unavailable("Location sample accuracy is too poor (must be <= 100m).")
+                        QualificationFailureReason.FUTURE_TIMESTAMP -> OperationResult.Unavailable("Location sample timestamp is invalid.")
+                        QualificationFailureReason.INVALID_COORDINATES -> OperationResult.Invalid("Location sample contains invalid coordinates.")
+                        QualificationFailureReason.INVALID_TARGET -> OperationResult.Invalid("Target location is invalid or does not have 150m radius.")
+                        QualificationFailureReason.MISSING_SAMPLE -> OperationResult.Denied("Location sample is missing.")
+                        QualificationFailureReason.NONE -> OperationResult.Denied("Location qualification failed.")
                     }
                 }
+                is TransactionUnlockResult.UnsupportedMode -> OperationResult.Invalid("Unsupported lock mode: ${result.mode}")
             }
         } catch (e: Exception) {
             if (e is CancellationException) throw e

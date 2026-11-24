@@ -276,6 +276,72 @@ No manual code fix was required. The agent corrected a missing permission linter
   - Why qualifying a location sample in Issue #16 does NOT grant or authorize a capsule unlock (unlock authorization belongs downstream to Issue #17).
 - **Feedback and next step:** Open Draft PR on GitHub, obtain teammate review from User G, and perform human merge into `main`.
 
+## Feature or task: Issue #17 Evaluate current time-and-location conditions without a past-visit latch
+
+- **Task and purpose:** Implementation of Issue #17 (Evaluate current time-and-location conditions without a past-visit latch), joining #15 TIME unlock and #16 LOCATION qualification into a pure condition evaluator and server-authoritative recipient unlock transaction path, with User J as acting implementation owner and User G as reviewer.
+- **Session date(s):** November 24, 2026.
+- **Issue and PR:** [Issue #17](https://github.com/theguardianofthebed/Time-Capsule/issues/17), task branch `feature/17-current-conditions`.
+- **Requirement/design references:** FR-06, FR-07, NFR-04; ARC-05; DD-05; AC-06; T-19, T-20, T-42.
+- **Agent environment:** Android Studio Agent Mode.
+- **Model used:** Gemini 3.8 Flash.
+
+### Goal
+
+Implement `ConditionEvaluator` for pure client-side condition checks, read live recipient unlock requirements from `Source.SERVER`, request ephemeral foreground location fixes for LOCATION and BOTH modes, evaluate sample quality and distance dynamically on every transaction attempt, enforce server-authorized unlock transitions in `DefaultFirestoreAdapter` without persisting or latching past visits, and verify against truth table and boundary conditions.
+
+### Requests and prompts
+
+| # | Request summary | Actual prompt (key part) | Why it worked (or didn't) |
+|---|-----------------|--------------------------|---------------------------|
+| 1 | Execute Issue #17 implementation & update w3 log | "Refer to TimeCapsule_Issue17_Gemini_Implementation_Prompt.md. Also update user J's w3 log as user J will be the main implementer and others will review later whenever available." | Validated 8 readiness gates (`PREFLIGHT_RECORD_VALID`), created `feature/17-current-conditions` branch, and implemented pure condition evaluator, server unlock requirements lookup, location-qualified unlock transaction, repository orchestration, and test suites. |
+
+### What the agent changed and verified
+
+- **Pure Domain Condition Evaluator (`ConditionEvaluator.kt`):**
+  - Implemented `ConditionEvaluator.evaluate(mode, target, sample, nowElapsedRealtimeNanos)` evaluating client-side conditions for `TIME`, `LOCATION`, and `TIME_AND_LOCATION` (BOTH) modes.
+  - Reuses `LocationQualifier.qualify` to check distance ($\le 150\text{ m}$), sample age ($0..\!60\text{ s}$), and horizontal accuracy ($\le 100\text{ m}$).
+  - Does NOT persist or latch past states (`locationOK`/`timeOK`).
+- **Server-Authoritative Recipient Unlock Requirements (`RecipientUnlockRequirements.kt`, `FirestoreAdapter.kt`, `DefaultFirestoreAdapter.kt`):**
+  - Implemented `readRecipientUnlockRequirements(capsuleId, recipientUid)` returning `Source.SERVER` metadata.
+  - Skips location acquisition completely if server record is already `unlocked == true` (idempotent success).
+- **Atomic Location & Time Transaction (`DefaultFirestoreAdapter.verifyRecipientUnlock`):**
+  - Extended `verifyRecipientUnlock` transaction to handle `LOCATION`, `BOTH`, and `TIME_AND_LOCATION` lock modes inside `runTransaction`.
+  - Evaluates `LocationQualifier.qualify` using fresh `clockNanosSupplier()` on EVERY transaction retry execution.
+  - Updates `unlocked = true` and `unlockedAt = FieldValue.serverTimestamp()` inside the transaction. Server rules enforce `request.time >= unlockAt` for TIME and BOTH modes.
+- **Repository Location Orchestration (`DefaultCapsuleRepository.verifyUnlock`):**
+  - Injected optional `locationAdapter` and `clockNanosSupplier` into `DefaultCapsuleRepository`.
+  - Validates authenticated session, fetches live unlock requirements, acquires one-shot current location via `locationAdapter.getCurrentLocation()`, rechecks session across suspension boundaries, and submits to Firestore adapter.
+- **UI & DI Wiring (`MainActivity.kt`):**
+  - Updated `MainActivity` container initialization to pass `locationAdapter` to `DefaultCapsuleRepository`.
+- **Automated Verification Suite:**
+  - Written `ConditionEvaluatorTest.kt` (7 JVM unit tests covering truth table combinations for T-19 and boundary limits for T-42).
+  - Updated `DefaultCapsuleRepositoryUnlockTest.kt` (16 JVM unit tests covering TIME, LOCATION, BOTH modes, session races, missing permissions, and network failures).
+  - 254 JVM unit tests passed across project (`:app:testDebugUnitTest`).
+  - 42 Firebase Firestore & Storage security rules tests passed (`npx firebase emulators:exec --project demo-timecapsule "npm test"`).
+  - Clean debug build, test APK compile, and lint (`:app:assembleDebug`, `:app:assembleDebugAndroidTest`, `:app:lintDebug`).
+
+### Checks and results
+
+- `./gradlew :app:testDebugUnitTest`: PASS (254 JVM unit tests passed across project, 0 failed).
+- `npx firebase emulators:exec --project demo-timecapsule "npm test"`: PASS (42 security rules tests passed, 0 failed).
+- `./gradlew :app:assembleDebug :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors).
+- `py tools/check_readiness.py --issue 17 --evidence docs/agent-tools/readiness-evidence-issue17.json`: PASS (`PREFLIGHT_RECORD_VALID`).
+- `git diff --check`: PASS (clean).
+
+### Errors and manual fixes
+
+No manual code fix was required. The agent corrected a missing constructor parameter in `FakeLocationAdapterForUnlock` by implementing `override fun isLocationAvailable(): Boolean = true` and removed an unused import in `DefaultFirestoreAdapter.kt`.
+
+### My review and understanding
+
+- **What I reviewed:** Inspected the generated `ConditionEvaluator.kt`, `RecipientUnlockRequirements.kt`, `FirestoreAdapter.kt`, `DefaultFirestoreAdapter.kt`, `DefaultCapsuleRepository.kt`, `MainActivity.kt`, `ConditionEvaluatorTest.kt`, and `DefaultCapsuleRepositoryUnlockTest.kt` diffs.
+- **What I can explain:**
+  - How `ConditionEvaluator` and `DefaultFirestoreAdapter` evaluate current sample age ($0..\!60\text{ s}$), horizontal accuracy ($\le 100\text{ m}$), and target distance ($\le 150\text{ m}$) dynamically on every attempt without caching or latching past visits.
+  - Why `readRecipientUnlockRequirements` uses an authoritative `Source.SERVER` read to check if a capsule is already unlocked before attempting GPS acquisition.
+  - How Firestore security rules enforce `request.time >= unlockAt` for TIME and BOTH modes while the client enforces live location qualification within the atomic transaction.
+- **Feedback and next step:** Commit implementation files, open Draft PR on GitHub, obtain teammate review from User G, and perform human merge into `main`.
+
+
 
 
 

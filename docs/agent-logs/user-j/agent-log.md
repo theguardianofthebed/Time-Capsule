@@ -407,5 +407,35 @@ User J confirmed task ownership and execution. Independent teammate PR review by
 User J confirmed task ownership and execution. Independent teammate PR review by User G or User F and manual testing follow separately.
 
 
+## 2026-11-24-issue17-current-conditions — Evaluate current time-and-location conditions without a past-visit latch
+
+- **Owner / scope / period:** User J (Junwon), explicitly confirmed as implementation owner for Issue #17. Period: November 24, 2026. MVP Scope.
+- **Environment/model:** Android Studio Agent Mode (Gemini 3.8 Flash).
+- **GitHub:** [Issue #17](https://github.com/theguardianofthebed/Time-Capsule/issues/17); task branch `feature/17-current-conditions`.
+- **References:** FR-06, FR-07, NFR-04; ARC-05; DD-05; AC-06; T-19, T-20, T-42.
+
+### Work performed
+
+1. **Pure Domain Condition Evaluator (`ConditionEvaluator.kt`):** Implemented `ConditionEvaluator.evaluate(mode, target, sample, nowElapsedRealtimeNanos)` evaluating client-side conditions for `TIME`, `LOCATION`, and `TIME_AND_LOCATION` (BOTH) modes. Reuses `LocationQualifier.qualify` to check distance ($\le 150\text{ m}$), sample age ($0..\!60\text{ s}$), and horizontal accuracy ($\le 100\text{ m}$). Does NOT persist or latch past states (`locationOK`/`timeOK`).
+2. **Server-Authoritative Recipient Unlock Requirements (`RecipientUnlockRequirements.kt`, `FirestoreAdapter.kt`, `DefaultFirestoreAdapter.kt`):** Implemented `readRecipientUnlockRequirements(capsuleId, recipientUid)` returning `Source.SERVER` metadata. Skips location acquisition completely if server record is already `unlocked == true` (idempotent success).
+3. **Atomic Location & Time Transaction (`DefaultFirestoreAdapter.verifyRecipientUnlock`):** Extended `verifyRecipientUnlock` transaction to handle `LOCATION`, `BOTH`, and `TIME_AND_LOCATION` lock modes inside `runTransaction`. Evaluates `LocationQualifier.qualify` using fresh `clockNanosSupplier()` on EVERY transaction retry execution. Updates `unlocked = true` and `unlockedAt = FieldValue.serverTimestamp()` inside the transaction. Server rules enforce `request.time >= unlockAt` for TIME and BOTH modes.
+4. **Repository Location Orchestration (`DefaultCapsuleRepository.verifyUnlock`):** Injected optional `locationAdapter` and `clockNanosSupplier` into `DefaultCapsuleRepository`. Validates authenticated session, fetches live unlock requirements, acquires one-shot current location via `locationAdapter.getCurrentLocation()`, rechecks session across suspension boundaries, and submits to Firestore adapter.
+5. **UI & DI Wiring (`MainActivity.kt`):** Updated `MainActivity` container initialization to pass `locationAdapter` to `DefaultCapsuleRepository`.
+6. **Automated Verification Suite:** Written `ConditionEvaluatorTest.kt` (7 JVM unit tests covering truth table combinations for T-19 and boundary limits for T-42). Updated `DefaultCapsuleRepositoryUnlockTest.kt` (16 JVM unit tests covering TIME, LOCATION, BOTH modes, session races, missing permissions, and network failures).
+
+### Checks and verification
+
+- `./gradlew :app:testDebugUnitTest`: PASS (254 JVM unit tests passed across project, 0 failed)
+- `npx firebase emulators:exec --project demo-timecapsule "npm test"`: PASS (42 security rules tests passed, 0 failed)
+- `./gradlew :app:assembleDebug :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors)
+- `py tools/check_readiness.py --issue 17 --evidence docs/agent-tools/readiness-evidence-issue17.json`: PASS (`PREFLIGHT_RECORD_VALID`)
+- `git diff --check`: PASS (clean)
+
+### Human input and remaining work
+
+User J confirmed task ownership and execution. Independent teammate PR review by User G and manual testing follow separately.
+
+
+
 
 
