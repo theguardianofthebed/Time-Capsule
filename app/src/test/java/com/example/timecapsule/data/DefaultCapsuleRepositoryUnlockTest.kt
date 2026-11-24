@@ -28,7 +28,7 @@ import org.junit.Test
  * JVM Unit tests verifying [DefaultCapsuleRepository.verifyUnlock] behavior for Issue #17.
  * Covers TIME, LOCATION, and BOTH lock modes, live recipient requirements reads, current-location qualification,
  * truth table simulation (T-19), staying inside before/after deadline (T-20), boundary enforcement (T-42),
- * missing permissions/services, session race protection, and idempotent unlocked state.
+ * missing permissions/services, session race protection, pending-write rejection, and idempotent unlocked state.
  */
 class DefaultCapsuleRepositoryUnlockTest {
 
@@ -39,10 +39,11 @@ class DefaultCapsuleRepositoryUnlockTest {
     private lateinit var repository: DefaultCapsuleRepository
 
     private val targetSeoul = LocationTarget(latitude = 37.5665, longitude = 126.9780, radiusMeters = 150.0)
-    private val testNowNanos = 100_000_000_000L
+    private var testNowNanos = 100_000_000_000L
 
     @Before
     fun setUp() {
+        testNowNanos = 100_000_000_000L
         sessionTracker = DefaultSessionTracker()
         fakeAuthAdapter = FakeAuthAdapterForUnlock(sessionTracker)
         fakeFirestoreAdapter = FakeFirestoreAdapterForUnlock()
@@ -131,6 +132,27 @@ class DefaultCapsuleRepositoryUnlockTest {
     }
 
     @Test
+    fun `verifyUnlock rejects unacknowledged local update with pending writes`() = runBlocking {
+        sessionTracker.startSession("recipient-uid-1")
+        fakeFirestoreAdapter.seedCapsule(
+            capsuleId = "pending-writes-capsule",
+            recipientUid = "recipient-uid-1",
+            unlocked = true, // Unconfirmed local update
+            lockMode = "LOCATION",
+            deadlineReached = true,
+            locationTarget = targetSeoul,
+            hasPendingWrites = true // P0: Local pending write flag!
+        )
+        fakeLocationAdapter.fineLocationGranted = false // If pending writes were accepted, GPS would be skipped
+
+        val result = repository.verifyUnlock("pending-writes-capsule")
+
+        // Must reject pending write evidence and attempt real location verification (which fails due to missing perm)
+        assertTrue(result is OperationResult.Denied)
+        assertTrue((result as OperationResult.Denied).message.contains("permission"))
+    }
+
+    @Test
     fun `verifyUnlock treats already unlocked capsule as idempotent success without querying GPS`() = runBlocking {
         sessionTracker.startSession("recipient-uid-1")
         fakeFirestoreAdapter.seedCapsule(
@@ -139,7 +161,8 @@ class DefaultCapsuleRepositoryUnlockTest {
             unlocked = true,
             lockMode = "LOCATION",
             deadlineReached = true,
-            locationTarget = targetSeoul
+            locationTarget = targetSeoul,
+            hasPendingWrites = false
         )
 
         fakeLocationAdapter.fineLocationGranted = false // Would fail if GPS were queried
@@ -207,23 +230,111 @@ class DefaultCapsuleRepositoryUnlockTest {
     }
 
     @Test
-    fun `verifyUnlock denies LOCATION mode when permission is missing`() = runBlocking {
+    fun `verifyUnlock denies LOCATION mode when permission is revoked prior to submission`() = runBlocking {
         sessionTracker.startSession("recipient-uid-1")
         fakeFirestoreAdapter.seedCapsule(
-            capsuleId = "capsule-loc-perm",
+            capsuleId = "capsule-loc-perm-revoked",
             recipientUid = "recipient-uid-1",
             unlocked = false,
             lockMode = "LOCATION",
             deadlineReached = true,
             locationTarget = targetSeoul
         )
-        fakeLocationAdapter.fineLocationGranted = false
 
-        val result = repository.verifyUnlock("capsule-loc-perm")
+        // Simulate permission revoked right after sample acquisition
+        fakeLocationAdapter.fineLocationGranted = true
+        fakeLocationAdapter.sampleResult = LocationSampleResult(
+            status = LocationSampleStatus.SUCCESS,
+            sample = ForegroundLocationSample(37.5665, 126.9780, 90_000_000_000L, 20.0f)
+        )
+        fakeLocationAdapter.onGetLocationCallback = {
+            fakeLocationAdapter.fineLocationGranted = false
+        }
+
+        val result = repository.verifyUnlock("capsule-loc-perm-revoked")
 
         assertTrue(result is OperationResult.Denied)
-        val message = (result as OperationResult.Denied).message
-        assertTrue(message.contains("permission"))
+        assertTrue((result as OperationResult.Denied).message.contains("permission was revoked"))
+    }
+
+    @Test
+    fun `verifyUnlock denies LOCATION mode when location services are disabled prior to submission`() = runBlocking {
+        sessionTracker.startSession("recipient-uid-1")
+        fakeFirestoreAdapter.seedCapsule(
+            capsuleId = "capsule-loc-service-off",
+            recipientUid = "recipient-uid-1",
+            unlocked = false,
+            lockMode = "LOCATION",
+            deadlineReached = true,
+            locationTarget = targetSeoul
+        )
+
+        fakeLocationAdapter.locationAvailable = true
+        fakeLocationAdapter.sampleResult = LocationSampleResult(
+            status = LocationSampleStatus.SUCCESS,
+            sample = ForegroundLocationSample(37.5665, 126.9780, 90_000_000_000L, 20.0f)
+        )
+        fakeLocationAdapter.onGetLocationCallback = {
+            fakeLocationAdapter.locationAvailable = false
+        }
+
+        val result = repository.verifyUnlock("capsule-loc-service-off")
+
+        assertTrue(result is OperationResult.Unavailable)
+        assertTrue((result as OperationResult.Unavailable).message.contains("disabled"))
+    }
+
+    @Test
+    fun `verifyUnlock rejects sample if timestamp expires during transaction retry`() = runBlocking {
+        sessionTracker.startSession("recipient-uid-1")
+        fakeFirestoreAdapter.seedCapsule(
+            capsuleId = "capsule-loc-expiry-retry",
+            recipientUid = "recipient-uid-1",
+            unlocked = false,
+            lockMode = "LOCATION",
+            deadlineReached = true,
+            locationTarget = targetSeoul
+        )
+
+        fakeLocationAdapter.sampleResult = LocationSampleResult(
+            status = LocationSampleStatus.SUCCESS,
+            sample = ForegroundLocationSample(
+                latitude = 37.5665,
+                longitude = 126.9780,
+                elapsedRealtimeNanos = 90_000_000_000L, // Fresh when testNowNanos=100s (age=10s)
+                horizontalAccuracyMeters = 20.0f
+            )
+        )
+
+        // Simulate clock advancing by 60s during transaction retry execution
+        fakeFirestoreAdapter.onTransactionRetryCallback = {
+            testNowNanos = 160_000_000_001L // Age becomes 70.000000001s > 60s!
+        }
+
+        val result = repository.verifyUnlock("capsule-loc-expiry-retry")
+
+        assertTrue(result is OperationResult.Unavailable)
+        assertTrue((result as OperationResult.Unavailable).message.contains("stale"))
+        assertFalse(fakeFirestoreAdapter.isCapsuleUnlocked("capsule-loc-expiry-retry"))
+    }
+
+    @Test
+    fun `verifyUnlock rejects malformed location record missing radius`() = runBlocking {
+        sessionTracker.startSession("recipient-uid-1")
+        fakeFirestoreAdapter.seedCapsule(
+            capsuleId = "capsule-malformed-radius",
+            recipientUid = "recipient-uid-1",
+            unlocked = false,
+            lockMode = "LOCATION",
+            deadlineReached = true,
+            locationTarget = null, // Missing location target / malformed
+            isMalformedLocationTarget = true
+        )
+
+        val result = repository.verifyUnlock("capsule-malformed-radius")
+
+        assertTrue(result is OperationResult.Invalid)
+        assertTrue((result as OperationResult.Invalid).message.contains("malformed") || (result as OperationResult.Invalid).message.contains("requires a target"))
     }
 
     @Test
@@ -298,6 +409,46 @@ class DefaultCapsuleRepositoryUnlockTest {
     }
 
     @Test
+    fun `verifyUnlock handles prior location visit followed by departure before deadline`() = runBlocking {
+        sessionTracker.startSession("recipient-uid-1")
+        fakeFirestoreAdapter.seedCapsule(
+            capsuleId = "visit-departure-capsule",
+            recipientUid = "recipient-uid-1",
+            unlocked = false,
+            lockMode = "BOTH",
+            deadlineReached = false,
+            locationTarget = targetSeoul
+        )
+
+        // Early visit inside location -> denied due to early deadline
+        fakeLocationAdapter.sampleResult = LocationSampleResult(
+            status = LocationSampleStatus.SUCCESS,
+            sample = ForegroundLocationSample(37.5665, 126.9780, 90_000_000_000L, 20.0f)
+        )
+        val attempt1 = repository.verifyUnlock("visit-departure-capsule")
+        assertTrue(attempt1 is OperationResult.Denied)
+
+        // User departs location outside 150m and deadline arrives
+        fakeFirestoreAdapter.seedCapsule(
+            capsuleId = "visit-departure-capsule",
+            recipientUid = "recipient-uid-1",
+            unlocked = false,
+            lockMode = "BOTH",
+            deadlineReached = true,
+            locationTarget = targetSeoul
+        )
+        fakeLocationAdapter.sampleResult = LocationSampleResult(
+            status = LocationSampleStatus.SUCCESS,
+            sample = ForegroundLocationSample(37.5692, 126.9780, 90_000_000_000L, 20.0f) // ~300m away
+        )
+
+        // Attempt 2 after deadline while outside => Denied (no past-visit latch!)
+        val attempt2 = repository.verifyUnlock("visit-departure-capsule")
+        assertTrue(attempt2 is OperationResult.Denied)
+        assertFalse(fakeFirestoreAdapter.isCapsuleUnlocked("visit-departure-capsule"))
+    }
+
+    @Test
     fun `verifyUnlock handles recipient remaining inside before and after deadline without re-entry (T-20)`() = runBlocking {
         sessionTracker.startSession("recipient-uid-1")
         fakeFirestoreAdapter.seedCapsule(
@@ -333,6 +484,40 @@ class DefaultCapsuleRepositoryUnlockTest {
         assertTrue(attempt2 is OperationResult.Success)
         assertEquals(Availability.AVAILABLE, (attempt2 as OperationResult.Success).data)
         assertTrue(fakeFirestoreAdapter.isCapsuleUnlocked("t20-capsule"))
+    }
+
+    @Test
+    fun `verifyUnlock lost transaction response reconciles committed and uncommitted outcomes`() = runBlocking {
+        sessionTracker.startSession("recipient-uid-1")
+
+        // Case A: Transaction committed on server before response was lost
+        fakeFirestoreAdapter.seedCapsule(
+            capsuleId = "lost-response-committed",
+            recipientUid = "recipient-uid-1",
+            unlocked = false,
+            lockMode = "TIME",
+            deadlineReached = true
+        )
+        fakeFirestoreAdapter.simulateLostResponseCommitted = true
+
+        val resCommitted = repository.verifyUnlock("lost-response-committed")
+        assertTrue(resCommitted is OperationResult.Success)
+        assertEquals(Availability.AVAILABLE, (resCommitted as OperationResult.Success).data)
+
+        // Case B: Transaction failed/uncommitted on server before response was lost
+        fakeFirestoreAdapter.seedCapsule(
+            capsuleId = "lost-response-uncommitted",
+            recipientUid = "recipient-uid-1",
+            unlocked = false,
+            lockMode = "TIME",
+            deadlineReached = true
+        )
+        fakeFirestoreAdapter.simulateLostResponseCommitted = false
+        fakeFirestoreAdapter.simulateLostResponseError = true
+
+        val resUncommitted = repository.verifyUnlock("lost-response-uncommitted")
+        assertTrue(resUncommitted is OperationResult.Unavailable)
+        assertFalse(fakeFirestoreAdapter.isCapsuleUnlocked("lost-response-uncommitted"))
     }
 
     @Test
@@ -397,7 +582,9 @@ class DefaultCapsuleRepositoryUnlockTest {
     }
 
     private class FakeLocationAdapterForUnlock : LocationAdapter {
+        var locationAvailable = true
         var fineLocationGranted = true
+        var onGetLocationCallback: (() -> Unit)? = null
         var sampleResult = LocationSampleResult(
             status = LocationSampleStatus.SUCCESS,
             sample = ForegroundLocationSample(
@@ -408,15 +595,20 @@ class DefaultCapsuleRepositoryUnlockTest {
             )
         )
 
-        override fun isLocationAvailable(): Boolean = true
+        override fun isLocationAvailable(): Boolean = locationAvailable
         override fun isFineLocationGranted(): Boolean = fineLocationGranted
-        override suspend fun getCurrentLocation(): LocationSampleResult = sampleResult
+        override suspend fun getCurrentLocation(): LocationSampleResult {
+            onGetLocationCallback?.invoke()
+            return sampleResult
+        }
     }
 
     private class FakeFirestoreAdapterForUnlock : FirestoreAdapter {
         var simulateNetworkError = false
         var simulateLostResponseError = false
+        var simulateLostResponseCommitted = false
         var onUnlockCallback: (() -> Unit)? = null
+        var onTransactionRetryCallback: (() -> Unit)? = null
         private val capsules = mutableMapOf<String, TestCapsuleRecord>()
 
         data class TestCapsuleRecord(
@@ -426,7 +618,9 @@ class DefaultCapsuleRepositoryUnlockTest {
             val lockMode: String,
             val deadlineReached: Boolean,
             val unlockAt: Instant? = null,
-            val locationTarget: LocationTarget? = null
+            val locationTarget: LocationTarget? = null,
+            val hasPendingWrites: Boolean = false,
+            val isMalformedLocationTarget: Boolean = false
         )
 
         fun seedCapsule(
@@ -436,10 +630,12 @@ class DefaultCapsuleRepositoryUnlockTest {
             lockMode: String,
             deadlineReached: Boolean,
             unlockAt: Instant? = null,
-            locationTarget: LocationTarget? = null
+            locationTarget: LocationTarget? = null,
+            hasPendingWrites: Boolean = false,
+            isMalformedLocationTarget: Boolean = false
         ) {
             capsules[capsuleId] = TestCapsuleRecord(
-                capsuleId, recipientUid, unlocked, lockMode, deadlineReached, unlockAt, locationTarget
+                capsuleId, recipientUid, unlocked, lockMode, deadlineReached, unlockAt, locationTarget, hasPendingWrites, isMalformedLocationTarget
             )
         }
 
@@ -476,11 +672,20 @@ class DefaultCapsuleRepositoryUnlockTest {
                 else -> return OperationResult.Invalid("Unsupported lock mode: ${record.lockMode}")
             }
 
+            if (record.isMalformedLocationTarget) {
+                if (mode == LockMode.LOCATION || mode == LockMode.TIME_AND_LOCATION) {
+                    return OperationResult.Invalid("Capsule location target is malformed or invalid.")
+                }
+            }
+
+            // P0: Reject local unconfirmed pending writes!
+            val unlockedConfirmed = record.unlocked && !record.hasPendingWrites
+
             return OperationResult.Success(
                 RecipientUnlockRequirements(
                     capsuleId = capsuleId,
                     recipientUid = recipientUid,
-                    unlocked = record.unlocked,
+                    unlocked = unlockedConfirmed,
                     lockMode = mode,
                     unlockAt = record.unlockAt,
                     locationTarget = record.locationTarget
@@ -495,6 +700,17 @@ class DefaultCapsuleRepositoryUnlockTest {
             clockNanosSupplier: () -> Long
         ): OperationResult<Availability> {
             onUnlockCallback?.invoke()
+            onTransactionRetryCallback?.invoke()
+
+            if (simulateLostResponseCommitted) {
+                val rec = capsules[capsuleId]
+                if (rec != null) {
+                    rec.unlocked = true
+                    // Simulates DefaultFirestoreAdapter catch block reconciling committed server state
+                    return OperationResult.Success(Availability.AVAILABLE)
+                }
+            }
+
             if (simulateNetworkError || simulateLostResponseError) {
                 return OperationResult.Unavailable("Network response lost during unlock verification.")
             }
@@ -505,7 +721,7 @@ class DefaultCapsuleRepositoryUnlockTest {
                 return OperationResult.Denied("Only the designated recipient can unlock this capsule.")
             }
 
-            if (record.unlocked) {
+            if (record.unlocked && !record.hasPendingWrites) {
                 return OperationResult.Success(Availability.AVAILABLE)
             }
 
@@ -521,7 +737,7 @@ class DefaultCapsuleRepositoryUnlockTest {
                     return OperationResult.Denied("Location sample is missing.")
                 }
                 val target = record.locationTarget
-                    ?: return OperationResult.Invalid("Capsule target location is missing.")
+                    ?: return OperationResult.Invalid("Capsule location target is missing or malformed.")
                 val nowNanos = clockNanosSupplier()
                 val qual = LocationQualifier.qualify(target, locationSample, nowNanos)
                 if (!qual.isQualifying) {

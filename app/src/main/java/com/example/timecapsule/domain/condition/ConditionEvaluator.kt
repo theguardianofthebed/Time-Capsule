@@ -17,7 +17,7 @@ import java.time.Instant
  *                     Note: Does NOT claim server-time approval, which is strictly enforced by server security rules.
  * @property isLocationRequired True if the lock mode requires location qualification (LOCATION or TIME_AND_LOCATION).
  * @property locationResult The detailed qualification result from [LocationQualifier], or null if location was not required.
- * @property failureReason Categorized failure reason, or [QualificationFailureReason.NONE] if eligible.
+ * @property failureReason Categorized location failure reason, or [QualificationFailureReason.NONE] if location is eligible or not required.
  * @property simulatedTimeEligible Optional test-only evaluation of time condition when simulated server time is provided.
  */
 data class ConditionEvaluationResult(
@@ -38,6 +38,18 @@ data class ConditionEvaluationResult(
  * 3. Never manufactures server time from device clock in production; server rules enforce `request.time >= unlockAt`.
  */
 object ConditionEvaluator {
+
+    /**
+     * Evaluates client-side location eligibility directly for a target location and sample.
+     */
+    fun evaluateLocationEligibility(
+        target: LocationTarget?,
+        sample: ForegroundLocationSample?,
+        nowElapsedRealtimeNanos: Long,
+        distanceCalculator: DistanceCalculator = HaversineDistanceCalculator
+    ): LocationQualificationResult {
+        return LocationQualifier.qualify(target, sample, nowElapsedRealtimeNanos, distanceCalculator)
+    }
 
     /**
      * Evaluates client-side conditions for a given lock mode, target location, current sample, and monotonic timestamp.
@@ -75,13 +87,13 @@ object ConditionEvaluator {
                     isEligible = isEligible,
                     isLocationRequired = false,
                     locationResult = null,
-                    failureReason = if (isEligible) QualificationFailureReason.NONE else QualificationFailureReason.STALE_SAMPLE,
+                    failureReason = QualificationFailureReason.NONE,
                     simulatedTimeEligible = timeEligible
                 )
             }
             LockMode.LOCATION -> {
                 // For LOCATION mode, evaluate fresh foreground sample against target coordinates and radius.
-                val locQual = LocationQualifier.qualify(target, sample, nowElapsedRealtimeNanos, distanceCalculator)
+                val locQual = evaluateLocationEligibility(target, sample, nowElapsedRealtimeNanos, distanceCalculator)
                 ConditionEvaluationResult(
                     isEligible = locQual.isQualifying,
                     isLocationRequired = true,
@@ -92,7 +104,7 @@ object ConditionEvaluator {
             }
             LockMode.TIME_AND_LOCATION -> {
                 // For TIME_AND_LOCATION (BOTH) mode, both location qualification and server time must succeed.
-                val locQual = LocationQualifier.qualify(target, sample, nowElapsedRealtimeNanos, distanceCalculator)
+                val locQual = evaluateLocationEligibility(target, sample, nowElapsedRealtimeNanos, distanceCalculator)
                 val locationEligible = locQual.isQualifying
                 val isEligible = if (timeEligible != null) {
                     locationEligible && timeEligible

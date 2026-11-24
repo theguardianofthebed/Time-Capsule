@@ -127,7 +127,12 @@ class DefaultFirestoreAdapter(
                 return OperationResult.Denied("Only the designated recipient can unlock this capsule.")
             }
 
-            val unlocked = doc.getBoolean("unlocked") ?: false
+            // P0: Reject local unconfirmed mutations or cached results.
+            val unlockedRaw = doc.getBoolean("unlocked") ?: false
+            val hasPendingWrites = doc.metadata.hasPendingWrites()
+            val isFromCache = doc.metadata.isFromCache
+            val unlocked = unlockedRaw && !hasPendingWrites && !isFromCache
+
             val lockModeStr = doc.getString("lockMode") ?: "TIME"
             val lockMode = when (lockModeStr) {
                 "TIME" -> LockMode.TIME
@@ -143,8 +148,8 @@ class DefaultFirestoreAdapter(
             val locationTarget = if (locMap != null) {
                 val lat = (locMap["latitude"] as? Number)?.toDouble()
                 val lng = (locMap["longitude"] as? Number)?.toDouble()
-                val radiusM = (locMap["radiusM"] as? Number)?.toDouble() ?: 150.0
-                if (lat != null && lng != null && lat.isFinite() && lng.isFinite() && radiusM == 150.0) {
+                val radiusM = (locMap["radiusM"] as? Number)?.toDouble()
+                if (lat != null && lng != null && radiusM != null && lat.isFinite() && lng.isFinite() && radiusM == 150.0) {
                     LocationTarget(latitude = lat, longitude = lng, radiusMeters = radiusM)
                 } else {
                     if (lockMode == LockMode.LOCATION || lockMode == LockMode.TIME_AND_LOCATION) {
@@ -237,9 +242,9 @@ class DefaultFirestoreAdapter(
                     val locMap = snapshot.get("location") as? Map<*, *>
                     val lat = (locMap?.get("latitude") as? Number)?.toDouble()
                     val lng = (locMap?.get("longitude") as? Number)?.toDouble()
-                    val radiusM = (locMap?.get("radiusM") as? Number)?.toDouble() ?: 150.0
+                    val radiusM = (locMap?.get("radiusM") as? Number)?.toDouble()
 
-                    if (lat == null || lng == null || !lat.isFinite() || !lng.isFinite() || radiusM != 150.0) {
+                    if (lat == null || lng == null || radiusM == null || !lat.isFinite() || !lng.isFinite() || radiusM != 150.0) {
                         return@runTransaction TransactionUnlockResult.InvalidTargetLocation
                     }
 
@@ -286,6 +291,8 @@ class DefaultFirestoreAdapter(
             try {
                 val checkDoc = instance.collection("capsules").document(cleanCapsuleId).get(Source.SERVER).await()
                 if (checkDoc.exists() &&
+                    !checkDoc.metadata.hasPendingWrites() &&
+                    !checkDoc.metadata.isFromCache &&
                     checkDoc.getString("recipientId") == cleanRecipientUid &&
                     checkDoc.getBoolean("unlocked") == true) {
                     return OperationResult.Success(Availability.AVAILABLE)

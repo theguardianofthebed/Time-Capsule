@@ -1,5 +1,6 @@
 package com.example.timecapsule.data.adapter
 
+import android.os.SystemClock
 import com.example.timecapsule.domain.model.Availability
 import com.example.timecapsule.domain.model.ForegroundLocationSample
 import com.example.timecapsule.domain.model.RecipientProfile
@@ -59,7 +60,7 @@ interface FirestoreAdapter {
         capsuleId: String,
         recipientUid: String,
         locationSample: ForegroundLocationSample? = null,
-        clockNanosSupplier: () -> Long = { System.currentTimeMillis() * 1_000_000L }
+        clockNanosSupplier: () -> Long = { SystemClock.elapsedRealtimeNanos() }
     ): OperationResult<Availability> {
         return OperationResult.Unavailable("Unlock verification is not implemented in this adapter.")
     }

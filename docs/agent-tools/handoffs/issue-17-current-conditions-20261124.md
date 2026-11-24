@@ -1,50 +1,48 @@
-# Task handoff: Issue #17 Evaluate current time-and-location conditions without a past-visit latch
+# Task handoff: Issue #17 Evaluate current time-and-location conditions without a past-visit latch (Post-Review Corrections)
 
 - **Confirmed owner:** User J (explicitly confirmed by user prompt)
 - **Scope / period / different human reviewer:** MVP / 24 November 2026 / User G (reviewer)
-- **Issue / PR:** Issue #17 / PR pending
+- **Issue / PR:** Issue #17 / Branch pushed (`origin/feature/17-current-conditions`)
 - **Branch / base / head:** `feature/17-current-conditions` / Base `93b7409e871f215ea2cfc08642c1c934ddf5ec27` / Head `feature/17-current-conditions`
-- **State:** IN_PROGRESS (Implementation complete, verification passed, pending draft PR and teammate review)
-- **Boundary:** Pure `ConditionEvaluator`, live recipient unlock requirements read, current-location verification in `DefaultFirestoreAdapter` transaction, `DefaultCapsuleRepository` location orchestration, and automated unit/rules test suite.
+- **State:** READY_FOR_REVIEW (Post-review corrections P0/P1/P2 applied, branch pushed, verification passed)
+- **Boundary:** Pure `ConditionEvaluator`, live recipient unlock requirements read, pending-write rejection, location-qualified unlock transaction, `DefaultCapsuleRepository` location orchestration, and automated unit/rules/emulator test suite.
 - **Predecessors:** Issue 15 (PR #41, merge `6ccd2ffb02dde02278f8c9b30a4ae1355ea180ff`) and Issue 16 (PR #42, merge `93b7409e871f215ea2cfc08642c1c934ddf5ec27`). Ancestry verified on base commit `93b7409e871f215ea2cfc08642c1c934ddf5ec27`.
 - **Contract:** FR-06, FR-07, NFR-04, ARC-05, DD-05, AC-06, T-19, T-20, T-42.
 - **Overlap inspection:** Inspected active branches/PRs; no competing claims or overlapping file modifications for condition evaluation and location unlock verification.
 - **Readiness:** All eight readiness gates PASSED (`PREFLIGHT_RECORD_VALID` in `docs/agent-tools/readiness-evidence-issue17.json`).
 
-## Implementation Summary
+## Post-Review Corrections Applied
 
-1. **Pure Domain Condition Evaluator (`ConditionEvaluator.kt`):**
-   - Created pure JVM `ConditionEvaluator` evaluating client-side conditions for `TIME`, `LOCATION`, and `TIME_AND_LOCATION` (BOTH) modes.
-   - Reuses `LocationQualifier.qualify` to evaluate sample age (0..60s), accuracy (<=100m), and target distance (<=150m).
-   - Never remembers previous truth or persists `locationOK` / `timeOK` flags as future authorization.
-2. **Server-Authoritative Recipient Unlock Requirements (`RecipientUnlockRequirements.kt`, `FirestoreAdapter.kt`, `DefaultFirestoreAdapter.kt`):**
-   - Added `readRecipientUnlockRequirements(capsuleId, recipientUid)` doing an authoritative `Source.SERVER` read of metadata.
-   - Returns lock mode, unlock target, and existing unlocked status. If already unlocked (`unlocked == true`), skips GPS acquisition completely.
-3. **Atomic Location & Time Transaction (`DefaultFirestoreAdapter.verifyRecipientUnlock`):**
-   - Extended `verifyRecipientUnlock` transaction to handle `LOCATION`, `BOTH`, and `TIME_AND_LOCATION` lock modes inside `runTransaction`.
-   - Evaluates `LocationQualifier.qualify` using fresh `clockNanosSupplier()` on EVERY transaction retry execution.
-   - Rejects stale samples (>60s), poor accuracy (>100m), or distance outside 150m before any update.
-   - Updates `unlocked = true` and `unlockedAt = FieldValue.serverTimestamp()` inside the transaction. Server rules enforce `request.time >= unlockAt` for TIME and BOTH modes.
-4. **Repository Location Orchestration (`DefaultCapsuleRepository.verifyUnlock`):**
-   - Injected optional `locationAdapter` and `clockNanosSupplier` into `DefaultCapsuleRepository`.
-   - Evaluates session validity across suspension points, requests ephemeral foreground location fix for LOCATION/BOTH modes, checks permissions/services, and submits to Firestore adapter.
-5. **Automated Verification:**
-   - 254 JVM unit tests passed (`:app:testDebugUnitTest`).
-   - 42 Firebase Firestore & Storage security rules tests passed (`npx firebase emulators:exec --project demo-timecapsule "npm test"`).
-   - Clean debug build, test APK compile, and lint (`:app:assembleDebug`, `:app:assembleDebugAndroidTest`, `:app:lintDebug`).
+1. **P0 — Prevent False Server-Confirmed Unlock:**
+   - Updated `readRecipientUnlockRequirements` and transaction failure reconciliation path in `DefaultFirestoreAdapter.kt` to check `!doc.metadata.hasPendingWrites() && !doc.metadata.isFromCache`.
+   - Rejects unconfirmed local mutations and cached state so `unlocked == true` is accepted strictly when server confirmation is established.
+   - Added regression test `verifyUnlock rejects unacknowledged local update with pending writes` in `DefaultCapsuleRepositoryUnlockTest.kt`.
+2. **P1 — Validate Location Availability Throughout the Attempt:**
+   - Updated `DefaultCapsuleRepository.verifyUnlock` to recheck `isFineLocationGranted()` AND `isLocationAvailable()` both before and after sample acquisition, prior to transaction submission.
+   - Re-evaluates sample freshness with fresh `clockNanosSupplier()` on every transaction retry callback without performing GPS inside the callback.
+   - Added unit tests for permission revocation mid-flight and location service disablement mid-flight.
+3. **P1 — Remove Wall-Clock Fallback:**
+   - Removed `System.currentTimeMillis() * 1_000_000L` wall-clock fallback from `DefaultCapsuleRepository.kt` and `FirestoreAdapter.kt`.
+   - Uses `android.os.SystemClock.elapsedRealtimeNanos()` in production and deterministic injected clock suppliers in tests.
+4. **P1 — Add Missing Automated Verification:**
+   - Extended `DefaultCapsuleRepositoryUnlockTest.kt` (260 unit tests passed) to cover pending-write rejection, permission/service revocation mid-flight, sample expiration during retry, malformed target rejection, lost response reconciliation, and session races.
+   - Extended `FirebaseEmulatorUnlockIntegrationTest.kt` (42 security rules tests passed) to cover real LOCATION-only unlock, real BOTH mode truth table combinations (`F/F`, `F/T`, `T/F`, `T/T`), prior visit departure before deadline, and staying inside across deadline without re-entry (T-20).
+5. **P2 — Focused Cleanup:**
+   - Separated location eligibility check in `ConditionEvaluator.kt` and removed `STALE_SAMPLE` as a time failure representation.
+   - Rejects malformed backend location records missing `radiusM` or with `radiusM != 150.0`.
+
+## Automated Verification Suite
+
+- 260 JVM unit tests passed (`:app:testDebugUnitTest`).
+- 42 Firebase Firestore & Storage security rules tests passed (`cmd /c npx firebase emulators:exec --project demo-timecapsule "npm test"`).
+- Clean debug build, AndroidTest APK compile, and lint (`:app:assembleDebug`, `:app:assembleDebugAndroidTest`, `:app:lintDebug`).
+- Android instrumentation test execution: **NOT RUN** (0 connected ADB devices; test code compiles cleanly).
 
 ## Remaining work
 
-- Commit and push `feature/17-current-conditions` branch.
-- Open Draft PR on GitHub (`Refs #17`).
-- Perform physical device or Google Play emulator walkthrough.
 - Teammate PR review by User G and human merge into `main`.
 
 ## Workspace and recovery
 
-- Branch: `feature/17-current-conditions`
-- Clean working tree with untracked evidence and handoff files in `docs/agent-tools/`.
-
-## Next action
-
-Update User J's agent logs (`agent-log-w3.md` and `agent-log.md`), commit implementation files, and open Draft PR.
+- Branch: `feature/17-current-conditions` (pushed to `origin/feature/17-current-conditions`).
+- Clean working tree.

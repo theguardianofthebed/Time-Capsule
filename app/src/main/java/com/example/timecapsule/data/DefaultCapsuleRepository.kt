@@ -30,13 +30,7 @@ class DefaultCapsuleRepository(
     private val firestoreAdapter: FirestoreAdapter,
     private val publicationCoordinator: CapsulePublicationCoordinator? = null,
     private val locationAdapter: LocationAdapter? = null,
-    private val clockNanosSupplier: () -> Long = {
-        try {
-            SystemClock.elapsedRealtimeNanos()
-        } catch (_: Throwable) {
-            System.currentTimeMillis() * 1_000_000L
-        }
-    }
+    private val clockNanosSupplier: () -> Long = { SystemClock.elapsedRealtimeNanos() }
 ) : CapsuleRepository {
 
     override fun session(): SessionSnapshot = sessionTracker.currentSession()
@@ -85,12 +79,13 @@ class DefaultCapsuleRepository(
      * 1. Validates authenticated session snapshot (`initialSession`).
      * 2. Reads live server unlock requirements (`firestoreAdapter.readRecipientUnlockRequirements`).
      * 3. Idempotency: If server record is already `unlocked == true`, returns [Availability.AVAILABLE] without requesting location.
-     * 4. For LOCATION / BOTH modes: Requests fresh ephemeral foreground location fix from [locationAdapter].
-     * 5. Revalidates session tracker across suspension boundaries (`sessionTracker.currentSession() == initialSession`).
-     * 6. Evaluates client-side sample quality, age (0..60s), accuracy (<=100m), and distance (<=150m) via [ConditionEvaluator].
-     * 7. Executes atomic Firestore transaction ([firestoreAdapter.verifyRecipientUnlock]), where server rules enforce
+     * 4. For LOCATION / BOTH modes: Validates permission and location services before AND after location acquisition.
+     * 5. Requests fresh ephemeral foreground location fix from [locationAdapter].
+     * 6. Revalidates session tracker across suspension boundaries (`sessionTracker.currentSession() == initialSession`).
+     * 7. Evaluates client-side sample quality, age (0..60s), accuracy (<=100m), and distance (<=150m) via [ConditionEvaluator].
+     * 8. Executes atomic Firestore transaction ([firestoreAdapter.verifyRecipientUnlock]), where server rules enforce
      *    `request.time >= resource.data.unlockAt` for TIME and BOTH modes.
-     * 8. Never persists `locationOK` or past geofence ENTER as future authorization.
+     * 9. Never persists `locationOK` or past geofence ENTER as future authorization.
      */
     override suspend fun verifyUnlock(capsuleId: String): OperationResult<Availability> {
         val cleanId = capsuleId.trim()
@@ -128,6 +123,9 @@ class DefaultCapsuleRepository(
             if (!adapter.isFineLocationGranted()) {
                 return OperationResult.Denied("Precise location permission is required for location unlock.")
             }
+            if (!adapter.isLocationAvailable()) {
+                return OperationResult.Unavailable("Location services are disabled or unavailable.")
+            }
 
             val locResult = adapter.getCurrentLocation()
             val postLocSession = sessionTracker.currentSession()
@@ -153,8 +151,17 @@ class DefaultCapsuleRepository(
             null
         }
 
-        // Evaluate client-side location eligibility prior to remote transaction submission
+        // Recheck location availability and permission prior to remote transaction submission
         if (mode == LockMode.LOCATION || mode == LockMode.TIME_AND_LOCATION) {
+            val adapter = locationAdapter
+                ?: return OperationResult.Unavailable("Location adapter is unavailable for location unlock.")
+            if (!adapter.isFineLocationGranted()) {
+                return OperationResult.Denied("Precise location permission was revoked prior to unlock submission.")
+            }
+            if (!adapter.isLocationAvailable()) {
+                return OperationResult.Unavailable("Location services were disabled prior to unlock submission.")
+            }
+
             val nowNanos = clockNanosSupplier()
             val eval = ConditionEvaluator.evaluate(mode, requirements.locationTarget, sample, nowNanos)
             if (!eval.isEligible) {
