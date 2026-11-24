@@ -276,9 +276,9 @@ No manual code fix was required. The agent corrected a missing permission linter
   - Why qualifying a location sample in Issue #16 does NOT grant or authorize a capsule unlock (unlock authorization belongs downstream to Issue #17).
 - **Feedback and next step:** Open Draft PR on GitHub, obtain teammate review from User G, and perform human merge into `main`.
 
-## Feature or task: Issue #17 Evaluate current time-and-location conditions without a past-visit latch (Post-Review Corrections)
+## Feature or task: Issue #17 Evaluate current time-and-location conditions without a past-visit latch (Final Review Corrections)
 
-- **Task and purpose:** Implementation and post-review corrections for Issue #17 (Evaluate current time-and-location conditions without a past-visit latch), joining #15 TIME unlock and #16 LOCATION qualification into a pure condition evaluator and server-authoritative recipient unlock transaction path, with User J as acting implementation owner and User G as reviewer.
+- **Task and purpose:** Implementation and final review corrections for Issue #17 (Evaluate current time-and-location conditions without a past-visit latch), joining #15 TIME unlock and #16 LOCATION qualification into a pure condition evaluator and server-authoritative recipient unlock transaction path, with User J as acting implementation owner and User G as reviewer.
 - **Session date(s):** November 24, 2026.
 - **Issue and PR:** [Issue #17](https://github.com/theguardianofthebed/Time-Capsule/issues/17), task branch `feature/17-current-conditions` (pushed to `origin/feature/17-current-conditions`).
 - **Requirement/design references:** FR-06, FR-07, NFR-04; ARC-05; DD-05; AC-06; T-19, T-20, T-42.
@@ -287,7 +287,7 @@ No manual code fix was required. The agent corrected a missing permission linter
 
 ### Goal
 
-Implement `ConditionEvaluator` for pure client-side condition checks, read live recipient unlock requirements from `Source.SERVER`, request ephemeral foreground location fixes for LOCATION and BOTH modes, evaluate sample quality and distance dynamically on every transaction attempt, enforce server-authorized unlock transitions in `DefaultFirestoreAdapter` without persisting or latching past visits, apply post-review corrections P0/P1/P2 (unconfirmed pending-write rejection, mid-flight location permission/service revalidation, removal of wall-clock fallbacks, expanded emulator/unit test suites), and verify against truth table and boundary conditions.
+Implement `ConditionEvaluator` for pure client-side condition checks, read live recipient unlock requirements from `Source.SERVER`, request ephemeral foreground location fixes for LOCATION and BOTH modes, evaluate sample quality and distance dynamically on every transaction attempt, enforce server-authorized unlock transitions in `DefaultFirestoreAdapter` without persisting or latching past visits, apply review corrections (unconfirmed pending-write rejection, deterministic emulator integration test deadlines, clock callback clarification, live emulator instrumentation test execution), and verify against truth table and boundary conditions.
 
 ### Requests and prompts
 
@@ -296,6 +296,7 @@ Implement `ConditionEvaluator` for pure client-side condition checks, read live 
 | 1 | Execute Issue #17 implementation & update w3 log | "Refer to TimeCapsule_Issue17_Gemini_Implementation_Prompt.md. Also update user J's w3 log as user J will be the main implementer and others will review later whenever available." | Validated 8 readiness gates (`PREFLIGHT_RECORD_VALID`), created `feature/17-current-conditions` branch, and implemented pure condition evaluator, server unlock requirements lookup, location-qualified unlock transaction, repository orchestration, and test suites. |
 | 2 | Commit and push to branch | "Commit and push to github repo branch, don't modify main or other branches. DOn't open PR too." | Committed `db83659` and pushed `feature/17-current-conditions` branch to GitHub without modifying `main` or opening a PR. |
 | 3 | Post-implementation review corrections | "TimeCapsule — Issue #17 Post-Implementation Review Corrections... P0 Prevent false server-confirmed unlock, P1 Validate location availability throughout attempt, P1 Remove wall-clock fallback, P1 Add missing automated verification, P2 Focused cleanup." | Addressed P0/P1/P2 corrections: added `hasPendingWrites`/`isFromCache` rejection, mid-flight location availability checks, removed wall-clock fallback, and added 260 unit tests / 42 rules tests. |
+| 4 | Final review corrections & live emulator execution | "Complete these final corrections: 1. Make the new Android Firebase integration tests deterministic... 2. Clarify fake transaction-retry test... 3. Reject entire unconfirmed/cached metadata snapshot... 4. Execute FirebaseEmulatorUnlockIntegrationTest on actual Android emulator... 5. Update handoff and User J logs." | Made integration test deadlines deterministic with dynamic server time waiting, rejected entire unconfirmed snapshot in `readRecipientUnlockRequirements`, updated KDoc, launched `emulator-5554`, and executed `connectedDebugAndroidTest` (35 PASSED). |
 
 ### What the agent changed and verified
 
@@ -305,7 +306,7 @@ Implement `ConditionEvaluator` for pure client-side condition checks, read live 
   - Does NOT persist or latch past states (`locationOK`/`timeOK`). Separated pure location eligibility check and removed `STALE_SAMPLE` as a time failure representation.
 - **Server-Authoritative Recipient Unlock Requirements (`RecipientUnlockRequirements.kt`, `FirestoreAdapter.kt`, `DefaultFirestoreAdapter.kt`):**
   - Implemented `readRecipientUnlockRequirements(capsuleId, recipientUid)` returning `Source.SERVER` metadata.
-  - **P0 Correction:** Rejects unconfirmed local mutations and cached state (`!doc.metadata.hasPendingWrites() && !doc.metadata.isFromCache`), ensuring `unlocked == true` is accepted strictly when server confirmation is established. Skips location acquisition completely for server-confirmed unlocked records.
+  - **P0 Correction:** Rejects entire unconfirmed local mutation or cached metadata snapshot (`doc.metadata.hasPendingWrites() || doc.metadata.isFromCache`), returning `OperationResult.Unavailable("Capsule metadata is unconfirmed or cached.")`. Skips location acquisition completely for server-confirmed unlocked records.
 - **Atomic Location & Time Transaction (`DefaultFirestoreAdapter.verifyRecipientUnlock`):**
   - Extended `verifyRecipientUnlock` transaction to handle `LOCATION`, `BOTH`, and `TIME_AND_LOCATION` lock modes inside `runTransaction`.
   - Evaluates `LocationQualifier.qualify` using fresh `clockNanosSupplier()` on EVERY transaction retry execution without performing GPS inside the callback.
@@ -320,12 +321,14 @@ Implement `ConditionEvaluator` for pure client-side condition checks, read live 
   - Written `ConditionEvaluatorTest.kt` (7 JVM unit tests covering truth table combinations for T-19 and boundary limits for T-42).
   - Extended `DefaultCapsuleRepositoryUnlockTest.kt` (260 JVM unit tests passed covering TIME, LOCATION, BOTH modes, pending-write rejection, mid-flight permission/service revocation, sample expiration during retry, malformed target rejection, lost response reconciliation, and session races).
   - Extended `FirebaseEmulatorUnlockIntegrationTest.kt` (42 security rules tests passed covering real LOCATION-only unlock, real BOTH mode truth table combinations `F/F`, `F/T`, `T/F`, `T/T`, prior visit departure before deadline, and staying inside across deadline without re-entry T-20).
+  - Executed Android instrumentation integration test suite on live Android emulator `emulator-5554` connected to Firebase Emulators (`:app:connectedDebugAndroidTest`): **35 PASSED, 0 FAILED**.
   - Clean debug build, test APK compile, and lint (`:app:assembleDebug`, `:app:assembleDebugAndroidTest`, `:app:lintDebug`).
 
 ### Checks and results
 
 - `./gradlew :app:testDebugUnitTest`: PASS (260 JVM unit tests passed across project, 0 failed).
 - `cmd /c npx firebase emulators:exec --project demo-timecapsule "npm test"`: PASS (42 security rules tests passed, 0 failed).
+- `./gradlew :app:connectedDebugAndroidTest`: PASS (35 Android instrumentation tests passed on live `emulator-5554` with Firebase Emulators, 0 failed).
 - `./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors).
 - `py tools/check_readiness.py --issue 17 --evidence docs/agent-tools/readiness-evidence-issue17.json`: PASS (`PREFLIGHT_RECORD_VALID`).
 - `git diff --check`: PASS (clean).
@@ -336,13 +339,10 @@ No manual code fix was required. The agent corrected a missing constructor param
 
 ### My review and understanding
 
-- **What I reviewed:** Inspected the generated `ConditionEvaluator.kt`, `RecipientUnlockRequirements.kt`, `FirestoreAdapter.kt`, `DefaultFirestoreAdapter.kt`, `DefaultCapsuleRepository.kt`, `MainActivity.kt`, `ConditionEvaluatorTest.kt`, `DefaultCapsuleRepositoryUnlockTest.kt`, and `FirebaseEmulatorUnlockIntegrationTest.kt` diffs.
-- **What I can explain:**
-  - How `DefaultFirestoreAdapter` enforces P0 server-confirmation by checking `!hasPendingWrites() && !isFromCache` before accepting `unlocked == true`.
-  - How `DefaultCapsuleRepository` revalidates location permissions and enabled services throughout the unlock attempt.
-  - Why wall-clock fallbacks were removed in favor of monotonic `SystemClock.elapsedRealtimeNanos()` to prevent clock manipulation attacks.
-  - How Firestore security rules enforce `request.time >= unlockAt` for TIME and BOTH modes while client-side location qualification is evaluated dynamically on every transaction retry.
-- **Feedback and next step:** Push corrections to `feature/17-current-conditions`, obtain teammate code review from User G, and perform human merge into `main`.
+- **What I reviewed:** Pending student review and personal confirmation by User J.
+- **What I can explain:** Pending student review and personal confirmation by User J.
+- **Feedback and next step:** Push final review corrections to `feature/17-current-conditions`, obtain teammate code review from User G, and perform human manual UI walkthrough before human merge into `main`.
+
 
 
 

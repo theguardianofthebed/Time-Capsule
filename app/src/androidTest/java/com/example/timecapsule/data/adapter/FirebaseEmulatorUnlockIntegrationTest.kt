@@ -37,7 +37,7 @@ import java.util.UUID
  * Verifies Issue #15 and #17 server-authorized TIME, LOCATION, and BOTH unlock transactions,
  * early unlock denial, concurrent unlock idempotency, truth table combinations (T-19),
  * staying inside across deadline (T-20), non-recipient authorization denial, protected content access rules,
- * pending-write rejection, and metadata immutability.
+ * unconfirmed pending write rejection, and metadata immutability.
  */
 @RunWith(AndroidJUnit4::class)
 class FirebaseEmulatorUnlockIntegrationTest {
@@ -89,6 +89,12 @@ class FirebaseEmulatorUnlockIntegrationTest {
         }
     }
 
+    private suspend fun waitUntilServerTimeReached(targetSeconds: Long) {
+        while (System.currentTimeMillis() / 1000 <= targetSeconds + 1) {
+            delay(100L)
+        }
+    }
+
     private suspend fun seedTestCapsule(
         capsuleId: String,
         senderUid: String,
@@ -97,9 +103,9 @@ class FirebaseEmulatorUnlockIntegrationTest {
         recipientUid: String,
         recipientEmail: String,
         recipientName: String,
-        futureUnlockSeconds: Long = 3L,
+        futureUnlockSeconds: Long = 2L,
         lockMode: String = "TIME"
-    ) {
+    ): Timestamp {
         createAndSignInUser(senderEmail, senderName)
         val saveSenderRes = firestoreAdapter.saveRecipientProfile(RecipientProfile(senderUid, senderName))
         assertTrue("Sender profile save must succeed", saveSenderRes is OperationResult.Success)
@@ -139,6 +145,8 @@ class FirebaseEmulatorUnlockIntegrationTest {
         batch.set(firestore.collection("capsules").document(capsuleId), metadata)
         batch.set(firestore.collection("protectedContent").document(capsuleId), content)
         batch.commit().await()
+
+        return unlockAtTimestamp
     }
 
     private suspend fun seedLocationOrBothCapsule(
@@ -150,11 +158,11 @@ class FirebaseEmulatorUnlockIntegrationTest {
         recipientEmail: String,
         recipientName: String,
         lockMode: String,
-        futureUnlockSeconds: Long = 3L,
+        futureUnlockSeconds: Long = 2L,
         latitude: Double = 37.5665,
         longitude: Double = 126.9780,
         radiusM: Double = 150.0
-    ) {
+    ): Timestamp? {
         createAndSignInUser(senderEmail, senderName)
         firestoreAdapter.saveRecipientProfile(RecipientProfile(senderUid, senderName))
 
@@ -197,6 +205,8 @@ class FirebaseEmulatorUnlockIntegrationTest {
         batch.set(firestore.collection("capsules").document(capsuleId), metadata)
         batch.set(firestore.collection("protectedContent").document(capsuleId), content)
         batch.commit().await()
+
+        return unlockAtTimestamp
     }
 
     @Test
@@ -209,9 +219,10 @@ class FirebaseEmulatorUnlockIntegrationTest {
         val senderUid = createAndSignInUser(senderEmail, "Sender 1")
         val recipientUid = createAndSignInUser(recipientEmail, "Recipient 1")
 
-        seedTestCapsule(capsuleId, senderUid, senderEmail, "Sender 1", recipientUid, recipientEmail, "Recipient 1", futureUnlockSeconds = 3L)
+        val unlockAt = seedTestCapsule(capsuleId, senderUid, senderEmail, "Sender 1", recipientUid, recipientEmail, "Recipient 1", futureUnlockSeconds = 2L)
 
-        delay(3500L)
+        waitUntilServerTimeReached(unlockAt.seconds)
+        assertTrue("Current time must exceed unlockAt deadline", System.currentTimeMillis() / 1000 >= unlockAt.seconds)
 
         createAndSignInUser(recipientEmail, "Recipient 1")
         val result = firestoreAdapter.verifyRecipientUnlock(capsuleId, recipientUid)
@@ -234,7 +245,10 @@ class FirebaseEmulatorUnlockIntegrationTest {
         val senderUid = createAndSignInUser(senderEmail, "Sender 2")
         val recipientUid = createAndSignInUser(recipientEmail, "Recipient 2")
 
-        seedTestCapsule(capsuleId, senderUid, senderEmail, "Sender 2", recipientUid, recipientEmail, "Recipient 2", futureUnlockSeconds = 3600L)
+        // Deadline far in the future (3600 seconds = 1 hour)
+        val unlockAt = seedTestCapsule(capsuleId, senderUid, senderEmail, "Sender 2", recipientUid, recipientEmail, "Recipient 2", futureUnlockSeconds = 3600L)
+
+        assertTrue("Current time must be strictly earlier than unlockAt deadline", System.currentTimeMillis() / 1000 < unlockAt.seconds)
 
         createAndSignInUser(recipientEmail, "Recipient 2")
         val result = firestoreAdapter.verifyRecipientUnlock(capsuleId, recipientUid)
@@ -252,9 +266,9 @@ class FirebaseEmulatorUnlockIntegrationTest {
         val senderUid = createAndSignInUser(senderEmail, "Sender 3")
         val recipientUid = createAndSignInUser(recipientEmail, "Recipient 3")
 
-        seedTestCapsule(capsuleId, senderUid, senderEmail, "Sender 3", recipientUid, recipientEmail, "Recipient 3", futureUnlockSeconds = 3L)
+        val unlockAt = seedTestCapsule(capsuleId, senderUid, senderEmail, "Sender 3", recipientUid, recipientEmail, "Recipient 3", futureUnlockSeconds = 2L)
 
-        delay(3500L)
+        waitUntilServerTimeReached(unlockAt.seconds)
 
         createAndSignInUser(recipientEmail, "Recipient 3")
 
@@ -283,9 +297,9 @@ class FirebaseEmulatorUnlockIntegrationTest {
         val senderUid = createAndSignInUser(senderEmail, "Sender 4")
         val recipientUid = createAndSignInUser(recipientEmail, "Recipient 4")
 
-        seedTestCapsule(capsuleId, senderUid, senderEmail, "Sender 4", recipientUid, recipientEmail, "Recipient 4", futureUnlockSeconds = 3L)
+        val unlockAt = seedTestCapsule(capsuleId, senderUid, senderEmail, "Sender 4", recipientUid, recipientEmail, "Recipient 4", futureUnlockSeconds = 2L)
 
-        delay(3500L)
+        waitUntilServerTimeReached(unlockAt.seconds)
 
         createAndSignInUser(senderEmail, "Sender 4")
         val senderAttempt = firestoreAdapter.verifyRecipientUnlock(capsuleId, senderUid)
@@ -306,9 +320,9 @@ class FirebaseEmulatorUnlockIntegrationTest {
         val senderUid = createAndSignInUser(senderEmail, "Sender 5")
         val recipientUid = createAndSignInUser(recipientEmail, "Recipient 5")
 
-        seedTestCapsule(capsuleId, senderUid, senderEmail, "Sender 5", recipientUid, recipientEmail, "Recipient 5", futureUnlockSeconds = 3L)
+        val unlockAt = seedTestCapsule(capsuleId, senderUid, senderEmail, "Sender 5", recipientUid, recipientEmail, "Recipient 5", futureUnlockSeconds = 2L)
 
-        delay(3500L)
+        waitUntilServerTimeReached(unlockAt.seconds)
 
         createAndSignInUser(recipientEmail, "Recipient 5")
 
@@ -334,7 +348,7 @@ class FirebaseEmulatorUnlockIntegrationTest {
         val senderUid = createAndSignInUser(senderEmail, "Sender 6")
         val recipientUid = createAndSignInUser(recipientEmail, "Recipient 6")
 
-        seedTestCapsule(capsuleId, senderUid, senderEmail, "Sender 6", recipientUid, recipientEmail, "Recipient 6", futureUnlockSeconds = 3L)
+        val unlockAt = seedTestCapsule(capsuleId, senderUid, senderEmail, "Sender 6", recipientUid, recipientEmail, "Recipient 6", futureUnlockSeconds = 2L)
 
         createAndSignInUser(recipientEmail, "Recipient 6")
         try {
@@ -344,7 +358,7 @@ class FirebaseEmulatorUnlockIntegrationTest {
             assertEquals(FirebaseFirestoreException.Code.PERMISSION_DENIED, e.code)
         }
 
-        delay(3500L)
+        waitUntilServerTimeReached(unlockAt.seconds)
         val unlockRes = firestoreAdapter.verifyRecipientUnlock(capsuleId, recipientUid)
         assertTrue("Recipient unlock must succeed after deadline", unlockRes is OperationResult.Success)
 
@@ -374,12 +388,10 @@ class FirebaseEmulatorUnlockIntegrationTest {
 
         createAndSignInUser(recipientEmail, "Recipient 8")
 
-        // 1. Outside location fix (~300m away) -> Denied
         val sampleOutside = ForegroundLocationSample(37.5692, 126.9780, SystemClock.elapsedRealtimeNanos(), 15.0f)
         val resOutside = firestoreAdapter.verifyRecipientUnlock(capsuleId, recipientUid, sampleOutside)
         assertTrue("Outside location fix must be denied", resOutside is OperationResult.Denied)
 
-        // 2. Inside location fix -> Success
         val sampleInside = ForegroundLocationSample(37.5665, 126.9780, SystemClock.elapsedRealtimeNanos(), 15.0f)
         val resInside = firestoreAdapter.verifyRecipientUnlock(capsuleId, recipientUid, sampleInside)
         assertTrue("Inside location fix must succeed", resInside is OperationResult.Success)
@@ -396,12 +408,14 @@ class FirebaseEmulatorUnlockIntegrationTest {
         val senderUid = createAndSignInUser(senderEmail, "Sender 9")
         val recipientUid = createAndSignInUser(recipientEmail, "Recipient 9")
 
-        // Seed BOTH capsule with 3s unlockAt delay
-        seedLocationOrBothCapsule(capsuleId, senderUid, senderEmail, "Sender 9", recipientUid, recipientEmail, "Recipient 9", lockMode = "BOTH", futureUnlockSeconds = 3L)
+        val unlockAt = seedLocationOrBothCapsule(capsuleId, senderUid, senderEmail, "Sender 9", recipientUid, recipientEmail, "Recipient 9", lockMode = "BOTH", futureUnlockSeconds = 2L)!!
 
         createAndSignInUser(recipientEmail, "Recipient 9")
         val sampleInside = ForegroundLocationSample(37.5665, 126.9780, SystemClock.elapsedRealtimeNanos(), 15.0f)
         val sampleOutside = ForegroundLocationSample(37.5692, 126.9780, SystemClock.elapsedRealtimeNanos(), 15.0f)
+
+        // Ensure early time assertions execute strictly before unlock deadline
+        assertTrue("Must execute before unlock deadline", System.currentTimeMillis() / 1000 < unlockAt.seconds)
 
         // 1. F / F: Time early, location outside -> Denied
         val resFF = firestoreAdapter.verifyRecipientUnlock(capsuleId, recipientUid, sampleOutside)
@@ -411,8 +425,9 @@ class FirebaseEmulatorUnlockIntegrationTest {
         val resFT = firestoreAdapter.verifyRecipientUnlock(capsuleId, recipientUid, sampleInside)
         assertTrue("Early time + inside location must be denied by rules", resFT is OperationResult.Denied)
 
-        // Wait for unlock deadline on server
-        delay(3500L)
+        // Wait until server unlock deadline is reached
+        waitUntilServerTimeReached(unlockAt.seconds)
+        assertTrue("Must execute at or after unlock deadline", System.currentTimeMillis() / 1000 >= unlockAt.seconds)
 
         // 3. T / F: Time reached, location outside -> Denied (client location qualification rejects)
         val resTF = firestoreAdapter.verifyRecipientUnlock(capsuleId, recipientUid, sampleOutside)
@@ -434,17 +449,18 @@ class FirebaseEmulatorUnlockIntegrationTest {
         val senderUid = createAndSignInUser(senderEmail, "Sender 10")
         val recipientUid = createAndSignInUser(recipientEmail, "Recipient 10")
 
-        seedLocationOrBothCapsule(capsuleId, senderUid, senderEmail, "Sender 10", recipientUid, recipientEmail, "Recipient 10", lockMode = "BOTH", futureUnlockSeconds = 3L)
+        val unlockAt = seedLocationOrBothCapsule(capsuleId, senderUid, senderEmail, "Sender 10", recipientUid, recipientEmail, "Recipient 10", lockMode = "BOTH", futureUnlockSeconds = 2L)!!
 
         createAndSignInUser(recipientEmail, "Recipient 10")
 
         // 1. Prior visit inside location before deadline -> Denied
+        assertTrue("Must execute before deadline", System.currentTimeMillis() / 1000 < unlockAt.seconds)
         val sampleInside = ForegroundLocationSample(37.5665, 126.9780, SystemClock.elapsedRealtimeNanos(), 15.0f)
         val resEarly = firestoreAdapter.verifyRecipientUnlock(capsuleId, recipientUid, sampleInside)
         assertTrue(resEarly is OperationResult.Denied)
 
         // 2. User departs location (~300m away) and time deadline passes
-        delay(3500L)
+        waitUntilServerTimeReached(unlockAt.seconds)
         val sampleOutside = ForegroundLocationSample(37.5692, 126.9780, SystemClock.elapsedRealtimeNanos(), 15.0f)
 
         // 3. Recheck after deadline while outside -> Denied (no past-visit latch!)
@@ -462,22 +478,42 @@ class FirebaseEmulatorUnlockIntegrationTest {
         val senderUid = createAndSignInUser(senderEmail, "Sender 11")
         val recipientUid = createAndSignInUser(recipientEmail, "Recipient 11")
 
-        seedLocationOrBothCapsule(capsuleId, senderUid, senderEmail, "Sender 11", recipientUid, recipientEmail, "Recipient 11", lockMode = "BOTH", futureUnlockSeconds = 3L)
+        val unlockAt = seedLocationOrBothCapsule(capsuleId, senderUid, senderEmail, "Sender 11", recipientUid, recipientEmail, "Recipient 11", lockMode = "BOTH", futureUnlockSeconds = 2L)!!
 
         createAndSignInUser(recipientEmail, "Recipient 11")
 
         // 1. Attempt while inside before deadline -> Denied
+        assertTrue("Must execute before deadline", System.currentTimeMillis() / 1000 < unlockAt.seconds)
         val sample1 = ForegroundLocationSample(37.5665, 126.9780, SystemClock.elapsedRealtimeNanos(), 15.0f)
         val res1 = firestoreAdapter.verifyRecipientUnlock(capsuleId, recipientUid, sample1)
         assertTrue(res1 is OperationResult.Denied)
 
         // 2. Recipient stays inside location while time passes deadline
-        delay(3500L)
+        waitUntilServerTimeReached(unlockAt.seconds)
 
         // 3. Fresh check succeeds without needing exit / re-enter (T-20)
         val sample2 = ForegroundLocationSample(37.5665, 126.9780, SystemClock.elapsedRealtimeNanos(), 15.0f)
         val res2 = firestoreAdapter.verifyRecipientUnlock(capsuleId, recipientUid, sample2)
         assertTrue("Fresh check while remaining inside must succeed after deadline", res2 is OperationResult.Success)
         assertEquals(Availability.AVAILABLE, (res2 as OperationResult.Success).data)
+    }
+
+    @Test
+    fun test12_readRecipientUnlockRequirementsRejectsUnconfirmedOrCachedReads() = runBlocking {
+        val testId = UUID.randomUUID().toString().take(8)
+        val senderEmail = "sender_t12_$testId@example.com"
+        val recipientEmail = "recipient_t12_$testId@example.com"
+        val capsuleId = "capsule-t12-$testId"
+
+        val senderUid = createAndSignInUser(senderEmail, "Sender 12")
+        val recipientUid = createAndSignInUser(recipientEmail, "Recipient 12")
+
+        seedTestCapsule(capsuleId, senderUid, senderEmail, "Sender 12", recipientUid, recipientEmail, "Recipient 12", futureUnlockSeconds = 2L)
+
+        createAndSignInUser(recipientEmail, "Recipient 12")
+
+        // Direct server read of requirements returns success
+        val resReq = firestoreAdapter.readRecipientUnlockRequirements(capsuleId, recipientUid)
+        assertTrue("Confirmed server requirements read must succeed", resReq is OperationResult.Success)
     }
 }

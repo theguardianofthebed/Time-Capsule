@@ -143,13 +143,12 @@ class DefaultCapsuleRepositoryUnlockTest {
             locationTarget = targetSeoul,
             hasPendingWrites = true // P0: Local pending write flag!
         )
-        fakeLocationAdapter.fineLocationGranted = false // If pending writes were accepted, GPS would be skipped
 
         val result = repository.verifyUnlock("pending-writes-capsule")
 
-        // Must reject pending write evidence and attempt real location verification (which fails due to missing perm)
-        assertTrue(result is OperationResult.Denied)
-        assertTrue((result as OperationResult.Denied).message.contains("permission"))
+        // P0: Must reject pending write snapshot in readRecipientUnlockRequirements and return Unavailable
+        assertTrue(result is OperationResult.Unavailable)
+        assertTrue((result as OperationResult.Unavailable).message.contains("unconfirmed") || result.message.contains("cached"))
     }
 
     @Test
@@ -241,7 +240,6 @@ class DefaultCapsuleRepositoryUnlockTest {
             locationTarget = targetSeoul
         )
 
-        // Simulate permission revoked right after sample acquisition
         fakeLocationAdapter.fineLocationGranted = true
         fakeLocationAdapter.sampleResult = LocationSampleResult(
             status = LocationSampleStatus.SUCCESS,
@@ -284,8 +282,15 @@ class DefaultCapsuleRepositoryUnlockTest {
         assertTrue((result as OperationResult.Unavailable).message.contains("disabled"))
     }
 
+    /**
+     * Verifies that the transaction callback re-evaluates the clock supplier on every transaction attempt.
+     *
+     * Note: This test simulates time advancement during callback execution on a fake adapter to verify
+     * callback freshness rechecking. It is a unit verification of callback logic, not proof of SDK-level
+     * Firestore contention retry mechanics.
+     */
     @Test
-    fun `verifyUnlock rejects sample if timestamp expires during transaction retry`() = runBlocking {
+    fun `verifyUnlockTransactionCallback_rechecksMonotonicClockAndRejectsExpiredSample`() = runBlocking {
         sessionTracker.startSession("recipient-uid-1")
         fakeFirestoreAdapter.seedCapsule(
             capsuleId = "capsule-loc-expiry-retry",
@@ -327,14 +332,14 @@ class DefaultCapsuleRepositoryUnlockTest {
             unlocked = false,
             lockMode = "LOCATION",
             deadlineReached = true,
-            locationTarget = null, // Missing location target / malformed
+            locationTarget = null,
             isMalformedLocationTarget = true
         )
 
         val result = repository.verifyUnlock("capsule-malformed-radius")
 
         assertTrue(result is OperationResult.Invalid)
-        assertTrue((result as OperationResult.Invalid).message.contains("malformed") || (result as OperationResult.Invalid).message.contains("requires a target"))
+        assertTrue((result as OperationResult.Invalid).message.contains("malformed") || result.message.contains("requires a target"))
     }
 
     @Test
@@ -428,7 +433,7 @@ class DefaultCapsuleRepositoryUnlockTest {
         val attempt1 = repository.verifyUnlock("visit-departure-capsule")
         assertTrue(attempt1 is OperationResult.Denied)
 
-        // User departs location outside 150m and deadline arrives
+        // User departs location (~300m away) and time deadline passes
         fakeFirestoreAdapter.seedCapsule(
             capsuleId = "visit-departure-capsule",
             recipientUid = "recipient-uid-1",
@@ -479,7 +484,7 @@ class DefaultCapsuleRepositoryUnlockTest {
             locationTarget = targetSeoul
         )
 
-        // Attempt 2: Fresh foreground fix succeeds without needing exit/re-entry
+        // Attempt 2: Fresh foreground fix succeeds without needing exit/re-enter (T-20)
         val attempt2 = repository.verifyUnlock("t20-capsule")
         assertTrue(attempt2 is OperationResult.Success)
         assertEquals(Availability.AVAILABLE, (attempt2 as OperationResult.Success).data)
@@ -665,6 +670,11 @@ class DefaultCapsuleRepositoryUnlockTest {
                 return OperationResult.Denied("Only the designated recipient can unlock this capsule.")
             }
 
+            // P0: Reject entire unconfirmed/cached metadata snapshot!
+            if (record.hasPendingWrites) {
+                return OperationResult.Unavailable("Capsule metadata is unconfirmed or cached.")
+            }
+
             val mode = when (record.lockMode) {
                 "TIME" -> LockMode.TIME
                 "LOCATION" -> LockMode.LOCATION
@@ -678,14 +688,11 @@ class DefaultCapsuleRepositoryUnlockTest {
                 }
             }
 
-            // P0: Reject local unconfirmed pending writes!
-            val unlockedConfirmed = record.unlocked && !record.hasPendingWrites
-
             return OperationResult.Success(
                 RecipientUnlockRequirements(
                     capsuleId = capsuleId,
                     recipientUid = recipientUid,
-                    unlocked = unlockedConfirmed,
+                    unlocked = record.unlocked,
                     lockMode = mode,
                     unlockAt = record.unlockAt,
                     locationTarget = record.locationTarget

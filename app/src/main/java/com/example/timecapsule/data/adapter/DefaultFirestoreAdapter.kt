@@ -127,11 +127,11 @@ class DefaultFirestoreAdapter(
                 return OperationResult.Denied("Only the designated recipient can unlock this capsule.")
             }
 
-            // P0: Reject local unconfirmed mutations or cached results.
-            val unlockedRaw = doc.getBoolean("unlocked") ?: false
-            val hasPendingWrites = doc.metadata.hasPendingWrites()
-            val isFromCache = doc.metadata.isFromCache
-            val unlocked = unlockedRaw && !hasPendingWrites && !isFromCache
+            // P0: Reject entire unconfirmed/cached metadata snapshot.
+            if (doc.metadata.hasPendingWrites() || doc.metadata.isFromCache) {
+                return OperationResult.Unavailable("Capsule metadata is unconfirmed or cached.")
+            }
+            val unlocked = doc.getBoolean("unlocked") ?: false
 
             val lockModeStr = doc.getString("lockMode") ?: "TIME"
             val lockMode = when (lockModeStr) {
