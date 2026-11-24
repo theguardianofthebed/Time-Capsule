@@ -1,0 +1,86 @@
+{
+  "issue": 16,
+  "checked_at": "2026-11-23T12:00:00Z",
+  "selected_base": "6ccd2ffb02dde02278f8c9b30a4ae1355ea180ff",
+  "owner": "User J",
+  "owner_confirmation": "Confirmed User J as acting student owner for Issue #16 implementation",
+  "branch": "feature/16-map-foreground-location",
+  "period": "23 November 2026",
+  "scope": "MVP",
+  "reviewer": "User G",
+  "components": [
+    "app/src/main/java/com/example/timecapsule/domain/model/LocationSample.kt",
+    "app/src/main/java/com/example/timecapsule/domain/location/LocationQualifier.kt",
+    "app/src/main/java/com/example/timecapsule/data/adapter/LocationAdapter.kt",
+    "app/src/main/java/com/example/timecapsule/data/adapter/DefaultLocationAdapter.kt",
+    "app/src/main/java/com/example/timecapsule/ui/s05/S05RecipientLockFragment.kt",
+    "app/src/main/java/com/example/timecapsule/ui/s05/S05MapTargetDialogFragment.kt",
+    "app/src/main/java/com/example/timecapsule/ui/draft/CapsuleDraftViewModel.kt",
+    "app/src/main/java/com/example/timecapsule/data/media/PhotoDraftJournal.kt",
+    "app/src/main/AndroidManifest.xml"
+  ],
+  "deliverable": "S-05 Google Maps target selection and fresh foreground location adapter",
+  "contract_approval": "FR-06, NFR-02, ARC-07, DD-12, DD-22, AC-05, T-16, T-17, T-18, T-42",
+  "blocking_failures": [],
+  "inventory": {
+    "issues": "Issue #16 map target selection and foreground location adapter",
+    "branches": "feature/16-map-foreground-location based on main at 6ccd2ffb02dde02278f8c9b30a4ae1355ea180ff",
+    "prs": "PR #41 merged for Issue 15",
+    "handoffs": "issue-16-map-foreground-location.md",
+    "compatible": true,
+    "compatibility_evidence": "No active competing claims or overlapping file modifications for location adapter and map target selection",
+    "active_claims": [
+      {
+        "issue": 16,
+        "owner": "User J",
+        "branch": "feature/16-map-foreground-location",
+        "overlaps": false,
+        "agreement": "Explicit requester prompt allocating Issue #16 implementation to User J"
+      }
+    ]
+  },
+  "dependencies": [
+    {
+      "issue": 9,
+      "pr": "https://github.com/theguardianofthebed/Time-Capsule/pull/29",
+      "merged": true,
+      "merge_commit": "c60d866cdc9794af97db129c946b66711270f6b9",
+      "implementation_inspection": "PR #29 merged into main, contains CapsuleRepository, LocationAdapter, and session interfaces",
+      "paths": [
+        "app/src/main/java/com/example/timecapsule/data/adapter/LocationAdapter.kt"
+      ],
+      "checks": [
+        {
+          "result": "PASS",
+          "procedure": "JVM unit tests and debug build",
+          "expected_actual": "25 unit tests passed",
+          "commit": "c60d866cdc9794af97db129c946b66711270f6b9",
+          "environment": "Android Studio Agent Mode, Nov 10 2026",
+          "evidence": "PR #29 verification record"
+        }
+      ],
+      "blocking_failures": []
+    },
+    {
+      "issue": 12,
+      "pr": "https://github.com/theguardianofthebed/Time-Capsule/pull/36",
+      "merged": true,
+      "merge_commit": "26d78cc897ec2bd6853288be9c66838dd3bf63d2",
+      "implementation_inspection": "PR #36 merged into main, contains S-04, S-05, S-06 flow and CapsuleDraftViewModel",
+      "paths": [
+        "app/src/main/java/com/example/timecapsule/ui/s05/S05RecipientLockFragment.kt"
+      ],
+      "checks": [
+        {
+          "result": "PASS",
+          "procedure": "JVM unit tests and Android emulator checks",
+          "expected_actual": "Draft and review creation tests passed",
+          "commit": "26d78cc897ec2bd6853288be9c66838dd3bf63d2",
+          "environment": "Android Studio Agent Mode, Nov 13 2026",
+          "evidence": "PR #36 merge commit 26d78cc"
+        }
+      ],
+      "blocking_failures": []
+    }
+  ]
+}

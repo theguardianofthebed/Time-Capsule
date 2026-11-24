@@ -9,8 +9,12 @@ enum class LockMode { TIME, LOCATION, TIME_AND_LOCATION }
 data class LocationTarget(
     val latitude: Double,
     val longitude: Double,
-    val radiusMeters: Double = 150.0,
-)
+    val radiusMeters: Double = FIXED_RADIUS_METERS,
+) {
+    companion object {
+        const val FIXED_RADIUS_METERS: Double = 150.0
+    }
+}
 
 data class CapsuleLock(
     val mode: LockMode,

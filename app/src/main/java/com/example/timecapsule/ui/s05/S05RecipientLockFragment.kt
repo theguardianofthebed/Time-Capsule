@@ -20,6 +20,7 @@ import com.example.timecapsule.databinding.FragmentS05RecipientLockBinding
 import com.example.timecapsule.domain.model.LocationTarget
 import com.example.timecapsule.domain.model.LockMode
 import com.example.timecapsule.domain.result.OperationResult
+import com.example.timecapsule.domain.session.SessionSnapshot
 import com.example.timecapsule.domain.time.TimeConversionHelper
 import com.example.timecapsule.ui.ViewModelFactory
 import com.example.timecapsule.ui.draft.CapsuleDraftViewModel
@@ -32,6 +33,7 @@ import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Calendar
+import java.util.UUID
 import kotlinx.coroutines.launch
 
 /**
@@ -40,6 +42,10 @@ import kotlinx.coroutines.launch
  * and lock condition configuration (Time, Location, Both).
  */
 class S05RecipientLockFragment : Fragment() {
+
+    companion object {
+        private const val KEY_ACTIVE_MAP_REQUEST_ID = "key_active_map_request_id"
+    }
 
     private var _binding: FragmentS05RecipientLockBinding? = null
     private val binding get() = _binding!!
@@ -50,6 +56,9 @@ class S05RecipientLockFragment : Fragment() {
     var onNextToConfirmSendListener: (() -> Unit)? = null
     var onNavigateToMomentsListener: (() -> Unit)? = null
     var onNavigateToAccountListener: (() -> Unit)? = null
+
+    /** Active map dialog request ID for matching result bundles. */
+    var activeMapRequestId: String? = null
 
     private var isSyncingText = false
 
@@ -65,6 +74,10 @@ class S05RecipientLockFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        if (savedInstanceState != null) {
+            activeMapRequestId = savedInstanceState.getString(KEY_ACTIVE_MAP_REQUEST_ID)
+        }
+
         val mainActivity = requireActivity() as MainActivity
         viewModel = ViewModelProvider(
             requireActivity(),
@@ -74,9 +87,43 @@ class S05RecipientLockFragment : Fragment() {
 
         viewModel.syncSessionState()
 
+        parentFragmentManager.setFragmentResultListener(
+            S05MapTargetDialogFragment.REQUEST_KEY_MAP_TARGET,
+            viewLifecycleOwner
+        ) { _, bundle ->
+            val currentState = viewModel.uiState.value
+            val currentSession = (activity as? MainActivity)?.container?.sessionTracker?.currentSession()
+                ?: SessionSnapshot(currentState.activeSessionUid ?: "", -1)
+
+            val payload = S05MapTargetResultValidator.ResultPayload.fromBundle(bundle)
+            val validationContext = S05MapTargetResultValidator.ValidationContext(
+                editable = currentState.editable,
+                activeCapsuleId = currentState.capsuleId,
+                activeSession = currentSession,
+                activeRequestId = activeMapRequestId
+            )
+
+            if (S05MapTargetResultValidator.validateResult(payload, validationContext)) {
+                // Clear active request ID on successful consumption to prevent replay attacks!
+                activeMapRequestId = null
+                val target = LocationTarget(
+                    latitude = payload.latitude,
+                    longitude = payload.longitude,
+                    radiusMeters = LocationTarget.FIXED_RADIUS_METERS
+                )
+                viewModel.updateLocation(target, payload.displayName)
+                binding.tvS05Error.visibility = View.GONE
+            }
+        }
+
         setupClickListeners()
         setupTextWatcher()
         observeViewModelState()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        activeMapRequestId?.let { outState.putString(KEY_ACTIVE_MAP_REQUEST_ID, it) }
     }
 
     override fun onResume() {
@@ -124,16 +171,12 @@ class S05RecipientLockFragment : Fragment() {
 
         binding.btnLockPlace.setOnClickListener {
             viewModel.updateLockMode(LockMode.LOCATION)
-            viewModel.updateLocation(null, null)
-            binding.tvS05Error.text = getString(R.string.s05_location_notice)
-            binding.tvS05Error.visibility = View.VISIBLE
+            binding.tvS05Error.visibility = View.GONE
         }
 
         binding.btnLockBoth.setOnClickListener {
             viewModel.updateLockMode(LockMode.TIME_AND_LOCATION)
-            viewModel.updateLocation(null, null)
-            binding.tvS05Error.text = getString(R.string.s05_location_notice)
-            binding.tvS05Error.visibility = View.VISIBLE
+            binding.tvS05Error.visibility = View.GONE
         }
 
         binding.btnSelectDateTime.setOnClickListener {
@@ -141,8 +184,20 @@ class S05RecipientLockFragment : Fragment() {
         }
 
         binding.btnSelectPlace.setOnClickListener {
-            binding.tvS05Error.text = getString(R.string.s05_location_notice)
-            binding.tvS05Error.visibility = View.VISIBLE
+            val state = viewModel.uiState.value
+            val requestId = UUID.randomUUID().toString()
+            activeMapRequestId = requestId
+            val sessionGen = (activity as? MainActivity)?.container?.sessionTracker?.currentSession()?.sessionGeneration ?: -1L
+
+            val dialog = S05MapTargetDialogFragment.newInstance(
+                state.locationTarget,
+                state.locationName,
+                state.capsuleId,
+                state.activeSessionUid,
+                sessionGen,
+                requestId
+            )
+            dialog.show(parentFragmentManager, "S05MapTargetDialog")
         }
 
         binding.btnReviewCapsule.setOnClickListener {

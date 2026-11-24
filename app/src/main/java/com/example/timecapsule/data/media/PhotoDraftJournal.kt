@@ -7,6 +7,7 @@ import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
+import com.example.timecapsule.domain.model.LocationTarget
 import java.util.Properties
 import java.util.UUID
 
@@ -15,7 +16,9 @@ data class PhotoDraftRecord(
     val capsuleId: String,
     val title: String,
     val text: String,
-    val photo: RetainedOriginalPhoto?
+    val photo: RetainedOriginalPhoto?,
+    val locationTarget: LocationTarget? = null,
+    val locationName: String? = null
 )
 
 /** Atomically replaces one UID-scoped draft record; callers serialize access and use I/O threads. */
@@ -39,6 +42,14 @@ open class PhotoDraftJournal(private val root: File) {
                 setProperty("format", it.format.name)
                 setProperty("size", it.sizeBytes.toString())
                 setProperty("hash", it.sha256)
+            }
+            draft.locationTarget?.let {
+                setProperty("locLat", it.latitude.toString())
+                setProperty("locLng", it.longitude.toString())
+                setProperty("locRadius", it.radiusMeters.toString())
+            }
+            draft.locationName?.let {
+                setProperty("locName", it)
             }
         }
         val temporary = File.createTempFile("draft-", ".partial", root)
@@ -68,8 +79,24 @@ open class PhotoDraftJournal(private val root: File) {
         } catch (error: RuntimeException) {
             throw IOException("Saved photo information is invalid.", error)
         }
+        val latStr = properties.getProperty("locLat")
+        val lngStr = properties.getProperty("locLng")
+        val locName = properties.getProperty("locName")
+        val locationTarget = if (latStr != null && lngStr != null) {
+            try {
+                val lat = latStr.toDouble()
+                val lng = lngStr.toDouble()
+                if (lat.isFinite() && lat in -90.0..90.0 && lng.isFinite() && lng in -180.0..180.0) {
+                    LocationTarget(latitude = lat, longitude = lng, radiusMeters = LocationTarget.FIXED_RADIUS_METERS)
+                } else null
+            } catch (_: Exception) {
+                null
+            }
+        } else null
+        val restoredName = if (locationTarget != null) locName else null
+
         PhotoDraftRecord(id, properties.getProperty("title", ""),
-            properties.getProperty("text", ""), photo)
+            properties.getProperty("text", ""), photo, locationTarget, restoredName)
     }
 
     /** Replaces only the expected old draft; an already-created replacement keeps all later edits. */

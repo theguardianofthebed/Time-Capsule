@@ -6,6 +6,7 @@ import com.example.timecapsule.data.media.PhotoDraftRecord
 import com.example.timecapsule.domain.model.CapsuleDraft
 import com.example.timecapsule.domain.model.FrozenCapsuleOperation
 import java.io.IOException
+import java.util.Locale
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -38,7 +39,11 @@ class PrivatePublicationDrafts(
                     check(it.sha256 == original.sha256) { "Replacement photo changed." }
                 }
             }
-            val candidate = PhotoDraftRecord(newId, operation.title ?: "", operation.text, copy)
+            val lockLocation = operation.lock.location
+            val locName = lockLocation?.let {
+                String.format(Locale.US, "%.4f, %.4f", it.latitude, it.longitude)
+            }
+            val candidate = PhotoDraftRecord(newId, operation.title ?: "", operation.text, copy, lockLocation, locName)
             val saved = try {
                 drafts.replaceIfCurrent(operation.senderUid, operation.capsuleId, candidate)
             } catch (cancelled: CancellationException) {
@@ -87,9 +92,14 @@ class PrivatePublicationDrafts(
     /** Maps the saved replacement to an editable draft; confirmation is intentionally reset. */
     private fun asDraft(operation: FrozenCapsuleOperation, saved: PhotoDraftRecord): CapsuleDraft {
         saved.photo?.let { originals.verify(it) }
+        val updatedLock = operation.lock.copy(location = saved.locationTarget ?: operation.lock.location)
+        val locationName = saved.locationName ?: operation.lock.location?.let {
+            String.format(Locale.US, "%.4f, %.4f", it.latitude, it.longitude)
+        }
         return CapsuleDraft(saved.capsuleId, operation.recipientUid, saved.text,
-            saved.photo?.let { originals.file(it).toURI().toString() }, operation.lock,
+            saved.photo?.let { originals.file(it).toURI().toString() }, updatedLock,
             title = saved.title.ifBlank { null }, isRecipientConfirmed = false,
+            locationName = locationName,
             originalPhoto = saved.photo, creationZone = operation.creationZone)
     }
 }

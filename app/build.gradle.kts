@@ -61,6 +61,9 @@ android {
         versionCode = 1
         versionName = "1.0"
 
+        val mapsApiKey = project.findProperty("MAPS_API_KEY") as? String ?: "DEFAULT_MAPS_API_KEY"
+        manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
+
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -69,6 +72,11 @@ android {
             optimization {
                 enable = false
             }
+        }
+    }
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
         }
     }
     compileOptions {
@@ -111,4 +119,6 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.test.rules)
+    androidTestImplementation("androidx.fragment:fragment-testing:1.6.2")
+    debugImplementation("androidx.fragment:fragment-testing-manifest:1.6.2")
 }

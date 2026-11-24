@@ -344,4 +344,41 @@ class PublicationDraftRecoveryTest {
         val result = service.recoverPublications()
         assertTrue(result is OperationResult.Unavailable)
     }
+
+    /** Replacement draft preserves location target across process restart and journal reload. */
+    @Test fun replacementDraftPreservesLocationTargetAcrossProcessRestart() = runBlocking {
+        val originals = OriginalPhotoStore(temporary.newFolder()) { OriginalPhotoFormat.JPEG }
+        val opFolder = temporary.newFolder()
+        val draftFolder = temporary.newFolder()
+
+        val locationTarget = LocationTarget(latitude = 37.5665, longitude = 126.9780, radiusMeters = 150.0)
+        val locationLock = CapsuleLock(LockMode.LOCATION, location = locationTarget)
+        val draft = CapsuleDraft("loc-old", "recipient", "location message", null, locationLock, isRecipientConfirmed = true)
+        val frozen = FrozenCapsuleOperation.freeze(draft, "sender", "UTC", now)
+
+        val opJournal = FrozenOperationJournal(opFolder)
+        opJournal.save(FrozenOperationRecord(frozen, PublicationPhase.FAILED))
+
+        val draftJournal = PhotoDraftJournal(draftFolder)
+        draftJournal.save("sender", PhotoDraftRecord("loc-old", "", "location message", null, locationTarget, "37.5665, 126.9780"))
+
+        val store = PrivatePublicationDrafts(originals, draftJournal)
+        val coord = CapsulePublicationCoordinator(opJournal, backend(PublicationInspection.ABSENT), null,
+            { SessionSnapshot("sender", 1) }, { now }, { "UTC" }, drafts = store, newId = { "loc-new-1" })
+
+        val replaceRes = coord.abandonForNewDraft("loc-old") as OperationResult.Success
+        assertEquals("loc-new-1", replaceRes.data.capsuleId)
+        assertNotNull(replaceRes.data.lock.location)
+        assertEquals(37.5665, replaceRes.data.lock.location!!.latitude, 0.0001)
+
+        val newDraftJournal = PhotoDraftJournal(draftFolder)
+        val restoredFromJournal = newDraftJournal.load("sender")
+
+        assertNotNull(restoredFromJournal)
+        assertEquals("loc-new-1", restoredFromJournal!!.capsuleId)
+        val target = restoredFromJournal.locationTarget!!
+        assertEquals(37.5665, target.latitude, 0.0001)
+        assertEquals(126.9780, target.longitude, 0.0001)
+        assertEquals(150.0, target.radiusMeters, 0.01)
+    }
 }
