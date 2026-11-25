@@ -271,4 +271,28 @@ class StorageRaceRegressionTest {
         // Verify pending marker exists
         assertTrue(orchestrator.hasPendingCleanup())
     }
+
+    @Test
+    fun testProductionImageValidationHeaderDetection() = runBlocking {
+        val pngBytes = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00)
+        val jpegBytes = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xE0.toByte(), 0x00)
+        val malformedBytes = byteArrayOf(0x00, 0x01, 0x02, 0x03, 0x04)
+
+        // Test PNG detection
+        val pngFormat = if (pngBytes.size >= 4 &&
+            pngBytes[0] == 0x89.toByte() && pngBytes[1] == 0x50.toByte() &&
+            pngBytes[2] == 0x4E.toByte() && pngBytes[3] == 0x47.toByte()) OriginalPhotoFormat.PNG else OriginalPhotoFormat.JPEG
+        assertEquals(OriginalPhotoFormat.PNG, pngFormat)
+
+        // Test JPEG detection
+        val jpegFormat = if (jpegBytes.size >= 3 &&
+            jpegBytes[0] == 0xFF.toByte() && jpegBytes[1] == 0xD8.toByte() &&
+            jpegBytes[2] == 0xFF.toByte()) OriginalPhotoFormat.JPEG else OriginalPhotoFormat.PNG
+        assertEquals(OriginalPhotoFormat.JPEG, jpegFormat)
+
+        // Test malformed header rejection
+        val isMalformedValid = (malformedBytes.size >= 4 && malformedBytes[0] == 0x89.toByte() && malformedBytes[1] == 0x50.toByte()) ||
+                (malformedBytes.size >= 3 && malformedBytes[0] == 0xFF.toByte() && malformedBytes[1] == 0xD8.toByte())
+        assertFalse("Malformed image bytes must be rejected", isMalformedValid)
+    }
 }

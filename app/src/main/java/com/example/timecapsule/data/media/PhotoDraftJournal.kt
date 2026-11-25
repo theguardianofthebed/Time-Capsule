@@ -8,6 +8,7 @@ import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import com.example.timecapsule.domain.model.LocationTarget
+import com.example.timecapsule.domain.session.SessionSnapshot
 import java.util.Properties
 import java.util.UUID
 
@@ -22,13 +23,20 @@ data class PhotoDraftRecord(
 )
 
 /** Atomically replaces one UID-scoped draft record; callers serialize access and use I/O threads. */
-open class PhotoDraftJournal(private val root: File) {
+open class PhotoDraftJournal(
+    private val root: File,
+    private val session: (() -> SessionSnapshot)? = null
+) {
     companion object {
         private val access = Any()
     }
 
     /** Persists a draft before old original bytes are eligible for local cleanup. */
     open fun save(uid: String, draft: PhotoDraftRecord): Unit = synchronized(access) {
+        val activeSession = session?.invoke()
+        if (activeSession != null && (!activeSession.isAuthenticated || activeSession.uid != uid)) {
+            throw IOException("Stale or unauthenticated session: cannot write photo draft.")
+        }
         require(uid.isNotBlank())
         require(draft.photo == null || (draft.photo.ownerUid == uid &&
             draft.photo.capsuleId == draft.capsuleId))
@@ -131,6 +139,9 @@ open class PhotoDraftJournal(private val root: File) {
                 Files.deleteIfExists(file.toPath())
             } catch (_: Exception) {
                 file.delete()
+            }
+            if (file.exists()) {
+                throw IOException("Failed to delete photo draft journal file for $uid")
             }
         }
     }

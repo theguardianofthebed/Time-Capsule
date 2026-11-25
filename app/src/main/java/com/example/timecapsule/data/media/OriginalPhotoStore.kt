@@ -132,7 +132,9 @@ class OriginalPhotoStore(
         require(ownerUid.isNotBlank())
         val dir = File(root, digestName(ownerUid))
         if (dir.exists()) {
-            dir.deleteRecursively()
+            if (!dir.deleteRecursively() || dir.exists()) {
+                throw IOException("Failed to delete original photo directory for $ownerUid")
+            }
         }
     }
 

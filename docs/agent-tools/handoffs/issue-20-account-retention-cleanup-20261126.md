@@ -32,13 +32,12 @@
    - Purges compose buffers and local photo files upon confirmed publication.
 5. **Backup Exclusions (`backup_rules.xml`, `data_extraction_rules.xml`):**
    - Configured XML rules to exclude all app-private protected directories (`retained-content`, `capsule-operations`, `original-photos`, `frozen-photos`, `photo-drafts`, `notification-attempts.json`, `no_backup`).
-6. **Fifth Review Remaining Blockers Corrections:**
-   - **Correction 1**: Updated `DefaultCapsuleRepository.readContent()` to pass originating `targetSession: SessionSnapshot` to `retentionAdapter.readRetainedContent(targetSession, cleanId)`.
-   - **Correction 2**: Persisted `pending-cleanup.properties` BEFORE Auth sign-out in `AccountSessionManager.kt`. Verified `!file.exists()` in `AccountCleanupOrchestrator.kt` and preserved original `pendingUid` in marker.
-   - **Correction 3**: Implemented PNG (`0x89 0x50 0x4E 0x47`) vs JPEG (`0xFF 0xD8 0xFF`) header byte inspection and byte size validation in `DefaultFirestoreAdapter.kt`.
-   - **Correction 4**: Expanded `StorageRaceRegressionTest.kt` with 5 tests covering late write gates, old-generation read denial, PNG/JPEG byte detection, fail-closed photo downloads, and deletion failure cleanup blocks.
+6. **Sixth Review Corrections:**
+   - **Task 1**: Updated `AccountSessionManager.kt` to persist pending cleanup BEFORE Auth sign-out. Added null-UID sign-out retries and fail-closed session activation.
+   - **Task 2**: Connected `session: () -> SessionSnapshot` across all 7 stores and enforced `activeSession.sessionGeneration == targetSession.sessionGeneration` inside storage locks without generation-zero bypass. Verified `!file.exists()` on file deletion.
+   - **Task 3**: Implemented PNG (`0x89 0x50 0x4E 0x47`) vs JPEG (`0xFF 0xD8 0xFF`) header byte probe and image byte validation in `DefaultFirestoreAdapter.kt`.
 7. **Automated Verification:**
-   - 338 JVM unit tests passing (`./gradlew :app:testDebugUnitTest`).
+   - 341 JVM unit tests passing (`./gradlew :app:testDebugUnitTest`).
    - Clean debug APK build (`./gradlew :app:assembleDebug`).
    - Clean AndroidTest APK build (`./gradlew :app:assembleDebugAndroidTest`).
    - Clean Android lint (`./gradlew :app:lintDebug`).

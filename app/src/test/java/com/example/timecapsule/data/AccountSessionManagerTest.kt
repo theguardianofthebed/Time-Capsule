@@ -288,6 +288,67 @@ class AccountSessionManagerTest {
     }
 
     @Test
+    fun testSignOutFailureFailsClosedAndRetriesOnSecondAttempt() = runBlocking {
+        var cleanupAttempts = 0
+        var shouldFailCleanup = true
+        var isCleanupPending = false
+
+        val manager = AccountSessionManager(
+            authAdapter = fakeAuthAdapter,
+            firestoreAdapter = fakeFirestoreAdapter,
+            sessionTracker = sessionTracker,
+            onAccountCleared = { uid ->
+                cleanupAttempts++
+                if (shouldFailCleanup) {
+                    isCleanupPending = true
+                    OperationResult.Unavailable("Cleanup failed")
+                } else {
+                    isCleanupPending = false
+                    OperationResult.Success(Unit)
+                }
+            },
+            isCleanupPending = { isCleanupPending }
+        )
+
+        fakeAuthAdapter.uid = "user-failing-signout"
+        sessionTracker.startSession("user-failing-signout")
+
+        // First sign-out attempt fails
+        val firstSignOut = manager.signOut()
+        assertTrue(firstSignOut is OperationResult.Unavailable)
+        assertEquals("user-failing-signout", fakeAuthAdapter.activeUid())
+        assertTrue(sessionTracker.currentSession().isAuthenticated)
+        assertEquals(1, cleanupAttempts)
+
+        // Fix the store failure and attempt second sign-out
+        shouldFailCleanup = false
+        val secondSignOut = manager.signOut()
+        assertTrue(secondSignOut is OperationResult.Success)
+        assertNull(fakeAuthAdapter.activeUid())
+        assertFalse(sessionTracker.currentSession().isAuthenticated)
+        assertEquals(2, cleanupAttempts)
+    }
+
+    @Test
+    fun testPendingCleanupBlocksSignIn() = runBlocking {
+        val isCleanupPending = true
+        val manager = AccountSessionManager(
+            authAdapter = fakeAuthAdapter,
+            firestoreAdapter = fakeFirestoreAdapter,
+            sessionTracker = sessionTracker,
+            onAccountCleared = {
+                if (isCleanupPending) OperationResult.Unavailable("Pending cleanup")
+                else OperationResult.Success(Unit)
+            },
+            isCleanupPending = { isCleanupPending }
+        )
+
+        val signInRes = manager.signIn("user@example.com", "password123")
+        assertTrue("Sign in must be blocked when cleanup is pending", signInRes is OperationResult.Unavailable)
+        assertFalse(sessionTracker.currentSession().isAuthenticated)
+    }
+
+    @Test
     fun testAccountReplacementInvalidatesOldSessionBeforeOnAccountClearedCallback() = runBlocking {
         var oldSessionValidAtCleanup: Boolean? = null
         var clearedUid: String? = null

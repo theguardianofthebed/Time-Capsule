@@ -8,6 +8,7 @@ import com.example.timecapsule.domain.model.LockMode
 import com.example.timecapsule.domain.model.OriginalPhotoFormat
 import com.example.timecapsule.domain.model.PublicationPhase
 import com.example.timecapsule.domain.model.RetainedOriginalPhoto
+import com.example.timecapsule.domain.session.SessionSnapshot
 import java.io.File
 import java.io.IOException
 import java.nio.file.Files
@@ -21,7 +22,10 @@ import java.util.Properties
  * Call on an I/O dispatcher. Every write completes and syncs before upload/publication may start.
  * A process-wide lock also serializes independent instances during Activity recreation.
  */
-class FrozenOperationJournal(private val root: File) {
+class FrozenOperationJournal(
+    private val root: File,
+    private val session: (() -> SessionSnapshot)? = null
+) {
     /** Identifies the private store when coordinating attempts across recreated instances. */
     val storageIdentity: String
         get() = root.canonicalPath
@@ -36,6 +40,10 @@ class FrozenOperationJournal(private val root: File) {
      * Phase changes must be authorized by the publication coordinator's actual network results.
      */
     fun save(record: FrozenOperationRecord) = synchronized(access) {
+        val activeSession = session?.invoke()
+        if (activeSession != null && (!activeSession.isAuthenticated || (record.operation.senderUid.isNotBlank() && activeSession.uid != record.operation.senderUid))) {
+            throw IOException("Stale or unauthenticated session: cannot write operation record.")
+        }
         val operation = record.operation
         operation.verify()
         record.replacementDraftId?.let {
@@ -197,7 +205,9 @@ class FrozenOperationJournal(private val root: File) {
         if (uid.isBlank()) return@synchronized
         val dir = accountDirectory(uid)
         if (dir.exists()) {
-            dir.deleteRecursively()
+            if (!dir.deleteRecursively() || dir.exists()) {
+                throw IOException("Failed to delete operation journal directory for $uid")
+            }
         }
     }
 
