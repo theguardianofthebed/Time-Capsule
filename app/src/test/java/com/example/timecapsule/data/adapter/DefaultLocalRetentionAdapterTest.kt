@@ -2,6 +2,7 @@ package com.example.timecapsule.data.adapter
 
 import com.example.timecapsule.domain.model.OriginalPhotoFormat
 import com.example.timecapsule.domain.result.OperationResult
+import com.example.timecapsule.domain.session.SessionSnapshot
 import java.io.File
 import java.time.Instant
 import kotlinx.coroutines.runBlocking
@@ -173,5 +174,49 @@ class DefaultLocalRetentionAdapterTest {
 
         val readC = retentionAdapter.readRetainedContent(uid, "capsule-c")
         assertTrue(readC is OperationResult.Denied)
+    }
+
+    @Test
+    fun testSessionValidationEnforcesActiveSession() = runBlocking {
+        var activeSession = SessionSnapshot("user-session-1", 1L)
+        val adapterWithSession = DefaultLocalRetentionAdapter(rootDir, session = { activeSession })
+
+        val saveRes = adapterWithSession.saveRetainedContent(
+            "user-session-1", "capsule-s1", Instant.now(), "Content S1", null, null
+        )
+        assertTrue(saveRes is OperationResult.Success)
+
+        // Switch active session to another user
+        activeSession = SessionSnapshot("user-session-2", 2L)
+
+        // Read for user-session-1 must be denied
+        val readRes = adapterWithSession.readRetainedContent("user-session-1", "capsule-s1")
+        assertTrue(readRes is OperationResult.Denied)
+
+        // Save for user-session-1 must be denied
+        val saveDenied = adapterWithSession.saveRetainedContent(
+            "user-session-1", "capsule-s2", Instant.now(), "Content S2", null, null
+        )
+        assertTrue(saveDenied is OperationResult.Denied)
+    }
+
+    @Test
+    fun testMalformedMarkerFlagsReturnDenied() = runBlocking {
+        val uid = "user-flag-test"
+        val capsuleId = "capsule-flag-1"
+
+        retentionAdapter.saveRetainedContent(uid, capsuleId, Instant.now(), "Text Flag", null, null)
+
+        val accountHash = MessageDigest.getInstance("SHA-256")
+            .digest(uid.toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }
+        val markerFile = File(rootDir, "$accountHash/$capsuleId/verified-marker.properties")
+        assertTrue(markerFile.exists())
+
+        // Overwrite marker file with corrupt flags (both false)
+        markerFile.writeText("version=1\nuid=$uid\ncapsuleId=$capsuleId\nverifiedUnlockedAt=${Instant.now()}\nhasText=false\nhasPhoto=false\n")
+
+        val readRes = retentionAdapter.readRetainedContent(uid, capsuleId)
+        assertTrue(readRes is OperationResult.Denied)
     }
 }

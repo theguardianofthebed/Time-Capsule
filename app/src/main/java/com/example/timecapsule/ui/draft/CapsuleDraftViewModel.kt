@@ -120,7 +120,7 @@ class CapsuleDraftViewModel(
         val state = _uiState.value
         return token == photoToken &&
             state.activeSessionUid == uid &&
-            accountSessionManager.restoreSessionIfAuthenticated() == uid &&
+            accountSessionManager.currentSession().uid == uid &&
             accountSessionManager.currentSession() == observedSession &&
             state.capsuleId == capsuleId
     }
@@ -175,7 +175,7 @@ class CapsuleDraftViewModel(
             try {
                 photoSaveMutex.withLock {
                     if (_uiState.value.activeSessionUid != uid ||
-                        accountSessionManager.restoreSessionIfAuthenticated() != uid ||
+                        accountSessionManager.currentSession().uid != uid ||
                         accountSessionManager.currentSession() != observedSession ||
                         _uiState.value.capsuleId != capsuleId) {
                         return@withLock
@@ -343,7 +343,7 @@ class CapsuleDraftViewModel(
     }
 
     init {
-        val currentUid = accountSessionManager.restoreSessionIfAuthenticated()
+        val currentUid = accountSessionManager.currentSession().uid
         observedSession = accountSessionManager.currentSession()
         _uiState.update { it.copy(activeSessionUid = currentUid) }
         if (!currentUid.isNullOrBlank()) {
@@ -422,7 +422,7 @@ class CapsuleDraftViewModel(
             )
         }
         if (mode == RecipientMode.FUTURE_ME) {
-            val currentUid = accountSessionManager.restoreSessionIfAuthenticated() ?: _uiState.value.activeSessionUid ?: ""
+            val currentUid = accountSessionManager.currentSession().uid ?: _uiState.value.activeSessionUid ?: ""
             selectFutureMe(currentUid)
         } else {
             _uiState.update {
@@ -904,7 +904,7 @@ class CapsuleDraftViewModel(
         capturedSession: SessionSnapshot
     ): Boolean =
         token == publicationToken && _uiState.value.activeSessionUid == uid &&
-            accountSessionManager.restoreSessionIfAuthenticated() == uid &&
+            accountSessionManager.currentSession().uid == uid &&
             accountSessionManager.isSessionValid(capturedSession)
 
     /** Bounds read-only recovery waiting without canceling the independently owned send task. */
@@ -921,7 +921,7 @@ class CapsuleDraftViewModel(
         if (!_uiState.value.editable) return
         val previous = _uiState.value.originalPhoto
         photoToken++
-        val activeUid = accountSessionManager.restoreSessionIfAuthenticated()
+        val activeUid = accountSessionManager.currentSession().uid
         _uiState.value = CapsuleDraftUiState(activeSessionUid = activeUid)
         if (!activeUid.isNullOrBlank()) {
             selectFutureMe(activeUid)

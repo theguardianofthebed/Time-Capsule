@@ -6,6 +6,7 @@ import com.example.timecapsule.data.session.DefaultSessionTracker
 import com.example.timecapsule.domain.model.RecipientProfile
 import com.example.timecapsule.domain.result.OperationResult
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -90,7 +91,7 @@ class SessionRestorationTest {
         val manager = AccountSessionManager(authAdapter, FakeFirestoreAdapterForSession(), sessionTracker)
 
         manager.restoreSessionIfAuthenticated()
-        manager.signOut()
+        runBlocking { manager.signOut() }
 
         assertNull(authAdapter.activeUid())
         assertFalse(sessionTracker.currentSession().isAuthenticated)

@@ -1,7 +1,9 @@
 package com.example.timecapsule.data.adapter
 
 import com.example.timecapsule.domain.model.OriginalPhotoFormat
+import com.example.timecapsule.domain.model.OriginalPhotoLimits
 import com.example.timecapsule.domain.result.OperationResult
+import com.example.timecapsule.domain.session.SessionSnapshot
 import java.io.File
 import java.io.IOException
 import java.nio.file.Files
@@ -25,9 +27,11 @@ import kotlinx.coroutines.withContext
  *    Missing text or photo files cause the read to fail closed ([OperationResult.Unavailable]).
  *
  * @param root Base directory for retained content storage, typically `File(noBackupFilesDir, "retained-content")`.
+ * @param session Optional session supplier for active session validation.
  */
 class DefaultLocalRetentionAdapter(
-    private val root: File
+    private val root: File,
+    private val session: (() -> SessionSnapshot)? = null
 ) : LocalRetentionAdapter {
 
     companion object {
@@ -50,6 +54,10 @@ class DefaultLocalRetentionAdapter(
         val cleanCapsuleId = capsuleId.trim()
         if (cleanUid.isBlank() || cleanCapsuleId.isBlank()) {
             return@withContext OperationResult.Invalid("UID and capsule ID must not be blank for retention.")
+        }
+        val activeSession = session?.invoke()
+        if (activeSession != null && (!activeSession.isAuthenticated || activeSession.uid != cleanUid)) {
+            return@withContext OperationResult.Denied("Retained content save denied for foreign or unauthenticated session.")
         }
         if (!cleanCapsuleId.matches(Regex("[A-Za-z0-9_-]+"))) {
             return@withContext OperationResult.Invalid("Invalid capsule ID format for storage.")
@@ -124,6 +132,10 @@ class DefaultLocalRetentionAdapter(
         if (cleanUid.isBlank() || cleanCapsuleId.isBlank()) {
             return@withContext OperationResult.Denied("Authenticated UID and capsule ID are required.")
         }
+        val activeSession = session?.invoke()
+        if (activeSession != null && (!activeSession.isAuthenticated || activeSession.uid != cleanUid)) {
+            return@withContext OperationResult.Denied("Retained content read denied for foreign or unauthenticated session.")
+        }
 
         synchronized(lock) {
             try {
@@ -152,15 +164,27 @@ class DefaultLocalRetentionAdapter(
                     return@synchronized OperationResult.Denied("Retained marker timestamp is corrupted.")
                 }
 
-                val hasText = properties.getProperty("hasText", "false").toBooleanStrictOrNull() ?: false
-                val hasPhoto = properties.getProperty("hasPhoto", "false").toBooleanStrictOrNull() ?: false
+                val hasTextStr = properties.getProperty("hasText")
+                val hasPhotoStr = properties.getProperty("hasPhoto")
+                val hasText = hasTextStr?.toBooleanStrictOrNull()
+                    ?: return@synchronized OperationResult.Denied("Retained marker hasText flag is missing or invalid.")
+                val hasPhoto = hasPhotoStr?.toBooleanStrictOrNull()
+                    ?: return@synchronized OperationResult.Denied("Retained marker hasPhoto flag is missing or invalid.")
+
+                if (!hasText && !hasPhoto) {
+                    return@synchronized OperationResult.Denied("Retained marker declares neither text nor photo content.")
+                }
 
                 val textContent = if (hasText) {
                     val textFile = File(directory, TEXT_FILE_NAME)
                     if (!textFile.exists()) {
                         return@synchronized OperationResult.Unavailable("Retained text file is missing.")
                     }
-                    textFile.readText(Charsets.UTF_8)
+                    val t = textFile.readText(Charsets.UTF_8)
+                    if (t.isBlank()) {
+                        return@synchronized OperationResult.Unavailable("Retained text content is empty.")
+                    }
+                    t
                 } else null
 
                 val photoFormat = if (hasPhoto) {
@@ -177,7 +201,11 @@ class DefaultLocalRetentionAdapter(
                     if (!photoFile.exists()) {
                         return@synchronized OperationResult.Unavailable("Retained photo file is missing.")
                     }
-                    photoFile.readBytes()
+                    val bytes = photoFile.readBytes()
+                    if (!OriginalPhotoLimits.acceptsSize(bytes.size.toLong())) {
+                        return@synchronized OperationResult.Unavailable("Retained photo size is invalid.")
+                    }
+                    bytes
                 } else null
 
                 OperationResult.Success(

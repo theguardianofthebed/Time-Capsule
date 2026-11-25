@@ -3,6 +3,7 @@ package com.example.timecapsule.data.adapter
 import android.os.SystemClock
 import com.example.timecapsule.domain.model.Availability
 import com.example.timecapsule.domain.model.ForegroundLocationSample
+import com.example.timecapsule.domain.model.ProtectedCapsuleContent
 import com.example.timecapsule.domain.model.RecipientProfile
 import com.example.timecapsule.domain.model.RecipientUnlockRequirements
 import com.example.timecapsule.domain.model.UnlockConfirmationKind
@@ -83,5 +84,13 @@ interface FirestoreAdapter {
         clockNanosSupplier: () -> Long = { SystemClock.elapsedRealtimeNanos() }
     ): OperationResult<Availability> {
         return OperationResult.Unavailable("Unlock verification is not implemented in this adapter.")
+    }
+
+    /** Reads protected content for [capsuleId] if recipient is authorized. */
+    suspend fun readProtectedContent(
+        capsuleId: String,
+        recipientUid: String
+    ): OperationResult<ProtectedCapsuleContent> {
+        return OperationResult.Unavailable("Protected content read is not implemented in this adapter.")
     }
 }

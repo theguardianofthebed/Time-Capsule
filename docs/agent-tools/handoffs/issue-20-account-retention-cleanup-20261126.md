@@ -32,8 +32,18 @@
    - Purges compose buffers and local photo files upon confirmed publication.
 5. **Backup Exclusions (`backup_rules.xml`, `data_extraction_rules.xml`):**
    - Configured XML rules to exclude all app-private protected directories (`retained-content`, `capsule-operations`, `original-photos`, `frozen-photos`, `photo-drafts`, `notification-attempts.json`, `no_backup`).
-6. **Automated Verification:**
-   - 323 JVM unit tests passing (`./gradlew :app:testDebugUnitTest`).
+6. **Code Review Corrections (A–I):**
+   - **Correction A**: Separated opaque recovery from full publication payloads. Added `matchesOpaque` in `PublicationRecordMatcher` and handled opaque operations in `FirestoreCapsulePublication` and `CapsulePublicationCoordinator`.
+   - **Correction B**: Fail-closed account cleanup in `AccountCleanupOrchestrator` returning `OperationResult.Unavailable` on error and persisting `pending-cleanup.properties`.
+   - **Correction C**: Session-aware write authorization checking `sessionTracker.isSessionValid(targetSession)` inside storage mutexes.
+   - **Correction D**: Session authorization for retained content in `DefaultLocalRetentionAdapter`.
+   - **Correction E**: Interrupted cleanup recovery on process restart (`cleanupInterruptedSessions`).
+   - **Correction F**: Marker flag and byte validation in `DefaultLocalRetentionAdapter`.
+   - **Correction G**: Asynchronous non-blocking account sign-out/switch.
+   - **Correction H**: Server-confirmed retention handoff in `DefaultCapsuleRepository.readContent`.
+   - **Correction I**: Suppressed raw snapshot exposure for uncertain self-sends.
+7. **Automated Verification:**
+   - 330 JVM unit tests passing (`./gradlew :app:testDebugUnitTest`).
    - Clean debug APK build (`./gradlew :app:assembleDebug`).
    - Clean Android lint (`./gradlew :app:lintDebug`).
 

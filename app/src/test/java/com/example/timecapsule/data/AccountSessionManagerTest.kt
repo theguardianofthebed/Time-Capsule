@@ -272,13 +272,16 @@ class AccountSessionManagerTest {
             fakeAuthAdapter,
             fakeFirestoreAdapter,
             sessionTracker,
-            onAccountCleared = { clearedAccountUid = it }
+            onAccountCleared = {
+                clearedAccountUid = it
+                OperationResult.Success(Unit)
+            }
         )
 
         fakeAuthAdapter.uid = "user-101"
         sessionTracker.startSession("user-101")
 
-        manager.signOut()
+        runBlocking { manager.signOut() }
 
         assertEquals("user-101", clearedAccountUid)
         assertFalse(sessionTracker.currentSession().isAuthenticated)
@@ -301,6 +304,7 @@ class AccountSessionManagerTest {
                 initialSession?.let { oldSession ->
                     oldSessionValidAtCleanup = sessionTracker.isSessionValid(oldSession)
                 }
+                OperationResult.Success(Unit)
             }
         )
 

@@ -38,7 +38,9 @@ class OpaqueRecoveryTest {
         override suspend fun publish(operation: FrozenCapsuleOperation) {}
 
         override suspend fun inspect(operation: FrozenCapsuleOperation): PublicationInspection {
-            return inspectionResults[operation.capsuleId] ?: PublicationInspection.ABSENT
+            val res = inspectionResults[operation.capsuleId] ?: PublicationInspection.ABSENT
+            println("FakeCapsulePublicationBackend.inspect(${operation.capsuleId}) = $res")
+            return res
         }
     }
 
@@ -47,6 +49,7 @@ class OpaqueRecoveryTest {
 
     @Before
     fun setUp() {
+        CapsulePublicationCoordinator.clearActiveAttemptsForTesting()
         journalDir = temporaryFolder.newFolder("capsule-operations")
         journal = FrozenOperationJournal(journalDir)
         fakeBackend = FakeCapsulePublicationBackend()
@@ -62,6 +65,7 @@ class OpaqueRecoveryTest {
 
     @After
     fun tearDown() {
+        CapsulePublicationCoordinator.clearActiveAttemptsForTesting()
         temporaryFolder.delete()
     }
 
@@ -133,5 +137,101 @@ class OpaqueRecoveryTest {
         val loadedAfter = journal.load(uid, capsuleId)
         assertNotNull(loadedAfter)
         assertEquals(PublicationPhase.SENT, loadedAfter!!.phase)
+    }
+
+    @Test
+    fun testOpaqueReconciliationWithoutTitleMatchesServer() = runBlocking {
+        val uid = "user-sender-1"
+        val capsuleId = "capsule-notitle-300"
+
+        val rawOp = FrozenCapsuleOperation(
+            capsuleId = capsuleId,
+            senderUid = uid,
+            recipientUid = "recipient-300",
+            title = null,
+            text = "No Title Message",
+            lock = CapsuleLock(LockMode.TIME, unlockAt = Instant.now().plusSeconds(3600)),
+            creationZone = "UTC",
+            photo = null,
+            snapshotDigest = ""
+        )
+        val op = rawOp.copy(snapshotDigest = rawOp.calculateDigest())
+        journal.save(FrozenOperationRecord(op, phase = PublicationPhase.PUBLISHING, photoAcknowledged = true))
+
+        journal.compactAccountDataToOpaque(uid)
+        fakeBackend.inspectionResults[capsuleId] = PublicationInspection.MATCHING
+
+        val session = SessionSnapshot(uid = uid, sessionGeneration = 1L)
+        val res = coordinator.reconcile(capsuleId, session)
+
+        assertTrue(res is OperationResult.Success)
+        val loadedAfter = journal.load(uid, capsuleId)
+        assertNotNull(loadedAfter)
+        assertEquals(PublicationPhase.SENT, loadedAfter!!.phase)
+    }
+
+    @Test
+    fun testOpaqueRetryWithAbsentServerStateDoesNotRepublish() = runBlocking {
+        val uid = "user-sender-1"
+        val capsuleId = "capsule-absent-400"
+
+        val rawOp = FrozenCapsuleOperation(
+            capsuleId = capsuleId,
+            senderUid = uid,
+            recipientUid = "recipient-400",
+            title = "Test",
+            text = "Text",
+            lock = CapsuleLock(LockMode.TIME, unlockAt = Instant.now().plusSeconds(3600)),
+            creationZone = "UTC",
+            photo = null,
+            snapshotDigest = ""
+        )
+        val op = rawOp.copy(snapshotDigest = rawOp.calculateDigest())
+        journal.save(FrozenOperationRecord(op, phase = PublicationPhase.FAILED, terminalRejectionConfirmed = true))
+
+        journal.compactAccountDataToOpaque(uid)
+        fakeBackend.inspectionResults[capsuleId] = PublicationInspection.ABSENT
+
+        val session = SessionSnapshot(uid = uid, sessionGeneration = 1L)
+        val res = coordinator.retry(capsuleId, session)
+        println("RETRY RESULT: $res")
+        assertTrue("Expected OutcomeUnknown, Denied, or Unavailable but got $res", res is OperationResult.OutcomeUnknown || res is OperationResult.Denied || res is OperationResult.Unavailable)
+        val loadedAfter = journal.load(uid, capsuleId)
+        assertNotNull(loadedAfter)
+        assertTrue(loadedAfter!!.operation.isOpaque)
+        assertEquals("", loadedAfter.operation.text)
+    }
+
+    @Test
+    fun testAbsentServerReadPreservesUncertaintyForInFlightWrite() = runBlocking {
+        val uid = "user-sender-1"
+        val capsuleId = "capsule-inflight-500"
+
+        val rawOp = FrozenCapsuleOperation(
+            capsuleId = capsuleId,
+            senderUid = uid,
+            recipientUid = "recipient-500",
+            title = "In-Flight Title",
+            text = "In-Flight Text",
+            lock = CapsuleLock(LockMode.TIME, unlockAt = Instant.now().plusSeconds(3600)),
+            creationZone = "UTC",
+            photo = null,
+            snapshotDigest = ""
+        )
+        val op = rawOp.copy(snapshotDigest = rawOp.calculateDigest())
+        journal.save(FrozenOperationRecord(op, phase = PublicationPhase.PUBLISHING, hasUnresolvedWrite = true))
+
+        journal.compactAccountDataToOpaque(uid)
+        fakeBackend.inspectionResults[capsuleId] = PublicationInspection.ABSENT
+
+        val session = SessionSnapshot(uid = uid, sessionGeneration = 1L)
+        val res = coordinator.reconcile(capsuleId, session)
+
+        // Must remain OutcomeUnknown to preserve earlier write uncertainty
+        assertTrue(res is OperationResult.OutcomeUnknown)
+        val loadedAfter = journal.load(uid, capsuleId)
+        assertNotNull(loadedAfter)
+        assertEquals(PublicationPhase.OUTCOME_UNKNOWN, loadedAfter!!.phase)
+        assertTrue(loadedAfter.hasUnresolvedWrite)
     }
 }

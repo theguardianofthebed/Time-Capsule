@@ -19,6 +19,7 @@ import com.example.timecapsule.ui.s05.S05RecipientLockFragment
 import com.example.timecapsule.ui.s06.S06ConfirmSendFragment
 import com.example.timecapsule.ui.s08.S08AccountSettingsFragment
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 /**
  * Main activity for the TimeCapsule application using native Views and ViewBinding.
@@ -56,7 +57,7 @@ class MainActivity : AppCompatActivity() {
         container = appContainer
 
         // Unconditionally restore session into SessionTracker on every Activity/container creation
-        val activeUid = container.accountSessionManager.restoreSessionIfAuthenticated()
+        val activeUid = runBlocking { container.accountSessionManager.restoreSessionIfAuthenticated() }
         if (!activeUid.isNullOrBlank()) {
             container.recoveryCoordinator?.triggerForegroundRecovery()
         }
@@ -138,7 +139,7 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         if (::container.isInitialized) {
-            val activeUid = container.accountSessionManager.restoreSessionIfAuthenticated()
+            val activeUid = runBlocking { container.accountSessionManager.restoreSessionIfAuthenticated() }
             if (!activeUid.isNullOrBlank()) {
                 container.recoveryCoordinator?.triggerForegroundRecovery()
             }
@@ -150,7 +151,7 @@ class MainActivity : AppCompatActivity() {
             is S01SignInFragment -> {
                 fragment.onGoToRegisterListener = { navigateToRegister() }
                 fragment.onSignInSuccessListener = {
-                    val uid = container.accountSessionManager.restoreSessionIfAuthenticated()
+                    val uid = runBlocking { container.accountSessionManager.restoreSessionIfAuthenticated() }
                     if (!uid.isNullOrBlank()) {
                         container.recoveryCoordinator?.triggerForegroundRecovery()
                     }
@@ -159,7 +160,7 @@ class MainActivity : AppCompatActivity() {
             }
             is S02RegisterFragment -> {
                 fragment.onRegisterSuccessListener = {
-                    val uid = container.accountSessionManager.restoreSessionIfAuthenticated()
+                    val uid = runBlocking { container.accountSessionManager.restoreSessionIfAuthenticated() }
                     if (!uid.isNullOrBlank()) {
                         container.recoveryCoordinator?.triggerForegroundRecovery()
                     }
@@ -191,7 +192,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun handleMomentsClick() {
-        val activeUid = container.accountSessionManager.restoreSessionIfAuthenticated()
+        val activeUid = kotlinx.coroutines.runBlocking { container.accountSessionManager.restoreSessionIfAuthenticated() }
         if (activeUid.isNullOrBlank()) {
             navigateToSignIn()
         } else {

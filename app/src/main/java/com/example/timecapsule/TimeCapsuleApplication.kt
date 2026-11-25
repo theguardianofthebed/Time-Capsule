@@ -120,7 +120,9 @@ class TimeCapsuleApplication : Application() {
             originalPhotoStore = originalPhotoStore,
             photoDraftJournal = photoDraftJournal,
             unlockNotificationCoordinator = unlockNotificationCoordinator,
-            sessionTracker = sessionTracker
+            sessionTracker = sessionTracker,
+            noBackupDir = noBackupDir,
+            frozenPhotosDir = File(noBackupDir, "frozen-photos")
         )
 
         val accountSessionManager = AccountSessionManager(
@@ -128,9 +130,7 @@ class TimeCapsuleApplication : Application() {
             firestoreAdapter = firestoreAdapter,
             sessionTracker = sessionTracker,
             onAccountCleared = { uid ->
-                runBlocking {
-                    accountCleanupOrchestrator.cleanupAccount(uid)
-                }
+                accountCleanupOrchestrator.cleanupAccount(uid)
             }
         )
 

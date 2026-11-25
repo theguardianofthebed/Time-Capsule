@@ -5,6 +5,7 @@ import com.example.timecapsule.data.media.PhotoDraftJournal
 import com.example.timecapsule.data.media.PhotoDraftRecord
 import com.example.timecapsule.domain.model.CapsuleDraft
 import com.example.timecapsule.domain.model.FrozenCapsuleOperation
+import com.example.timecapsule.domain.session.SessionSnapshot
 import java.io.IOException
 import java.util.Locale
 import kotlinx.coroutines.CancellationException
@@ -22,12 +23,17 @@ interface PublicationDraftStore {
 /** Uses non-backed-up originals and the existing private draft journal; no provider URI is reopened. */
 class PrivatePublicationDrafts(
     private val originals: OriginalPhotoStore,
-    private val drafts: PhotoDraftJournal
+    private val drafts: PhotoDraftJournal,
+    private val session: (() -> SessionSnapshot)? = null
 ) : PublicationDraftStore {
     /** Persists a replacement before releasing any previous editable photo reference. */
     override suspend fun replacement(operation: FrozenCapsuleOperation, newId: String): CapsuleDraft =
         withContext(Dispatchers.IO) {
             require(newId != operation.capsuleId && newId.matches(Regex("[A-Za-z0-9_-]+")))
+            val activeSession = session?.invoke()
+            if (activeSession != null && (!activeSession.isAuthenticated || activeSession.uid != operation.senderUid)) {
+                throw IOException("Session changed during draft replacement.")
+            }
             val current = drafts.load(operation.senderUid)
             if (current != null && current.capsuleId != operation.capsuleId && current.capsuleId != newId) {
                 throw IOException("A different editable draft already exists.")
@@ -83,6 +89,10 @@ class PrivatePublicationDrafts(
     /** Removes raw text/photo from the old compose buffer only after confirmed publication. */
     override suspend fun clearConfirmed(operation: FrozenCapsuleOperation): Boolean =
         withContext(Dispatchers.IO) {
+            val activeSession = session?.invoke()
+            if (activeSession != null && (!activeSession.isAuthenticated || activeSession.uid != operation.senderUid)) {
+                return@withContext false
+            }
             val cleared = drafts.clearIfCurrent(operation.senderUid, operation.capsuleId)
                 ?: return@withContext false
             cleared.photo?.takeIf { it != operation.photo }?.let { originals.file(it).delete() }

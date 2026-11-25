@@ -31,6 +31,7 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import java.io.IOException
 
 /**
  * Unit tests verifying [AccountCleanupOrchestrator] multi-store cleanup,
@@ -66,6 +67,7 @@ class AccountCleanupOrchestratorTest {
         }
     }
 
+    private lateinit var noBackupDir: File
     private lateinit var fakeNotificationAdapter: FakeNotificationAdapter
     private lateinit var unlockNotificationCoordinator: UnlockNotificationCoordinator
 
@@ -75,6 +77,7 @@ class AccountCleanupOrchestratorTest {
         journalDir = temporaryFolder.newFolder("capsule-operations")
         photoStoreDir = temporaryFolder.newFolder("original-photos")
         photoDraftDir = temporaryFolder.newFolder("photo-drafts")
+        noBackupDir = temporaryFolder.newFolder("no_backup")
         attemptFile = temporaryFolder.newFile("notification-attempts.json")
 
         retentionAdapter = DefaultLocalRetentionAdapter(retentionDir)
@@ -97,7 +100,8 @@ class AccountCleanupOrchestratorTest {
             originalPhotoStore = originalPhotoStore,
             photoDraftJournal = photoDraftJournal,
             unlockNotificationCoordinator = unlockNotificationCoordinator,
-            sessionTracker = sessionTracker
+            sessionTracker = sessionTracker,
+            noBackupDir = noBackupDir
         )
     }
 
@@ -174,5 +178,46 @@ class AccountCleanupOrchestratorTest {
 
         // E. Notifications canceled
         assertTrue(fakeNotificationAdapter.canceledAccounts.contains(uid))
+    }
+
+    @Test
+    fun testInterruptedCleanupRecoveryOnStartup() = runBlocking {
+        val interruptedUid = "user-interrupted-1"
+        retentionAdapter.saveRetainedContent(interruptedUid, "capsule-int-1", Instant.now(), "Content Interrupted", null, null)
+
+        // Simulate process death after pending marker was written
+        val markerFile = File(noBackupDir, "pending-cleanup.properties")
+        markerFile.writeText("pendingUid=$interruptedUid\n")
+        assertTrue(markerFile.exists())
+
+        // Run startup recovery
+        val res = orchestrator.cleanupInterruptedSessions("active-user-2")
+        assertTrue(res is OperationResult.Success)
+
+        // Pending marker must be deleted after successful recovery
+        assertFalse(markerFile.exists())
+
+        // Content of interrupted user must be purged
+        val readRes = retentionAdapter.readRetainedContent(interruptedUid, "capsule-int-1")
+        assertTrue(readRes is OperationResult.Denied)
+    }
+
+    @Test
+    fun testFailingCleanupFailsClosedAndPreservesPendingMarker() = runBlocking {
+        val failingAdapter = object : LocalRetentionAdapter by retentionAdapter {
+            override suspend fun clearAccountData(uid: String) {
+                throw IOException("Injected retention storage failure")
+            }
+        }
+        val failingOrchestrator = AccountCleanupOrchestrator(
+            retentionAdapter = failingAdapter,
+            noBackupDir = noBackupDir
+        )
+
+        val res = failingOrchestrator.cleanupAccount("user-fail-1")
+        assertTrue(res is OperationResult.Unavailable)
+
+        val markerFile = File(noBackupDir, "pending-cleanup.properties")
+        assertTrue("Pending marker must be preserved when cleanup fails", markerFile.exists())
     }
 }

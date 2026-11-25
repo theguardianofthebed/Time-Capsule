@@ -68,6 +68,10 @@ class CapsulePublicationCoordinator(
         private val work = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         private val active = ConcurrentHashMap<
             AttemptKey, Deferred<OperationResult<String>>>()
+
+        fun clearActiveAttemptsForTesting() {
+            active.clear()
+        }
     }
 
     init {
@@ -85,9 +89,15 @@ class CapsulePublicationCoordinator(
         }
         try {
             val attempt = registration.withLock {
+                if (session() != targetSession || !targetSession.isAuthenticated) {
+                    return@withLock null
+                }
                 val previous = journal.load(uid, draft.capsuleId)
                 require(previous?.phase != PublicationPhase.ABANDONED) {
                     "An abandoned operation cannot be submitted again."
+                }
+                require(previous?.operation?.isOpaque != true) {
+                    "An opaque recovery record cannot be resubmitted."
                 }
                 val candidate = if (previous == null) {
                     FrozenCapsuleOperation.freeze(draft, uid, draft.creationZone.ifBlank { zone() }, now())
@@ -99,18 +109,22 @@ class CapsulePublicationCoordinator(
                     "Submitted capsule cannot be edited. Resolve its outcome first."
                 }
                 val key = key(candidate)
-                active[key]?.let { return@withLock it }
-                if (previous == null) {
-                    journal.save(FrozenOperationRecord(candidate))
-                    start(key) { execute(FrozenOperationRecord(candidate), targetSession) }
+                val existing = active[key]
+                if (existing != null && existing.isActive) {
+                    existing
                 } else {
-                    start(key) {
-                        if (previous.phase == PublicationPhase.SENT && hasPhotoProof(previous)) {
-                            OperationResult.Success(previous.operation.capsuleId)
-                        } else recover(previous, targetSession, replay = false)
+                    if (previous == null) {
+                        journal.save(FrozenOperationRecord(candidate))
+                        start(key) { execute(FrozenOperationRecord(candidate), targetSession) }
+                    } else {
+                        start(key) {
+                            if (previous.phase == PublicationPhase.SENT && hasPhotoProof(previous)) {
+                                OperationResult.Success(previous.operation.capsuleId)
+                            } else recover(previous, targetSession, replay = false)
+                        }
                     }
                 }
-            }
+            } ?: return@withContext denied()
             awaitResult(draft.capsuleId, targetSession, attempt)
         } catch (cancelled: CancellationException) {
             throw cancelled
@@ -138,7 +152,9 @@ class CapsulePublicationCoordinator(
                     "An abandoned operation cannot be retried."
                 }
                 val key = key(saved.operation)
-                active[key] ?: start(key) { recover(saved, targetSession, replay = true) }
+                val existing = active[key]
+                if (existing != null && existing.isActive) existing
+                else start(key) { recover(saved, targetSession, replay = true) }
             } ?: return@withContext OperationResult.Invalid("No saved send exists for this account.")
             awaitResult(capsuleId, targetSession, attempt)
         } catch (cancelled: CancellationException) {
@@ -229,8 +245,11 @@ class CapsulePublicationCoordinator(
                     drafts?.clearConfirmed(latest.operation) ?: false
                 } else false
                 if (session() != targetSession) return@withContext denied()
+                val isSelfSend = latest.operation.senderUid == latest.operation.recipientUid
+                val isUncertainSelfSend = isSelfSend && latest.phase != PublicationPhase.SENT
+                val snapshotToExpose = if (latest.phase == PublicationPhase.SENT || isUncertainSelfSend || latest.operation.isOpaque) null else latest.operation
                 recovered += RecoveredPublication(latest.operation.capsuleId, latest.phase,
-                    if (latest.phase == PublicationPhase.SENT) null else latest.operation,
+                    snapshotToExpose,
                     latest.phase == PublicationPhase.FAILED && !mayHaveEarlierWrite(latest) &&
                         active[key(latest.operation)]?.isActive != true, cleared)
             }
@@ -258,6 +277,9 @@ class CapsulePublicationCoordinator(
         try {
             val saved = journal.load(uid, capsuleId)
                 ?: return@withContext OperationResult.Invalid("No saved send exists for this account.")
+            if (saved.operation.isOpaque) {
+                return@withContext OperationResult.Denied("An opaque recovery record cannot be abandoned for a new draft.")
+            }
             if (saved.phase == PublicationPhase.ABANDONED) {
                 return@withContext prepareReplacement(saved, targetSession)
             }
@@ -357,7 +379,7 @@ class CapsulePublicationCoordinator(
             PublicationInspection.MATCHING -> resolveMatching(operation)
             PublicationInspection.CONFLICT -> conflict(operation)
             PublicationInspection.ABSENT -> {
-                if (replay && saved.phase != PublicationPhase.SENT &&
+                if (replay && !operation.isOpaque && saved.phase != PublicationPhase.SENT &&
                     saved.phase != PublicationPhase.ABANDONED) {
                     // An absent record permits only unchanged replay, never edited/new-ID restart.
                     execute(journal.load(operation.senderUid, operation.capsuleId) ?: saved, captured)

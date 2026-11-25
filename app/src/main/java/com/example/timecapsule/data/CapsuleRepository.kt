@@ -116,6 +116,11 @@ interface CapsuleRepository {
         if (session() != targetSession) OperationResult.Denied("Account session changed.")
         else OperationResult.Unavailable("Unlock verification is not implemented in this repository.")
 
-    /** Reads protected content for [capsuleId] after authorization check. */
+    /** Reads protected content for [capsuleId]. */
     suspend fun readContent(capsuleId: String): OperationResult<ProtectedCapsuleContent>
+
+    /** Reads protected content for [capsuleId] bound to [targetSession] after authorization check. */
+    suspend fun readContent(capsuleId: String, targetSession: SessionSnapshot): OperationResult<ProtectedCapsuleContent> =
+        if (session() != targetSession) OperationResult.Denied("Account session changed.")
+        else readContent(capsuleId)
 }

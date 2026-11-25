@@ -138,18 +138,14 @@ class FrozenOperationJournal(private val root: File) {
      */
     fun compactAccountDataToOpaque(uid: String): List<String> = synchronized(access) {
         if (uid.isBlank()) return@synchronized emptyList()
-        val records = try {
-            list(uid)
-        } catch (_: Exception) {
-            return@synchronized emptyList()
-        }
+        val records = list(uid)
         val opaqueIds = mutableListOf<String>()
         for (record in records) {
             val operation = record.operation
             val destination = target(uid, operation.capsuleId)
             if (record.phase == PublicationPhase.SENT || record.phase == PublicationPhase.ABANDONED) {
-                if (destination.exists()) {
-                    destination.delete()
+                if (destination.exists() && !destination.delete()) {
+                    throw IOException("Cannot delete resolved operation file: $destination")
                 }
             } else {
                 val opaqueOperation = operation.copy(

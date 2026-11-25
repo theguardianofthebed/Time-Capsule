@@ -8,6 +8,7 @@ import com.example.timecapsule.domain.model.RecipientConfirmation
 import com.example.timecapsule.domain.model.RecipientProfile
 import com.example.timecapsule.domain.result.OperationResult
 import com.example.timecapsule.domain.session.SessionSnapshot
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -20,7 +21,7 @@ class AccountSessionManager(
     private val firestoreAdapter: FirestoreAdapter,
     private val sessionTracker: SessionTracker,
     private val sessionGuard: SessionGuard = SessionGuard(sessionTracker),
-    private val onAccountCleared: ((String) -> Unit)? = null
+    private val onAccountCleared: (suspend (String) -> OperationResult<Unit>)? = null
 ) {
 
     private val authMutex = Mutex()
@@ -36,49 +37,60 @@ class AccountSessionManager(
      * Changes generation only on an identity transition; foreground checks preserve in-flight work.
      * Enforces session invalidation and account cleanup BEFORE activating a new session.
      */
-    fun restoreSessionIfAuthenticated(): String? {
-        val activeUid = authAdapter.activeUid()
-        val currentUid = sessionTracker.currentSession().uid
+    fun restoreSessionIfAuthenticated(): String? = runBlocking {
+        authMutex.withLock {
+            val activeUid = authAdapter.activeUid()
+            val currentUid = sessionTracker.currentSession().uid
 
-        if (!activeUid.isNullOrBlank()) {
-            if (currentUid != activeUid) {
-                sessionTracker.clearSession()
-                if (!currentUid.isNullOrBlank()) {
-                    onAccountCleared?.invoke(currentUid)
+            if (!activeUid.isNullOrBlank()) {
+                if (currentUid != activeUid) {
+                    sessionTracker.clearSession()
+                    if (!currentUid.isNullOrBlank()) {
+                        val cleanupRes = onAccountCleared?.invoke(currentUid)
+                        if (cleanupRes is OperationResult.Unavailable) {
+                            return@withLock null
+                        }
+                    }
+                    sessionTracker.startSession(activeUid)
                 }
-                sessionTracker.startSession(activeUid)
-            }
-            return activeUid
-        } else {
-            if (sessionTracker.currentSession().isAuthenticated) {
-                sessionTracker.clearSession()
-                if (!currentUid.isNullOrBlank()) {
-                    onAccountCleared?.invoke(currentUid)
+                return@withLock activeUid
+            } else {
+                if (sessionTracker.currentSession().isAuthenticated) {
+                    sessionTracker.clearSession()
+                    if (!currentUid.isNullOrBlank()) {
+                        onAccountCleared?.invoke(currentUid)
+                    }
                 }
+                return@withLock null
             }
-            return null
         }
     }
 
     /** Performs user sign in and updates SessionTracker exactly once on success. */
-    suspend fun signIn(email: String, password: String): OperationResult<String> = authMutex.withLock {
+    suspend fun signIn(email: String, password: String): OperationResult<String> {
         val capturedSession = sessionTracker.currentSession()
         val oldUid = capturedSession.uid
         val result = authAdapter.signIn(email, password)
 
-        if (checkAndHandleStaleCallback(capturedSession)) {
-            return@withLock OperationResult.Denied("Stale session invalidation: session changed during sign-in")
-        }
-
-        if (result is OperationResult.Success) {
-            val newUid = result.data
-            if (!oldUid.isNullOrBlank() && oldUid != newUid) {
-                sessionTracker.clearSession()
-                onAccountCleared?.invoke(oldUid)
+        return authMutex.withLock {
+            if (checkAndHandleStaleCallback(capturedSession)) {
+                return@withLock OperationResult.Denied("Stale session invalidation: session changed during sign-in")
             }
-            sessionTracker.startSession(newUid)
+
+            if (result is OperationResult.Success) {
+                val newUid = result.data
+                if (!oldUid.isNullOrBlank() && oldUid != newUid) {
+                    sessionTracker.clearSession()
+                    val cleanupRes = onAccountCleared?.invoke(oldUid)
+                    if (cleanupRes is OperationResult.Unavailable) {
+                        authAdapter.signOut()
+                        return@withLock OperationResult.Unavailable("Account cleanup failed. Cannot start new session.")
+                    }
+                }
+                sessionTracker.startSession(newUid)
+            }
+            result
         }
-        return@withLock result
     }
 
     /** Performs user sign up, starts session, and creates `recipientDirectory/{uid}` profile. */
@@ -86,17 +98,17 @@ class AccountSessionManager(
         email: String,
         password: String,
         displayName: String
-    ): OperationResult<String> = authMutex.withLock {
+    ): OperationResult<String> {
         val trimmedEmail = email.trim()
         val trimmedName = displayName.trim()
         if (trimmedName.isBlank()) {
-            return@withLock OperationResult.Invalid("Display name must not be blank.")
+            return OperationResult.Invalid("Display name must not be blank.")
         }
         if (trimmedEmail.isBlank() || password.isBlank()) {
-            return@withLock OperationResult.Invalid("Email and password must not be blank.")
+            return OperationResult.Invalid("Email and password must not be blank.")
         }
         if (password.length < 6) {
-            return@withLock OperationResult.Invalid("Password must be at least 6 characters.")
+            return OperationResult.Invalid("Password must be at least 6 characters.")
         }
 
         val capturedSession = sessionTracker.currentSession()
@@ -105,40 +117,48 @@ class AccountSessionManager(
         // If user is already authenticated in Auth, attempt profile repair directly without duplicate Auth creation
         val activeUid = authAdapter.activeUid()
         if (!activeUid.isNullOrBlank()) {
-            val repairRes = repairProfileInternal(activeUid, trimmedName)
-            return@withLock if (repairRes is OperationResult.Success) {
-                OperationResult.Success(activeUid)
-            } else {
-                OperationResult.Unavailable("Account exists, but recipient profile setup failed. Please update profile to complete setup.")
+            return authMutex.withLock {
+                val repairRes = repairProfileInternal(activeUid, trimmedName)
+                if (repairRes is OperationResult.Success) {
+                    OperationResult.Success(activeUid)
+                } else {
+                    OperationResult.Unavailable("Account exists, but recipient profile setup failed. Please update profile to complete setup.")
+                }
             }
         }
 
         val authResult = authAdapter.signUp(trimmedEmail, password, trimmedName)
 
-        if (checkAndHandleStaleCallback(capturedSession)) {
-            return@withLock OperationResult.Denied("Stale session invalidation: session changed during sign-up")
-        }
+        return authMutex.withLock {
+            if (checkAndHandleStaleCallback(capturedSession)) {
+                return@withLock OperationResult.Denied("Stale session invalidation: session changed during sign-up")
+            }
 
-        if (authResult is OperationResult.Success) {
-            val uid = authResult.data
-            if (!oldUid.isNullOrBlank() && oldUid != uid) {
-                sessionTracker.clearSession()
-                onAccountCleared?.invoke(oldUid)
-            }
-            sessionTracker.startSession(uid)
-            val postAuthSession = sessionTracker.currentSession()
+            if (authResult is OperationResult.Success) {
+                val uid = authResult.data
+                if (!oldUid.isNullOrBlank() && oldUid != uid) {
+                    sessionTracker.clearSession()
+                    val cleanupRes = onAccountCleared?.invoke(oldUid)
+                    if (cleanupRes is OperationResult.Unavailable) {
+                        authAdapter.signOut()
+                        return@withLock OperationResult.Unavailable("Account cleanup failed. Cannot start new session.")
+                    }
+                }
+                sessionTracker.startSession(uid)
+                val postAuthSession = sessionTracker.currentSession()
 
-            val profile = RecipientProfile(uid = uid, displayName = trimmedName)
-            val profileResult = sessionGuard.runGuarded(postAuthSession) {
-                firestoreAdapter.saveRecipientProfile(profile)
+                val profile = RecipientProfile(uid = uid, displayName = trimmedName)
+                val profileResult = sessionGuard.runGuarded(postAuthSession) {
+                    firestoreAdapter.saveRecipientProfile(profile)
+                }
+                if (profileResult !is OperationResult.Success) {
+                    return@withLock OperationResult.Unavailable(
+                        "Account registered, but recipient profile setup failed. Please click 'Register / Repair' to complete setup."
+                    )
+                }
             }
-            if (profileResult !is OperationResult.Success) {
-                return@withLock OperationResult.Unavailable(
-                    "Account registered, but recipient profile setup failed. Please click 'Register / Repair' to complete setup."
-                )
-            }
+            authResult
         }
-        return@withLock authResult
     }
 
     /**
@@ -220,13 +240,19 @@ class AccountSessionManager(
         return confirmation.copy(isConfirmed = confirm)
     }
 
-    /** Signs out the current user and clears session tracker exactly once. */
-    fun signOut() {
-        val oldUid = sessionTracker.currentSession().uid
-        authAdapter.signOut()
-        sessionTracker.clearSession()
-        if (!oldUid.isNullOrBlank()) {
-            onAccountCleared?.invoke(oldUid)
+    /** Signs out the current user and clears session tracker before executing cleanup. */
+    fun signOut(): OperationResult<Unit> = runBlocking {
+        authMutex.withLock {
+            val oldUid = sessionTracker.currentSession().uid
+            authAdapter.signOut()
+            sessionTracker.clearSession()
+            if (!oldUid.isNullOrBlank()) {
+                val cleanupRes = onAccountCleared?.invoke(oldUid)
+                if (cleanupRes is OperationResult.Unavailable) {
+                    return@withLock cleanupRes
+                }
+            }
+            OperationResult.Success(Unit)
         }
     }
 
@@ -241,7 +267,7 @@ class AccountSessionManager(
                     sessionTracker.clearSession()
                 }
                 if (!oldUid.isNullOrBlank()) {
-                    onAccountCleared?.invoke(oldUid)
+                    runBlocking { onAccountCleared?.invoke(oldUid) }
                 }
             }
             return true
