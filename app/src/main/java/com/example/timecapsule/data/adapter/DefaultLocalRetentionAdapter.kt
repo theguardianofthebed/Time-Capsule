@@ -236,7 +236,9 @@ class DefaultLocalRetentionAdapter(
         synchronized(lock) {
             val accountDir = accountDirectory(cleanUid)
             if (accountDir.exists()) {
-                accountDir.deleteRecursively()
+                if (!accountDir.deleteRecursively() || accountDir.exists()) {
+                    throw IOException("Failed to delete retained content directory for $cleanUid")
+                }
             }
         }
     }

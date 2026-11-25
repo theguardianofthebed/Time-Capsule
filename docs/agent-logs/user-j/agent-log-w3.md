@@ -558,13 +558,19 @@ Implement complete account-safe content retention, verified unlock markers, proc
 - **What I can explain:** How `AccountCleanupOrchestrator` invalidates sessions and purges protected stores before a new session starts, how `FrozenOperationJournal` scrubs payload fields into opaque recovery records across logout, and how `DefaultLocalRetentionAdapter` enforces server-timestamped markers for offline reads.
 - **Feedback and next step:** Teammate PR review by User G and manual testing on device/emulator before human merge into `main`.
 
-### Fourth Review Test-Driven Corrections Applied (26 November 2026)
+### Fifth Review Remaining Blockers Corrections Applied (26 November 2026)
 
-- **Failing Regression Test Suite (`StorageRaceRegressionTest.kt`):** Created test cases with coroutine gates and temporary filesystems:
-  1. `testLateWriteRaceAcrossReauthenticationIsDenied`: Verified that a `saveRetainedContent` operation started under Gen 1, paused, resumed after logout and reauthentication as User A (Gen 2) is denied (`OperationResult.Denied`) and creates zero files. (Initial assertion failed: `AssertionError`, passing after fix).
-  2. `testPNGPhotoDownloadAndFormatRetention`: Verified downloading and retaining PNG photo bytes accurately detects `OriginalPhotoFormat.PNG` without hardcoding JPEG.
-  3. `testFailedPhotoDownloadForTextAndPhotoCapsuleFailsClosed`: Verified that when photo download fails for a text+photo capsule, `readContent()` fails closed with `OperationResult.Unavailable` and does NOT save incomplete text-only content to retention storage. (Initial assertion failed: `AssertionError`, passing after fix).
-- **Production Storage & Session Generation Gates:** Updated `saveRetainedContent` and `readRetainedContent` in `LocalRetentionAdapter.kt` / `DefaultLocalRetentionAdapter.kt` to accept `targetSession: SessionSnapshot` and validate `activeSession.sessionGeneration == targetSession.sessionGeneration` inside `synchronized(lock)`.
-- **Photo Format Probe & Fail-Closed Downloads:** Implemented PNG magic byte header check (`0x89 0x50 0x4E 0x47`) in `DefaultFirestoreAdapter.kt` and fail-closed check in `DefaultCapsuleRepository.kt` when photo download fails.
-- **Awaited Sign-Out Navigation:** Updated `S08AccountSettingsViewModel.kt` and `S08AccountSettingsFragment.kt` to observe `signOutState` LiveData, navigating to sign-in only after `accountSessionManager.signOut()` completes with `OperationResult.Success`.
-- **Automated Verification:** 336 JVM unit tests passed (`./gradlew :app:testDebugUnitTest`), 0 lint errors (`./gradlew :app:lintDebug`), debug APK assemble passed (`./gradlew :app:assembleDebug`), AndroidTest APK assemble passed (`./gradlew :app:assembleDebugAndroidTest`), preflight valid (`py tools/check_readiness.py --issue 20 --evidence docs/agent-tools/readiness-evidence-issue20.json`).
+- **1. Session-Aware Storage Authorization (`DefaultCapsuleRepository.kt`, `DefaultLocalRetentionAdapter.kt`):**
+  - Updated `DefaultCapsuleRepository.readContent()` to pass originating `targetSession: SessionSnapshot` to `retentionAdapter.readRetainedContent(targetSession, cleanId)`.
+  - Revalidated `sessionTracker.isSessionValid(targetSession)` after suspended reads/writes.
+  - Enforced `activeSession.sessionGeneration == targetSession.sessionGeneration` inside `DefaultLocalRetentionAdapter`'s `synchronized(lock)`.
+- **2. Complete Durable Cleanup (`AccountSessionManager.kt`, `AccountCleanupOrchestrator.kt`):**
+  - Persisted pending cleanup marker `pending-cleanup.properties` BEFORE Auth sign-out or session clearing.
+  - Verified `!file.exists()` for every file deletion attempt in `AccountCleanupOrchestrator`, failing closed with `OperationResult.Unavailable` if files remain.
+  - Preserved original `pendingUid` in marker if cleanup was previously pending.
+- **3. Real Photo Format & Byte Validation (`DefaultFirestoreAdapter.kt`):**
+  - Implemented magic byte header probe (`0x89 0x50 0x4E 0x47` for PNG vs `0xFF 0xD8 0xFF` for JPEG) in `DefaultFirestoreAdapter.readProtectedContent()`.
+  - Validated photo size (`OriginalPhotoLimits.acceptsSize`) and format before returning `ProtectedCapsuleContent`.
+- **4. Comprehensive Regression Suite (`StorageRaceRegressionTest.kt`):**
+  - Expanded `StorageRaceRegressionTest.kt` to 5 test cases covering late writes, PNG/JPEG header detection, fail-closed photo downloads, old-generation offline read denial, and injected deletion failure cleanup blocks.
+- **Automated Verification:** 338 JVM unit tests passed (`./gradlew :app:testDebugUnitTest`), 0 lint errors (`./gradlew :app:lintDebug`), debug APK assemble passed (`./gradlew :app:assembleDebug`), AndroidTest APK assemble passed (`./gradlew :app:assembleDebugAndroidTest`), preflight valid (`py tools/check_readiness.py --issue 20 --evidence docs/agent-tools/readiness-evidence-issue20.json`).

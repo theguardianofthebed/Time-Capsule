@@ -74,9 +74,12 @@ class SessionGuardWriteRaceTest {
         assertTrue(sessionTracker.isSessionValid(gen2Session))
 
         // Attempting to read using Gen 1 target session fails authorization
-        val readGen1 = retentionAdapter.readRetainedContent("user-a", "capsule-gen1")
+        val readGen1 = retentionAdapter.readRetainedContent(gen1Session, "capsule-gen1")
+        assertTrue("Read with gen1Session must be denied", readGen1 is OperationResult.Denied)
+
         // Current active session (Gen 2) permits read for active account
-        assertTrue(readGen1 is OperationResult.Success)
+        val readGen2 = retentionAdapter.readRetainedContent(gen2Session, "capsule-gen1")
+        assertTrue("Read with gen2Session must succeed", readGen2 is OperationResult.Success)
     }
 
     @Test

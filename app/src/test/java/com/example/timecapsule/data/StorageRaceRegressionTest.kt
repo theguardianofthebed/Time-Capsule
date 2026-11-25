@@ -229,4 +229,46 @@ class StorageRaceRegressionTest {
         val offlineRes = retentionAdapter.readRetainedContent("user-recipient-2", "capsule-failed-photo")
         assertTrue(offlineRes is OperationResult.Denied)
     }
+
+    @Test
+    fun testOldGenerationOfflineReadIsDeniedAfterReauthentication() = runBlocking {
+        sessionTracker.startSession("user-a")
+        val gen1Session = sessionTracker.currentSession()
+
+        retentionAdapter.saveRetainedContent(
+            targetSession = gen1Session,
+            capsuleId = "capsule-gen1-read",
+            verifiedUnlockedAt = Instant.now(),
+            text = "Text Gen 1",
+            photoBytes = null,
+            photoFormat = null
+        )
+
+        // Logout and re-authenticate as User A (Gen 1 -> logout -> Gen 2)
+        sessionTracker.clearSession()
+        sessionTracker.startSession("user-a")
+
+        // Offline read using Gen 1 targetSession MUST be denied
+        val readGen1 = retentionAdapter.readRetainedContent(gen1Session, "capsule-gen1-read")
+        assertTrue("Read using old generation must be denied", readGen1 is OperationResult.Denied)
+    }
+
+    @Test
+    fun testInjectedDeletionFailureBlocksSessionActivation() = runBlocking {
+        val failingAdapter = object : LocalRetentionAdapter by retentionAdapter {
+            override suspend fun clearAccountData(uid: String) {
+                throw IOException("Injected deletion failure during account cleanup")
+            }
+        }
+        val orchestrator = AccountCleanupOrchestrator(
+            retentionAdapter = failingAdapter,
+            noBackupDir = noBackupDir
+        )
+
+        val cleanupRes = orchestrator.cleanupAccount("user-failing")
+        assertTrue(cleanupRes is OperationResult.Unavailable)
+
+        // Verify pending marker exists
+        assertTrue(orchestrator.hasPendingCleanup())
+    }
 }

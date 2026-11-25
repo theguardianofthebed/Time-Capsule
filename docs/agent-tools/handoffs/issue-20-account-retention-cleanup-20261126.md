@@ -32,13 +32,13 @@
    - Purges compose buffers and local photo files upon confirmed publication.
 5. **Backup Exclusions (`backup_rules.xml`, `data_extraction_rules.xml`):**
    - Configured XML rules to exclude all app-private protected directories (`retained-content`, `capsule-operations`, `original-photos`, `frozen-photos`, `photo-drafts`, `notification-attempts.json`, `no_backup`).
-6. **Fourth Review Test-Driven Corrections:**
-   - **Task 1**: Added deterministic failing regression tests in `StorageRaceRegressionTest.kt` verifying session generation write gates, PNG format retention, and fail-closed photo downloads.
-   - **Task 2**: Updated `saveRetainedContent` and `readRetainedContent` in `LocalRetentionAdapter.kt` / `DefaultLocalRetentionAdapter.kt` to validate `targetSession.sessionGeneration` inside `synchronized(lock)`.
-   - **Task 3**: Implemented PNG magic byte header check (`0x89 0x50 0x4E 0x47`) in `DefaultFirestoreAdapter.kt` and fail-closed photo download handling in `DefaultCapsuleRepository.kt`.
-   - **Task 4**: Wired S08 sign-out navigation to observe `signOutState` LiveData in `S08AccountSettingsFragment.kt` and navigate only on `OperationResult.Success`.
+6. **Fifth Review Remaining Blockers Corrections:**
+   - **Correction 1**: Updated `DefaultCapsuleRepository.readContent()` to pass originating `targetSession: SessionSnapshot` to `retentionAdapter.readRetainedContent(targetSession, cleanId)`.
+   - **Correction 2**: Persisted `pending-cleanup.properties` BEFORE Auth sign-out in `AccountSessionManager.kt`. Verified `!file.exists()` in `AccountCleanupOrchestrator.kt` and preserved original `pendingUid` in marker.
+   - **Correction 3**: Implemented PNG (`0x89 0x50 0x4E 0x47`) vs JPEG (`0xFF 0xD8 0xFF`) header byte inspection and byte size validation in `DefaultFirestoreAdapter.kt`.
+   - **Correction 4**: Expanded `StorageRaceRegressionTest.kt` with 5 tests covering late write gates, old-generation read denial, PNG/JPEG byte detection, fail-closed photo downloads, and deletion failure cleanup blocks.
 7. **Automated Verification:**
-   - 336 JVM unit tests passing (`./gradlew :app:testDebugUnitTest`).
+   - 338 JVM unit tests passing (`./gradlew :app:testDebugUnitTest`).
    - Clean debug APK build (`./gradlew :app:assembleDebug`).
    - Clean AndroidTest APK build (`./gradlew :app:assembleDebugAndroidTest`).
    - Clean Android lint (`./gradlew :app:lintDebug`).

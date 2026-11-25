@@ -291,7 +291,10 @@ class DefaultCapsuleRepository(
         // 1. Check local retention first if adapter is present
         val retention = retentionAdapter
         if (retention != null) {
-            val offlineRes = retention.readRetainedContent(activeUid, cleanId)
+            val offlineRes = retention.readRetainedContent(targetSession, cleanId)
+            if (!sessionTracker.isSessionValid(targetSession)) {
+                return OperationResult.Denied("Account session changed during content read.")
+            }
             if (offlineRes is OperationResult.Success) {
                 val retained = offlineRes.data
                 val photoPath = if (retained.photoBytes != null) "retainedMedia/${retained.uid}/$cleanId" else null

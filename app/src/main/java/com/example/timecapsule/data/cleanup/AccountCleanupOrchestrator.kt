@@ -206,7 +206,10 @@ class AccountCleanupOrchestrator(
                                 journal.clearAccountData(cleanUid)
                                 val remainingFiles = capsuleDir.listFiles()
                                 if (remainingFiles != null && remainingFiles.isEmpty()) {
-                                    capsuleDir.delete()
+                                    if (!capsuleDir.delete() && capsuleDir.exists()) {
+                                        hasError = true
+                                        if (firstErrorMessage == null) firstErrorMessage = "Failed to delete frozen capsule directory."
+                                    }
                                 }
                             }
                         }
@@ -245,8 +248,19 @@ class AccountCleanupOrchestrator(
         if (!parent.isDirectory && !parent.mkdirs()) {
             throw IOException("Cannot create directory for pending cleanup marker.")
         }
+        var uidToPersist = uid
+        if (markerFile.exists()) {
+            val existingUid = try {
+                val props = Properties().apply { markerFile.inputStream().use { load(it) } }
+                props.getProperty("pendingUid") ?: ""
+            } catch (_: Exception) { "" }
+            if (existingUid.isNotBlank()) {
+                uidToPersist = existingUid
+            }
+        }
+        if (uidToPersist.isBlank()) return
         val properties = Properties().apply {
-            setProperty("pendingUid", uid)
+            setProperty("pendingUid", uidToPersist)
             setProperty("timestamp", System.currentTimeMillis().toString())
         }
         val temp = File.createTempFile("pending-", ".partial", parent)
@@ -264,6 +278,9 @@ class AccountCleanupOrchestrator(
         } finally {
             temp.delete()
         }
+        if (!markerFile.exists()) {
+            throw IOException("Failed to create pending cleanup marker.")
+        }
     }
 
     private fun removePendingMarker() {
@@ -273,6 +290,9 @@ class AccountCleanupOrchestrator(
                 Files.deleteIfExists(markerFile.toPath())
             } catch (_: Exception) {
                 markerFile.delete()
+            }
+            if (markerFile.exists()) {
+                throw IOException("Failed to delete pending cleanup marker.")
             }
         }
     }
