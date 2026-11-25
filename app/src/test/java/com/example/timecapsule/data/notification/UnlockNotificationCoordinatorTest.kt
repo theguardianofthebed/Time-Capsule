@@ -16,6 +16,7 @@ import org.junit.Test
 private class FakeNotificationAdapter : NotificationAdapter {
     var permitted: Boolean = true
     var channelCreated: Boolean = false
+    var postResultToReturn: NotificationPostResult? = null
     val postedNotifications = mutableListOf<Pair<String, String>>()
     val cancelledAccounts = mutableListOf<String>()
     var throwOnNotify: Boolean = false
@@ -26,11 +27,12 @@ private class FakeNotificationAdapter : NotificationAdapter {
         channelCreated = true
     }
 
-    override fun postUnlockNotification(accountUid: String, capsuleId: String): Boolean {
+    override fun postUnlockNotification(accountUid: String, capsuleId: String): NotificationPostResult {
         if (throwOnNotify) throw RuntimeException("Notification service failure")
-        if (!permitted) return false
+        postResultToReturn?.let { return it }
+        if (!permitted) return NotificationPostResult.NOT_ATTEMPTED_PERMISSION_DENIED
         postedNotifications.add(accountUid to capsuleId)
-        return true
+        return NotificationPostResult.ATTEMPTED_SUCCESS
     }
 
     override fun cancelAccountNotifications(accountUid: String) {
@@ -141,6 +143,18 @@ class UnlockNotificationCoordinatorTest {
         coordinator.handleUnlockOutcome("capsule-101", outcome, session1)
 
         assertTrue(fakeAdapter.postedNotifications.isEmpty())
+        assertEquals(AttemptState.ABSENT, attemptStore.getAttemptState("recipient-uid-1", "capsule-101"))
+    }
+
+    @Test
+    fun `invalidateAccount cancels account notifications and clears attempt store`() {
+        sessionTracker.startSession("recipient-uid-1")
+        attemptStore.recordPendingPermission("recipient-uid-1", "capsule-101")
+
+        coordinator.invalidateAccount("recipient-uid-1")
+
+        assertEquals(1, fakeAdapter.cancelledAccounts.size)
+        assertEquals("recipient-uid-1", fakeAdapter.cancelledAccounts.first())
         assertEquals(AttemptState.ABSENT, attemptStore.getAttemptState("recipient-uid-1", "capsule-101"))
     }
 

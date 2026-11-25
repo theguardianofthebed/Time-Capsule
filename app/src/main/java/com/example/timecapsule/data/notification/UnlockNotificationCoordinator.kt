@@ -1,6 +1,7 @@
 package com.example.timecapsule.data.notification
 
 import com.example.timecapsule.data.session.SessionTracker
+import com.example.timecapsule.domain.model.Availability
 import com.example.timecapsule.domain.model.UnlockConfirmationKind
 import com.example.timecapsule.domain.model.UnlockVerificationOutcome
 import com.example.timecapsule.domain.session.SessionSnapshot
@@ -9,11 +10,11 @@ import com.example.timecapsule.domain.session.SessionSnapshot
  * Coordinator orchestrating account-safe local notifications after confirmed recipient unlock.
  *
  * Decision Table & Security Enforcement:
- * 1. Confirmed First Unlock (Allowed): Atomically claims attempt and posts local alert.
- * 2. Confirmed First Unlock (Denied): Persists candidate in [AttemptState.PENDING_PERMISSION].
+ * 1. Confirmed First Unlock (Allowed): Posts local alert and atomically claims attempt on posting.
+ * 2. Confirmed First Unlock (Denied/Blocked): Preserves candidate in [AttemptState.PENDING_PERMISSION].
  * 3. Already Unlocked (Pending Permission & Allowed): Attempts once for pending candidate.
  * 4. Already Unlocked (Absent): Does NOT post historical alerts for already unlocked capsules.
- * 5. Session Protection: Revalidates immutable [SessionSnapshot] before attempt claim and posting.
+ * 5. Session Drift Protection: Revalidates immutable [SessionSnapshot] before attempt claim and posting.
  * 6. Exception Isolation: Notification or storage failures are caught and isolated so unlock verification
  *    results are never corrupted.
  *
@@ -26,6 +27,8 @@ class UnlockNotificationCoordinator(
     private val attemptStore: NotificationAttemptStore,
     private val sessionTracker: SessionTracker
 ) {
+
+    private val lock = Any()
 
     /**
      * Evaluates unlock confirmation [outcome] for [capsuleId] bound to [targetSession]
@@ -44,43 +47,84 @@ class UnlockNotificationCoordinator(
             val cleanCapsuleId = capsuleId.trim()
             if (cleanCapsuleId.isBlank()) return
 
-            if (!sessionTracker.isSessionValid(targetSession) || !targetSession.isAuthenticated || targetSession.uid.isNullOrBlank()) {
+            if (outcome.availability != Availability.AVAILABLE) {
                 return
             }
-            val accountUid = targetSession.uid
 
-            val currentState = attemptStore.getAttemptState(accountUid, cleanCapsuleId)
-
-            when (outcome.confirmationKind) {
-                UnlockConfirmationKind.FIRST_UNLOCK_CONFIRMED -> {
-                    if (currentState == AttemptState.ATTEMPTED) return
-
-                    if (!notificationAdapter.areNotificationsPermitted()) {
-                        attemptStore.recordPendingPermission(accountUid, cleanCapsuleId)
-                        return
-                    }
-
-                    if (!attemptStore.atomicallyClaimAttempt(accountUid, cleanCapsuleId)) return
-
-                    if (!sessionTracker.isSessionValid(targetSession)) return
-
-                    notificationAdapter.postUnlockNotification(accountUid, cleanCapsuleId)
+            synchronized(lock) {
+                if (!sessionTracker.isSessionValid(targetSession) ||
+                    !targetSession.isAuthenticated ||
+                    targetSession.uid.isNullOrBlank() ||
+                    sessionTracker.currentSession() != targetSession) {
+                    return
                 }
-                UnlockConfirmationKind.ALREADY_UNLOCKED,
-                UnlockConfirmationKind.RECONCILED_AVAILABLE -> {
-                    if (currentState == AttemptState.PENDING_PERMISSION) {
-                        if (!notificationAdapter.areNotificationsPermitted()) return
+                val accountUid = targetSession.uid
 
-                        if (!attemptStore.atomicallyClaimAttempt(accountUid, cleanCapsuleId)) return
+                val currentState = attemptStore.getAttemptState(accountUid, cleanCapsuleId)
 
-                        if (!sessionTracker.isSessionValid(targetSession)) return
+                when (outcome.confirmationKind) {
+                    UnlockConfirmationKind.FIRST_UNLOCK_CONFIRMED -> {
+                        if (currentState == AttemptState.ATTEMPTED) return
 
-                        notificationAdapter.postUnlockNotification(accountUid, cleanCapsuleId)
+                        if (!notificationAdapter.areNotificationsPermitted()) {
+                            attemptStore.recordPendingPermission(accountUid, cleanCapsuleId)
+                            return
+                        }
+
+                        if (!sessionTracker.isSessionValid(targetSession) || sessionTracker.currentSession() != targetSession) {
+                            return
+                        }
+
+                        val postResult = notificationAdapter.postUnlockNotification(accountUid, cleanCapsuleId)
+                        when (postResult) {
+                            NotificationPostResult.NOT_ATTEMPTED_PERMISSION_DENIED,
+                            NotificationPostResult.NOT_ATTEMPTED_CHANNEL_BLOCKED -> {
+                                attemptStore.recordPendingPermission(accountUid, cleanCapsuleId)
+                            }
+                            NotificationPostResult.ATTEMPTED_SUCCESS,
+                            NotificationPostResult.ATTEMPTED_FAILED -> {
+                                attemptStore.atomicallyClaimAttempt(accountUid, cleanCapsuleId)
+                            }
+                        }
+                    }
+                    UnlockConfirmationKind.ALREADY_UNLOCKED,
+                    UnlockConfirmationKind.RECONCILED_AVAILABLE -> {
+                        if (currentState == AttemptState.PENDING_PERMISSION) {
+                            if (!notificationAdapter.areNotificationsPermitted()) return
+
+                            if (!sessionTracker.isSessionValid(targetSession) || sessionTracker.currentSession() != targetSession) {
+                                return
+                            }
+
+                            val postResult = notificationAdapter.postUnlockNotification(accountUid, cleanCapsuleId)
+                            when (postResult) {
+                                NotificationPostResult.NOT_ATTEMPTED_PERMISSION_DENIED,
+                                NotificationPostResult.NOT_ATTEMPTED_CHANNEL_BLOCKED -> {
+                                    // Remain PENDING_PERMISSION for retry
+                                }
+                                NotificationPostResult.ATTEMPTED_SUCCESS,
+                                NotificationPostResult.ATTEMPTED_FAILED -> {
+                                    attemptStore.atomicallyClaimAttempt(accountUid, cleanCapsuleId)
+                                }
+                            }
+                        }
                     }
                 }
             }
         } catch (_: Exception) {
             // Isolates notification exceptions from corrupting unlock verification outcomes
+        }
+    }
+
+    /**
+     * Clears notification attempts and active alerts during account logout or switch.
+     */
+    fun invalidateAccount(accountUid: String) {
+        val cleanUid = accountUid.trim()
+        if (cleanUid.isBlank()) return
+        synchronized(lock) {
+            notificationAdapter.cancelAccountNotifications(cleanUid)
+            attemptStore.clearAccount(cleanUid)
         }
     }
 }

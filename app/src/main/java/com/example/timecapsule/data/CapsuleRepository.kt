@@ -70,6 +70,25 @@ interface CapsuleRepository {
     /** Retrieves participant-scoped Sent and Received capsule lists for active user [uid]. */
     suspend fun lists(uid: String): OperationResult<CapsuleListsSnapshot>
 
+    /**
+     * Performs a read-only recipient unlock authorization check for [capsuleId].
+     * Never executes an unlock transaction, acquires location, or mutates remote state.
+     */
+    suspend fun checkUnlockStatus(capsuleId: String): OperationResult<UnlockVerificationOutcome> =
+        OperationResult.Unavailable("Unlock status check is not implemented in this repository.")
+
+    /**
+     * Performs a read-only recipient unlock authorization check for [capsuleId] bound to [targetSession].
+     * Never executes an unlock transaction, acquires location, or mutates remote state.
+     */
+    suspend fun checkUnlockStatus(
+        capsuleId: String,
+        targetSession: SessionSnapshot
+    ): OperationResult<UnlockVerificationOutcome> {
+        if (session() != targetSession) return OperationResult.Denied("Account session changed.")
+        return checkUnlockStatus(capsuleId)
+    }
+
     /** Requests server-authoritative unlock verification for [capsuleId] with detailed outcome. */
     suspend fun verifyUnlockOutcome(capsuleId: String): OperationResult<UnlockVerificationOutcome> =
         verifyUnlockOutcome(capsuleId, session())
@@ -79,7 +98,7 @@ interface CapsuleRepository {
         if (session() != targetSession) return OperationResult.Denied("Account session changed.")
         return when (val res = verifyUnlock(capsuleId, targetSession)) {
             is OperationResult.Success -> OperationResult.Success(
-                UnlockVerificationOutcome(res.data, UnlockConfirmationKind.FIRST_UNLOCK_CONFIRMED)
+                UnlockVerificationOutcome(res.data, UnlockConfirmationKind.ALREADY_UNLOCKED)
             )
             is OperationResult.Invalid -> OperationResult.Invalid(res.message)
             is OperationResult.Denied -> OperationResult.Denied(res.message)
@@ -95,7 +114,7 @@ interface CapsuleRepository {
     /** Requests server-authoritative unlock verification for [capsuleId] bound to [targetSession]. */
     suspend fun verifyUnlock(capsuleId: String, targetSession: SessionSnapshot): OperationResult<Availability> =
         if (session() != targetSession) OperationResult.Denied("Account session changed.")
-        else verifyUnlock(capsuleId)
+        else OperationResult.Unavailable("Unlock verification is not implemented in this repository.")
 
     /** Reads protected content for [capsuleId] after authorization check. */
     suspend fun readContent(capsuleId: String): OperationResult<ProtectedCapsuleContent>

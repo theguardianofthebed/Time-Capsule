@@ -466,10 +466,20 @@ Implement account-safe local notifications for confirmed first unlocks without t
   - Clean debug APK assemble passed (`:app:assembleDebug`).
   - Clean Android lint passed (`:app:lintDebug`).
 
+### P1 & P2 Review Corrections Applied (November 25, 2026)
+
+- **P1-01 Durable Notification Attempt Claims:** Updated `NotificationAttemptStore.kt` to write updates via atomic temporary-file replacement and verify `saveToFile()` success before returning `true` on attempt claims. Reverts in-memory state on write failure. Replaced colon key concatenation with structured URL-encoded keys (`uid:<uid>:capsule:<capsuleId>`). Added unwritable storage test in `NotificationAttemptStoreTest.kt`.
+- **P1-02 Read-Only Notification Tap Authorization:** Introduced `checkUnlockStatus(capsuleId, targetSession)` in `CapsuleRepository` and `DefaultCapsuleRepository`, which authoritatively checks `readRecipientUnlockRequirements` without executing an unlock transaction, acquiring location samples, or mutating backend state. Updated `NotificationEntryValidator` to call `checkUnlockStatus`. Added regression test verifying locked capsules do not trigger unlock transactions on notification tap.
+- **P1-03 Conservative Fallback Provenance:** Updated interface default implementations in `CapsuleRepository.kt` and `FirestoreAdapter.kt` to map legacy `verifyUnlock` / `verifyRecipientUnlock` success to `ALREADY_UNLOCKED` (conservative, non-notifying fallback) instead of `FIRST_UNLOCK_CONFIRMED`.
+- **P1-04 Account-Switch Invalidation & Functional Cancellation:** Implemented functional account notification cancellation in `DefaultNotificationAdapter.cancelAccountNotifications(uid)`. Added `UnlockNotificationCoordinator.invalidateAccount(uid)` and wired `AccountSessionManager.onAccountCleared` to cancel posted notifications and clear attempt markers upon logout/switch.
+- **P1-05 Complete Permission Evaluation:** Updated `areNotificationsPermitted()` in `DefaultNotificationAdapter` to evaluate app-wide notification settings, API 33+ `POST_NOTIFICATIONS` runtime permission, and API 26+ channel importance (`IMPORTANCE_NONE`). Updated `S08AccountSettingsFragment` to open system app/channel notification settings via `Settings.ACTION_APP_NOTIFICATION_SETTINGS`.
+- **P1-06 Distinguish Attempts from Permission-Blocked Non-Attempts:** Introduced `NotificationPostResult` enum (`NOT_ATTEMPTED_PERMISSION_DENIED`, `NOT_ATTEMPTED_CHANNEL_BLOCKED`, `ATTEMPTED_SUCCESS`, `ATTEMPTED_FAILED`). `UnlockNotificationCoordinator` records/preserves `PENDING_PERMISSION` on non-attempts, preserving candidate retryability, and claims `ATTEMPTED` only on actual posting attempts.
+- **P2 Correctness & Maintainability:** Built Uri data payloads safely with `Uri.Builder()`, prevented duplicate notification intent processing in `MainActivity`, rechecked active session snapshot before returning valid entry result, moved strings to `res/values/strings.xml`, added KDoc, and re-threw `CancellationException`.
+
 ### Checks and results
 
-- `./gradlew :app:testDebugUnitTest`: PASS (305 JVM unit tests passed across project, 0 failed)
-- `./gradlew :app:assembleDebug :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors)
+- `./gradlew :app:testDebugUnitTest`: PASS (307 JVM unit tests passed across project, 0 failed)
+- `./gradlew :app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest`: PASS (`BUILD SUCCESSFUL`, 0 lint errors)
 - `py tools/check_readiness.py --issue 19 --evidence docs/agent-tools/readiness-evidence-issue19.json`: PASS (`PREFLIGHT_RECORD_VALID`)
 - `git status`: PASS (clean on `feature/19-local-notifications`)
 

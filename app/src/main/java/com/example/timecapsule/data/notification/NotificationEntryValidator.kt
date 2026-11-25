@@ -74,8 +74,8 @@ class NotificationEntryValidator(
             return NotificationEntryResult.Invalid("Notification account UID does not match current active session UID.")
         }
 
-        val outcomeResult = repository.verifyUnlockOutcome(cleanCapsuleId, currentSession)
-        if (!sessionTracker.isSessionValid(currentSession)) {
+        val outcomeResult = repository.checkUnlockStatus(cleanCapsuleId, currentSession)
+        if (!sessionTracker.isSessionValid(currentSession) || sessionTracker.currentSession() != currentSession) {
             return NotificationEntryResult.Invalid("Account session changed during notification authorization recheck.")
         }
 

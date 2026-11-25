@@ -95,9 +95,25 @@ class TimeCapsuleApplication : Application() {
         val sessionTracker = DefaultSessionTracker()
         val authAdapter = DefaultAuthAdapter()
         val firestoreAdapter = DefaultFirestoreAdapter { context }
-        val accountSessionManager = AccountSessionManager(authAdapter, firestoreAdapter, sessionTracker)
 
         val noBackupDir = context.noBackupFilesDir ?: File(context.filesDir, "no_backup")
+
+        val notificationAdapter = DefaultNotificationAdapter(context)
+        val notificationAttemptStore = NotificationAttemptStore(File(noBackupDir, "notification-attempts.json"))
+        val unlockNotificationCoordinator = UnlockNotificationCoordinator(
+            notificationAdapter = notificationAdapter,
+            attemptStore = notificationAttemptStore,
+            sessionTracker = sessionTracker
+        )
+
+        val accountSessionManager = AccountSessionManager(
+            authAdapter = authAdapter,
+            firestoreAdapter = firestoreAdapter,
+            sessionTracker = sessionTracker,
+            onAccountCleared = { uid ->
+                unlockNotificationCoordinator.invalidateAccount(uid)
+            }
+        )
 
         val storageAdapter = DefaultStorageAdapter(
             FirebaseStorage.getInstance(),
@@ -114,14 +130,6 @@ class TimeCapsuleApplication : Application() {
         val retentionAdapter = object : LocalRetentionAdapter {
             override suspend fun clearAccountData(uid: String) {}
         }
-
-        val notificationAdapter = DefaultNotificationAdapter(context)
-        val notificationAttemptStore = NotificationAttemptStore(File(noBackupDir, "notification-attempts.json"))
-        val unlockNotificationCoordinator = UnlockNotificationCoordinator(
-            notificationAdapter = notificationAdapter,
-            attemptStore = notificationAttemptStore,
-            sessionTracker = sessionTracker
-        )
 
         val publication = firestoreAdapter.firestoreInstance()?.let { firestore ->
             CapsulePublicationCoordinator(

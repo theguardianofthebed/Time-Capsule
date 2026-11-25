@@ -109,6 +109,39 @@ class DefaultCapsuleRepository(
         return OperationResult.Unavailable("Capsule lists query requires Issue #21 implementation.")
     }
 
+    override suspend fun checkUnlockStatus(
+        capsuleId: String,
+        targetSession: SessionSnapshot
+    ): OperationResult<UnlockVerificationOutcome> {
+        val cleanId = capsuleId.trim()
+        if (cleanId.isBlank()) {
+            return OperationResult.Invalid("Capsule ID must not be blank for unlock check.")
+        }
+        if (!sessionTracker.isSessionValid(targetSession) || !targetSession.isAuthenticated || targetSession.uid.isNullOrBlank()) {
+            return OperationResult.Denied("Authentication required to check capsule unlock status.")
+        }
+        val activeUid = targetSession.uid
+
+        val reqResult = firestoreAdapter.readRecipientUnlockRequirements(cleanId, activeUid)
+        if (!sessionTracker.isSessionValid(targetSession)) {
+            return OperationResult.Denied("Account session changed during unlock check.")
+        }
+
+        if (reqResult !is OperationResult.Success) {
+            @Suppress("UNCHECKED_CAST")
+            return reqResult as OperationResult<UnlockVerificationOutcome>
+        }
+
+        val requirements = reqResult.data
+        return if (requirements.unlocked) {
+            OperationResult.Success(
+                UnlockVerificationOutcome(Availability.AVAILABLE, UnlockConfirmationKind.ALREADY_UNLOCKED)
+            )
+        } else {
+            OperationResult.Denied("Capsule remains locked.")
+        }
+    }
+
     override suspend fun verifyUnlockOutcome(capsuleId: String): OperationResult<UnlockVerificationOutcome> {
         return verifyUnlockOutcome(capsuleId, sessionTracker.currentSession())
     }

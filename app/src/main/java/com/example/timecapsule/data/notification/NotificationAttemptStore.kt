@@ -1,6 +1,7 @@
 package com.example.timecapsule.data.notification
 
 import java.io.File
+import java.net.URLEncoder
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -29,14 +30,14 @@ enum class AttemptState {
  * Persistent store managing atomic notification attempt markers for account/capsule pairs.
  *
  * Security & Isolation Guarantees:
- * 1. Opaque Identity Keying: Keys entries by `(accountUid, capsuleId)`. Stores NO message content,
+ * 1. Encoded Identity Keying: Keys entries using structured URL encoding (`uid=<uid>&capsule=<capsuleId>`)
+ *    to prevent delimiter collision or ambiguity across UIDs and capsule IDs. Stores NO message content,
  *    photos, sender identity, user email, location, or tokens.
- * 2. Atomic Claiming: [atomicallyClaimAttempt] performs atomic state check-and-set to guarantee
- *    that concurrent verification checks or retries execute at most one attempt claim.
- * 3. Persistence: Durably persists state in a backup-excluded app-private JSON file to survive
- *    Activity recreation and process restarts.
+ * 2. Durable Atomic Persistence: Writes updates via atomic temporary-file replacement. Claims return
+ *    success ONLY after disk persistence succeeds, preserving previous valid state on storage failure.
+ * 3. Fail-Closed Recovery: Preserves existing state if persistent file is unreadable or corrupt.
  *
- * @param storeFile Durable JSON file location for persistent markers.
+ * @param storeFile Durable file location for persistent markers.
  */
 class NotificationAttemptStore(
     private val storeFile: File
@@ -44,19 +45,22 @@ class NotificationAttemptStore(
 
     private val lock = Any()
     private val inMemoryState = ConcurrentHashMap<String, AttemptState>()
+    private var persistentLoadFailed = false
 
     init {
         loadFromFile()
     }
 
-    /** Generates collision-safe store key for [accountUid] and [capsuleId]. */
+    /** Generates structured URL-encoded key for [accountUid] and [capsuleId]. */
     private fun makeKey(accountUid: String, capsuleId: String): String {
         val cleanUid = accountUid.trim()
         val cleanCapsuleId = capsuleId.trim()
         require(cleanUid.isNotBlank() && cleanCapsuleId.isNotBlank()) {
             "Account UID and capsule ID must not be blank for notification attempt store."
         }
-        return "$cleanUid:$cleanCapsuleId"
+        val encodedUid = URLEncoder.encode(cleanUid, "UTF-8")
+        val encodedCapsule = URLEncoder.encode(cleanCapsuleId, "UTF-8")
+        return "uid:$encodedUid:capsule:$encodedCapsule"
     }
 
     /**
@@ -72,29 +76,40 @@ class NotificationAttemptStore(
 
     /**
      * Records a [AttemptState.PENDING_PERMISSION] state when a confirmed unlock occurs while permission is denied.
+     * Reverts memory state if durable storage write fails.
+     *
+     * @return True if persistent record was saved successfully.
      */
-    fun recordPendingPermission(accountUid: String, capsuleId: String) {
+    fun recordPendingPermission(accountUid: String, capsuleId: String): Boolean {
         val cleanUid = accountUid.trim()
         val cleanCapsuleId = capsuleId.trim()
-        if (cleanUid.isBlank() || cleanCapsuleId.isBlank()) return
+        if (cleanUid.isBlank() || cleanCapsuleId.isBlank()) return false
         val key = makeKey(cleanUid, cleanCapsuleId)
 
         synchronized(lock) {
-            val current = inMemoryState[key]
-            if (current != AttemptState.ATTEMPTED) {
-                inMemoryState[key] = AttemptState.PENDING_PERMISSION
-                saveToFile()
+            val previousState = inMemoryState[key]
+            if (previousState == AttemptState.ATTEMPTED) {
+                return false
             }
+            inMemoryState[key] = AttemptState.PENDING_PERMISSION
+            val saved = saveToFile()
+            if (!saved) {
+                if (previousState != null) {
+                    inMemoryState[key] = previousState
+                } else {
+                    inMemoryState.remove(key)
+                }
+            }
+            return saved
         }
     }
 
     /**
      * Atomically claims a notification attempt for [accountUid] and [capsuleId].
-     * If current state is [AttemptState.ABSENT] or [AttemptState.PENDING_PERMISSION],
-     * transitions state to [AttemptState.ATTEMPTED] and returns true.
-     * If already [AttemptState.ATTEMPTED], returns false.
+     * Durable persistence must succeed before returning true. If persistence fails,
+     * preserves previous valid state and returns false.
      *
-     * @return True if attempt claim was successfully acquired; false if already attempted.
+     * @return True if attempt claim was successfully persisted to durable storage; false otherwise.
      */
     fun atomicallyClaimAttempt(accountUid: String, capsuleId: String): Boolean {
         val cleanUid = accountUid.trim()
@@ -103,12 +118,21 @@ class NotificationAttemptStore(
         val key = makeKey(cleanUid, cleanCapsuleId)
 
         synchronized(lock) {
-            val current = inMemoryState[key] ?: AttemptState.ABSENT
-            if (current == AttemptState.ATTEMPTED) {
+            val previousState = inMemoryState[key] ?: AttemptState.ABSENT
+            if (previousState == AttemptState.ATTEMPTED) {
                 return false
             }
+
             inMemoryState[key] = AttemptState.ATTEMPTED
-            saveToFile()
+            val saved = saveToFile()
+            if (!saved) {
+                if (previousState != AttemptState.ABSENT) {
+                    inMemoryState[key] = previousState
+                } else {
+                    inMemoryState.remove(key)
+                }
+                return false
+            }
             return true
         }
     }
@@ -119,15 +143,19 @@ class NotificationAttemptStore(
     fun clearAccount(accountUid: String) {
         val cleanUid = accountUid.trim()
         if (cleanUid.isBlank()) return
-        val prefix = "$cleanUid:"
+        val encodedUidPrefix = "uid:" + URLEncoder.encode(cleanUid, "UTF-8") + ":capsule:"
 
         synchronized(lock) {
-            val keysToRemove = inMemoryState.keys.filter { it.startsWith(prefix) }
+            val keysToRemove = inMemoryState.keys.filter { it.startsWith(encodedUidPrefix) }
+            if (keysToRemove.isEmpty()) return
+
+            val backup = HashMap(inMemoryState)
             for (k in keysToRemove) {
                 inMemoryState.remove(k)
             }
-            if (keysToRemove.isNotEmpty()) {
-                saveToFile()
+            if (!saveToFile()) {
+                inMemoryState.clear()
+                inMemoryState.putAll(backup)
             }
         }
     }
@@ -154,22 +182,36 @@ class NotificationAttemptStore(
                     }
                 }
             } catch (_: Exception) {
-                // Fail closed on corrupted persistent state
+                persistentLoadFailed = true
             }
         }
     }
 
-    private fun saveToFile() {
+    private fun saveToFile(): Boolean {
         synchronized(lock) {
-            try {
+            return try {
                 val parent = storeFile.parentFile
                 if (parent != null && !parent.exists()) {
-                    parent.mkdirs()
+                    if (!parent.mkdirs() && !parent.exists()) {
+                        return false
+                    }
                 }
                 val text = inMemoryState.entries.joinToString("\n") { "${it.key}=${it.value.name}" }
-                storeFile.writeText(text, Charsets.UTF_8)
+                val tempFile = File(storeFile.parentFile, "${storeFile.name}.tmp")
+                tempFile.writeText(text, Charsets.UTF_8)
+                if (tempFile.renameTo(storeFile)) {
+                    true
+                } else {
+                    storeFile.delete()
+                    val copied = tempFile.renameTo(storeFile)
+                    if (!copied) {
+                        tempFile.copyTo(storeFile, overwrite = true)
+                        tempFile.delete()
+                    }
+                    true
+                }
             } catch (_: Exception) {
-                // Log/fail gracefully on storage IO exception
+                false
             }
         }
     }

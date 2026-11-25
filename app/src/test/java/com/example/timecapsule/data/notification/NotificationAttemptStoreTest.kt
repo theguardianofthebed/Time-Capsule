@@ -10,7 +10,7 @@ import org.junit.Test
 
 /**
  * Unit tests for [NotificationAttemptStore] verifying persistent state transitions,
- * account isolation, atomic claiming, and store reconstruction survival.
+ * account isolation, atomic claiming, storage write failure handling, and store reconstruction survival.
  */
 class NotificationAttemptStoreTest {
 
@@ -73,6 +73,25 @@ class NotificationAttemptStoreTest {
         val reloadedStore = NotificationAttemptStore(tempFile)
         assertEquals(AttemptState.PENDING_PERMISSION, reloadedStore.getAttemptState("user-1", "capsule-101"))
         assertEquals(AttemptState.ATTEMPTED, reloadedStore.getAttemptState("user-1", "capsule-102"))
+    }
+
+    @Test
+    fun `write failure preserves previous state and returns false`() {
+        val unwritableFile = File(tempFile.parentFile, "unwritable_dir_test/store.json")
+        // Create file inside a non-directory file to trigger write failure
+        val parentAsFile = File(tempFile.parentFile, "unwritable_dir_test")
+        parentAsFile.createNewFile()
+        parentAsFile.setWritable(false)
+
+        try {
+            val unwritableStore = NotificationAttemptStore(unwritableFile)
+            val claimed = unwritableStore.atomicallyClaimAttempt("user-1", "capsule-101")
+            assertFalse("Write failure must return false on attempt claim", claimed)
+            assertEquals(AttemptState.ABSENT, unwritableStore.getAttemptState("user-1", "capsule-101"))
+        } finally {
+            parentAsFile.setWritable(true)
+            parentAsFile.delete()
+        }
     }
 
     @Test

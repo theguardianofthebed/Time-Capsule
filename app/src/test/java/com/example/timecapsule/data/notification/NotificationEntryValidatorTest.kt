@@ -11,6 +11,7 @@ import com.example.timecapsule.domain.model.UnlockVerificationOutcome
 import com.example.timecapsule.domain.result.OperationResult
 import com.example.timecapsule.domain.session.SessionSnapshot
 import kotlinx.coroutines.runBlocking
+import org.junit.Assert
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -18,16 +19,24 @@ import org.junit.Test
 
 private class FakeEntryRepository : CapsuleRepository {
     var outcomeToReturn: OperationResult<UnlockVerificationOutcome> = OperationResult.Success(
-        UnlockVerificationOutcome(Availability.AVAILABLE, UnlockConfirmationKind.FIRST_UNLOCK_CONFIRMED)
+        UnlockVerificationOutcome(Availability.AVAILABLE, UnlockConfirmationKind.ALREADY_UNLOCKED)
     )
+    var unlockTransactionCalled: Boolean = false
 
     override fun session(): SessionSnapshot = SessionSnapshot(uid = "recipient-1", sessionGeneration = 1)
     override suspend fun getRecipient(uid: String) = OperationResult.Unavailable("Not implemented")
     override suspend fun publish(frozenOperation: CapsuleDraft) = OperationResult.Unavailable("Not implemented")
     override suspend fun reconcile(capsuleId: String) = OperationResult.Unavailable("Not implemented")
     override suspend fun lists(uid: String) = OperationResult.Unavailable("Not implemented")
-    override suspend fun verifyUnlock(capsuleId: String) = OperationResult.Success(Availability.AVAILABLE)
-    override suspend fun verifyUnlockOutcome(capsuleId: String, targetSession: SessionSnapshot): OperationResult<UnlockVerificationOutcome> = outcomeToReturn
+    override suspend fun checkUnlockStatus(capsuleId: String, targetSession: SessionSnapshot): OperationResult<UnlockVerificationOutcome> = outcomeToReturn
+    override suspend fun verifyUnlock(capsuleId: String): OperationResult<Availability> {
+        unlockTransactionCalled = true
+        return OperationResult.Success(Availability.AVAILABLE)
+    }
+    override suspend fun verifyUnlockOutcome(capsuleId: String, targetSession: SessionSnapshot): OperationResult<UnlockVerificationOutcome> {
+        unlockTransactionCalled = true
+        return outcomeToReturn
+    }
     override suspend fun readContent(capsuleId: String) = OperationResult.Unavailable("Not implemented")
 }
 
@@ -80,7 +89,7 @@ class NotificationEntryValidatorTest {
     }
 
     @Test
-    fun `payload matching active session and unlocked capsule returns Valid`() = runBlocking {
+    fun `payload matching active session and unlocked capsule returns Valid without executing unlock transaction`() = runBlocking {
         val result = validator.validateEntryPayload(
             action = DefaultNotificationAdapter.ACTION_NOTIFICATION_TAP,
             accountUid = "recipient-1",
@@ -88,10 +97,11 @@ class NotificationEntryValidatorTest {
         )
         assertTrue(result is NotificationEntryResult.Valid)
         assertEquals("capsule-101", (result as NotificationEntryResult.Valid).capsuleId)
+        Assert.assertFalse("Notification tap must not execute unlock transaction", fakeRepository.unlockTransactionCalled)
     }
 
     @Test
-    fun `payload targeting locked capsule returns Invalid`() = runBlocking {
+    fun `payload targeting locked capsule returns Invalid without executing unlock transaction`() = runBlocking {
         fakeRepository.outcomeToReturn = OperationResult.Denied("Capsule remains locked.")
         val result = validator.validateEntryPayload(
             action = DefaultNotificationAdapter.ACTION_NOTIFICATION_TAP,
@@ -99,5 +109,6 @@ class NotificationEntryValidatorTest {
             capsuleId = "capsule-101"
         )
         assertTrue(result is NotificationEntryResult.Invalid)
+        Assert.assertFalse("Notification tap must not execute unlock transaction", fakeRepository.unlockTransactionCalled)
     }
 }

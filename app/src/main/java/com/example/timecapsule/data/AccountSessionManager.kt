@@ -19,7 +19,8 @@ class AccountSessionManager(
     private val authAdapter: AuthAdapter,
     private val firestoreAdapter: FirestoreAdapter,
     private val sessionTracker: SessionTracker,
-    private val sessionGuard: SessionGuard = SessionGuard(sessionTracker)
+    private val sessionGuard: SessionGuard = SessionGuard(sessionTracker),
+    private val onAccountCleared: ((String) -> Unit)? = null
 ) {
 
     private val authMutex = Mutex()
@@ -200,8 +201,12 @@ class AccountSessionManager(
 
     /** Signs out the current user and clears session tracker exactly once. */
     fun signOut() {
+        val oldUid = sessionTracker.currentSession().uid
         authAdapter.signOut()
         sessionTracker.clearSession()
+        if (!oldUid.isNullOrBlank()) {
+            onAccountCleared?.invoke(oldUid)
+        }
     }
 
     private fun checkAndHandleStaleCallback(capturedSession: SessionSnapshot): Boolean {
