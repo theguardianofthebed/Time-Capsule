@@ -265,6 +265,25 @@ class AccountSessionManagerTest {
     }
 
     @Test
+    fun testSignOutTriggersOnAccountClearedCallback() {
+        var clearedAccountUid: String? = null
+        val manager = AccountSessionManager(
+            fakeAuthAdapter,
+            fakeFirestoreAdapter,
+            sessionTracker,
+            onAccountCleared = { clearedAccountUid = it }
+        )
+
+        fakeAuthAdapter.uid = "user-101"
+        sessionTracker.startSession("user-101")
+
+        manager.signOut()
+
+        assertEquals("user-101", clearedAccountUid)
+        assertFalse(sessionTracker.currentSession().isAuthenticated)
+    }
+
+    @Test
     fun testSignUpFinishesAfterOriginalSessionInvalidated() = runBlocking {
         val delayedAuth = object : AuthAdapter by fakeAuthAdapter {
             override suspend fun signUp(email: String, password: String, displayName: String): OperationResult<String> {

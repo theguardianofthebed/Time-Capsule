@@ -95,6 +95,25 @@ class NotificationAttemptStoreTest {
     }
 
     @Test
+    fun `corrupted or malformed file fails claims closed and preserves file`() {
+        val corruptFile = File.createTempFile("corrupt_attempts", ".json")
+        try {
+            corruptFile.writeText("invalid_key_without_equals_and_corrupt_state", Charsets.UTF_8)
+            val corruptStore = NotificationAttemptStore(corruptFile)
+
+            assertFalse("Claim must fail closed on corrupted journal file", corruptStore.atomicallyClaimAttempt("user-1", "capsule-101"))
+            assertFalse("Pending permission record must fail closed on corrupted file", corruptStore.recordPendingPermission("user-1", "capsule-101"))
+            assertEquals(AttemptState.ABSENT, corruptStore.getAttemptState("user-1", "capsule-101"))
+
+            // Ensure clearAccount does NOT overwrite the corrupted file on disk
+            corruptStore.clearAccount("user-1")
+            assertEquals("invalid_key_without_equals_and_corrupt_state", corruptFile.readText(Charsets.UTF_8))
+        } finally {
+            if (corruptFile.exists()) corruptFile.delete()
+        }
+    }
+
+    @Test
     fun `clearAccount removes markers for target account only`() {
         store.atomicallyClaimAttempt("user-1", "capsule-101")
         store.atomicallyClaimAttempt("user-2", "capsule-101")

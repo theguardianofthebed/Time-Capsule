@@ -485,9 +485,15 @@ Implement account-safe local notifications for confirmed first unlocks without t
 - **5. Complete UI & Lifecycle Fixes:** Added duplicate intent key tracking in `MainActivity.kt` with `onSaveInstanceState` / `onCreate` state restoration. Updated `S08AccountSettingsFragment` to evaluate channel importance (`IMPORTANCE_NONE`) and route to `Settings.ACTION_APP_NOTIFICATION_SETTINGS`. Moved all user-facing strings into `res/values/strings.xml`.
 - **6. Regression Verification:** Added 3 new unit tests in `UnlockNotificationCoordinatorTest.kt` (310 total passed in `:app:testDebugUnitTest`). Clean debug APK, test APK, and Android lint (`:app:assembleDebug`, `:app:assembleDebugAndroidTest`, `:app:lintDebug`).
 
+### Final Focused Review Corrections Applied (November 25, 2026)
+
+- **1. Malformed Journal Recovery:** Updated `loadFromFile()` in `NotificationAttemptStore.kt` to validate structure and enum constants strictly. Malformed lines set `persistentLoadFailed = true`. `clearAccount` is guarded by `if (persistentLoadFailed) return` to prevent overwriting corrupted persistent files with empty/partial in-memory state. Added `corrupted or malformed file fails claims closed and preserves file` unit test.
+- **2. Session Invalidation Wiring:** Connected all session invalidation and account replacement paths in `AccountSessionManager.kt` (`signOut`, `signIn`, `signUpAndCreateProfile`, `restoreSessionIfAuthenticated`, `checkAndHandleStaleCallback`) to invoke `onAccountCleared`, cancelling active notifications and clearing attempt store markers. Same-session restoration (`currentUid == activeUid`) preserves in-flight work. Added `testSignOutTriggersOnAccountClearedCallback` unit test.
+- **3. UI & Lifecycle Intent Fixes:** Updated intent processing in `MainActivity.kt` so that intent key tracking only retains successful/valid authorizations, ensuring transient entry failures do not permanently block subsequent legitimate notification taps. Verified system notification settings route in `S08AccountSettingsFragment.kt` and moved remaining user-facing strings to `res/values/strings.xml`.
+
 ### Checks and results
 
-- `./gradlew :app:testDebugUnitTest`: PASS (310 JVM unit tests passed across project, 0 failed)
+- `./gradlew :app:testDebugUnitTest`: PASS (312 JVM unit tests passed across project, 0 failed)
 - `./gradlew :app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest`: PASS (`BUILD SUCCESSFUL`, 0 lint errors)
 - `py tools/check_readiness.py --issue 19 --evidence docs/agent-tools/readiness-evidence-issue19.json`: PASS (`PREFLIGHT_RECORD_VALID`)
 - `git status`: PASS (clean on `feature/19-local-notifications`)

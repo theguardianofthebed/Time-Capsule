@@ -169,6 +169,7 @@ class NotificationAttemptStore(
 
     /**
      * Clears recorded markers for [accountUid] during account cleanup.
+     * Does NOT overwrite corrupted storage if persistent load previously failed.
      */
     fun clearAccount(accountUid: String) {
         val cleanUid = accountUid.trim()
@@ -176,6 +177,7 @@ class NotificationAttemptStore(
         val encodedUidPrefix = "uid:" + URLEncoder.encode(cleanUid, "UTF-8") + ":capsule:"
 
         synchronized(lock) {
+            if (persistentLoadFailed) return
             val keysToRemove = inMemoryState.keys.filter { it.startsWith(encodedUidPrefix) }
             if (keysToRemove.isEmpty()) return
 
@@ -193,26 +195,40 @@ class NotificationAttemptStore(
     private fun loadFromFile() {
         synchronized(lock) {
             inMemoryState.clear()
+            persistentLoadFailed = false
             if (!storeFile.exists()) return
             try {
                 val lines = storeFile.readLines(Charsets.UTF_8)
                 for (line in lines) {
-                    val parts = line.split("=", limit = 2)
-                    if (parts.size == 2) {
-                        val key = parts[0].trim()
-                        val stateStr = parts[1].trim()
-                        val state = try {
-                            AttemptState.valueOf(stateStr)
-                        } catch (_: Exception) {
-                            AttemptState.ABSENT
-                        }
-                        if (key.isNotBlank() && state != AttemptState.ABSENT) {
-                            inMemoryState[key] = state
-                        }
+                    val trimmed = line.trim()
+                    if (trimmed.isEmpty()) continue
+                    val parts = trimmed.split("=", limit = 2)
+                    if (parts.size != 2) {
+                        persistentLoadFailed = true
+                        inMemoryState.clear()
+                        return
+                    }
+                    val key = parts[0].trim()
+                    val stateStr = parts[1].trim()
+                    if (key.isBlank() || !key.startsWith("uid:") || !key.contains(":capsule:")) {
+                        persistentLoadFailed = true
+                        inMemoryState.clear()
+                        return
+                    }
+                    val state = try {
+                        AttemptState.valueOf(stateStr)
+                    } catch (_: Exception) {
+                        persistentLoadFailed = true
+                        inMemoryState.clear()
+                        return
+                    }
+                    if (state != AttemptState.ABSENT) {
+                        inMemoryState[key] = state
                     }
                 }
             } catch (_: Exception) {
                 persistentLoadFailed = true
+                inMemoryState.clear()
             }
         }
     }
