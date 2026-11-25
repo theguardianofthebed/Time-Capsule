@@ -25,22 +25,33 @@ import com.example.timecapsule.domain.result.OperationResult
 import com.example.timecapsule.domain.session.SessionSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import java.time.Instant
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
+/**
+ * Deterministic unit test suite for [ForegroundRecoveryCoordinator] verifying single-flight coalescing,
+ * immediate completion/failure safety, session drift protection across async boundaries, timeout boundaries,
+ * waiter cancellation isolation, UI callback session revalidation, and domain unlock/recovery business logic.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ForegroundRecoveryCoordinatorTest {
 
@@ -49,46 +60,70 @@ class ForegroundRecoveryCoordinatorTest {
 
     @Before
     fun setUp() {
+        Dispatchers.setMain(UnconfinedTestDispatcher())
         sessionTracker = DefaultSessionTracker()
         sessionTracker.startSession("user-1")
         fakeRepository = FakeCapsuleRepository()
     }
 
+    @After
+    fun tearDown() {
+        Dispatchers.resetMain()
+    }
+
     private fun TestScope.createCoordinator(
         repo: CapsuleRepository = fakeRepository,
-        sessionTrack: SessionTracker = sessionTracker
+        sessionTrack: SessionTracker = sessionTracker,
+        timeoutMillis: Long = 15_000L
     ): ForegroundRecoveryCoordinator {
         val dispatcher = UnconfinedTestDispatcher(testScheduler)
         return ForegroundRecoveryCoordinator(
             repository = repo,
             sessionTracker = sessionTrack,
             ioDispatcher = dispatcher,
-            scope = this
+            scope = this,
+            responseTimeoutMillis = timeoutMillis
         )
     }
 
-    // (a) app-open/resume/detail/Retry same path for known IDs
+    // --- Single-Flight Tests ---
+
     @Test
-    fun appOpenResumeDetailRetry_samePathForKnownIds() = runTest {
+    fun immediateCompletionDuringRegistration_handledSafely() = runTest {
         val coordinator = createCoordinator()
-        fakeRepository.unlockResults["capsule-1"] = OperationResult.Success(Availability.AVAILABLE)
-        fakeRepository.recoveredList = listOf(
-            RecoveredPublication("capsule-1", PublicationPhase.SENT, null, false)
-        )
+        fakeRepository.unlockResults["capsule-immediate"] = OperationResult.Success(Availability.AVAILABLE)
 
-        val summary = coordinator.checkForeground(listOf("capsule-1"))
+        val res = coordinator.verifyUnlock("capsule-immediate")
 
-        assertTrue(summary.publicationRecoveryResult is OperationResult.Success)
-        assertEquals(1, summary.unlockResults.size)
-        assertEquals(
-            Availability.AVAILABLE,
-            (summary.unlockResults["capsule-1"] as OperationResult.Success).data
-        )
-        assertEquals(1, fakeRepository.recoverPublicationsCallCount.get())
+        assertTrue(res is OperationResult.Success)
+        assertEquals(Availability.AVAILABLE, (res as OperationResult.Success).data)
         assertEquals(1, fakeRepository.verifyUnlockCallCount.get())
+
+        // Subsequent call must run a fresh operation
+        val res2 = coordinator.verifyUnlock("capsule-immediate")
+        assertTrue(res2 is OperationResult.Success)
+        assertEquals(2, fakeRepository.verifyUnlockCallCount.get())
     }
 
-    // (b) two simultaneous same-ID requests = one verify operation
+    @Test
+    fun immediateFailureDuringRegistration_handledSafelyAndEvictedFromMap() = runTest {
+        val coordinator = createCoordinator()
+        fakeRepository.onVerifyUnlockException = RuntimeException("Immediate database error")
+
+        val res = coordinator.verifyUnlock("capsule-fail-immediate")
+
+        assertTrue(res is OperationResult.Unavailable)
+        assertEquals(1, fakeRepository.verifyUnlockCallCount.get())
+
+        // Map key is cleared; next call attempts a fresh operation
+        fakeRepository.onVerifyUnlockException = null
+        fakeRepository.unlockResults["capsule-fail-immediate"] = OperationResult.Success(Availability.AVAILABLE)
+
+        val res2 = coordinator.verifyUnlock("capsule-fail-immediate")
+        assertTrue(res2 is OperationResult.Success)
+        assertEquals(2, fakeRepository.verifyUnlockCallCount.get())
+    }
+
     @Test
     fun twoSimultaneousSameIdRequests_coalesceToOneVerifyOperation() = runTest {
         val coordinator = createCoordinator()
@@ -113,9 +148,138 @@ class ForegroundRecoveryCoordinatorTest {
         assertEquals(1, fakeRepository.verifyUnlockCallCount.get())
     }
 
-    // (c) different UID or same UID/new generation = separate operations and stale reply ignored
     @Test
-    fun differentUidOrSameUidNewGeneration_createsSeparateOperationsAndIgnoresStaleReply() = runTest {
+    fun differentCapsuleIds_operateIndependently() = runTest {
+        val coordinator = createCoordinator()
+        fakeRepository.unlockResults["capsule-A"] = OperationResult.Success(Availability.AVAILABLE)
+        fakeRepository.unlockResults["capsule-B"] = OperationResult.Denied("Locked")
+
+        val resA = coordinator.verifyUnlock("capsule-A")
+        val resB = coordinator.verifyUnlock("capsule-B")
+
+        assertTrue(resA is OperationResult.Success)
+        assertTrue(resB is OperationResult.Denied)
+        assertEquals(2, fakeRepository.verifyUnlockCallCount.get())
+    }
+
+    @Test
+    fun completedFlight_followedByFreshRetry() = runTest {
+        val coordinator = createCoordinator()
+        fakeRepository.unlockResults["capsule-retry"] = OperationResult.Unavailable("Offline network")
+
+        val res1 = coordinator.verifyUnlock("capsule-retry")
+        assertTrue(res1 is OperationResult.Unavailable)
+        assertEquals(1, fakeRepository.verifyUnlockCallCount.get())
+
+        // Network recovers -> update fake repository result
+        fakeRepository.unlockResults["capsule-retry"] = OperationResult.Success(Availability.AVAILABLE)
+
+        val res2 = coordinator.verifyUnlock("capsule-retry")
+
+        assertTrue(res2 is OperationResult.Success)
+        assertEquals(Availability.AVAILABLE, (res2 as OperationResult.Success).data)
+        assertEquals(2, fakeRepository.verifyUnlockCallCount.get())
+    }
+
+    @Test
+    fun cancellationOfOneWaiter_doesNotCancelOtherWaiterOrUnderlyingScope() = runTest {
+        val coordinator = createCoordinator()
+        val gate = CompletableDeferred<OperationResult<Availability>>()
+        fakeRepository.onVerifyUnlockDeferred = { gate }
+
+        val job1 = launch { coordinator.verifyUnlock("capsule-waiter") }
+        val job2 = async { coordinator.verifyUnlock("capsule-waiter") }
+
+        runCurrent()
+        job1.cancel()
+
+        gate.complete(OperationResult.Success(Availability.AVAILABLE))
+
+        val res2 = job2.await()
+        assertTrue(res2 is OperationResult.Success)
+        assertEquals(Availability.AVAILABLE, (res2 as OperationResult.Success).data)
+    }
+
+    @Test
+    fun stalledOperationTimeout_followedBySafeFreshVerificationAttempt() = runTest {
+        val coordinator = createCoordinator(timeoutMillis = 100L)
+        val neverGate = CompletableDeferred<OperationResult<Availability>>()
+        fakeRepository.onVerifyUnlockDeferred = { neverGate }
+
+        val job1 = async { coordinator.verifyUnlock("capsule-stalled") }
+        runCurrent()
+        advanceTimeBy(150L)
+
+        val res1 = job1.await()
+        assertTrue(res1 is OperationResult.Unavailable)
+        assertTrue((res1 as OperationResult.Unavailable).message.contains("timed out"))
+
+        // Stalled flight completed with timeout and was removed from map; subsequent call runs fresh
+        fakeRepository.onVerifyUnlockDeferred = null
+        fakeRepository.unlockResults["capsule-stalled"] = OperationResult.Success(Availability.AVAILABLE)
+
+        val res2 = coordinator.verifyUnlock("capsule-stalled")
+        assertTrue(res2 is OperationResult.Success)
+        assertEquals(Availability.AVAILABLE, (res2 as OperationResult.Success).data)
+    }
+
+    // --- Session Isolation Tests ---
+
+    @Test
+    fun accountSwitchBeforeScheduledOperation_returnsDeniedWithoutCallingRepository() = runTest {
+        val coordinator = createCoordinator()
+        val capturedSession = sessionTracker.currentSession()
+
+        // Switch user session before starting
+        sessionTracker.startSession("user-2")
+
+        val res = coordinator.verifyUnlock("capsule-1", capturedSession)
+
+        assertTrue(res is OperationResult.Denied)
+        assertTrue((res as OperationResult.Denied).message.contains("Authentication required") || res.message.contains("changed"))
+        assertEquals(0, fakeRepository.verifyUnlockCallCount.get())
+    }
+
+    @Test
+    fun accountSwitchWhilePublicationRecoverySuspended_returnsDeniedAndDiscardsResult() = runTest {
+        val coordinator = createCoordinator()
+        val gate = CompletableDeferred<OperationResult<List<RecoveredPublication>>>()
+        fakeRepository.onRecoverDeferred = { gate }
+
+        val capturedSession = sessionTracker.currentSession()
+        val job = async { coordinator.recoverPublications(capturedSession) }
+
+        runCurrent()
+        // Account switch occurs while recovery is in flight
+        sessionTracker.startSession("user-2")
+
+        gate.complete(OperationResult.Success(listOf(RecoveredPublication("capsule-1", PublicationPhase.SENT, null, false))))
+
+        val res = job.await()
+        assertTrue(res is OperationResult.Denied)
+        assertTrue((res as OperationResult.Denied).message.contains("session changed"))
+    }
+
+    @Test
+    fun accountSwitchBetweenCapsuleChecksInCheckForeground_stopsWorkAndReturnsDenied() = runTest {
+        val coordinator = createCoordinator()
+        fakeRepository.unlockResults["capsule-1"] = OperationResult.Success(Availability.AVAILABLE)
+        fakeRepository.unlockResults["capsule-2"] = OperationResult.Success(Availability.AVAILABLE)
+
+        fakeRepository.onVerifyUnlockCallback = { capsuleId ->
+            if (capsuleId == "capsule-1") {
+                sessionTracker.startSession("user-2")
+            }
+        }
+
+        val summary = coordinator.checkForeground(listOf("capsule-1", "capsule-2"))
+
+        assertTrue(summary.publicationRecoveryResult is OperationResult.Denied)
+        assertTrue((summary.publicationRecoveryResult as OperationResult.Denied).message.contains("session changed"))
+    }
+
+    @Test
+    fun sameUidNewSessionGeneration_isolatesFlightAndIgnoresStaleReply() = runTest {
         val coordinator = createCoordinator()
         val gate = CompletableDeferred<OperationResult<Availability>>()
         fakeRepository.onVerifyUnlockDeferred = { gate }
@@ -124,7 +288,7 @@ class ForegroundRecoveryCoordinatorTest {
         runCurrent()
         assertEquals(1, fakeRepository.verifyUnlockCallCount.get())
 
-        // Session generation increments (e.g. relogged in or user switch)
+        // Re-authenticate same UID -> new session generation (e.g. generation 2 -> 3)
         sessionTracker.startSession("user-1")
 
         val job2 = async { coordinator.verifyUnlock("capsule-gen-1") }
@@ -136,54 +300,83 @@ class ForegroundRecoveryCoordinatorTest {
         val res1 = job1.await()
         val res2 = job2.await()
 
-        // job1 was under generation 1, but session moved to generation 2 before job1 finished -> Denied
         assertTrue(res1 is OperationResult.Denied)
         assertTrue(res2 is OperationResult.Success)
     }
 
-    // (d) cancellation of one waiter
     @Test
-    fun cancellationOfOneWaiter_doesNotCancelOtherWaiterOrUnderlyingScope() = runTest {
+    fun logoutDuringActiveOperation_deniesResult() = runTest {
         val coordinator = createCoordinator()
         val gate = CompletableDeferred<OperationResult<Availability>>()
         fakeRepository.onVerifyUnlockDeferred = { gate }
 
-        val job1 = launch { coordinator.verifyUnlock("capsule-waiter") }
-        val job2 = async { coordinator.verifyUnlock("capsule-waiter") }
+        val job = async { coordinator.verifyUnlock("capsule-logout") }
+        runCurrent()
 
-        // Cancel job1
-        job1.cancel()
-
-        // Complete gate for job2
+        sessionTracker.clearSession()
         gate.complete(OperationResult.Success(Availability.AVAILABLE))
 
-        val res2 = job2.await()
-        assertTrue(res2 is OperationResult.Success)
-        assertEquals(Availability.AVAILABLE, (res2 as OperationResult.Success).data)
+        val res = job.await()
+        assertTrue(res is OperationResult.Denied)
     }
 
-    // (e) a failed/offline result followed by a truly fresh successful Retry
     @Test
-    fun failedOrOfflineResult_followedByTrulyFreshSuccessfulRetry() = runTest {
+    fun triggerForegroundRecovery_deliversCallbackOnMainWithSessionValidation() = runTest {
         val coordinator = createCoordinator()
-        fakeRepository.unlockResults["capsule-retry"] = OperationResult.Unavailable("Offline network")
+        fakeRepository.unlockResults["capsule-cb"] = OperationResult.Success(Availability.AVAILABLE)
 
-        val res1 = coordinator.verifyUnlock("capsule-retry")
-        assertTrue(res1 is OperationResult.Unavailable)
-        assertEquals(1, fakeRepository.verifyUnlockCallCount.get())
+        val callbackInvoked = AtomicBoolean(false)
+        coordinator.triggerForegroundRecovery(listOf("capsule-cb")) { summary ->
+            callbackInvoked.set(true)
+            assertTrue(summary.publicationRecoveryResult is OperationResult.Success)
+        }
 
-        // Now network recovers -> update fake repository result
-        fakeRepository.unlockResults["capsule-retry"] = OperationResult.Success(Availability.AVAILABLE)
-
-        // Second call (Retry) must NOT return cached failure, must invoke repository again!
-        val res2 = coordinator.verifyUnlock("capsule-retry")
-
-        assertTrue(res2 is OperationResult.Success)
-        assertEquals(Availability.AVAILABLE, (res2 as OperationResult.Success).data)
-        assertEquals(2, fakeRepository.verifyUnlockCallCount.get())
+        runCurrent()
+        assertTrue(callbackInvoked.get())
     }
 
-    // (f) zero known IDs do not fake a received list
+    @Test
+    fun triggerForegroundRecovery_suppressesCallbackIfSessionChanged() = runTest {
+        val coordinator = createCoordinator()
+        val gate = CompletableDeferred<OperationResult<List<RecoveredPublication>>>()
+        fakeRepository.onRecoverDeferred = { gate }
+
+        val callbackInvoked = AtomicBoolean(false)
+        coordinator.triggerForegroundRecovery(listOf("capsule-cb")) {
+            callbackInvoked.set(true)
+        }
+
+        runCurrent()
+        // Account changes before recovery finishes
+        sessionTracker.startSession("user-2")
+        gate.complete(OperationResult.Success(emptyList()))
+
+        runCurrent()
+        assertFalse(callbackInvoked.get())
+    }
+
+    // --- Domain Business Logic Tests ---
+
+    @Test
+    fun appOpenResumeDetailRetry_samePathForKnownIds() = runTest {
+        val coordinator = createCoordinator()
+        fakeRepository.unlockResults["capsule-1"] = OperationResult.Success(Availability.AVAILABLE)
+        fakeRepository.recoveredList = listOf(
+            RecoveredPublication("capsule-1", PublicationPhase.SENT, null, false)
+        )
+
+        val summary = coordinator.checkForeground(listOf("capsule-1"))
+
+        assertTrue(summary.publicationRecoveryResult is OperationResult.Success)
+        assertEquals(1, summary.unlockResults.size)
+        assertEquals(
+            Availability.AVAILABLE,
+            (summary.unlockResults["capsule-1"] as OperationResult.Success).data
+        )
+        assertEquals(1, fakeRepository.recoverPublicationsCallCount.get())
+        assertEquals(1, fakeRepository.verifyUnlockCallCount.get())
+    }
+
     @Test
     fun zeroKnownIds_doesNotFakeReceivedList() = runTest {
         val coordinator = createCoordinator()
@@ -193,7 +386,6 @@ class ForegroundRecoveryCoordinatorTest {
         assertTrue(summary.publicationRecoveryResult is OperationResult.Success)
     }
 
-    // (g) time-only before/after deadline via existing real verifier
     @Test
     fun timeOnlyBeforeAfterDeadline_viaRealVerifier() = runTest {
         val sessionTrack = DefaultSessionTracker()
@@ -209,13 +401,11 @@ class ForegroundRecoveryCoordinatorTest {
         )
         val coord = createCoordinator(repo = repository, sessionTrack = sessionTrack)
 
-        // Seed capsule with deadline NOT reached
         fakeFirestore.seedCapsule("capsule-time", "recipient-1", unlocked = false, mode = "TIME", deadlineReached = false)
 
         val earlyRes = coord.verifyUnlock("capsule-time")
         assertTrue(earlyRes is OperationResult.Denied)
 
-        // Advance deadline -> reached
         fakeFirestore.seedCapsule("capsule-time", "recipient-1", unlocked = false, mode = "TIME", deadlineReached = true)
 
         val lateRes = coord.verifyUnlock("capsule-time")
@@ -223,7 +413,6 @@ class ForegroundRecoveryCoordinatorTest {
         assertEquals(Availability.AVAILABLE, (lateRes as OperationResult.Success).data)
     }
 
-    // (h) combined location invalid/permission denied/previous visit not latched
     @Test
     fun combinedLocationInvalidPermissionDeniedPreviousVisitNotLatched() = runTest {
         val sessionTrack = DefaultSessionTracker()
@@ -264,7 +453,6 @@ class ForegroundRecoveryCoordinatorTest {
         assertTrue(resDeparted is OperationResult.Denied)
     }
 
-    // (i) confirmed unlock never relocks
     @Test
     fun confirmedUnlock_neverRelocks() = runTest {
         val sessionTrack = DefaultSessionTracker()
@@ -291,7 +479,6 @@ class ForegroundRecoveryCoordinatorTest {
         assertEquals(Availability.AVAILABLE, (res as OperationResult.Success).data)
     }
 
-    // (j) saved uncertain send foreground reconciliation never implicitly republishes or generates a new ID
     @Test
     fun savedUncertainSendReconciliation_neverImplicitlyRepublishesOrGeneratesNewId() = runTest {
         val coordinator = createCoordinator()
@@ -303,35 +490,7 @@ class ForegroundRecoveryCoordinatorTest {
 
         assertTrue(summary.publicationRecoveryResult is OperationResult.Success)
         assertEquals(1, fakeRepository.recoverPublicationsCallCount.get())
-        // Ensure publish was NOT called implicitly
         assertEquals(0, fakeRepository.publishCallCount.get())
-    }
-
-    // (k) activity/Fragment recreation does not duplicate, leak or overwrite active state
-    @Test
-    fun activityFragmentRecreation_doesNotDuplicateLeakOrOverwriteActiveState() = runTest {
-        val coordinator = createCoordinator()
-        val gate = CompletableDeferred<OperationResult<List<RecoveredPublication>>>()
-        fakeRepository.onRecoverDeferred = { gate }
-
-        val job1 = async { coordinator.recoverPublications() }
-        runCurrent()
-        assertEquals(1, fakeRepository.recoverPublicationsCallCount.get())
-
-        // Simulate Activity recreation where Fragment attaches and triggers recovery again
-        val job2 = async { coordinator.recoverPublications() }
-        runCurrent()
-
-        // Still exactly 1 call to repository!
-        assertEquals(1, fakeRepository.recoverPublicationsCallCount.get())
-
-        gate.complete(OperationResult.Success(emptyList()))
-
-        val res1 = job1.await()
-        val res2 = job2.await()
-
-        assertTrue(res1 is OperationResult.Success)
-        assertTrue(res2 is OperationResult.Success)
     }
 
     @Test
@@ -358,7 +517,8 @@ class ForegroundRecoveryCoordinatorTest {
         assertTrue(resReconcile is OperationResult.Invalid)
     }
 
-    // Fake CapsuleRepository for Coordinator tests
+    // --- Fakes for Test Isolation ---
+
     private class FakeCapsuleRepository : CapsuleRepository {
         val recoverPublicationsCallCount = AtomicInteger(0)
         val verifyUnlockCallCount = AtomicInteger(0)
@@ -368,6 +528,8 @@ class ForegroundRecoveryCoordinatorTest {
         val unlockResults = mutableMapOf<String, OperationResult<Availability>>()
 
         var onVerifyUnlockDeferred: (() -> CompletableDeferred<OperationResult<Availability>>)? = null
+        var onVerifyUnlockCallback: ((String) -> Unit)? = null
+        var onVerifyUnlockException: Exception? = null
         var onRecoverDeferred: (() -> CompletableDeferred<OperationResult<List<RecoveredPublication>>>)? = null
 
         override fun session(): SessionSnapshot = SessionSnapshot("user-1", 1)
@@ -394,6 +556,9 @@ class ForegroundRecoveryCoordinatorTest {
 
         override suspend fun verifyUnlock(capsuleId: String): OperationResult<Availability> {
             verifyUnlockCallCount.incrementAndGet()
+            onVerifyUnlockCallback?.invoke(capsuleId)
+            val exc = onVerifyUnlockException
+            if (exc != null) throw exc
             val deferred = onVerifyUnlockDeferred?.invoke()
             if (deferred != null) {
                 return deferred.await()

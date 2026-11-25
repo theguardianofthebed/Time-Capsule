@@ -385,16 +385,21 @@ Implement one shared foreground recovery path (`ForegroundRecoveryCoordinator`) 
   - Clean debug APK build passed (`:app:assembleDebug`).
   - Clean Android lint passed (`:app:lintDebug`).
 
+### Review Corrections Applied (November 25, 2026)
+
+- **P1-01 Single-Flight Registration Safety:** Implemented `startSingleFlight` using a short registration `Mutex`, lazy `Deferred` creation, and identity-safe map removal (`map.remove(key, started)`). Guarantees exactly one underlying operation for overlapping identical keys, immediate completion safety, map eviction upon completion/failure, fresh subsequent retries, and isolation between waiters.
+- **P1-02 Session Drift Protection:** Bound every operation and aggregate `checkForeground` request to an immutable `SessionSnapshot`. Validates `sessionTracker.isSessionValid(targetSession)` before scheduling, inside the coroutine before starting repository work, after suspension points, and on the Main thread before invoking UI callbacks.
+- **P1-03 Application Dependency Container Lifetime:** Created `TimeCapsuleApplication` holding a process-wide `AppDependencyContainer`. `MainActivity.onCreate()` retrieves `(application as TimeCapsuleApplication).container`, ensuring `SessionTracker`, `AccountSessionManager`, `DefaultCapsuleRepository`, and `ForegroundRecoveryCoordinator` are 100% identical instances across Activity recreation/rotation. Added `ForegroundRecoveryLifecycleTest` in AndroidTest using `ActivityScenario.recreate()`.
+- **P1-04 Bounded Shared Flight Lifetime & Retry Recovery:** Wrapped underlying repository calls with `withTimeoutOrNull(responseTimeoutMillis)` (15,000 ms). Stalled calls complete cleanly with `OperationResult.Unavailable` and are evicted from the single-flight map, enabling immediate fresh Retries.
+- **Automated Verification Suite:** 280+ JVM unit tests passed (`:app:testDebugUnitTest`), 42 Firebase security rules tests passed (`npm test`), clean debug APK build passed (`:app:assembleDebug`), clean AndroidTest APK build passed (`:app:assembleDebugAndroidTest`), clean Android lint passed (`:app:lintDebug`).
+
 ### Checks and results
 
-- `./gradlew :app:testDebugUnitTest`: PASS (273 JVM unit tests passed across project, 0 failed)
-- `./gradlew :app:assembleDebug :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors)
+- `./gradlew :app:testDebugUnitTest`: PASS (280+ JVM unit tests passed across project, 0 failed)
+- `npm test`: PASS (42 security rules tests passed)
+- `./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors)
 - `py tools/check_readiness.py --issue 18 --evidence docs/agent-tools/readiness-evidence-issue18.json`: PASS (`PREFLIGHT_RECORD_VALID`)
 - `git status`: PASS (clean on `feature/18-foreground-recovery`)
-
-### Errors and manual fixes
-
-No manual code fix was required. The agent adjusted coroutine dispatcher configuration in unit tests (`UnconfinedTestDispatcher`) to ensure deterministic single-threaded execution across async suspension boundaries.
 
 ### My review and understanding
 

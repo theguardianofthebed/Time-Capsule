@@ -50,7 +50,7 @@
         {
           "result": "PASS",
           "procedure": "JVM unit tests, Firebase rules tests, and Android instrumentation tests",
-          "expected_actual": "205 JVM unit tests and 42 rules tests passed",
+          "expected_actual": "176 JVM unit tests reported in PR description (201 JVM unit tests and 42 rules tests following review corrections)",
           "commit": "15cf5bfdc39e6827c1a5407198cd65f6e6a7c232",
           "environment": "Android Studio Agent Mode, Nov 22 2026",
           "evidence": "PR #40 verification record"
@@ -72,7 +72,7 @@
         {
           "result": "PASS",
           "procedure": "JVM unit tests, Firebase rules tests, and Android instrumentation tests",
-          "expected_actual": "222 JVM unit tests and 42 rules tests passed",
+          "expected_actual": "214 JVM unit tests reported in PR description (222 JVM unit tests and 42 rules tests following review corrections)",
           "commit": "6ccd2ffb02dde02278f8c9b30a4ae1355ea180ff",
           "environment": "Android Studio Agent Mode, Nov 23 2026",
           "evidence": "PR #41 verification record"

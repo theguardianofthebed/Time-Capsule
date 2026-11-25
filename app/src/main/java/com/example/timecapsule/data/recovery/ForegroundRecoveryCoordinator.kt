@@ -11,12 +11,16 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Result summary data class for foreground recovery checks.
@@ -35,47 +39,98 @@ data class ForegroundRecoverySummary(
  * Coordinates and coalesces foreground recovery operations across app-open, return to foreground,
  * and explicit UI retry actions.
  *
- * Concurrency & Session Rules:
- * 1. Coalesces overlapping publication recovery for the same (uid, sessionGeneration).
- * 2. Coalesces overlapping recipient unlock checks for the same (uid, sessionGeneration, capsuleId).
- * 3. Coalesces overlapping send outcome reconciliation for the same (uid, sessionGeneration, capsuleId).
- * 4. Removes completed flight entries upon completion (including failures) so subsequent retries
- *    acquire fresh server and location evidence.
- * 5. Revalidates session tracker before returning results to caller and discards stale callbacks.
- * 6. Does not hold strong references to Activity or Fragment instances.
+ * Single-Flight & Session Security Guarantees:
+ * 1. Single-Flight Coalescing: Uses a short registration [Mutex] and identity-safe `active.remove(key, started)`
+ *    to guarantee that overlapping identical keys execute exactly one underlying operation.
+ * 2. Immediate Completion Safety: Lazy [Deferred] creation and registration before execution prevent races
+ *    where immediate coroutine completions modify un-registered map entries.
+ * 3. Fresh Subsequent Retries: Completed or failed flight entries are automatically removed upon completion
+ *    so subsequent retries acquire fresh server and location evidence.
+ * 4. Waiter Isolation: Cancellation of one waiter's coroutine does not cancel other waiters or the underlying job.
+ * 5. Session Drift Protection: Binds each operation and aggregate check to an immutable [SessionSnapshot].
+ *    Validates session state before starting, during suspension points, and before UI callback delivery.
+ * 6. Non-Blocking Lifecycle: Does not hold strong references to Activity or Fragment instances.
  */
 class ForegroundRecoveryCoordinator(
     private val repository: CapsuleRepository,
     private val sessionTracker: SessionTracker,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
-    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + ioDispatcher)
+    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + ioDispatcher),
+    private val responseTimeoutMillis: Long = 15_000L
 ) {
     private data class RecoveryKey(val uid: String, val sessionGeneration: Long)
     private data class UnlockKey(val uid: String, val sessionGeneration: Long, val capsuleId: String)
     private data class ReconcileKey(val uid: String, val sessionGeneration: Long, val capsuleId: String)
 
+    private val registrationMutex = Mutex()
     private val activeRecovery = ConcurrentHashMap<RecoveryKey, Deferred<OperationResult<List<RecoveredPublication>>>>()
     private val activeUnlock = ConcurrentHashMap<UnlockKey, Deferred<OperationResult<Availability>>>()
     private val activeReconcile = ConcurrentHashMap<ReconcileKey, Deferred<OperationResult<SendStatus>>>()
 
     /**
+     * Reusable single-flight registration helper using a short registration [Mutex],
+     * lazy [Deferred] creation, registration before execution, and identity-safe map removal.
+     */
+    private suspend fun <K : Any, V : Any> startSingleFlight(
+        map: ConcurrentHashMap<K, Deferred<V>>,
+        key: K,
+        action: suspend () -> V
+    ): Deferred<V> {
+        val existing = map[key]
+        if (existing != null && existing.isActive) {
+            return existing
+        }
+        return registrationMutex.withLock {
+            val current = map[key]
+            if (current != null && current.isActive) {
+                current
+            } else {
+                val started = scope.async(ioDispatcher, start = CoroutineStart.LAZY) {
+                    action()
+                }
+                map[key] = started
+                started.invokeOnCompletion {
+                    map.remove(key, started)
+                }
+                started.start()
+                started
+            }
+        }
+    }
+
+    /**
      * Executes or joins an in-flight send recovery for the active session (uid, sessionGeneration).
      *
+     * @param targetSession Optional explicitly bound session. Defaults to current session.
      * @return Typed result containing recovered publication records, or [OperationResult.Denied] if session changed.
      */
-    suspend fun recoverPublications(): OperationResult<List<RecoveredPublication>> = withContext(ioDispatcher) {
-        val captured = sessionTracker.currentSession()
-        val uid = captured.uid
-        if (!captured.isAuthenticated || uid.isNullOrBlank()) {
+    suspend fun recoverPublications(
+        targetSession: SessionSnapshot = sessionTracker.currentSession()
+    ): OperationResult<List<RecoveredPublication>> = withContext(ioDispatcher) {
+        val uid = targetSession.uid
+        if (!targetSession.isAuthenticated || uid.isNullOrBlank() || !sessionTracker.isSessionValid(targetSession)) {
             return@withContext OperationResult.Denied("Authentication required for publication recovery.")
         }
-        val key = RecoveryKey(uid, captured.sessionGeneration)
+        val key = RecoveryKey(uid, targetSession.sessionGeneration)
 
-        val deferred = activeRecovery.computeIfAbsent(key) {
-            scope.async {
-                repository.recoverPublications()
-            }.also { d ->
-                d.invokeOnCompletion { activeRecovery.remove(key, d) }
+        val deferred = startSingleFlight(activeRecovery, key) {
+            if (!sessionTracker.isSessionValid(targetSession)) {
+                return@startSingleFlight OperationResult.Denied("Account session changed before publication recovery started.")
+            }
+            val res = try {
+                withTimeoutOrNull(responseTimeoutMillis) {
+                    repository.recoverPublications()
+                } ?: OperationResult.Unavailable("Publication recovery timed out.")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                OperationResult.Unavailable("Publication recovery failed: ${e.message}")
+            }
+
+            if (!sessionTracker.isSessionValid(targetSession)) {
+                OperationResult.Denied("Account session changed during publication recovery execution.")
+            } else {
+                res
             }
         }
 
@@ -87,7 +142,7 @@ class ForegroundRecoveryCoordinator(
             OperationResult.Unavailable("Publication recovery failed: ${e.message}")
         }
 
-        if (!sessionTracker.isSessionValid(captured)) {
+        if (!sessionTracker.isSessionValid(targetSession)) {
             return@withContext OperationResult.Denied("Account session changed during publication recovery.")
         }
 
@@ -99,25 +154,41 @@ class ForegroundRecoveryCoordinator(
      * Removes completed flight so subsequent retries acquire fresh server and location evidence.
      *
      * @param capsuleId The known capsule ID to verify unlock for.
+     * @param targetSession Optional explicitly bound session. Defaults to current session.
      * @return Typed availability result.
      */
-    suspend fun verifyUnlock(capsuleId: String): OperationResult<Availability> = withContext(ioDispatcher) {
+    suspend fun verifyUnlock(
+        capsuleId: String,
+        targetSession: SessionSnapshot = sessionTracker.currentSession()
+    ): OperationResult<Availability> = withContext(ioDispatcher) {
         val cleanId = capsuleId.trim()
         if (cleanId.isBlank()) {
             return@withContext OperationResult.Invalid("Capsule ID must not be blank for unlock verification.")
         }
-        val captured = sessionTracker.currentSession()
-        val uid = captured.uid
-        if (!captured.isAuthenticated || uid.isNullOrBlank()) {
+        val uid = targetSession.uid
+        if (!targetSession.isAuthenticated || uid.isNullOrBlank() || !sessionTracker.isSessionValid(targetSession)) {
             return@withContext OperationResult.Denied("Authentication required for unlock verification.")
         }
-        val key = UnlockKey(uid, captured.sessionGeneration, cleanId)
+        val key = UnlockKey(uid, targetSession.sessionGeneration, cleanId)
 
-        val deferred = activeUnlock.computeIfAbsent(key) {
-            scope.async {
-                repository.verifyUnlock(cleanId)
-            }.also { d ->
-                d.invokeOnCompletion { activeUnlock.remove(key, d) }
+        val deferred = startSingleFlight(activeUnlock, key) {
+            if (!sessionTracker.isSessionValid(targetSession)) {
+                return@startSingleFlight OperationResult.Denied("Account session changed before unlock verification started.")
+            }
+            val res = try {
+                withTimeoutOrNull(responseTimeoutMillis) {
+                    repository.verifyUnlock(cleanId)
+                } ?: OperationResult.Unavailable("Unlock verification timed out.")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                OperationResult.Unavailable("Unlock verification failed: ${e.message}")
+            }
+
+            if (!sessionTracker.isSessionValid(targetSession)) {
+                OperationResult.Denied("Account session changed during unlock verification execution.")
+            } else {
+                res
             }
         }
 
@@ -129,7 +200,7 @@ class ForegroundRecoveryCoordinator(
             OperationResult.Unavailable("Unlock verification failed: ${e.message}")
         }
 
-        if (!sessionTracker.isSessionValid(captured)) {
+        if (!sessionTracker.isSessionValid(targetSession)) {
             return@withContext OperationResult.Denied("Account session changed during unlock verification.")
         }
 
@@ -140,25 +211,41 @@ class ForegroundRecoveryCoordinator(
      * Executes or joins an in-flight send outcome reconciliation for [capsuleId] under the active session.
      *
      * @param capsuleId The capsule ID to reconcile send outcome for.
+     * @param targetSession Optional explicitly bound session. Defaults to current session.
      * @return Typed send status result.
      */
-    suspend fun reconcile(capsuleId: String): OperationResult<SendStatus> = withContext(ioDispatcher) {
+    suspend fun reconcile(
+        capsuleId: String,
+        targetSession: SessionSnapshot = sessionTracker.currentSession()
+    ): OperationResult<SendStatus> = withContext(ioDispatcher) {
         val cleanId = capsuleId.trim()
         if (cleanId.isBlank()) {
             return@withContext OperationResult.Invalid("Capsule ID must not be blank for reconciliation.")
         }
-        val captured = sessionTracker.currentSession()
-        val uid = captured.uid
-        if (!captured.isAuthenticated || uid.isNullOrBlank()) {
+        val uid = targetSession.uid
+        if (!targetSession.isAuthenticated || uid.isNullOrBlank() || !sessionTracker.isSessionValid(targetSession)) {
             return@withContext OperationResult.Denied("Authentication required for send reconciliation.")
         }
-        val key = ReconcileKey(uid, captured.sessionGeneration, cleanId)
+        val key = ReconcileKey(uid, targetSession.sessionGeneration, cleanId)
 
-        val deferred = activeReconcile.computeIfAbsent(key) {
-            scope.async {
-                repository.reconcile(cleanId)
-            }.also { d ->
-                d.invokeOnCompletion { activeReconcile.remove(key, d) }
+        val deferred = startSingleFlight(activeReconcile, key) {
+            if (!sessionTracker.isSessionValid(targetSession)) {
+                return@startSingleFlight OperationResult.Denied("Account session changed before reconciliation started.")
+            }
+            val res = try {
+                withTimeoutOrNull(responseTimeoutMillis) {
+                    repository.reconcile(cleanId)
+                } ?: OperationResult.Unavailable("Send reconciliation timed out.")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                OperationResult.Unavailable("Send reconciliation failed: ${e.message}")
+            }
+
+            if (!sessionTracker.isSessionValid(targetSession)) {
+                OperationResult.Denied("Account session changed during reconciliation execution.")
+            } else {
+                res
             }
         }
 
@@ -170,7 +257,7 @@ class ForegroundRecoveryCoordinator(
             OperationResult.Unavailable("Send reconciliation failed: ${e.message}")
         }
 
-        if (!sessionTracker.isSessionValid(captured)) {
+        if (!sessionTracker.isSessionValid(targetSession)) {
             return@withContext OperationResult.Denied("Account session changed during send reconciliation.")
         }
 
@@ -179,7 +266,7 @@ class ForegroundRecoveryCoordinator(
 
     /**
      * Entry point for foreground check (app-open, return to foreground, or S-03 list refresh / S-07 detail open in Issue #21).
-     * Runs publication recovery and verifies unlock for any provided [knownCapsuleIds].
+     * Binds aggregate request to one [SessionSnapshot] and runs publication recovery and unlock checks concurrently.
      *
      * @param knownCapsuleIds List of known capsule IDs to verify unlock for.
      * @return [ForegroundRecoverySummary] containing recovery results.
@@ -187,26 +274,51 @@ class ForegroundRecoveryCoordinator(
     suspend fun checkForeground(
         knownCapsuleIds: List<String> = emptyList()
     ): ForegroundRecoverySummary = withContext(ioDispatcher) {
-        val captured = sessionTracker.currentSession()
-        if (!captured.isAuthenticated || captured.uid.isNullOrBlank()) {
+        val capturedSession = sessionTracker.currentSession()
+        if (!capturedSession.isAuthenticated || capturedSession.uid.isNullOrBlank()) {
             return@withContext ForegroundRecoverySummary(
-                sessionSnapshot = captured,
+                sessionSnapshot = capturedSession,
                 publicationRecoveryResult = OperationResult.Denied("Authentication required for foreground recovery.")
             )
         }
 
-        val pubResult = recoverPublications()
-
-        val unlockMap = mutableMapOf<String, OperationResult<Availability>>()
-        for (id in knownCapsuleIds) {
+        val pubDeferred = async { recoverPublications(capturedSession) }
+        val unlockDeferreds = knownCapsuleIds.mapNotNull { id ->
             val cleanId = id.trim()
             if (cleanId.isNotBlank()) {
-                unlockMap[cleanId] = verifyUnlock(cleanId)
+                cleanId to async { verifyUnlock(cleanId, capturedSession) }
+            } else null
+        }
+
+        val pubResult = pubDeferred.await()
+
+        if (!sessionTracker.isSessionValid(capturedSession)) {
+            return@withContext ForegroundRecoverySummary(
+                sessionSnapshot = capturedSession,
+                publicationRecoveryResult = OperationResult.Denied("Account session changed during foreground recovery.")
+            )
+        }
+
+        val unlockMap = mutableMapOf<String, OperationResult<Availability>>()
+        for ((id, deferred) in unlockDeferreds) {
+            if (!sessionTracker.isSessionValid(capturedSession)) {
+                return@withContext ForegroundRecoverySummary(
+                    sessionSnapshot = capturedSession,
+                    publicationRecoveryResult = OperationResult.Denied("Account session changed during foreground recovery.")
+                )
             }
+            unlockMap[id] = deferred.await()
+        }
+
+        if (!sessionTracker.isSessionValid(capturedSession)) {
+            return@withContext ForegroundRecoverySummary(
+                sessionSnapshot = capturedSession,
+                publicationRecoveryResult = OperationResult.Denied("Account session changed during foreground recovery.")
+            )
         }
 
         ForegroundRecoverySummary(
-            sessionSnapshot = captured,
+            sessionSnapshot = capturedSession,
             publicationRecoveryResult = pubResult,
             unlockResults = unlockMap
         )
@@ -214,21 +326,25 @@ class ForegroundRecoveryCoordinator(
 
     /**
      * Non-blocking trigger for foreground recovery from Activity/Fragment lifecycle events.
-     * Launches on background scope and executes [checkForeground].
+     * Launches on background scope and delivers results on the Main thread only if session remains current.
      *
      * @param knownCapsuleIds List of known capsule IDs.
-     * @param onComplete Optional completion callback invoked only if session remains valid.
+     * @param onComplete Optional completion callback delivered on the Main thread with session revalidation.
      */
     fun triggerForegroundRecovery(
         knownCapsuleIds: List<String> = emptyList(),
         onComplete: ((ForegroundRecoverySummary) -> Unit)? = null
     ) {
-        val captured = sessionTracker.currentSession()
-        if (!captured.isAuthenticated || captured.uid.isNullOrBlank()) return
+        val capturedSession = sessionTracker.currentSession()
+        if (!capturedSession.isAuthenticated || capturedSession.uid.isNullOrBlank()) return
         scope.launch(ioDispatcher) {
             val summary = checkForeground(knownCapsuleIds)
-            if (sessionTracker.isSessionValid(captured)) {
-                onComplete?.invoke(summary)
+            if (sessionTracker.isSessionValid(capturedSession) && onComplete != null) {
+                withContext(Dispatchers.Main) {
+                    if (sessionTracker.isSessionValid(capturedSession)) {
+                        onComplete.invoke(summary)
+                    }
+                }
             }
         }
     }

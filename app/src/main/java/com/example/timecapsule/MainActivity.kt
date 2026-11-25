@@ -71,55 +71,13 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Initialize lightweight dependency container and AccountSessionManager
-        val sessionTracker = DefaultSessionTracker()
-        val authAdapter = DefaultAuthAdapter()
-        val firestoreAdapter = DefaultFirestoreAdapter { applicationContext }
-        val accountSessionManager = AccountSessionManager(authAdapter, firestoreAdapter, sessionTracker)
-
-        val storageAdapter = DefaultStorageAdapter(FirebaseStorage.getInstance(),
-            FirebaseFirestore.getInstance(), FirebaseAuth.getInstance())
-        val photoUploads = OriginalPhotoUploads(
-            OriginalPhotoStore(File(noBackupFilesDir, "original-photos"), AndroidOriginalImageProbe()),
-            File(noBackupFilesDir, "frozen-photos"), storageAdapter, sessionTracker::currentSession)
-        val locationAdapter = DefaultLocationAdapter(applicationContext)
-        val retentionAdapter = object : LocalRetentionAdapter {
-            override suspend fun clearAccountData(uid: String) {}
-        }
-
-        val publication = firestoreAdapter.firestoreInstance()?.let { firestore ->
-            CapsulePublicationCoordinator(
-                FrozenOperationJournal(File(noBackupFilesDir, "capsule-operations")),
-                FirestoreCapsulePublication(firestore, FirebaseAuth.getInstance()),
-                OriginalPublicationMedia(photoUploads), sessionTracker::currentSession,
-                drafts = com.example.timecapsule.data.publication.PrivatePublicationDrafts(
-                    OriginalPhotoStore(File(noBackupFilesDir, "original-photos"),
-                        AndroidOriginalImageProbe()),
-                    com.example.timecapsule.data.media.PhotoDraftJournal(
-                        File(noBackupFilesDir, "photo-drafts"))))
-        }
-        val repository = DefaultCapsuleRepository(sessionTracker, authAdapter, firestoreAdapter,
-            publication, locationAdapter)
-        val recoveryCoordinator = ForegroundRecoveryCoordinator(
-            repository, sessionTracker)
-
-        container = AppDependencyContainer(
-            sessionTracker = sessionTracker,
-            authAdapter = authAdapter,
-            firestoreAdapter = firestoreAdapter,
-            storageAdapter = storageAdapter,
-            locationAdapter = locationAdapter,
-            retentionAdapter = retentionAdapter,
-            repository = repository,
-            accountSessionManager = accountSessionManager,
-            photoUploads = photoUploads,
-            recoveryCoordinator = recoveryCoordinator
-        )
+        // Retrieve application-scoped dependency container to survive Activity recreation/rotation
+        container = (application as TimeCapsuleApplication).container
 
         // Unconditionally restore session into SessionTracker on every Activity/container creation
         val activeUid = container.accountSessionManager.restoreSessionIfAuthenticated()
         if (!activeUid.isNullOrBlank()) {
-            recoveryCoordinator.triggerForegroundRecovery()
+            container.recoveryCoordinator?.triggerForegroundRecovery()
         }
 
         // Register Fragment attach listener to re-wire navigation callbacks on Activity recreation/rotation
