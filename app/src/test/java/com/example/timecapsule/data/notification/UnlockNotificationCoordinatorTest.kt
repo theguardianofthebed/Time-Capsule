@@ -1,0 +1,157 @@
+package com.example.timecapsule.data.notification
+
+import com.example.timecapsule.data.session.DefaultSessionTracker
+import com.example.timecapsule.domain.model.Availability
+import com.example.timecapsule.domain.model.UnlockConfirmationKind
+import com.example.timecapsule.domain.model.UnlockVerificationOutcome
+import com.example.timecapsule.domain.session.SessionSnapshot
+import java.io.File
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Test
+
+private class FakeNotificationAdapter : NotificationAdapter {
+    var permitted: Boolean = true
+    var channelCreated: Boolean = false
+    val postedNotifications = mutableListOf<Pair<String, String>>()
+    val cancelledAccounts = mutableListOf<String>()
+    var throwOnNotify: Boolean = false
+
+    override fun areNotificationsPermitted(): Boolean = permitted
+
+    override fun createNotificationChannel() {
+        channelCreated = true
+    }
+
+    override fun postUnlockNotification(accountUid: String, capsuleId: String): Boolean {
+        if (throwOnNotify) throw RuntimeException("Notification service failure")
+        if (!permitted) return false
+        postedNotifications.add(accountUid to capsuleId)
+        return true
+    }
+
+    override fun cancelAccountNotifications(accountUid: String) {
+        cancelledAccounts.add(accountUid)
+    }
+}
+
+/**
+ * Unit tests for [UnlockNotificationCoordinator] verifying decision table behavior across
+ * permission states, deduplication, session drift, and error isolation.
+ */
+class UnlockNotificationCoordinatorTest {
+
+    private lateinit var tempFile: File
+    private lateinit var attemptStore: NotificationAttemptStore
+    private lateinit var fakeAdapter: FakeNotificationAdapter
+    private lateinit var sessionTracker: DefaultSessionTracker
+    private lateinit var coordinator: UnlockNotificationCoordinator
+
+    @Before
+    fun setUp() {
+        tempFile = File.createTempFile("notification_coord_test", ".json")
+        attemptStore = NotificationAttemptStore(tempFile)
+        fakeAdapter = FakeNotificationAdapter()
+        sessionTracker = DefaultSessionTracker()
+        coordinator = UnlockNotificationCoordinator(fakeAdapter, attemptStore, sessionTracker)
+    }
+
+    @After
+    fun tearDown() {
+        if (tempFile.exists()) {
+            tempFile.delete()
+        }
+    }
+
+    @Test
+    fun `confirmed first unlock with permission allowed posts notification and claims state`() {
+        sessionTracker.startSession("recipient-uid-1")
+        val session = sessionTracker.currentSession()
+        val outcome = UnlockVerificationOutcome(Availability.AVAILABLE, UnlockConfirmationKind.FIRST_UNLOCK_CONFIRMED)
+
+        coordinator.handleUnlockOutcome("capsule-101", outcome, session)
+
+        assertEquals(1, fakeAdapter.postedNotifications.size)
+        assertEquals("recipient-uid-1" to "capsule-101", fakeAdapter.postedNotifications.first())
+        assertEquals(AttemptState.ATTEMPTED, attemptStore.getAttemptState("recipient-uid-1", "capsule-101"))
+    }
+
+    @Test
+    fun `confirmed first unlock with permission denied records PENDING_PERMISSION without posting`() {
+        sessionTracker.startSession("recipient-uid-1")
+        val session = sessionTracker.currentSession()
+        fakeAdapter.permitted = false
+        val outcome = UnlockVerificationOutcome(Availability.AVAILABLE, UnlockConfirmationKind.FIRST_UNLOCK_CONFIRMED)
+
+        coordinator.handleUnlockOutcome("capsule-101", outcome, session)
+
+        assertTrue(fakeAdapter.postedNotifications.isEmpty())
+        assertEquals(AttemptState.PENDING_PERMISSION, attemptStore.getAttemptState("recipient-uid-1", "capsule-101"))
+    }
+
+    @Test
+    fun `already unlocked capsule with PENDING_PERMISSION candidate posts once when permission granted`() {
+        sessionTracker.startSession("recipient-uid-1")
+        val session = sessionTracker.currentSession()
+        attemptStore.recordPendingPermission("recipient-uid-1", "capsule-101")
+
+        fakeAdapter.permitted = true
+        val outcome = UnlockVerificationOutcome(Availability.AVAILABLE, UnlockConfirmationKind.ALREADY_UNLOCKED)
+
+        coordinator.handleUnlockOutcome("capsule-101", outcome, session)
+
+        assertEquals(1, fakeAdapter.postedNotifications.size)
+        assertEquals(AttemptState.ATTEMPTED, attemptStore.getAttemptState("recipient-uid-1", "capsule-101"))
+    }
+
+    @Test
+    fun `already unlocked capsule with ABSENT state does not create historical notification`() {
+        sessionTracker.startSession("recipient-uid-1")
+        val session = sessionTracker.currentSession()
+        val outcome = UnlockVerificationOutcome(Availability.AVAILABLE, UnlockConfirmationKind.ALREADY_UNLOCKED)
+
+        coordinator.handleUnlockOutcome("capsule-101", outcome, session)
+
+        assertTrue(fakeAdapter.postedNotifications.isEmpty())
+        assertEquals(AttemptState.ABSENT, attemptStore.getAttemptState("recipient-uid-1", "capsule-101"))
+    }
+
+    @Test
+    fun `repeated check on ATTEMPTED state does not post again`() {
+        sessionTracker.startSession("recipient-uid-1")
+        val session = sessionTracker.currentSession()
+        val outcome = UnlockVerificationOutcome(Availability.AVAILABLE, UnlockConfirmationKind.FIRST_UNLOCK_CONFIRMED)
+
+        coordinator.handleUnlockOutcome("capsule-101", outcome, session)
+        coordinator.handleUnlockOutcome("capsule-101", outcome, session)
+
+        assertEquals(1, fakeAdapter.postedNotifications.size)
+    }
+
+    @Test
+    fun `stale session snapshot discards notification attempt without state change`() {
+        sessionTracker.startSession("recipient-uid-1")
+        val session1 = sessionTracker.currentSession()
+        sessionTracker.startSession("recipient-uid-1") // Session generation 2
+
+        val outcome = UnlockVerificationOutcome(Availability.AVAILABLE, UnlockConfirmationKind.FIRST_UNLOCK_CONFIRMED)
+        coordinator.handleUnlockOutcome("capsule-101", outcome, session1)
+
+        assertTrue(fakeAdapter.postedNotifications.isEmpty())
+        assertEquals(AttemptState.ABSENT, attemptStore.getAttemptState("recipient-uid-1", "capsule-101"))
+    }
+
+    @Test
+    fun `notification adapter exception is isolated without throwing`() {
+        sessionTracker.startSession("recipient-uid-1")
+        val session = sessionTracker.currentSession()
+        fakeAdapter.throwOnNotify = true
+        val outcome = UnlockVerificationOutcome(Availability.AVAILABLE, UnlockConfirmationKind.FIRST_UNLOCK_CONFIRMED)
+
+        // Should not throw exception
+        coordinator.handleUnlockOutcome("capsule-101", outcome, session)
+    }
+}

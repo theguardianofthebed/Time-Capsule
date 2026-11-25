@@ -18,6 +18,8 @@ import com.example.timecapsule.domain.model.QualificationFailureReason
 import com.example.timecapsule.domain.model.RecipientProfile
 import com.example.timecapsule.domain.model.RecoveredPublication
 import com.example.timecapsule.domain.model.SendStatus
+import com.example.timecapsule.domain.model.UnlockConfirmationKind
+import com.example.timecapsule.domain.model.UnlockVerificationOutcome
 import com.example.timecapsule.domain.result.OperationResult
 import com.example.timecapsule.domain.session.SessionSnapshot
 
@@ -107,17 +109,18 @@ class DefaultCapsuleRepository(
         return OperationResult.Unavailable("Capsule lists query requires Issue #21 implementation.")
     }
 
-    override suspend fun verifyUnlock(capsuleId: String): OperationResult<Availability> {
-        return verifyUnlock(capsuleId, sessionTracker.currentSession())
+    override suspend fun verifyUnlockOutcome(capsuleId: String): OperationResult<UnlockVerificationOutcome> {
+        return verifyUnlockOutcome(capsuleId, sessionTracker.currentSession())
     }
 
     /**
      * Orchestrates recipient unlock verification for TIME, LOCATION, and TIME_AND_LOCATION (BOTH) capsules bound to [targetSession].
+     * Returns strongly typed [UnlockVerificationOutcome] distinguishing newly confirmed first unlocks from already unlocked capsules.
      */
-    override suspend fun verifyUnlock(
+    override suspend fun verifyUnlockOutcome(
         capsuleId: String,
         targetSession: SessionSnapshot
-    ): OperationResult<Availability> {
+    ): OperationResult<UnlockVerificationOutcome> {
         val cleanId = capsuleId.trim()
         if (cleanId.isBlank()) {
             return OperationResult.Invalid("Capsule ID must not be blank for unlock verification.")
@@ -135,12 +138,14 @@ class DefaultCapsuleRepository(
 
         if (reqResult !is OperationResult.Success) {
             @Suppress("UNCHECKED_CAST")
-            return reqResult as OperationResult<Availability>
+            return reqResult as OperationResult<UnlockVerificationOutcome>
         }
 
         val requirements = reqResult.data
         if (requirements.unlocked) {
-            return OperationResult.Success(Availability.AVAILABLE)
+            return OperationResult.Success(
+                UnlockVerificationOutcome(Availability.AVAILABLE, UnlockConfirmationKind.ALREADY_UNLOCKED)
+            )
         }
 
         val mode = requirements.lockMode
@@ -206,11 +211,28 @@ class DefaultCapsuleRepository(
         }
 
         // 2. Submit transaction to Firestore with location sample and monotonic timestamp supplier
-        val result = firestoreAdapter.verifyRecipientUnlock(cleanId, activeUid, sample, clockNanosSupplier)
+        val result = firestoreAdapter.verifyRecipientUnlockDetailed(cleanId, activeUid, sample, clockNanosSupplier)
         if (!sessionTracker.isSessionValid(targetSession)) {
             return OperationResult.Denied("Account session changed during unlock verification.")
         }
         return result
+    }
+
+    override suspend fun verifyUnlock(capsuleId: String): OperationResult<Availability> {
+        return verifyUnlock(capsuleId, sessionTracker.currentSession())
+    }
+
+    override suspend fun verifyUnlock(
+        capsuleId: String,
+        targetSession: SessionSnapshot
+    ): OperationResult<Availability> {
+        return when (val res = verifyUnlockOutcome(capsuleId, targetSession)) {
+            is OperationResult.Success -> OperationResult.Success(res.data.availability)
+            is OperationResult.Invalid -> OperationResult.Invalid(res.message)
+            is OperationResult.Denied -> OperationResult.Denied(res.message)
+            is OperationResult.Unavailable -> OperationResult.Unavailable(res.message)
+            is OperationResult.OutcomeUnknown -> OperationResult.OutcomeUnknown(res.capsuleId, res.message)
+        }
     }
 
     override suspend fun readContent(capsuleId: String): OperationResult<ProtectedCapsuleContent> {

@@ -499,6 +499,76 @@ Implement one shared foreground recovery path (`ForegroundRecoveryCoordinator`) 
 - **What I can explain:** Pending student review and personal confirmation by User J.
 - **Feedback and next step:** Teammate PR review by User G and manual testing on device/emulator before human merge into `main`.
 
+## 2026-11-25-issue19-local-notifications — Attempt account-safe local notifications after confirmed first unlock
+
+- **Owner / scope / period:** User J (Junwon), explicitly confirmed as implementation owner for Issue #19. Period: November 25, 2026. MVP Scope.
+- **Environment/model:** Android Studio Agent Mode (Gemini 3.8 Flash).
+- **GitHub:** [Issue #19](https://github.com/theguardianofthebed/Time-Capsule/issues/19); task branch `feature/19-local-notifications`.
+- **References:** FR-10, NFR-02; ARC-06, ARC-07; DD-09, DD-24; AC-08; T-26, T-32.
+
+### Goal
+
+Implement account-safe local notifications for confirmed first unlocks without turning `Availability.AVAILABLE` into false alerts. Introduce `UnlockVerificationOutcome` (`FIRST_UNLOCK_CONFIRMED`, `ALREADY_UNLOCKED`, `RECONCILED_AVAILABLE`). Implement `NotificationAttemptStore` persisting markers (`ABSENT`, `PENDING_PERMISSION`, `ATTEMPTED`) in a backup-excluded JSON file. Implement `UnlockNotificationCoordinator` enforcing session validity, decision table logic, and error isolation. Implement `NotificationAdapter` & `DefaultNotificationAdapter` using Android NotificationChannel and immutable PendingIntent with Uri payload. Declare `POST_NOTIFICATIONS` in `AndroidManifest.xml` and integrate runtime permission request launcher in S-08 Account Settings fragment. Implement `NotificationEntryValidator` for untrusted tap intent re-validation.
+
+### Requests and prompts
+
+| # | Request summary | Actual prompt (key part) | Why it worked (or didn't) |
+|---|-----------------|--------------------------|---------------------------|
+| 1 | Execute Issue #19 implementation & update w3 log | "Issue #19 Implementation and Engineering Handoff... update w3 log of user J as user J is in charge of this session after implementation" | Detailed handoff document specifying architecture, decision table, deduplication, PendingIntent safety, test requirements, and log update. |
+
+### What the agent changed and verified
+
+- **Unlock Outcome Provenance (`UnlockVerificationOutcome.kt`, `FirestoreAdapter.kt`, `CapsuleRepository.kt`):**
+  - Introduced `UnlockConfirmationKind` (`FIRST_UNLOCK_CONFIRMED`, `ALREADY_UNLOCKED`, `RECONCILED_AVAILABLE`) and `UnlockVerificationOutcome`.
+  - Updated `FirestoreAdapter` and `DefaultFirestoreAdapter` to return `verifyRecipientUnlockDetailed` with exact confirmation provenance.
+  - Updated `CapsuleRepository` and `DefaultCapsuleRepository` to expose `verifyUnlockOutcome(capsuleId, targetSession)`.
+- **Persistent Notification Attempt Store (`NotificationAttemptStore.kt`):**
+  - Implemented `NotificationAttemptStore` storing opaque keys `(accountUid, capsuleId)` with states `ABSENT`, `PENDING_PERMISSION`, `ATTEMPTED`.
+  - Implemented thread-safe `atomicallyClaimAttempt` ensuring at most one claim per candidate.
+  - Excludes all private message body, photo, email, location, or credential data.
+  - Durably persists entries in backup-excluded `notification-attempts.json` file.
+- **Session-Safe Notification Coordinator (`UnlockNotificationCoordinator.kt`):**
+  - Implemented `UnlockNotificationCoordinator` consuming `verifyUnlockOutcome` results.
+  - Enforces decision table:
+    - `FIRST_UNLOCK_CONFIRMED` + allowed -> claims attempt and posts notification.
+    - `FIRST_UNLOCK_CONFIRMED` + denied -> records `PENDING_PERMISSION` candidate.
+    - `ALREADY_UNLOCKED` / `RECONCILED_AVAILABLE` + `PENDING_PERMISSION` candidate + allowed -> posts notification once.
+    - `ALREADY_UNLOCKED` + `ABSENT` -> suppresses historical notification.
+  - Validates `SessionSnapshot` identity before claiming attempt and posting.
+  - Isolates notification/storage exceptions so unlock results are never corrupted or reversed.
+- **System Notification Adapter & Channel (`NotificationAdapter.kt`, `DefaultNotificationAdapter.kt`):**
+  - Implemented `DefaultNotificationAdapter` creating channel `capsule_unlock_channel`.
+  - Posts generic alert ("A capsule is ready.") without disclosing private message or photo data.
+  - Sets lockscreen visibility to `NotificationCompat.VISIBILITY_PRIVATE`.
+  - Builds explicit `PendingIntent` targeting `MainActivity` with `ACTION_NOTIFICATION_TAP`, `FLAG_IMMUTABLE`, and unique `data` URI (`timecapsule://notification/$accountUid/$capsuleId`) to prevent PendingIntent overwriting across capsules.
+- **Untrusted Entry Intent Re-validation (`NotificationEntryValidator.kt` & `MainActivity.kt`):**
+  - Implemented `NotificationEntryValidator` revalidating incoming tap intents against active session UID and authoritative repository `verifyUnlockOutcome` check.
+  - Handled cold start (`onCreate`) and `onNewIntent` in `MainActivity`.
+- **Runtime Permissions & Manifest (`AndroidManifest.xml`, `S08AccountSettingsFragment.kt`):**
+  - Declared `POST_NOTIFICATIONS` permission in `AndroidManifest.xml`.
+  - Added runtime permission request launcher (`ActivityResultContracts.RequestPermission`) in `S08AccountSettingsFragment` for API 33+ (Android 13 Tiramisu).
+- **Automated Verification Suite:**
+  - Written `NotificationAttemptStoreTest.kt` (8 unit tests).
+  - Written `UnlockNotificationCoordinatorTest.kt` (7 unit tests).
+  - Written `NotificationEntryValidatorTest.kt` (5 unit tests).
+  - Total 305 JVM unit tests passed (`:app:testDebugUnitTest`).
+  - Clean debug APK assemble passed (`:app:assembleDebug`).
+  - Clean Android lint passed (`:app:lintDebug`).
+
+### Checks and results
+
+- `./gradlew :app:testDebugUnitTest`: PASS (305 JVM unit tests passed across project, 0 failed)
+- `./gradlew :app:assembleDebug :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors)
+- `py tools/check_readiness.py --issue 19 --evidence docs/agent-tools/readiness-evidence-issue19.json`: PASS (`PREFLIGHT_RECORD_VALID`)
+- `git status`: PASS (clean on `feature/19-local-notifications`)
+
+### My review and understanding
+
+- **What I reviewed:** Pending student review and personal confirmation by User J.
+- **What I can explain:** Pending student review and personal confirmation by User J.
+- **Feedback and next step:** Teammate PR review by User G and manual testing on device/emulator before human merge into `main`.
+
+
 
 
 

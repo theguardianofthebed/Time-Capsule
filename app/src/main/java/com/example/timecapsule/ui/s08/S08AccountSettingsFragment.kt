@@ -7,12 +7,14 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.core.widget.doOnTextChanged
@@ -40,6 +42,19 @@ class S08AccountSettingsFragment : Fragment() {
 
     var onSignOutSuccessListener: (() -> Unit)? = null
     var onCreateCapsuleListener: (() -> Unit)? = null
+
+    private val requestNotificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        checkAndroidPermissionsStatus()
+        if (!isGranted) {
+            Toast.makeText(
+                context,
+                "You can still open eligible capsules in the app.",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -165,7 +180,13 @@ class S08AccountSettingsFragment : Fragment() {
         }
 
         binding.btnOpenNotificationSettings.setOnClickListener {
-            openSystemAppSettings()
+            val ctx = context ?: return@setOnClickListener
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                requestNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            } else {
+                openSystemAppSettings()
+            }
         }
 
         // Navigate to S-04 Content Draft

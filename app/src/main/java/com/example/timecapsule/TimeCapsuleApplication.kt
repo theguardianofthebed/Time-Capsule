@@ -16,6 +16,9 @@ import com.example.timecapsule.data.media.AndroidOriginalImageProbe
 import com.example.timecapsule.data.media.OriginalPhotoStore
 import com.example.timecapsule.data.media.OriginalPhotoUploads
 import com.example.timecapsule.data.media.PhotoDraftJournal
+import com.example.timecapsule.data.notification.DefaultNotificationAdapter
+import com.example.timecapsule.data.notification.NotificationAttemptStore
+import com.example.timecapsule.data.notification.UnlockNotificationCoordinator
 import com.example.timecapsule.data.publication.CapsulePublicationCoordinator
 import com.example.timecapsule.data.publication.FrozenOperationJournal
 import com.example.timecapsule.data.publication.OriginalPublicationMedia
@@ -112,6 +115,14 @@ class TimeCapsuleApplication : Application() {
             override suspend fun clearAccountData(uid: String) {}
         }
 
+        val notificationAdapter = DefaultNotificationAdapter(context)
+        val notificationAttemptStore = NotificationAttemptStore(File(noBackupDir, "notification-attempts.json"))
+        val unlockNotificationCoordinator = UnlockNotificationCoordinator(
+            notificationAdapter = notificationAdapter,
+            attemptStore = notificationAttemptStore,
+            sessionTracker = sessionTracker
+        )
+
         val publication = firestoreAdapter.firestoreInstance()?.let { firestore ->
             CapsulePublicationCoordinator(
                 journal = FrozenOperationJournal(File(noBackupDir, "capsule-operations")),
@@ -134,7 +145,8 @@ class TimeCapsuleApplication : Application() {
 
         val recoveryCoordinator = ForegroundRecoveryCoordinator(
             repository = repository,
-            sessionTracker = sessionTracker
+            sessionTracker = sessionTracker,
+            unlockNotificationCoordinator = unlockNotificationCoordinator
         )
 
         return AppDependencyContainer(
@@ -147,7 +159,10 @@ class TimeCapsuleApplication : Application() {
             repository = repository,
             accountSessionManager = accountSessionManager,
             photoUploads = photoUploads,
-            recoveryCoordinator = recoveryCoordinator
+            recoveryCoordinator = recoveryCoordinator,
+            notificationAdapter = notificationAdapter,
+            notificationAttemptStore = notificationAttemptStore,
+            unlockNotificationCoordinator = unlockNotificationCoordinator
         )
     }
 

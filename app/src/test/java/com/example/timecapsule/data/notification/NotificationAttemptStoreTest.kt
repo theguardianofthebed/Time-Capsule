@@ -1,0 +1,95 @@
+package com.example.timecapsule.data.notification
+
+import java.io.File
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Test
+
+/**
+ * Unit tests for [NotificationAttemptStore] verifying persistent state transitions,
+ * account isolation, atomic claiming, and store reconstruction survival.
+ */
+class NotificationAttemptStoreTest {
+
+    private lateinit var tempFile: File
+    private lateinit var store: NotificationAttemptStore
+
+    @Before
+    fun setUp() {
+        tempFile = File.createTempFile("notification_attempts_test", ".json")
+        store = NotificationAttemptStore(tempFile)
+    }
+
+    @After
+    fun tearDown() {
+        if (tempFile.exists()) {
+            tempFile.delete()
+        }
+    }
+
+    @Test
+    fun `getAttemptState returns ABSENT initially`() {
+        val state = store.getAttemptState("user-1", "capsule-101")
+        assertEquals(AttemptState.ABSENT, state)
+    }
+
+    @Test
+    fun `recordPendingPermission stores PENDING_PERMISSION state`() {
+        store.recordPendingPermission("user-1", "capsule-101")
+        val state = store.getAttemptState("user-1", "capsule-101")
+        assertEquals(AttemptState.PENDING_PERMISSION, state)
+    }
+
+    @Test
+    fun `atomicallyClaimAttempt claims ABSENT candidate and returns true`() {
+        val claimed = store.atomicallyClaimAttempt("user-1", "capsule-101")
+        assertTrue(claimed)
+        assertEquals(AttemptState.ATTEMPTED, store.getAttemptState("user-1", "capsule-101"))
+    }
+
+    @Test
+    fun `atomicallyClaimAttempt claims PENDING_PERMISSION candidate and returns true`() {
+        store.recordPendingPermission("user-1", "capsule-101")
+        val claimed = store.atomicallyClaimAttempt("user-1", "capsule-101")
+        assertTrue(claimed)
+        assertEquals(AttemptState.ATTEMPTED, store.getAttemptState("user-1", "capsule-101"))
+    }
+
+    @Test
+    fun `atomicallyClaimAttempt rejects duplicate claim when already ATTEMPTED`() {
+        assertTrue(store.atomicallyClaimAttempt("user-1", "capsule-101"))
+        assertFalse(store.atomicallyClaimAttempt("user-1", "capsule-101"))
+    }
+
+    @Test
+    fun `persistent markers survive store reconstruction`() {
+        store.recordPendingPermission("user-1", "capsule-101")
+        assertTrue(store.atomicallyClaimAttempt("user-1", "capsule-102"))
+
+        // Reconstruct store instance from same underlying file
+        val reloadedStore = NotificationAttemptStore(tempFile)
+        assertEquals(AttemptState.PENDING_PERMISSION, reloadedStore.getAttemptState("user-1", "capsule-101"))
+        assertEquals(AttemptState.ATTEMPTED, reloadedStore.getAttemptState("user-1", "capsule-102"))
+    }
+
+    @Test
+    fun `clearAccount removes markers for target account only`() {
+        store.atomicallyClaimAttempt("user-1", "capsule-101")
+        store.atomicallyClaimAttempt("user-2", "capsule-101")
+
+        store.clearAccount("user-1")
+
+        assertEquals(AttemptState.ABSENT, store.getAttemptState("user-1", "capsule-101"))
+        assertEquals(AttemptState.ATTEMPTED, store.getAttemptState("user-2", "capsule-101"))
+    }
+
+    @Test
+    fun `blank identifiers return ABSENT and return false on claim`() {
+        assertEquals(AttemptState.ABSENT, store.getAttemptState("", "capsule-101"))
+        assertFalse(store.atomicallyClaimAttempt(" ", "capsule-101"))
+        assertFalse(store.atomicallyClaimAttempt("user-1", " "))
+    }
+}

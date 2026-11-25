@@ -7,6 +7,8 @@ import com.example.timecapsule.domain.model.ProtectedCapsuleContent
 import com.example.timecapsule.domain.model.RecipientProfile
 import com.example.timecapsule.domain.model.RecoveredPublication
 import com.example.timecapsule.domain.model.SendStatus
+import com.example.timecapsule.domain.model.UnlockConfirmationKind
+import com.example.timecapsule.domain.model.UnlockVerificationOutcome
 import com.example.timecapsule.domain.result.OperationResult
 import com.example.timecapsule.domain.session.SessionSnapshot
 
@@ -68,8 +70,27 @@ interface CapsuleRepository {
     /** Retrieves participant-scoped Sent and Received capsule lists for active user [uid]. */
     suspend fun lists(uid: String): OperationResult<CapsuleListsSnapshot>
 
+    /** Requests server-authoritative unlock verification for [capsuleId] with detailed outcome. */
+    suspend fun verifyUnlockOutcome(capsuleId: String): OperationResult<UnlockVerificationOutcome> =
+        verifyUnlockOutcome(capsuleId, session())
+
+    /** Requests server-authoritative unlock verification for [capsuleId] bound to [targetSession] with detailed outcome. */
+    suspend fun verifyUnlockOutcome(capsuleId: String, targetSession: SessionSnapshot): OperationResult<UnlockVerificationOutcome> {
+        if (session() != targetSession) return OperationResult.Denied("Account session changed.")
+        return when (val res = verifyUnlock(capsuleId, targetSession)) {
+            is OperationResult.Success -> OperationResult.Success(
+                UnlockVerificationOutcome(res.data, UnlockConfirmationKind.FIRST_UNLOCK_CONFIRMED)
+            )
+            is OperationResult.Invalid -> OperationResult.Invalid(res.message)
+            is OperationResult.Denied -> OperationResult.Denied(res.message)
+            is OperationResult.Unavailable -> OperationResult.Unavailable(res.message)
+            is OperationResult.OutcomeUnknown -> OperationResult.OutcomeUnknown(res.capsuleId, res.message)
+        }
+    }
+
     /** Requests server-authoritative unlock verification for [capsuleId]. */
-    suspend fun verifyUnlock(capsuleId: String): OperationResult<Availability>
+    suspend fun verifyUnlock(capsuleId: String): OperationResult<Availability> =
+        verifyUnlock(capsuleId, session())
 
     /** Requests server-authoritative unlock verification for [capsuleId] bound to [targetSession]. */
     suspend fun verifyUnlock(capsuleId: String, targetSession: SessionSnapshot): OperationResult<Availability> =

@@ -1,33 +1,15 @@
 package com.example.timecapsule
 
+import android.content.Intent
 import android.os.Bundle
-import com.example.timecapsule.data.adapter.FirestoreCapsulePublication
-import com.example.timecapsule.data.publication.CapsulePublicationCoordinator
-import com.example.timecapsule.data.publication.FrozenOperationJournal
-import com.example.timecapsule.data.publication.OriginalPublicationMedia
-import com.example.timecapsule.data.adapter.DefaultStorageAdapter
-import com.example.timecapsule.data.media.OriginalPhotoStore
-import com.example.timecapsule.data.media.OriginalPhotoUploads
-import com.example.timecapsule.data.media.AndroidOriginalImageProbe
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.storage.FirebaseStorage
-import java.io.File
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
-import com.example.timecapsule.config.FirebaseConfig
-import com.example.timecapsule.data.AccountSessionManager
-import com.example.timecapsule.data.DefaultCapsuleRepository
-import com.example.timecapsule.data.adapter.DefaultAuthAdapter
-import com.example.timecapsule.data.adapter.DefaultFirestoreAdapter
-import com.example.timecapsule.data.adapter.DefaultLocationAdapter
-import com.example.timecapsule.data.adapter.LocalRetentionAdapter
-import com.example.timecapsule.data.adapter.LocationAdapter
+import androidx.lifecycle.lifecycleScope
 import com.example.timecapsule.data.di.AppDependencyContainer
-import com.example.timecapsule.data.recovery.ForegroundRecoveryCoordinator
-import com.example.timecapsule.data.session.DefaultSessionTracker
+import com.example.timecapsule.data.notification.NotificationEntryResult
+import com.example.timecapsule.data.notification.NotificationEntryValidator
 import com.example.timecapsule.databinding.ActivityMainBinding
 import com.example.timecapsule.ui.s01.S01SignInFragment
 import com.example.timecapsule.ui.s02.S02RegisterFragment
@@ -35,6 +17,7 @@ import com.example.timecapsule.ui.s04.S04ContentDraftFragment
 import com.example.timecapsule.ui.s05.S05RecipientLockFragment
 import com.example.timecapsule.ui.s06.S06ConfirmSendFragment
 import com.example.timecapsule.ui.s08.S08AccountSettingsFragment
+import kotlinx.coroutines.launch
 
 /**
  * Main activity for the TimeCapsule application using native Views and ViewBinding.
@@ -91,6 +74,37 @@ class MainActivity : AppCompatActivity() {
                 navigateToSignIn()
             } else {
                 navigateToContentDraft()
+            }
+        }
+
+        handleNotificationIntent(intent)
+    }
+
+    /** Processes incoming singleTop notification entry intent. */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleNotificationIntent(intent)
+    }
+
+    /**
+     * Inspects and authoritatively revalidates notification entry [intent] against current active session.
+     */
+    private fun handleNotificationIntent(intent: Intent?) {
+        if (intent == null || !::container.isInitialized) return
+        val validator = NotificationEntryValidator(container.repository, container.sessionTracker)
+        lifecycleScope.launch {
+            when (val result = validator.validateEntryIntent(intent)) {
+                is NotificationEntryResult.Valid -> {
+                    Toast.makeText(
+                        this@MainActivity,
+                        "A capsule is ready to open.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+                is NotificationEntryResult.Invalid -> {
+                    // Stale, malformed, or cross-account notification tap rejected safely without navigation
+                }
             }
         }
     }

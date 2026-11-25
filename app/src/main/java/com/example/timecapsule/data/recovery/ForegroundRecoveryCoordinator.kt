@@ -1,6 +1,7 @@
 package com.example.timecapsule.data.recovery
 
 import com.example.timecapsule.data.CapsuleRepository
+import com.example.timecapsule.data.notification.UnlockNotificationCoordinator
 import com.example.timecapsule.data.session.SessionTracker
 import com.example.timecapsule.domain.model.Availability
 import com.example.timecapsule.domain.model.RecoveredPublication
@@ -54,6 +55,7 @@ data class ForegroundRecoverySummary(
 class ForegroundRecoveryCoordinator(
     private val repository: CapsuleRepository,
     private val sessionTracker: SessionTracker,
+    private val unlockNotificationCoordinator: UnlockNotificationCoordinator? = null,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + ioDispatcher),
     private val responseTimeoutMillis: Long = 15_000L
@@ -176,9 +178,21 @@ class ForegroundRecoveryCoordinator(
                 return@startSingleFlight OperationResult.Denied("Account session changed before unlock verification started.")
             }
             val res = try {
-                withTimeoutOrNull(responseTimeoutMillis) {
-                    repository.verifyUnlock(cleanId, targetSession)
+                val outcomeResult = withTimeoutOrNull(responseTimeoutMillis) {
+                    repository.verifyUnlockOutcome(cleanId, targetSession)
                 } ?: OperationResult.Unavailable("Unlock verification timed out.")
+
+                if (outcomeResult is OperationResult.Success) {
+                    try {
+                        unlockNotificationCoordinator?.handleUnlockOutcome(cleanId, outcomeResult.data, targetSession)
+                    } catch (_: Exception) {
+                        // Isolate notification handling from unlock result
+                    }
+                    OperationResult.Success(outcomeResult.data.availability)
+                } else {
+                    @Suppress("UNCHECKED_CAST")
+                    outcomeResult as OperationResult<Availability>
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
