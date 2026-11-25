@@ -166,13 +166,38 @@ class DefaultNotificationAdapter(
         val cleanUid = accountUid.trim()
         if (cleanUid.isBlank()) return
 
-        val entries = postedAccountNotifications.remove(cleanUid) ?: return
-        val manager = NotificationManagerCompat.from(context)
-        for ((tag, id) in entries) {
-            try {
-                manager.cancel(tag, id)
+        val tagPrefix = "capsule_unlock:${Uri.encode(cleanUid)}:"
+
+        val memoryEntries = postedAccountNotifications.remove(cleanUid)
+        val managerCompat = NotificationManagerCompat.from(context)
+        if (memoryEntries != null) {
+            for ((tag, id) in memoryEntries) {
+                try {
+                    managerCompat.cancel(tag, id)
+                } catch (_: Exception) {
+                    // Ignore cancel exceptions
+                }
+            }
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+            val active = try {
+                manager?.activeNotifications
             } catch (_: Exception) {
-                // Ignore cancel exceptions during account cleanup
+                null
+            }
+            if (active != null) {
+                for (sno in active) {
+                    val tag = sno.tag
+                    if (tag != null && tag.startsWith(tagPrefix)) {
+                        try {
+                            manager?.cancel(tag, sno.id)
+                        } catch (_: Exception) {
+                            // Ignore cancel exceptions
+                        }
+                    }
+                }
             }
         }
     }

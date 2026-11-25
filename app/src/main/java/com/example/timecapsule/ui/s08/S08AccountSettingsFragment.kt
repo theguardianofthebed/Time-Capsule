@@ -1,6 +1,7 @@
 package com.example.timecapsule.ui.s08
 
 import android.Manifest
+import android.app.NotificationManager
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -22,6 +23,7 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
 import com.example.timecapsule.MainActivity
 import com.example.timecapsule.R
+import com.example.timecapsule.data.notification.DefaultNotificationAdapter
 import com.example.timecapsule.databinding.FragmentS08AccountSettingsBinding
 import com.example.timecapsule.domain.result.OperationResult
 import com.example.timecapsule.ui.ViewModelFactory
@@ -185,7 +187,7 @@ class S08AccountSettingsFragment : Fragment() {
                 ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                 requestNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             } else {
-                openSystemAppSettings()
+                openSystemNotificationSettings()
             }
         }
 
@@ -259,8 +261,21 @@ class S08AccountSettingsFragment : Fragment() {
 
         // Notification permission & system settings check across all Android versions
         val notificationsEnabled = NotificationManagerCompat.from(context).areNotificationsEnabled()
+        val postPermissionGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        } else {
+            true
+        }
 
-        if (notificationsEnabled) {
+        val channelEnabled = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+            val channel = manager?.getNotificationChannel(DefaultNotificationAdapter.CHANNEL_ID)
+            channel == null || channel.importance != NotificationManager.IMPORTANCE_NONE
+        } else {
+            true
+        }
+
+        if (notificationsEnabled && postPermissionGranted && channelEnabled) {
             binding.tvNotificationStatusBadge.text = getString(R.string.s08_badge_allowed)
             binding.tvNotificationStatusBadge.setBackgroundResource(R.drawable.bg_badge_success)
             binding.tvNotificationStatusBadge.setTextColor(ContextCompat.getColor(context, R.color.capsule_success_text))
@@ -268,6 +283,23 @@ class S08AccountSettingsFragment : Fragment() {
             binding.tvNotificationStatusBadge.text = getString(R.string.s08_badge_denied)
             binding.tvNotificationStatusBadge.setBackgroundResource(R.drawable.bg_badge_neutral)
             binding.tvNotificationStatusBadge.setTextColor(ContextCompat.getColor(context, R.color.capsule_text_muted))
+        }
+    }
+
+    /** Launches system application notification or details settings page for permission management. */
+    private fun openSystemNotificationSettings() {
+        val context = context ?: return
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                    putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                }
+                startActivity(intent)
+            } else {
+                openSystemAppSettings()
+            }
+        } catch (_: Exception) {
+            openSystemAppSettings()
         }
     }
 

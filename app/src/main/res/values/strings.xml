@@ -16,6 +16,7 @@
     <string name="notification_channel_description">Notifications when a sealed capsule becomes unlocked</string>
     <string name="notification_title">TimeCapsule</string>
     <string name="notification_body">A capsule is ready.</string>
+    <string name="s07_title_capsule_ready">A capsule is ready to open.</string>
 
     <string name="hint_email">Email address</string>
     <string name="hint_password">Password</string>

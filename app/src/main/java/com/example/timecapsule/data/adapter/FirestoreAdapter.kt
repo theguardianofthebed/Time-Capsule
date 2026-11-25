@@ -66,7 +66,7 @@ interface FirestoreAdapter {
     ): OperationResult<UnlockVerificationOutcome> {
         return when (val result = verifyRecipientUnlock(capsuleId, recipientUid, locationSample, clockNanosSupplier)) {
             is OperationResult.Success -> OperationResult.Success(
-                UnlockVerificationOutcome(result.data, UnlockConfirmationKind.FIRST_UNLOCK_CONFIRMED)
+                UnlockVerificationOutcome(result.data, UnlockConfirmationKind.ALREADY_UNLOCKED)
             )
             is OperationResult.Invalid -> OperationResult.Invalid(result.message)
             is OperationResult.Denied -> OperationResult.Denied(result.message)

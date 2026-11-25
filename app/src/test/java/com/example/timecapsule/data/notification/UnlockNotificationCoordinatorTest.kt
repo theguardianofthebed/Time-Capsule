@@ -1,11 +1,19 @@
 package com.example.timecapsule.data.notification
 
+import com.example.timecapsule.data.adapter.FirestoreAdapter
 import com.example.timecapsule.data.session.DefaultSessionTracker
 import com.example.timecapsule.domain.model.Availability
+import com.example.timecapsule.domain.model.ForegroundLocationSample
+import com.example.timecapsule.domain.model.RecipientProfile
+import com.example.timecapsule.domain.model.RecipientUnlockRequirements
 import com.example.timecapsule.domain.model.UnlockConfirmationKind
 import com.example.timecapsule.domain.model.UnlockVerificationOutcome
+import com.example.timecapsule.domain.result.OperationResult
 import com.example.timecapsule.domain.session.SessionSnapshot
 import java.io.File
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -40,9 +48,22 @@ private class FakeNotificationAdapter : NotificationAdapter {
     }
 }
 
+private class LegacyFirestoreAdapter : FirestoreAdapter {
+    override fun isAvailable(): Boolean = true
+    override fun firestoreInstance() = null
+    override suspend fun getRecipientProfile(uid: String) = OperationResult.Unavailable("Not implemented")
+    override suspend fun saveRecipientProfile(profile: RecipientProfile) = OperationResult.Unavailable("Not implemented")
+    override suspend fun verifyRecipientUnlock(
+        capsuleId: String,
+        recipientUid: String,
+        locationSample: ForegroundLocationSample?,
+        clockNanosSupplier: () -> Long
+    ): OperationResult<Availability> = OperationResult.Success(Availability.AVAILABLE)
+}
+
 /**
  * Unit tests for [UnlockNotificationCoordinator] verifying decision table behavior across
- * permission states, deduplication, session drift, and error isolation.
+ * permission states, deduplication, session drift, storage failures, and error isolation.
  */
 class UnlockNotificationCoordinatorTest {
 
@@ -131,6 +152,68 @@ class UnlockNotificationCoordinatorTest {
         coordinator.handleUnlockOutcome("capsule-101", outcome, session)
 
         assertEquals(1, fakeAdapter.postedNotifications.size)
+    }
+
+    @Test
+    fun `unwritable attempt store prevents notification posting`() {
+        val unwritableFile = File(tempFile.parentFile, "unwritable_dir/store.json")
+        val parentAsFile = File(tempFile.parentFile, "unwritable_dir")
+        parentAsFile.createNewFile()
+        parentAsFile.setWritable(false)
+
+        try {
+            val unwritableStore = NotificationAttemptStore(unwritableFile)
+            val unwritableCoordinator = UnlockNotificationCoordinator(fakeAdapter, unwritableStore, sessionTracker)
+
+            sessionTracker.startSession("recipient-uid-1")
+            val session = sessionTracker.currentSession()
+            val outcome = UnlockVerificationOutcome(Availability.AVAILABLE, UnlockConfirmationKind.FIRST_UNLOCK_CONFIRMED)
+
+            unwritableCoordinator.handleUnlockOutcome("capsule-101", outcome, session)
+
+            assertTrue("Notification adapter must NOT be called when storage claim fails", fakeAdapter.postedNotifications.isEmpty())
+        } finally {
+            parentAsFile.setWritable(true)
+            parentAsFile.delete()
+        }
+    }
+
+    @Test
+    fun `permission revoked at posting time restores pending permission state`() {
+        sessionTracker.startSession("recipient-uid-1")
+        val session = sessionTracker.currentSession()
+
+        fakeAdapter.permitted = true
+        fakeAdapter.postResultToReturn = NotificationPostResult.NOT_ATTEMPTED_PERMISSION_DENIED
+
+        val outcome = UnlockVerificationOutcome(Availability.AVAILABLE, UnlockConfirmationKind.FIRST_UNLOCK_CONFIRMED)
+        coordinator.handleUnlockOutcome("capsule-101", outcome, session)
+
+        assertEquals(AttemptState.PENDING_PERMISSION, attemptStore.getAttemptState("recipient-uid-1", "capsule-101"))
+
+        // Later when permission is restored and candidate rechecked
+        fakeAdapter.postResultToReturn = null
+        fakeAdapter.permitted = true
+        val recheckOutcome = UnlockVerificationOutcome(Availability.AVAILABLE, UnlockConfirmationKind.ALREADY_UNLOCKED)
+        coordinator.handleUnlockOutcome("capsule-101", recheckOutcome, session)
+
+        assertEquals(1, fakeAdapter.postedNotifications.size)
+        assertEquals(AttemptState.ATTEMPTED, attemptStore.getAttemptState("recipient-uid-1", "capsule-101"))
+    }
+
+    @Test
+    fun `legacy adapter default fallback yields ALREADY_UNLOCKED not FIRST_UNLOCK_CONFIRMED`() = runBlocking {
+        val legacyAdapter = LegacyFirestoreAdapter()
+        val result = legacyAdapter.verifyRecipientUnlockDetailed("capsule-101", "recipient-uid-1")
+
+        assertTrue(result is OperationResult.Success)
+        val outcome = (result as OperationResult.Success).data
+        assertEquals(Availability.AVAILABLE, outcome.availability)
+        assertEquals(
+            "Legacy fallback must return ALREADY_UNLOCKED to prevent false notification alerts",
+            UnlockConfirmationKind.ALREADY_UNLOCKED,
+            outcome.confirmationKind
+        )
     }
 
     @Test

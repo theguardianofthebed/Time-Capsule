@@ -10,12 +10,13 @@ import com.example.timecapsule.domain.session.SessionSnapshot
  * Coordinator orchestrating account-safe local notifications after confirmed recipient unlock.
  *
  * Decision Table & Security Enforcement:
- * 1. Confirmed First Unlock (Allowed): Posts local alert and atomically claims attempt on posting.
- * 2. Confirmed First Unlock (Denied/Blocked): Preserves candidate in [AttemptState.PENDING_PERMISSION].
- * 3. Already Unlocked (Pending Permission & Allowed): Attempts once for pending candidate.
- * 4. Already Unlocked (Absent): Does NOT post historical alerts for already unlocked capsules.
- * 5. Session Drift Protection: Revalidates immutable [SessionSnapshot] before attempt claim and posting.
- * 6. Exception Isolation: Notification or storage failures are caught and isolated so unlock verification
+ * 1. Durable Claim Before Post: Claims attempt in persistent store FIRST before invoking the Android notification side effect.
+ * 2. Confirmed First Unlock (Allowed): Claims attempt, then posts local alert. Restores pending state if definitively not attempted.
+ * 3. Confirmed First Unlock (Denied/Blocked): Preserves candidate in [AttemptState.PENDING_PERMISSION].
+ * 4. Already Unlocked (Pending Permission & Allowed): Claims attempt and posts once for pending candidate.
+ * 5. Already Unlocked (Absent): Does NOT post historical alerts for already unlocked capsules.
+ * 6. Session Protection: Revalidates immutable [SessionSnapshot] before attempt claim and posting.
+ * 7. Exception Isolation: Notification or storage failures are caught and isolated so unlock verification
  *    results are never corrupted.
  *
  * @param notificationAdapter Platform adapter for OS notification permissions and posting.
@@ -62,52 +63,42 @@ class UnlockNotificationCoordinator(
 
                 val currentState = attemptStore.getAttemptState(accountUid, cleanCapsuleId)
 
-                when (outcome.confirmationKind) {
-                    UnlockConfirmationKind.FIRST_UNLOCK_CONFIRMED -> {
-                        if (currentState == AttemptState.ATTEMPTED) return
-
-                        if (!notificationAdapter.areNotificationsPermitted()) {
-                            attemptStore.recordPendingPermission(accountUid, cleanCapsuleId)
-                            return
-                        }
-
-                        if (!sessionTracker.isSessionValid(targetSession) || sessionTracker.currentSession() != targetSession) {
-                            return
-                        }
-
-                        val postResult = notificationAdapter.postUnlockNotification(accountUid, cleanCapsuleId)
-                        when (postResult) {
-                            NotificationPostResult.NOT_ATTEMPTED_PERMISSION_DENIED,
-                            NotificationPostResult.NOT_ATTEMPTED_CHANNEL_BLOCKED -> {
-                                attemptStore.recordPendingPermission(accountUid, cleanCapsuleId)
-                            }
-                            NotificationPostResult.ATTEMPTED_SUCCESS,
-                            NotificationPostResult.ATTEMPTED_FAILED -> {
-                                attemptStore.atomicallyClaimAttempt(accountUid, cleanCapsuleId)
-                            }
-                        }
-                    }
+                val shouldAttempt = when (outcome.confirmationKind) {
+                    UnlockConfirmationKind.FIRST_UNLOCK_CONFIRMED -> currentState != AttemptState.ATTEMPTED
                     UnlockConfirmationKind.ALREADY_UNLOCKED,
-                    UnlockConfirmationKind.RECONCILED_AVAILABLE -> {
-                        if (currentState == AttemptState.PENDING_PERMISSION) {
-                            if (!notificationAdapter.areNotificationsPermitted()) return
+                    UnlockConfirmationKind.RECONCILED_AVAILABLE -> currentState == AttemptState.PENDING_PERMISSION
+                }
 
-                            if (!sessionTracker.isSessionValid(targetSession) || sessionTracker.currentSession() != targetSession) {
-                                return
-                            }
+                if (!shouldAttempt) return
 
-                            val postResult = notificationAdapter.postUnlockNotification(accountUid, cleanCapsuleId)
-                            when (postResult) {
-                                NotificationPostResult.NOT_ATTEMPTED_PERMISSION_DENIED,
-                                NotificationPostResult.NOT_ATTEMPTED_CHANNEL_BLOCKED -> {
-                                    // Remain PENDING_PERMISSION for retry
-                                }
-                                NotificationPostResult.ATTEMPTED_SUCCESS,
-                                NotificationPostResult.ATTEMPTED_FAILED -> {
-                                    attemptStore.atomicallyClaimAttempt(accountUid, cleanCapsuleId)
-                                }
-                            }
-                        }
+                if (!notificationAdapter.areNotificationsPermitted()) {
+                    if (outcome.confirmationKind == UnlockConfirmationKind.FIRST_UNLOCK_CONFIRMED) {
+                        attemptStore.recordPendingPermission(accountUid, cleanCapsuleId)
+                    }
+                    return
+                }
+
+                // 1. DURABLE CLAIM BEFORE POST
+                if (!attemptStore.atomicallyClaimAttempt(accountUid, cleanCapsuleId)) {
+                    return
+                }
+
+                // Revalidate session snapshot
+                if (!sessionTracker.isSessionValid(targetSession) || sessionTracker.currentSession() != targetSession) {
+                    return
+                }
+
+                // 2. ANDROID NOTIFICATION SIDE EFFECT
+                val postResult = notificationAdapter.postUnlockNotification(accountUid, cleanCapsuleId)
+                when (postResult) {
+                    NotificationPostResult.NOT_ATTEMPTED_PERMISSION_DENIED,
+                    NotificationPostResult.NOT_ATTEMPTED_CHANNEL_BLOCKED -> {
+                        // Restore pending permission marker if posting was definitively not attempted
+                        attemptStore.restorePendingPermissionIfClaimed(accountUid, cleanCapsuleId)
+                    }
+                    NotificationPostResult.ATTEMPTED_SUCCESS,
+                    NotificationPostResult.ATTEMPTED_FAILED -> {
+                        // Keep durable ATTEMPTED claim
                     }
                 }
             }

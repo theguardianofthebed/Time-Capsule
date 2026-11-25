@@ -1,7 +1,10 @@
 package com.example.timecapsule.data.notification
 
 import java.io.File
+import java.io.IOException
 import java.net.URLEncoder
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -30,12 +33,12 @@ enum class AttemptState {
  * Persistent store managing atomic notification attempt markers for account/capsule pairs.
  *
  * Security & Isolation Guarantees:
- * 1. Encoded Identity Keying: Keys entries using structured URL encoding (`uid=<uid>&capsule=<capsuleId>`)
+ * 1. Encoded Identity Keying: Keys entries using structured URL encoding (`uid:<uid>:capsule:<capsuleId>`)
  *    to prevent delimiter collision or ambiguity across UIDs and capsule IDs. Stores NO message content,
  *    photos, sender identity, user email, location, or tokens.
- * 2. Durable Atomic Persistence: Writes updates via atomic temporary-file replacement. Claims return
- *    success ONLY after disk persistence succeeds, preserving previous valid state on storage failure.
- * 3. Fail-Closed Recovery: Preserves existing state if persistent file is unreadable or corrupt.
+ * 2. Durable Atomic Persistence: Reuses [Files.move] with [StandardCopyOption.ATOMIC_MOVE] and [StandardCopyOption.REPLACE_EXISTING].
+ *    Claims return success ONLY after disk persistence succeeds, preserving previous valid state on storage failure.
+ * 3. Fail-Closed Recovery: Preserves existing state and fails claims closed if persistent file is unreadable or corrupt.
  *
  * @param storeFile Durable file location for persistent markers.
  */
@@ -87,6 +90,7 @@ class NotificationAttemptStore(
         val key = makeKey(cleanUid, cleanCapsuleId)
 
         synchronized(lock) {
+            if (persistentLoadFailed) return false
             val previousState = inMemoryState[key]
             if (previousState == AttemptState.ATTEMPTED) {
                 return false
@@ -106,7 +110,7 @@ class NotificationAttemptStore(
 
     /**
      * Atomically claims a notification attempt for [accountUid] and [capsuleId].
-     * Durable persistence must succeed before returning true. If persistence fails,
+     * Durable persistence must succeed before returning true. If persistence fails or store is unreadable,
      * preserves previous valid state and returns false.
      *
      * @return True if attempt claim was successfully persisted to durable storage; false otherwise.
@@ -118,6 +122,7 @@ class NotificationAttemptStore(
         val key = makeKey(cleanUid, cleanCapsuleId)
 
         synchronized(lock) {
+            if (persistentLoadFailed) return false
             val previousState = inMemoryState[key] ?: AttemptState.ABSENT
             if (previousState == AttemptState.ATTEMPTED) {
                 return false
@@ -131,6 +136,31 @@ class NotificationAttemptStore(
                 } else {
                     inMemoryState.remove(key)
                 }
+                return false
+            }
+            return true
+        }
+    }
+
+    /**
+     * Restores an [AttemptState.ATTEMPTED] state back to [AttemptState.PENDING_PERMISSION]
+     * if posting was definitively not attempted.
+     */
+    fun restorePendingPermissionIfClaimed(accountUid: String, capsuleId: String): Boolean {
+        val cleanUid = accountUid.trim()
+        val cleanCapsuleId = capsuleId.trim()
+        if (cleanUid.isBlank() || cleanCapsuleId.isBlank()) return false
+        val key = makeKey(cleanUid, cleanCapsuleId)
+
+        synchronized(lock) {
+            if (persistentLoadFailed) return false
+            val previousState = inMemoryState[key] ?: return false
+            if (previousState != AttemptState.ATTEMPTED) return false
+
+            inMemoryState[key] = AttemptState.PENDING_PERMISSION
+            val saved = saveToFile()
+            if (!saved) {
+                inMemoryState[key] = AttemptState.ATTEMPTED
                 return false
             }
             return true
@@ -189,29 +219,32 @@ class NotificationAttemptStore(
 
     private fun saveToFile(): Boolean {
         synchronized(lock) {
+            val parent = storeFile.parentFile ?: return false
+            if (!parent.isDirectory && !parent.mkdirs()) {
+                return false
+            }
+            val temporary = try {
+                File.createTempFile("attempt-", ".partial", parent)
+            } catch (_: IOException) {
+                return false
+            }
             return try {
-                val parent = storeFile.parentFile
-                if (parent != null && !parent.exists()) {
-                    if (!parent.mkdirs() && !parent.exists()) {
-                        return false
-                    }
+                temporary.outputStream().use { stream ->
+                    val text = inMemoryState.entries.joinToString("\n") { "${it.key}=${it.value.name}" }
+                    stream.write(text.toByteArray(Charsets.UTF_8))
+                    stream.fd.sync()
                 }
-                val text = inMemoryState.entries.joinToString("\n") { "${it.key}=${it.value.name}" }
-                val tempFile = File(storeFile.parentFile, "${storeFile.name}.tmp")
-                tempFile.writeText(text, Charsets.UTF_8)
-                if (tempFile.renameTo(storeFile)) {
-                    true
-                } else {
-                    storeFile.delete()
-                    val copied = tempFile.renameTo(storeFile)
-                    if (!copied) {
-                        tempFile.copyTo(storeFile, overwrite = true)
-                        tempFile.delete()
-                    }
-                    true
-                }
+                Files.move(
+                    temporary.toPath(),
+                    storeFile.toPath(),
+                    StandardCopyOption.ATOMIC_MOVE,
+                    StandardCopyOption.REPLACE_EXISTING
+                )
+                true
             } catch (_: Exception) {
                 false
+            } finally {
+                temporary.delete()
             }
         }
     }

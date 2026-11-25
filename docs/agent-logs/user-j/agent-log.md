@@ -567,9 +567,18 @@ Implement account-safe local notifications for confirmed first unlocks without t
 - **P1-06 Distinguish Attempts from Permission-Blocked Non-Attempts:** Introduced `NotificationPostResult` enum (`NOT_ATTEMPTED_PERMISSION_DENIED`, `NOT_ATTEMPTED_CHANNEL_BLOCKED`, `ATTEMPTED_SUCCESS`, `ATTEMPTED_FAILED`). `UnlockNotificationCoordinator` records/preserves `PENDING_PERMISSION` on non-attempts, preserving candidate retryability, and claims `ATTEMPTED` only on actual posting attempts.
 - **P2 Correctness & Maintainability:** Built Uri data payloads safely with `Uri.Builder()`, prevented duplicate notification intent processing in `MainActivity`, rechecked active session snapshot before returning valid entry result, moved strings to `res/values/strings.xml`, added KDoc, and re-threw `CancellationException`.
 
+### Second Review Corrections Applied (November 25, 2026)
+
+- **1. Durable Claim-Before-Post Ordering:** Enforced exact claim-before-post ordering in `UnlockNotificationCoordinator.kt`. `attemptStore.atomicallyClaimAttempt(uid, capsuleId)` executes FIRST using atomic journal persistence. Notification posting executes ONLY after successful claim persistence. If posting returns a definite non-attempt (`NOT_ATTEMPTED_PERMISSION_DENIED` or `NOT_ATTEMPTED_CHANNEL_BLOCKED`), `restorePendingPermissionIfClaimed` restores `PENDING_PERMISSION` marker.
+- **2. Reused Atomic Journal Persistence:** Adapted `FrozenOperationJournal`'s atomic persistence pattern (`File.createTempFile`, `stream.fd.sync()`, `Files.move(..., StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)`) in `NotificationAttemptStore.kt`. Removed destination-deleting fallback. Failed loads or corrupt records set `persistentLoadFailed` and fail claims closed without clearing memory state.
+- **3. Corrected Legacy Fallback Provenance:** Corrected `FirestoreAdapter.kt` default interface fallback `verifyRecipientUnlockDetailed` to map legacy `verifyRecipientUnlock` success to `ALREADY_UNLOCKED` (conservative non-notifying fallback), eliminating false `FIRST_UNLOCK_CONFIRMED` alerts from legacy code.
+- **4. Process Recreation Account Cancellation:** Updated `DefaultNotificationAdapter.cancelAccountNotifications` to query OS `NotificationManager.activeNotifications` on API 23+ in addition to memory tracking, cancelling matching tag prefixes (`capsule_unlock:<encodedUid>:`) across process restarts. Connected all session invalidation paths in `AccountSessionManager` (`signOut`, `signIn`, `signUpAndCreateProfile`, `restoreSessionIfAuthenticated`, `checkAndHandleStaleCallback`) to trigger account cleanup.
+- **5. Complete UI & Lifecycle Fixes:** Added duplicate intent key tracking in `MainActivity.kt` with `onSaveInstanceState` / `onCreate` state restoration. Updated `S08AccountSettingsFragment` to evaluate channel importance (`IMPORTANCE_NONE`) and route to `Settings.ACTION_APP_NOTIFICATION_SETTINGS`. Moved all user-facing strings into `res/values/strings.xml`.
+- **6. Regression Verification:** Added 3 new unit tests in `UnlockNotificationCoordinatorTest.kt` (310 total passed in `:app:testDebugUnitTest`). Clean debug APK, test APK, and Android lint (`:app:assembleDebug`, `:app:assembleDebugAndroidTest`, `:app:lintDebug`).
+
 ### Checks and results
 
-- `./gradlew :app:testDebugUnitTest`: PASS (307 JVM unit tests passed across project, 0 failed)
+- `./gradlew :app:testDebugUnitTest`: PASS (310 JVM unit tests passed across project, 0 failed)
 - `./gradlew :app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest`: PASS (`BUILD SUCCESSFUL`, 0 lint errors)
 - `py tools/check_readiness.py --issue 19 --evidence docs/agent-tools/readiness-evidence-issue19.json`: PASS (`PREFLIGHT_RECORD_VALID`)
 - `git status`: PASS (clean on `feature/19-local-notifications`)
