@@ -344,12 +344,66 @@ No manual code fix was required. The agent corrected a missing constructor param
 - **Feedback and next step:** Push final review corrections to `feature/17-current-conditions`, obtain teammate code review from User G, and perform human manual UI walkthrough before human merge into `main`.
 
 
+## Feature or task: Issue #18 Recheck unlock through the supported foreground recovery path
 
+- **Task and purpose:** Implementation of Issue #18 (Recheck unlock through the supported foreground recovery path), delivering a shared foreground recovery coordinator that coalesces send recovery and recipient unlock checks across app-open, foreground resume, and Retry actions, with User J as acting implementation owner and User G as reviewer.
+- **Session date(s):** November 24, 2026.
+- **Issue and PR:** [Issue #18](https://github.com/theguardianofthebed/Time-Capsule/issues/18), task branch `feature/18-foreground-recovery`.
+- **Requirement/design references:** FR-09, NFR-05; ARC-05, ARC-07; DD-08; AC-07; T-24, T-25, T-32.
+- **Agent environment:** Android Studio Agent Mode.
+- **Model used:** Gemini 3.8 Flash.
 
+### Goal
 
+Implement one shared foreground recovery path (`ForegroundRecoveryCoordinator`) triggered by app-open, return to foreground (`onResume`), and explicit UI Retry actions. Coalesce overlapping publication recovery for `(uid, sessionGeneration)` and recipient unlock checks for `(uid, sessionGeneration, capsuleId)`. Call only existing authoritative repository methods (`recoverPublications()`, `reconcile()`, `verifyUnlock()`), remove completed flights to ensure retries acquire fresh server and location evidence, validate session tracker to discard stale callbacks on account switch or session generation change, and integrate with `MainActivity`, `AppDependencyContainer`, `ViewModelFactory`, and `CapsuleDraftViewModel`.
 
+### Requests and prompts
 
+| # | Request summary | Actual prompt (key part) | Why it worked (or didn't) |
+|---|-----------------|--------------------------|---------------------------|
+| 1 | Execute Issue #18 implementation & update logs | "Implement GitHub Issue #18, 'Recheck unlock through the supported foreground recovery path,' on theguardianofthebed/Time-Capsule... Acting student: User J... Also update w3 log of User J as well after implementation." | Complete prompt specification detailing readiness preflight, foreground recovery coordinator rules, session generation coalescing, UI integration, test suite requirements, handoff, and log updates. |
 
+### What the agent changed and verified
 
+- **Foreground Recovery Coordinator (`ForegroundRecoveryCoordinator.kt`):**
+  - Created `ForegroundRecoveryCoordinator` to coordinate and coalesce foreground recovery across app-open, return to foreground (`onResume`), and explicit UI Retry actions.
+  - Coalesces overlapping publication recovery for `(uid, sessionGeneration)`.
+  - Coalesces overlapping recipient unlock checks for `(uid, sessionGeneration, capsuleId)`.
+  - Coalesces overlapping send outcome reconciliation for `(uid, sessionGeneration, capsuleId)`.
+  - Removes completed flight entries upon completion (including failures) so subsequent retries acquire fresh server and location evidence.
+  - Revalidates session tracker before returning results to callers and discards stale callbacks on account switch or session generation changes.
+  - Exposes `checkForeground(knownCapsuleIds)` as a clean entry point for S-03 refresh and S-07 detail open to be wired in Issue #21 when those screens exist.
+  - Does not hold strong references to Activity or Fragment instances.
+- **Android Lifecycle & Container Integration:**
+  - Wired `ForegroundRecoveryCoordinator` into `AppDependencyContainer`, `MainActivity`, and `ViewModelFactory`.
+  - `MainActivity.onResume()` triggers `triggerForegroundRecovery()` when user is authenticated.
+  - Post-login checks in `MainActivity` (S-01 sign-in success and S-02 register success) trigger `triggerForegroundRecovery()`.
+  - `CapsuleDraftViewModel.syncSessionState()` receives latest container repository and recovery coordinator on Fragment `onResume()` / Activity recreation, preventing stale container or session generation references on device rotation.
+- **Automated Verification Suite:**
+  - Written `ForegroundRecoveryCoordinatorTest.kt` (13 JVM unit tests passed covering app-open/resume/detail/Retry same path, two simultaneous same-ID coalescing, different UID or new session generation isolation, waiter cancellation, failed/offline result fresh retry, zero known IDs, time-only before/after deadline, combined location invalid/permission denied/previous visit not latched, confirmed unlock idempotent non-relock, saved uncertain send reconciliation without implicit republication, and activity/fragment recreation state preservation).
+  - Total 273 JVM unit tests passed (`:app:testDebugUnitTest`).
+  - Clean debug APK build passed (`:app:assembleDebug`).
+  - Clean Android lint passed (`:app:lintDebug`).
 
+### Review Corrections Applied (November 25, 2026)
 
+- **P1-01 Single-Flight Registration Safety:** Implemented `startSingleFlight` using a short registration `Mutex`, lazy `Deferred` creation, and identity-safe map removal (`map.remove(key, started)`). Guarantees exactly one underlying operation for overlapping identical keys, immediate completion safety, map eviction upon completion/failure, fresh subsequent retries, and isolation between waiters.
+- **P1-02 Session Drift Protection:** Bound every operation and aggregate `checkForeground` request to an immutable `SessionSnapshot`. Updated `ForegroundRecoveryCoordinator`, `CapsuleRepository`, `DefaultCapsuleRepository`, and `CapsulePublicationCoordinator` (`recoverPublications`, `reconcile`, `publish`, `retry`, `abandonForNewDraft`) to accept and validate `targetSession` across dispatcher transitions, journal reads, and network calls.
+- **P1-03 Application Dependency Container Lifetime:** Created `TimeCapsuleApplication` holding a process-wide `AppDependencyContainer`. `MainActivity.onCreate()` retrieves `(application as TimeCapsuleApplication).container`, ensuring `SessionTracker`, `AccountSessionManager`, `DefaultCapsuleRepository`, and `ForegroundRecoveryCoordinator` are 100% identical instances across Activity recreation/rotation. Added `ForegroundRecoveryLifecycleTest` in AndroidTest using `ActivityScenario.recreate()`.
+- **P1-04 Bounded Shared Flight Lifetime & Retry Recovery:** Wrapped underlying repository calls with `withTimeoutOrNull(responseTimeoutMillis)` (15,000 ms). Stalled calls complete cleanly with `OperationResult.Unavailable` and are evicted from the single-flight map, enabling immediate fresh Retries.
+- **P1-05 Firebase Initialization Order:** Updated `TimeCapsuleApplication` to run `FirebaseConfig.setupDebugEmulatorConnection` before creating operational adapters or accessing Firebase SDK singletons. Leaves `container == null` and displays fail-closed error UI if Firebase initialization fails.
+- **Automated Verification Suite:** 284 JVM unit tests passed (`:app:testDebugUnitTest`), 42 Firebase security rules tests passed (`npm test`), clean debug APK build passed (`:app:assembleDebug`), clean AndroidTest APK build passed (`:app:assembleDebugAndroidTest`), clean Android lint passed (`:app:lintDebug`).
+
+### Checks and results
+
+- `./gradlew :app:testDebugUnitTest`: PASS (284 JVM unit tests passed across project, 0 failed)
+- `npm test`: PASS (42 security rules tests passed, 0 failed)
+- `./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors)
+- `py tools/check_readiness.py --issue 18 --evidence docs/agent-tools/readiness-evidence-issue18.json`: PASS (`PREFLIGHT_RECORD_VALID`)
+- `git status`: PASS (clean on `feature/18-foreground-recovery`)
+
+### My review and understanding
+
+- **What I reviewed:** Pending student review and personal confirmation by User J.
+- **What I can explain:** Pending student review and personal confirmation by User J.
+- **Feedback and next step:** Teammate PR review by User G and manual testing on device/emulator before human merge into `main`.

@@ -1,0 +1,158 @@
+package com.example.timecapsule
+
+import android.app.Application
+import android.content.Context
+import com.example.timecapsule.config.FirebaseConfig
+import com.example.timecapsule.data.AccountSessionManager
+import com.example.timecapsule.data.DefaultCapsuleRepository
+import com.example.timecapsule.data.adapter.DefaultAuthAdapter
+import com.example.timecapsule.data.adapter.DefaultFirestoreAdapter
+import com.example.timecapsule.data.adapter.DefaultLocationAdapter
+import com.example.timecapsule.data.adapter.DefaultStorageAdapter
+import com.example.timecapsule.data.adapter.FirestoreCapsulePublication
+import com.example.timecapsule.data.adapter.LocalRetentionAdapter
+import com.example.timecapsule.data.di.AppDependencyContainer
+import com.example.timecapsule.data.media.AndroidOriginalImageProbe
+import com.example.timecapsule.data.media.OriginalPhotoStore
+import com.example.timecapsule.data.media.OriginalPhotoUploads
+import com.example.timecapsule.data.media.PhotoDraftJournal
+import com.example.timecapsule.data.publication.CapsulePublicationCoordinator
+import com.example.timecapsule.data.publication.FrozenOperationJournal
+import com.example.timecapsule.data.publication.OriginalPublicationMedia
+import com.example.timecapsule.data.publication.PrivatePublicationDrafts
+import com.example.timecapsule.data.recovery.ForegroundRecoveryCoordinator
+import com.example.timecapsule.data.session.DefaultSessionTracker
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.storage.FirebaseStorage
+import java.io.File
+
+/**
+ * Application class for TimeCapsule holding process-wide application dependencies.
+ * Ensures a single shared [AppDependencyContainer], [DefaultSessionTracker], and [ForegroundRecoveryCoordinator]
+ * survive Activity configuration changes (device rotation) without creating duplicate singletons or session drift.
+ */
+class TimeCapsuleApplication : Application() {
+
+    @Volatile
+    var container: AppDependencyContainer? = null
+        private set
+
+    override fun onCreate() {
+        super.onCreate()
+        initializeFirebaseAndContainer()
+    }
+
+    /**
+     * Initializes Firebase configuration and creates the process-wide [AppDependencyContainer].
+     *
+     * Ordering & Safety Rules:
+     * 1. In DEBUG builds: Connects Auth, Firestore, and Storage to local emulators BEFORE instantiating Firebase SDK singletons.
+     * 2. In RELEASE builds: Verifies default FirebaseApp availability before accessing services.
+     * 3. Applies [com.example.timecapsule.data.adapter.FirestoreCachePolicy.applyMemoryOnlyCache] via [FirebaseConfig.getMemoryOnlyFirestore].
+     * 4. Returns true on success; if Firebase initialization fails, leaves [container] null and fails closed without crashing.
+     */
+    @Synchronized
+    fun initializeFirebaseAndContainer(context: Context? = null): Boolean {
+        if (container != null) {
+            return true
+        }
+
+        val targetContext = context ?: try { applicationContext } catch (_: Exception) { null }
+        if (targetContext == null) {
+            container = null
+            return false
+        }
+
+        val isDebug = BuildConfig.DEBUG
+        if (isDebug) {
+            val emulatorInitialized = FirebaseConfig.setupDebugEmulatorConnection(targetContext, true)
+            if (!emulatorInitialized) {
+                container = null
+                return false
+            }
+        } else {
+            if (!FirebaseConfig.isFirebaseAvailable(targetContext)) {
+                container = null
+                return false
+            }
+        }
+
+        return try {
+            container = createContainer(targetContext)
+            true
+        } catch (_: Exception) {
+            container = null
+            false
+        }
+    }
+
+    /** Creates the process-wide [AppDependencyContainer] with application context dependencies. */
+    private fun createContainer(context: Context): AppDependencyContainer {
+        val sessionTracker = DefaultSessionTracker()
+        val authAdapter = DefaultAuthAdapter()
+        val firestoreAdapter = DefaultFirestoreAdapter { context }
+        val accountSessionManager = AccountSessionManager(authAdapter, firestoreAdapter, sessionTracker)
+
+        val noBackupDir = context.noBackupFilesDir ?: File(context.filesDir, "no_backup")
+
+        val storageAdapter = DefaultStorageAdapter(
+            FirebaseStorage.getInstance(),
+            FirebaseFirestore.getInstance(),
+            FirebaseAuth.getInstance()
+        )
+        val photoUploads = OriginalPhotoUploads(
+            OriginalPhotoStore(File(noBackupDir, "original-photos"), AndroidOriginalImageProbe()),
+            File(noBackupDir, "frozen-photos"),
+            storageAdapter,
+            sessionTracker::currentSession
+        )
+        val locationAdapter = DefaultLocationAdapter(context)
+        val retentionAdapter = object : LocalRetentionAdapter {
+            override suspend fun clearAccountData(uid: String) {}
+        }
+
+        val publication = firestoreAdapter.firestoreInstance()?.let { firestore ->
+            CapsulePublicationCoordinator(
+                journal = FrozenOperationJournal(File(noBackupDir, "capsule-operations")),
+                backend = FirestoreCapsulePublication(firestore, FirebaseAuth.getInstance()),
+                media = OriginalPublicationMedia(photoUploads),
+                session = sessionTracker::currentSession,
+                drafts = PrivatePublicationDrafts(
+                    OriginalPhotoStore(File(noBackupDir, "original-photos"), AndroidOriginalImageProbe()),
+                    PhotoDraftJournal(File(noBackupDir, "photo-drafts"))
+                )
+            )
+        }
+        val repository = DefaultCapsuleRepository(
+            sessionTracker = sessionTracker,
+            authAdapter = authAdapter,
+            firestoreAdapter = firestoreAdapter,
+            publicationCoordinator = publication,
+            locationAdapter = locationAdapter
+        )
+
+        val recoveryCoordinator = ForegroundRecoveryCoordinator(
+            repository = repository,
+            sessionTracker = sessionTracker
+        )
+
+        return AppDependencyContainer(
+            sessionTracker = sessionTracker,
+            authAdapter = authAdapter,
+            firestoreAdapter = firestoreAdapter,
+            storageAdapter = storageAdapter,
+            locationAdapter = locationAdapter,
+            retentionAdapter = retentionAdapter,
+            repository = repository,
+            accountSessionManager = accountSessionManager,
+            photoUploads = photoUploads,
+            recoveryCoordinator = recoveryCoordinator
+        )
+    }
+
+    /** Allows injecting a custom test container for deterministic instrumentation tests. */
+    fun setContainerForTesting(testContainer: AppDependencyContainer) {
+        container = testContainer
+    }
+}

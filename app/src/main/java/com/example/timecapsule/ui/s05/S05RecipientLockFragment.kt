@@ -82,10 +82,11 @@ class S05RecipientLockFragment : Fragment() {
         viewModel = ViewModelProvider(
             requireActivity(),
             ViewModelFactory(mainActivity.container.accountSessionManager,
-                requireContext().applicationContext, mainActivity.container.repository)
+                requireContext().applicationContext, mainActivity.container.repository,
+                mainActivity.container.recoveryCoordinator)
         )[CapsuleDraftViewModel::class.java]
 
-        viewModel.syncSessionState()
+        viewModel.syncSessionState(mainActivity.container.repository, mainActivity.container.recoveryCoordinator)
 
         parentFragmentManager.setFragmentResultListener(
             S05MapTargetDialogFragment.REQUEST_KEY_MAP_TARGET,
@@ -128,7 +129,12 @@ class S05RecipientLockFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
-        viewModel.syncSessionState()
+        val mainActivity = activity as? MainActivity
+        if (mainActivity != null) {
+            viewModel.syncSessionState(mainActivity.container.repository, mainActivity.container.recoveryCoordinator)
+        } else {
+            viewModel.syncSessionState()
+        }
     }
 
     private fun setupTextWatcher() {

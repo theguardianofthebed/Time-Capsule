@@ -54,10 +54,11 @@ class S06ConfirmSendFragment : Fragment() {
         viewModel = ViewModelProvider(
             requireActivity(),
             ViewModelFactory(mainActivity.container.accountSessionManager,
-                requireContext().applicationContext, mainActivity.container.repository)
+                requireContext().applicationContext, mainActivity.container.repository,
+                mainActivity.container.recoveryCoordinator)
         )[CapsuleDraftViewModel::class.java]
 
-        viewModel.syncSessionState()
+        viewModel.syncSessionState(mainActivity.container.repository, mainActivity.container.recoveryCoordinator)
 
         setupClickListeners()
         observeViewModelState()
@@ -66,7 +67,12 @@ class S06ConfirmSendFragment : Fragment() {
     /** Rechecks saved outcomes on foreground return without automatically publishing again. */
     override fun onResume() {
         super.onResume()
-        viewModel.syncSessionState()
+        val mainActivity = activity as? MainActivity
+        if (mainActivity != null) {
+            viewModel.syncSessionState(mainActivity.container.repository, mainActivity.container.recoveryCoordinator)
+        } else {
+            viewModel.syncSessionState()
+        }
     }
 
     /** Routes user actions through guarded ViewModel operations instead of Firebase calls. */

@@ -26,6 +26,7 @@ import com.example.timecapsule.data.adapter.DefaultLocationAdapter
 import com.example.timecapsule.data.adapter.LocalRetentionAdapter
 import com.example.timecapsule.data.adapter.LocationAdapter
 import com.example.timecapsule.data.di.AppDependencyContainer
+import com.example.timecapsule.data.recovery.ForegroundRecoveryCoordinator
 import com.example.timecapsule.data.session.DefaultSessionTracker
 import com.example.timecapsule.databinding.ActivityMainBinding
 import com.example.timecapsule.ui.s01.S01SignInFragment
@@ -53,67 +54,27 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Connect debug emulator endpoints in DEBUG builds; verify config availability in RELEASE builds
+        // Initialize Firebase configuration and retrieve application-scoped dependency container
         val isDebug = BuildConfig.DEBUG
-        if (isDebug) {
-            val emulatorInitialized = FirebaseConfig.setupDebugEmulatorConnection(applicationContext, true)
-            if (!emulatorInitialized) {
-                binding.tvInitError.text = "Firebase Initialization Failed (Fail-Closed)"
-                binding.tvInitError.visibility = View.VISIBLE
-                return
-            }
-        } else {
-            if (!FirebaseConfig.isFirebaseAvailable(applicationContext)) {
-                binding.tvInitError.text = "Firebase Configuration Missing (Fail-Closed)"
-                binding.tvInitError.visibility = View.VISIBLE
-                return
-            }
+        val app = application as TimeCapsuleApplication
+        val initSuccess = app.initializeFirebaseAndContainer()
+        val appContainer = app.container
+        if (!initSuccess || appContainer == null) {
+            binding.tvInitError.text = if (isDebug)
+                "Firebase Initialization Failed (Fail-Closed)"
+            else
+                "Firebase Configuration Missing (Fail-Closed)"
+            binding.tvInitError.visibility = View.VISIBLE
+            return
         }
 
-        // Initialize lightweight dependency container and AccountSessionManager
-        val sessionTracker = DefaultSessionTracker()
-        val authAdapter = DefaultAuthAdapter()
-        val firestoreAdapter = DefaultFirestoreAdapter { applicationContext }
-        val accountSessionManager = AccountSessionManager(authAdapter, firestoreAdapter, sessionTracker)
-
-        val storageAdapter = DefaultStorageAdapter(FirebaseStorage.getInstance(),
-            FirebaseFirestore.getInstance(), FirebaseAuth.getInstance())
-        val photoUploads = OriginalPhotoUploads(
-            OriginalPhotoStore(File(noBackupFilesDir, "original-photos"), AndroidOriginalImageProbe()),
-            File(noBackupFilesDir, "frozen-photos"), storageAdapter, sessionTracker::currentSession)
-        val locationAdapter = DefaultLocationAdapter(applicationContext)
-        val retentionAdapter = object : LocalRetentionAdapter {
-            override suspend fun clearAccountData(uid: String) {}
-        }
-
-        val publication = firestoreAdapter.firestoreInstance()?.let { firestore ->
-            CapsulePublicationCoordinator(
-                FrozenOperationJournal(File(noBackupFilesDir, "capsule-operations")),
-                FirestoreCapsulePublication(firestore, FirebaseAuth.getInstance()),
-                OriginalPublicationMedia(photoUploads), sessionTracker::currentSession,
-                drafts = com.example.timecapsule.data.publication.PrivatePublicationDrafts(
-                    OriginalPhotoStore(File(noBackupFilesDir, "original-photos"),
-                        AndroidOriginalImageProbe()),
-                    com.example.timecapsule.data.media.PhotoDraftJournal(
-                        File(noBackupFilesDir, "photo-drafts"))))
-        }
-        val repository = DefaultCapsuleRepository(sessionTracker, authAdapter, firestoreAdapter,
-            publication, locationAdapter)
-
-        container = AppDependencyContainer(
-            sessionTracker = sessionTracker,
-            authAdapter = authAdapter,
-            firestoreAdapter = firestoreAdapter,
-            storageAdapter = storageAdapter,
-            locationAdapter = locationAdapter,
-            retentionAdapter = retentionAdapter,
-            repository = repository,
-            accountSessionManager = accountSessionManager,
-            photoUploads = photoUploads
-        )
+        container = appContainer
 
         // Unconditionally restore session into SessionTracker on every Activity/container creation
         val activeUid = container.accountSessionManager.restoreSessionIfAuthenticated()
+        if (!activeUid.isNullOrBlank()) {
+            container.recoveryCoordinator?.triggerForegroundRecovery()
+        }
 
         // Register Fragment attach listener to re-wire navigation callbacks on Activity recreation/rotation
         supportFragmentManager.addFragmentOnAttachListener { _, fragment ->
@@ -134,14 +95,37 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /** Rechecks saved outcomes on foreground return without automatically publishing again. */
+    override fun onResume() {
+        super.onResume()
+        if (::container.isInitialized) {
+            val activeUid = container.accountSessionManager.restoreSessionIfAuthenticated()
+            if (!activeUid.isNullOrBlank()) {
+                container.recoveryCoordinator?.triggerForegroundRecovery()
+            }
+        }
+    }
+
     private fun attachFragmentListeners(fragment: Fragment) {
         when (fragment) {
             is S01SignInFragment -> {
                 fragment.onGoToRegisterListener = { navigateToRegister() }
-                fragment.onSignInSuccessListener = { navigateToContentDraft() }
+                fragment.onSignInSuccessListener = {
+                    val uid = container.accountSessionManager.restoreSessionIfAuthenticated()
+                    if (!uid.isNullOrBlank()) {
+                        container.recoveryCoordinator?.triggerForegroundRecovery()
+                    }
+                    navigateToContentDraft()
+                }
             }
             is S02RegisterFragment -> {
-                fragment.onRegisterSuccessListener = { navigateToContentDraft() }
+                fragment.onRegisterSuccessListener = {
+                    val uid = container.accountSessionManager.restoreSessionIfAuthenticated()
+                    if (!uid.isNullOrBlank()) {
+                        container.recoveryCoordinator?.triggerForegroundRecovery()
+                    }
+                    navigateToContentDraft()
+                }
                 fragment.onGoToSignInListener = { navigateToSignIn() }
             }
             is S04ContentDraftFragment -> {

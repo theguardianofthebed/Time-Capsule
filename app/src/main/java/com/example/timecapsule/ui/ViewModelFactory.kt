@@ -5,6 +5,8 @@ import android.content.Context
 import com.example.timecapsule.data.media.AndroidPhotoInput
 import androidx.lifecycle.ViewModelProvider
 import com.example.timecapsule.data.AccountSessionManager
+import com.example.timecapsule.data.CapsuleRepository
+import com.example.timecapsule.data.recovery.ForegroundRecoveryCoordinator
 import com.example.timecapsule.ui.draft.CapsuleDraftViewModel
 import com.example.timecapsule.ui.s01.S01SignInViewModel
 import com.example.timecapsule.ui.s02.S02RegisterViewModel
@@ -16,7 +18,8 @@ import com.example.timecapsule.ui.s08.S08AccountSettingsViewModel
 class ViewModelFactory(
     private val accountSessionManager: AccountSessionManager,
     private val context: Context? = null,
-    private val repository: com.example.timecapsule.data.CapsuleRepository? = null
+    private val repository: CapsuleRepository? = null,
+    private val recoveryCoordinator: ForegroundRecoveryCoordinator? = null
 ) : ViewModelProvider.Factory {
 
     @Suppress("UNCHECKED_CAST")
@@ -33,7 +36,7 @@ class ViewModelFactory(
                 S08AccountSettingsViewModel(accountSessionManager) as T
             }
             modelClass.isAssignableFrom(CapsuleDraftViewModel::class.java) -> {
-                CapsuleDraftViewModel(accountSessionManager, repository).also { model ->
+                CapsuleDraftViewModel(accountSessionManager, repository, recoveryCoordinator).also { model ->
                     context?.let { model.configurePhotos(AndroidPhotoInput(it)) }
                 } as T
             }

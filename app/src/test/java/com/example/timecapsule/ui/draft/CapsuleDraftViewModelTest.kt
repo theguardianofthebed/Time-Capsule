@@ -30,8 +30,11 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import androidx.lifecycle.viewModelScope
+import com.example.timecapsule.domain.session.SessionSnapshot
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -405,6 +408,44 @@ class CapsuleDraftViewModelTest {
         assertEquals("America/New_York", state.creationZone)
     }
 
+    @Test
+    fun `sendCapsule_suspendedOperation_accountSwitchBeforeExecution_suppressesRepositoryCall`() = runTest {
+        val repoGate = CompletableDeferred<OperationResult<String>>()
+        var publishCallCount = 0
+
+        val customRepo = object : CapsuleRepository by DefaultCapsuleRepository(sessionTracker, mockAuthAdapter, mockFirestoreAdapter) {
+            override suspend fun publish(frozenOperation: CapsuleDraft, targetSession: SessionSnapshot): OperationResult<String> {
+                if (!sessionTracker.isSessionValid(targetSession)) return OperationResult.Denied("Account session changed.")
+                publishCallCount++
+                return repoGate.await()
+            }
+        }
+
+        val testViewModel = CapsuleDraftViewModel(accountSessionManager, customRepo).apply {
+            updateText("Message to submit")
+            updateLockMode(LockMode.TIME)
+            updateUnlockAt(Instant.now().plusSeconds(3600))
+            selectFutureMe("sender-uid")
+        }
+
+        // 1. Initiate send operation under user-1 (queued on StandardTestDispatcher)
+        testViewModel.sendCapsule()
+
+        // 2. Switch account session to user-2 before coroutine progresses to repository.publish
+        accountSessionManager.signOut()
+        mockAuthAdapter = FakeAuthAdapter(initialUid = "user-2")
+        accountSessionManager = AccountSessionManager(mockAuthAdapter, mockFirestoreAdapter, sessionTracker)
+        sessionTracker.startSession("user-2")
+
+        // 3. Release coroutines
+        runCurrent()
+        repoGate.complete(OperationResult.Success("capsule-1"))
+        runCurrent()
+
+        // 4. Assert that stale work did not invoke the repository under user-2
+        assertEquals(0, publishCallCount)
+    }
+
     /** Controlled repository keeps UI race tests separate from the coordinator's disk/network tests. */
     private inner class PublicationRepository : CapsuleRepository by
         DefaultCapsuleRepository(sessionTracker, mockAuthAdapter, mockFirestoreAdapter) {
@@ -418,20 +459,38 @@ class CapsuleDraftViewModelTest {
         var replacement: CapsuleDraft? = null
 
         /** Records submitted values and allows a delayed acknowledgment. */
-        override suspend fun publish(frozenOperation: CapsuleDraft): OperationResult<String> {
+        override suspend fun publish(frozenOperation: CapsuleDraft, targetSession: SessionSnapshot): OperationResult<String> {
+            if (!sessionTracker.isSessionValid(targetSession)) return OperationResult.Denied("Account session changed.")
             published.add(frozenOperation)
             return onPublish(frozenOperation)
         }
+        override suspend fun publish(frozenOperation: CapsuleDraft): OperationResult<String> =
+            publish(frozenOperation, sessionTracker.currentSession())
+
         /** Returns independently controlled recovery evidence. */
-        override suspend fun recoverPublications() = onRecover?.invoke() ?: recovered
+        override suspend fun recoverPublications(targetSession: SessionSnapshot): OperationResult<List<RecoveredPublication>> {
+            if (!sessionTracker.isSessionValid(targetSession)) return OperationResult.Denied("Account session changed.")
+            return onRecover?.invoke() ?: recovered
+        }
+        override suspend fun recoverPublications() =
+            recoverPublications(sessionTracker.currentSession())
+
         /** Records unchanged retry identity without creating a second UI snapshot. */
-        override suspend fun retryPublication(capsuleId: String): OperationResult<String> {
+        override suspend fun retryPublication(capsuleId: String, targetSession: SessionSnapshot): OperationResult<String> {
+            if (!sessionTracker.isSessionValid(targetSession)) return OperationResult.Denied("Account session changed.")
             retried.add(capsuleId)
             return OperationResult.OutcomeUnknown(capsuleId, "Uncertain")
         }
+        override suspend fun retryPublication(capsuleId: String): OperationResult<String> =
+            retryPublication(capsuleId, sessionTracker.currentSession())
+
         /** Returns a coordinator-approved replacement fixture. */
+        override suspend fun abandonPublication(capsuleId: String, targetSession: SessionSnapshot): OperationResult<CapsuleDraft> {
+            if (!sessionTracker.isSessionValid(targetSession)) return OperationResult.Denied("Account session changed.")
+            return replacement?.let { OperationResult.Success(it) } ?: OperationResult.Unavailable("No copy")
+        }
         override suspend fun abandonPublication(capsuleId: String): OperationResult<CapsuleDraft> =
-            replacement?.let { OperationResult.Success(it) } ?: OperationResult.Unavailable("No copy")
+            abandonPublication(capsuleId, sessionTracker.currentSession())
     }
 
     /** Creates a valid location-only draft without dependence on the wall clock. */

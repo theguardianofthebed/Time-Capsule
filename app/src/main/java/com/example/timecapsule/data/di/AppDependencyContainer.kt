@@ -8,6 +8,7 @@ import com.example.timecapsule.data.adapter.FirestoreAdapter
 import com.example.timecapsule.data.adapter.LocalRetentionAdapter
 import com.example.timecapsule.data.adapter.LocationAdapter
 import com.example.timecapsule.data.adapter.StorageAdapter
+import com.example.timecapsule.data.recovery.ForegroundRecoveryCoordinator
 import com.example.timecapsule.data.session.DefaultSessionTracker
 
 /**
@@ -22,5 +23,6 @@ class AppDependencyContainer(
     val retentionAdapter: LocalRetentionAdapter,
     val repository: CapsuleRepository,
     val accountSessionManager: AccountSessionManager,
-    val photoUploads: OriginalPhotoUploads? = null
+    val photoUploads: OriginalPhotoUploads? = null,
+    val recoveryCoordinator: ForegroundRecoveryCoordinator? = null
 )
