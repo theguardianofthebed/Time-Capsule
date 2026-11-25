@@ -70,10 +70,10 @@ class AccountSessionManager(
 
         if (result is OperationResult.Success) {
             val newUid = result.data
+            sessionTracker.startSession(newUid)
             if (!oldUid.isNullOrBlank() && oldUid != newUid) {
                 onAccountCleared?.invoke(oldUid)
             }
-            sessionTracker.startSession(newUid)
         }
         return@withLock result
     }
@@ -118,10 +118,10 @@ class AccountSessionManager(
 
         if (authResult is OperationResult.Success) {
             val uid = authResult.data
+            sessionTracker.startSession(uid)
             if (!oldUid.isNullOrBlank() && oldUid != uid) {
                 onAccountCleared?.invoke(oldUid)
             }
-            sessionTracker.startSession(uid)
             val postAuthSession = sessionTracker.currentSession()
 
             val profile = RecipientProfile(uid = uid, displayName = trimmedName)
@@ -230,7 +230,7 @@ class AccountSessionManager(
         val currentSession = sessionTracker.currentSession()
         if (currentSession.sessionGeneration != capturedSession.sessionGeneration) {
             val activeUid = authAdapter.activeUid()
-            val oldUid = capturedSession.uid
+            val oldUid = currentSession.uid ?: capturedSession.uid
             if (activeUid != null && activeUid != currentSession.uid) {
                 authAdapter.signOut()
                 if (currentSession.isAuthenticated) {

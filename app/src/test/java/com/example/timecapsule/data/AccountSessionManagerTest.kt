@@ -5,6 +5,7 @@ import com.example.timecapsule.data.adapter.FirestoreAdapter
 import com.example.timecapsule.data.session.DefaultSessionTracker
 import com.example.timecapsule.domain.model.RecipientProfile
 import com.example.timecapsule.domain.result.OperationResult
+import com.example.timecapsule.domain.session.SessionSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
@@ -281,6 +282,39 @@ class AccountSessionManagerTest {
 
         assertEquals("user-101", clearedAccountUid)
         assertFalse(sessionTracker.currentSession().isAuthenticated)
+    }
+
+    @Test
+    fun testAccountReplacementInvalidatesOldSessionBeforeOnAccountClearedCallback() = runBlocking {
+        var oldSessionValidAtCleanup: Boolean? = null
+        var clearedUid: String? = null
+        var sessionAtCleanup: SessionSnapshot? = null
+        var initialSession: SessionSnapshot? = null
+
+        val manager = AccountSessionManager(
+            fakeAuthAdapter,
+            fakeFirestoreAdapter,
+            sessionTracker,
+            onAccountCleared = { uid ->
+                clearedUid = uid
+                sessionAtCleanup = sessionTracker.currentSession()
+                initialSession?.let { oldSession ->
+                    oldSessionValidAtCleanup = sessionTracker.isSessionValid(oldSession)
+                }
+            }
+        )
+
+        fakeAuthAdapter.uid = "user-old"
+        sessionTracker.startSession("user-old")
+        initialSession = sessionTracker.currentSession()
+
+        fakeAuthAdapter.uid = "user-new"
+        val res = manager.signIn("user-new@example.com", "validPass")
+
+        assertTrue(res is OperationResult.Success)
+        assertEquals("user-old", clearedUid)
+        assertEquals("user-123", sessionAtCleanup?.uid)
+        assertFalse("Old session snapshot must be invalid when onAccountCleared runs", oldSessionValidAtCleanup == true)
     }
 
     @Test

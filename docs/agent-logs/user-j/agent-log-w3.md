@@ -491,9 +491,15 @@ Implement account-safe local notifications for confirmed first unlocks without t
 - **2. Session Invalidation Wiring:** Connected all session invalidation and account replacement paths in `AccountSessionManager.kt` (`signOut`, `signIn`, `signUpAndCreateProfile`, `restoreSessionIfAuthenticated`, `checkAndHandleStaleCallback`) to invoke `onAccountCleared`, cancelling active notifications and clearing attempt store markers. Same-session restoration (`currentUid == activeUid`) preserves in-flight work. Added `testSignOutTriggersOnAccountClearedCallback` unit test.
 - **3. UI & Lifecycle Intent Fixes:** Updated intent processing in `MainActivity.kt` so that intent key tracking only retains successful/valid authorizations, ensuring transient entry failures do not permanently block subsequent legitimate notification taps. Verified system notification settings route in `S08AccountSettingsFragment.kt` and moved remaining user-facing strings to `res/values/strings.xml`.
 
+### Minimal Final Correction Applied (November 25, 2026)
+
+- **1. Account Invalidation Ordering:** Corrected invalidation ordering in `AccountSessionManager.kt` (`signIn`, `signUpAndCreateProfile`). `sessionTracker.startSession(newUid)` is executed FIRST, and `onAccountCleared(oldUid)` is invoked immediately after. Ensures the old session snapshot is invalidated in `SessionTracker` before notification cleanup runs, blocking any in-flight old-session callbacks. Corrected `checkAndHandleStaleCallback` to clean up the UID being invalidated. Added `testAccountReplacementInvalidatesOldSessionBeforeOnAccountClearedCallback` unit test in `AccountSessionManagerTest.kt`.
+- **2. Notification Permission Settings:** Verified system notification settings routing in `S08AccountSettingsFragment.kt` via `openSystemNotificationSettings()`.
+- **3. Verification:** Executed full test suite (313 JVM unit tests passed), clean debug build, lint, and test APK build.
+
 ### Checks and results
 
-- `./gradlew :app:testDebugUnitTest`: PASS (312 JVM unit tests passed across project, 0 failed)
+- `./gradlew :app:testDebugUnitTest`: PASS (313 JVM unit tests passed across project, 0 failed)
 - `./gradlew :app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest`: PASS (`BUILD SUCCESSFUL`, 0 lint errors)
 - `py tools/check_readiness.py --issue 19 --evidence docs/agent-tools/readiness-evidence-issue19.json`: PASS (`PREFLIGHT_RECORD_VALID`)
 - `git status`: PASS (clean on `feature/19-local-notifications`)
