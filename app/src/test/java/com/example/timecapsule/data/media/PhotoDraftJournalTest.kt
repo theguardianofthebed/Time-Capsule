@@ -38,4 +38,13 @@ class PhotoDraftJournalTest {
         assertNull(journal.load("a")?.photo)
         assertEquals("message", journal.load("a")?.text)
     }
+
+    /** Clearing account data erases the saved draft record. */
+    @Test fun clearAccountDataErasesRecord() {
+        val journal = PhotoDraftJournal(temporary.newFolder())
+        journal.save("user-1", PhotoDraftRecord("capsule-1", "Title", "Text", null))
+        assertEquals("Text", journal.load("user-1")?.text)
+        journal.clearAccountData("user-1")
+        assertNull(journal.load("user-1"))
+    }
 }

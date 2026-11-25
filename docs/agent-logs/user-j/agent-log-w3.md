@@ -509,3 +509,51 @@ Implement account-safe local notifications for confirmed first unlocks without t
 - **What I reviewed:** Pending student review and personal confirmation by User J.
 - **What I can explain:** Pending student review and personal confirmation by User J.
 - **Feedback and next step:** Teammate PR review by User G and manual testing on device/emulator before human merge into `main`.
+
+## Feature or task: Issue #20 — Isolate Retained Content and Clear Protected State on Account Changes
+
+- **Task and purpose:** Implementation of Issue #20 (Retained content protection and account cleanup), delivering UID-scoped app-private retained content storage, verified markers, account transition cleanup orchestration, opaque recovery records for unresolved sends across logout, locked self-send buffer removal, backup exclusions, and comprehensive automated unit tests.
+- **Session date(s):** November 25–26, 2026.
+- **Issue and PR:** [Issue #20](https://github.com/theguardianofthebed/Time-Capsule/issues/20), task branch `feature/20-account-retention-cleanup`.
+- **Requirement/design references:** FR-01, FR-12, NFR-01; ARC-06; DD-18; AC-01, AC-13; T-02, T-29, T-44.
+- **Agent environment:** Android Studio Agent Mode.
+- **Model used:** Gemini 3.8 Flash.
+
+### Goal
+
+Implement complete account-safe content retention, verified unlock markers, process-wide account cleanup, opaque recovery records across logout/switch, locked self-send compose buffer removal, and Android backup exclusions for protected data.
+
+### Requests and prompts
+
+| # | Request summary | Actual prompt (key part) | Why it worked (or didn't) |
+|---|-----------------|--------------------------|---------------------------|
+| 1 | Implementation plan & readiness | "Implement Issue #20 with Account-Safe Retention and Cleanup... Owner: User J, Reviewer: User G" | Complete preflight readiness checks (`check_readiness.py`) and explicit implementation plan artifact creation. |
+| 2 | Implementation & verification | "Proceed with the approved implementation plan." | Executed step-by-step tasks, updated retention adapters, cleanup orchestrator, journal compaction, application wiring, and backup rules. |
+
+### What the agent changed and verified
+
+- **Component 1 — UID-Scoped Retained Content Adapter:**
+  - Implemented `DefaultLocalRetentionAdapter.kt` under `noBackupFilesDir/retained-content/<hashed-uid>/<capsule-id>/` storing `verified-marker.properties` with authoritative server unlock timestamps (`verifiedUnlockedAt`).
+  - Enforced strict read contract requiring matching UID, valid marker, and complete text/photo files.
+- **Component 2 — Account Cleanup Orchestration & Transition Order:**
+  - Implemented `AccountCleanupOrchestrator.kt` coordinating sequential multi-store purging (`retentionAdapter`, `journal`, `originalPhotoStore`, `photoDraftJournal`, `unlockNotificationCoordinator`).
+  - Updated `AccountSessionManager.kt` (`signIn`, `signUpAndCreateProfile`, `restoreSessionIfAuthenticated`, `signOut`) to invalidate former session generation and execute cleanup BEFORE activating new session generation in `SessionTracker`.
+- **Component 3 — Opaque Recovery Records & Journal Compaction:**
+  - Added `compactAccountDataToOpaque()` to `FrozenOperationJournal.kt` scrubbing text, title, and photo payload fields on logout while retaining `capsuleId`, `snapshotDigest`, `phase`, `photoAcknowledged`, and `lockMode`.
+  - Adapted `CapsulePublicationCoordinator.kt` and `FrozenCapsuleOperation.kt` (`isOpaque = true`) to support server reconciliation for opaque records without re-exposing raw content.
+- **Component 4 — Locked Self-Send Buffer Removal & Media Store Cleanup:**
+  - Verified `PrivatePublicationDrafts.kt` and `OriginalPhotoUploads.kt` purge compose buffers and local photo files upon confirmed publication.
+- **Component 5 — Application Wiring & Backup Exclusions:**
+  - Configured `TimeCapsuleApplication.kt` with `DefaultLocalRetentionAdapter`, `AccountCleanupOrchestrator`, and startup recovery (`cleanupInterruptedSessions`).
+  - Updated `backup_rules.xml` and `data_extraction_rules.xml` to exclude all protected directories from cloud auto-backup and device transfer.
+- **Checks and results:**
+  - `py tools/check_readiness.py --issue 20 --evidence docs/agent-tools/readiness-evidence-issue20.json`: PASS (`PREFLIGHT_RECORD_VALID`).
+  - `./gradlew :app:testDebugUnitTest`: PASS (323 JVM unit tests passed across project, 0 failed).
+  - `./gradlew :app:lintDebug`: PASS (0 lint errors).
+  - `./gradlew :app:assembleDebug`: PASS (`BUILD SUCCESSFUL`).
+
+### My review and understanding
+
+- **What I reviewed:** Inspected diffs across `DefaultLocalRetentionAdapter.kt`, `AccountCleanupOrchestrator.kt`, `AccountSessionManager.kt`, `FrozenOperationJournal.kt`, `CapsulePublicationCoordinator.kt`, `PrivatePublicationDrafts.kt`, `OriginalPhotoUploads.kt`, `CapsuleDraftViewModel.kt`, `TimeCapsuleApplication.kt`, `backup_rules.xml`, `data_extraction_rules.xml`, `DefaultLocalRetentionAdapterTest.kt`, `AccountCleanupOrchestratorTest.kt`, and `OpaqueRecoveryTest.kt`.
+- **What I can explain:** How `AccountCleanupOrchestrator` invalidates sessions and purges protected stores before a new session starts, how `FrozenOperationJournal` scrubs payload fields into opaque recovery records across logout, and how `DefaultLocalRetentionAdapter` enforces server-timestamped markers for offline reads.
+- **Feedback and next step:** Teammate PR review by User G and manual testing on device/emulator before human merge into `main`.

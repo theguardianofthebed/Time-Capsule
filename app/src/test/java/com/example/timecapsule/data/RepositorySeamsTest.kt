@@ -4,7 +4,9 @@ import com.example.timecapsule.data.adapter.AuthAdapter
 import com.example.timecapsule.data.adapter.FirestoreAdapter
 import com.example.timecapsule.data.adapter.LocalRetentionAdapter
 import com.example.timecapsule.data.adapter.LocationAdapter
+import com.example.timecapsule.data.adapter.RetainedContent
 import com.example.timecapsule.data.adapter.StorageAdapter
+import com.example.timecapsule.domain.model.OriginalPhotoFormat
 import com.example.timecapsule.data.di.AppDependencyContainer
 import com.example.timecapsule.data.session.DefaultSessionTracker
 import com.example.timecapsule.domain.model.Availability
@@ -137,7 +139,51 @@ class FakeLocationAdapter(
 }
 
 class FakeLocalRetentionAdapter : LocalRetentionAdapter {
-    override suspend fun clearAccountData(uid: String) {}
+    private val memoryStore = mutableMapOf<String, RetainedContent>()
+
+    override suspend fun saveRetainedContent(
+        uid: String,
+        capsuleId: String,
+        verifiedUnlockedAt: Instant,
+        text: String?,
+        photoBytes: ByteArray?,
+        photoFormat: OriginalPhotoFormat?
+    ): OperationResult<Unit> {
+        val key = "$uid:$capsuleId"
+        memoryStore[key] = RetainedContent(
+            uid = uid,
+            capsuleId = capsuleId,
+            text = text,
+            photoBytes = photoBytes,
+            photoFormat = photoFormat,
+            verifiedUnlockedAt = verifiedUnlockedAt
+        )
+        return OperationResult.Success(Unit)
+    }
+
+    override suspend fun readRetainedContent(
+        uid: String,
+        capsuleId: String
+    ): OperationResult<RetainedContent> {
+        val key = "$uid:$capsuleId"
+        val content = memoryStore[key]
+        return if (content != null && content.uid == uid) {
+            OperationResult.Success(content)
+        } else {
+            OperationResult.Denied("No retained content for $capsuleId")
+        }
+    }
+
+    override suspend fun clearAccountData(uid: String) {
+        val keysToRemove = memoryStore.keys.filter { it.startsWith("$uid:") }
+        for (k in keysToRemove) {
+            memoryStore.remove(k)
+        }
+    }
+
+    override suspend fun clearAllData() {
+        memoryStore.clear()
+    }
 }
 
 /**

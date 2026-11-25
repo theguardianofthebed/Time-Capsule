@@ -45,7 +45,8 @@ class FrozenOperationJournal(private val root: File) {
         require(!record.replacementPrepared || record.replacementDraftId != null)
         val previous = load(operation.senderUid, operation.capsuleId)
         require(previous == null ||
-            previous.operation.canonicalPayload() == operation.canonicalPayload()) {
+            previous.operation.canonicalPayload() == operation.canonicalPayload() ||
+            operation.isOpaque) {
             "This capsule ID already belongs to different frozen content."
         }
         val destination = target(operation.senderUid, operation.capsuleId)
@@ -75,6 +76,9 @@ class FrozenOperationJournal(private val root: File) {
             require(fields.required("version") == "1") { "Unsupported operation format." }
             require(fields.required("senderUid") == uid)
             require(fields.required("capsuleId") == capsuleId)
+            val isOpaque = fields.getProperty("isOpaque", "false").toBooleanStrict()
+            val recipientUid = if (isOpaque) fields.getProperty("recipientUid", "") else fields.required("recipientUid")
+            val text = if (isOpaque) fields.getProperty("text", "") else fields.required("text")
             val photo = fields.getProperty("photoFile")?.let { name ->
                 RetainedOriginalPhoto(uid, capsuleId, name,
                     OriginalPhotoFormat.valueOf(fields.required("photoFormat")),
@@ -85,10 +89,11 @@ class FrozenOperationJournal(private val root: File) {
                     fields.required("radius").toDouble())
             }
             val operation = FrozenCapsuleOperation(
-                capsuleId, uid, fields.required("recipientUid"), fields.getProperty("title"),
-                fields.required("text"), CapsuleLock(LockMode.valueOf(fields.required("lockMode")),
+                capsuleId, uid, recipientUid, fields.getProperty("title"),
+                text, CapsuleLock(LockMode.valueOf(fields.required("lockMode")),
                     fields.getProperty("unlockAt")?.let(Instant::parse), location),
-                fields.required("creationZone"), photo, fields.required("snapshotDigest")
+                fields.required("creationZone"), photo, fields.required("snapshotDigest"),
+                isOpaque = isOpaque
             )
             operation.verify()
             FrozenOperationRecord(operation, PublicationPhase.valueOf(fields.required("phase")),
@@ -126,10 +131,57 @@ class FrozenOperationJournal(private val root: File) {
         }
     }
 
+    /**
+     * Compacts unresolved operations for [uid] into opaque recovery records by scrubbing
+     * sensitive content payload fields (text, title, photo reference).
+     * Deletes resolved (SENT) or ABANDONED records from local disk.
+     */
+    fun compactAccountDataToOpaque(uid: String): List<String> = synchronized(access) {
+        if (uid.isBlank()) return@synchronized emptyList()
+        val records = try {
+            list(uid)
+        } catch (_: Exception) {
+            return@synchronized emptyList()
+        }
+        val opaqueIds = mutableListOf<String>()
+        for (record in records) {
+            val operation = record.operation
+            val destination = target(uid, operation.capsuleId)
+            if (record.phase == PublicationPhase.SENT || record.phase == PublicationPhase.ABANDONED) {
+                if (destination.exists()) {
+                    destination.delete()
+                }
+            } else {
+                val opaqueOperation = operation.copy(
+                    text = "",
+                    title = null,
+                    photo = null,
+                    isOpaque = true
+                )
+                val opaqueRecord = record.copy(operation = opaqueOperation)
+                save(opaqueRecord)
+                opaqueIds.add(operation.capsuleId)
+            }
+        }
+        opaqueIds
+    }
+
+    /** Deletes all operation records for [uid] during full account erasure. */
+    fun clearAccountData(uid: String): Unit = synchronized(access) {
+        if (uid.isBlank()) return@synchronized
+        val dir = accountDirectory(uid)
+        if (dir.exists()) {
+            dir.deleteRecursively()
+        }
+    }
+
     /** Encodes explicit versioned fields; provider URIs and server-generated timestamps are excluded. */
     private fun encode(record: FrozenOperationRecord): Properties = Properties().apply {
         val operation = record.operation
         setProperty("version", "1")
+        if (operation.isOpaque) {
+            setProperty("isOpaque", "true")
+        }
         setProperty("capsuleId", operation.capsuleId)
         setProperty("senderUid", operation.senderUid)
         setProperty("recipientUid", operation.recipientUid)

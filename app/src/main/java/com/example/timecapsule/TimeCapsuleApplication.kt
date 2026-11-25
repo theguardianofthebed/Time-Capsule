@@ -7,10 +7,13 @@ import com.example.timecapsule.data.AccountSessionManager
 import com.example.timecapsule.data.DefaultCapsuleRepository
 import com.example.timecapsule.data.adapter.DefaultAuthAdapter
 import com.example.timecapsule.data.adapter.DefaultFirestoreAdapter
+import com.example.timecapsule.data.adapter.DefaultLocalRetentionAdapter
 import com.example.timecapsule.data.adapter.DefaultLocationAdapter
 import com.example.timecapsule.data.adapter.DefaultStorageAdapter
 import com.example.timecapsule.data.adapter.FirestoreCapsulePublication
 import com.example.timecapsule.data.adapter.LocalRetentionAdapter
+import com.example.timecapsule.data.cleanup.AccountCleanupOrchestrator
+import kotlinx.coroutines.runBlocking
 import com.example.timecapsule.data.di.AppDependencyContainer
 import com.example.timecapsule.data.media.AndroidOriginalImageProbe
 import com.example.timecapsule.data.media.OriginalPhotoStore
@@ -106,12 +109,28 @@ class TimeCapsuleApplication : Application() {
             sessionTracker = sessionTracker
         )
 
+        val retentionAdapter = DefaultLocalRetentionAdapter(File(noBackupDir, "retained-content"))
+        val operationJournal = FrozenOperationJournal(File(noBackupDir, "capsule-operations"))
+        val originalPhotoStore = OriginalPhotoStore(File(noBackupDir, "original-photos"), AndroidOriginalImageProbe())
+        val photoDraftJournal = PhotoDraftJournal(File(noBackupDir, "photo-drafts"))
+
+        val accountCleanupOrchestrator = AccountCleanupOrchestrator(
+            retentionAdapter = retentionAdapter,
+            journal = operationJournal,
+            originalPhotoStore = originalPhotoStore,
+            photoDraftJournal = photoDraftJournal,
+            unlockNotificationCoordinator = unlockNotificationCoordinator,
+            sessionTracker = sessionTracker
+        )
+
         val accountSessionManager = AccountSessionManager(
             authAdapter = authAdapter,
             firestoreAdapter = firestoreAdapter,
             sessionTracker = sessionTracker,
             onAccountCleared = { uid ->
-                unlockNotificationCoordinator.invalidateAccount(uid)
+                runBlocking {
+                    accountCleanupOrchestrator.cleanupAccount(uid)
+                }
             }
         )
 
@@ -121,27 +140,28 @@ class TimeCapsuleApplication : Application() {
             FirebaseAuth.getInstance()
         )
         val photoUploads = OriginalPhotoUploads(
-            OriginalPhotoStore(File(noBackupDir, "original-photos"), AndroidOriginalImageProbe()),
+            originalPhotoStore,
             File(noBackupDir, "frozen-photos"),
             storageAdapter,
             sessionTracker::currentSession
         )
         val locationAdapter = DefaultLocationAdapter(context)
-        val retentionAdapter = object : LocalRetentionAdapter {
-            override suspend fun clearAccountData(uid: String) {}
-        }
 
         val publication = firestoreAdapter.firestoreInstance()?.let { firestore ->
             CapsulePublicationCoordinator(
-                journal = FrozenOperationJournal(File(noBackupDir, "capsule-operations")),
+                journal = operationJournal,
                 backend = FirestoreCapsulePublication(firestore, FirebaseAuth.getInstance()),
                 media = OriginalPublicationMedia(photoUploads),
                 session = sessionTracker::currentSession,
                 drafts = PrivatePublicationDrafts(
-                    OriginalPhotoStore(File(noBackupDir, "original-photos"), AndroidOriginalImageProbe()),
-                    PhotoDraftJournal(File(noBackupDir, "photo-drafts"))
+                    originalPhotoStore,
+                    photoDraftJournal
                 )
             )
+        }
+
+        runBlocking {
+            accountCleanupOrchestrator.cleanupInterruptedSessions(authAdapter.activeUid())
         }
         val repository = DefaultCapsuleRepository(
             sessionTracker = sessionTracker,

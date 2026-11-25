@@ -313,8 +313,10 @@ class AccountSessionManagerTest {
 
         assertTrue(res is OperationResult.Success)
         assertEquals("user-old", clearedUid)
-        assertEquals("user-123", sessionAtCleanup?.uid)
+        // Under DD-18, during onAccountCleared the old session is cleared and unauthenticated BEFORE the new session starts
+        assertFalse("Active session must be unauthenticated while old account cleanup runs", sessionAtCleanup?.isAuthenticated == true)
         assertFalse("Old session snapshot must be invalid when onAccountCleared runs", oldSessionValidAtCleanup == true)
+        assertEquals("user-123", sessionTracker.currentSession().uid)
     }
 
     @Test

@@ -34,6 +34,7 @@ class AccountSessionManager(
     /**
      * Restores active user session from [authAdapter] on application restart or container recreation.
      * Changes generation only on an identity transition; foreground checks preserve in-flight work.
+     * Enforces session invalidation and account cleanup BEFORE activating a new session.
      */
     fun restoreSessionIfAuthenticated(): String? {
         val activeUid = authAdapter.activeUid()
@@ -41,10 +42,11 @@ class AccountSessionManager(
 
         if (!activeUid.isNullOrBlank()) {
             if (currentUid != activeUid) {
-                sessionTracker.startSession(activeUid)
+                sessionTracker.clearSession()
                 if (!currentUid.isNullOrBlank()) {
                     onAccountCleared?.invoke(currentUid)
                 }
+                sessionTracker.startSession(activeUid)
             }
             return activeUid
         } else {
@@ -70,10 +72,11 @@ class AccountSessionManager(
 
         if (result is OperationResult.Success) {
             val newUid = result.data
-            sessionTracker.startSession(newUid)
             if (!oldUid.isNullOrBlank() && oldUid != newUid) {
+                sessionTracker.clearSession()
                 onAccountCleared?.invoke(oldUid)
             }
+            sessionTracker.startSession(newUid)
         }
         return@withLock result
     }
@@ -118,10 +121,11 @@ class AccountSessionManager(
 
         if (authResult is OperationResult.Success) {
             val uid = authResult.data
-            sessionTracker.startSession(uid)
             if (!oldUid.isNullOrBlank() && oldUid != uid) {
+                sessionTracker.clearSession()
                 onAccountCleared?.invoke(oldUid)
             }
+            sessionTracker.startSession(uid)
             val postAuthSession = sessionTracker.currentSession()
 
             val profile = RecipientProfile(uid = uid, displayName = trimmedName)

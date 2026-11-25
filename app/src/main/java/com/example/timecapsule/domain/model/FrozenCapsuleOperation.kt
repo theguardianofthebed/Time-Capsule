@@ -25,7 +25,8 @@ data class FrozenCapsuleOperation(
     val lock: CapsuleLock,
     val creationZone: String,
     val photo: RetainedOriginalPhoto?,
-    val snapshotDigest: String
+    val snapshotDigest: String,
+    val isOpaque: Boolean = false
 ) {
     /** Returns the one approved remote path, without exposing a public download URL. */
     val photoObjectPath: String?
@@ -35,6 +36,10 @@ data class FrozenCapsuleOperation(
     fun verify() {
         require(capsuleId.matches(Regex("[A-Za-z0-9_-]+"))) { "Invalid capsule ID." }
         require(senderUid.isNotBlank() && !senderUid.contains('/')) { "Invalid sender UID." }
+        if (isOpaque) {
+            require(snapshotDigest.isNotBlank()) { "Snapshot digest is required for opaque recovery." }
+            return
+        }
         require(recipientUid.isNotBlank()) { "Recipient is required." }
         require(text.isNotBlank() || photo != null) { "Message or photo is required." }
         ZoneId.of(creationZone)

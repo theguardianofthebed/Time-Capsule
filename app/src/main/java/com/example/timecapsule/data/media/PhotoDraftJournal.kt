@@ -122,6 +122,19 @@ open class PhotoDraftJournal(private val root: File) {
         current
     }
 
+    /** Clears compose buffer journal for [uid] during account cleanup. */
+    open fun clearAccountData(uid: String): Unit = synchronized(access) {
+        if (uid.isBlank()) return@synchronized
+        val file = target(uid)
+        if (file.exists()) {
+            try {
+                Files.deleteIfExists(file.toPath())
+            } catch (_: Exception) {
+                file.delete()
+            }
+        }
+    }
+
     /** Hashes the UID to isolate journals without putting account identifiers in file names. */
     private fun target(uid: String): File {
         val key = MessageDigest.getInstance("SHA-256").digest(uid.toByteArray(Charsets.UTF_8))

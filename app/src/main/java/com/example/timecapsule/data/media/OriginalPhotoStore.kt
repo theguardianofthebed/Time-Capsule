@@ -127,6 +127,15 @@ class OriginalPhotoStore(
     private fun digestName(value: String): String =
         hex(MessageDigest.getInstance("SHA-256").digest(value.toByteArray(Charsets.UTF_8)))
 
+    /** Clears all stored private photos for [ownerUid] during account cleanup. */
+    fun clearAccountData(ownerUid: String) {
+        require(ownerUid.isNotBlank())
+        val dir = File(root, digestName(ownerUid))
+        if (dir.exists()) {
+            dir.deleteRecursively()
+        }
+    }
+
     /** Encodes a digest as its stable lowercase hexadecimal fingerprint. */
     private fun hex(bytes: ByteArray): String = bytes.joinToString("") { "%02x".format(it) }
 }
