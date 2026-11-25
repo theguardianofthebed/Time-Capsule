@@ -40,7 +40,33 @@ data class ProtectedCapsuleContent(
     val capsuleId: String,
     val text: String?,
     val photoObjectPath: String?,
-)
+    val photoBytes: ByteArray? = null,
+    val photoFormat: OriginalPhotoFormat? = null
+) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+        other as ProtectedCapsuleContent
+        if (capsuleId != other.capsuleId) return false
+        if (text != other.text) return false
+        if (photoObjectPath != other.photoObjectPath) return false
+        if (photoBytes != null) {
+            if (other.photoBytes == null) return false
+            if (!photoBytes.contentEquals(other.photoBytes)) return false
+        } else if (other.photoBytes != null) return false
+        if (photoFormat != other.photoFormat) return false
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = capsuleId.hashCode()
+        result = 31 * result + (text?.hashCode() ?: 0)
+        result = 31 * result + (photoObjectPath?.hashCode() ?: 0)
+        result = 31 * result + (photoBytes?.contentHashCode() ?: 0)
+        result = 31 * result + (photoFormat?.hashCode() ?: 0)
+        return result
+    }
+}
 
 /**
  * Stable capsuleId must be reused across retries, never regenerated for the same send.

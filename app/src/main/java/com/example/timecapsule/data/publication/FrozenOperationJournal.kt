@@ -92,6 +92,8 @@ class FrozenOperationJournal(private val root: File) {
                     isOpaque = true
                 )
                 operation.verify()
+                val hadPhotoProp = fields.getProperty("hadPhoto")
+                val hadPhoto = hadPhotoProp?.toBooleanStrictOrNull() ?: true
                 return@synchronized FrozenOperationRecord(
                     operation = operation,
                     phase = PublicationPhase.valueOf(fields.required("phase")),
@@ -100,7 +102,7 @@ class FrozenOperationJournal(private val root: File) {
                     terminalRejectionConfirmed = fields.getProperty("terminalRejectionConfirmed", "false").toBooleanStrict(),
                     replacementDraftId = fields.getProperty("replacementDraftId"),
                     replacementPrepared = fields.getProperty("replacementPrepared", "false").toBooleanStrict(),
-                    hadPhoto = fields.getProperty("hadPhoto", "false").toBooleanStrict()
+                    hadPhoto = hadPhoto
                 )
             }
             val recipientUid = fields.required("recipientUid")

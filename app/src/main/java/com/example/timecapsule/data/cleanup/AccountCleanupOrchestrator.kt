@@ -66,7 +66,27 @@ class AccountCleanupOrchestrator(
      */
     suspend fun cleanupAccount(uid: String): OperationResult<Unit> = withContext(Dispatchers.IO) {
         val cleanUid = uid.trim()
-        if (cleanUid.isBlank()) return@withContext OperationResult.Success(Unit)
+        if (cleanUid.isBlank()) {
+            if (hasPendingCleanup()) {
+                val markerFile = pendingMarkerFile()
+                if (markerFile != null && markerFile.exists()) {
+                    val pendingUid = try {
+                        val properties = Properties().apply {
+                            markerFile.inputStream().use { load(it) }
+                        }
+                        properties.getProperty("pendingUid") ?: ""
+                    } catch (_: Exception) { "" }
+                    if (pendingUid.isNotBlank()) {
+                        return@withContext cleanupMutex.withLock {
+                            performCleanupInternal(pendingUid)
+                        }
+                    } else {
+                        return@withContext OperationResult.Unavailable("Malformed pending cleanup marker found.")
+                    }
+                }
+            }
+            return@withContext OperationResult.Success(Unit)
+        }
 
         cleanupMutex.withLock {
             performCleanupInternal(cleanUid)

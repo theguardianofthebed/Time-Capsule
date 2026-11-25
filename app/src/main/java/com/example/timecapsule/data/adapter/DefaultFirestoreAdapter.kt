@@ -7,6 +7,8 @@ import com.example.timecapsule.domain.model.Availability
 import com.example.timecapsule.domain.model.ForegroundLocationSample
 import com.example.timecapsule.domain.model.LocationTarget
 import com.example.timecapsule.domain.model.LockMode
+import com.example.timecapsule.domain.model.OriginalPhotoFormat
+import com.example.timecapsule.domain.model.OriginalPhotoLimits
 import com.example.timecapsule.domain.model.ProtectedCapsuleContent
 import com.example.timecapsule.domain.model.QualificationFailureReason
 import com.example.timecapsule.domain.model.RecipientProfile
@@ -40,7 +42,8 @@ private sealed interface TransactionUnlockResult {
  * Enforces memory-only cache configuration before returning the Firestore SDK instance.
  */
 class DefaultFirestoreAdapter(
-    private val contextSupplier: () -> Context? = { null }
+    private val contextSupplier: () -> Context? = { null },
+    private val storageAdapter: StorageAdapter? = null
 ) : FirestoreAdapter {
 
     override fun isAvailable(): Boolean {
@@ -169,6 +172,9 @@ class DefaultFirestoreAdapter(
                 null
             }
 
+            val unlockedAtTimestamp = doc.getTimestamp("unlockedAt")
+            val unlockedAtInstant = unlockedAtTimestamp?.toInstant()
+
             OperationResult.Success(
                 RecipientUnlockRequirements(
                     capsuleId = cleanCapsuleId,
@@ -176,7 +182,8 @@ class DefaultFirestoreAdapter(
                     unlocked = unlocked,
                     lockMode = lockMode,
                     unlockAt = unlockAtInstant,
-                    locationTarget = locationTarget
+                    locationTarget = locationTarget,
+                    unlockedAt = unlockedAtInstant
                 )
             )
         } catch (e: Exception) {
@@ -357,12 +364,30 @@ class DefaultFirestoreAdapter(
 
             val text = doc.getString("text")
             val photoObjectPath = doc.getString("photoObjectPath")
+            var photoBytes: ByteArray? = null
+            var photoFormat: OriginalPhotoFormat? = null
+
+            if (!photoObjectPath.isNullOrBlank()) {
+                val storage = storageAdapter
+                if (storage != null) {
+                    val downloadRes = storage.downloadPhotoBytes(
+                        photoObjectPath,
+                        OriginalPhotoLimits.MAX_BYTES
+                    )
+                    if (downloadRes is OperationResult.Success) {
+                        photoBytes = downloadRes.data
+                        photoFormat = OriginalPhotoFormat.JPEG
+                    }
+                }
+            }
 
             OperationResult.Success(
                 ProtectedCapsuleContent(
                     capsuleId = cleanCapsuleId,
                     text = text,
-                    photoObjectPath = photoObjectPath
+                    photoObjectPath = photoObjectPath,
+                    photoBytes = photoBytes,
+                    photoFormat = photoFormat
                 )
             )
         } catch (e: Exception) {

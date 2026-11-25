@@ -58,7 +58,7 @@ class FirebaseEmulatorIntegrationTest {
         auth = FirebaseAuth.getInstance()
         firestore = FirebaseFirestore.getInstance()
         authAdapter = DefaultAuthAdapter { auth }
-        firestoreAdapter = DefaultFirestoreAdapter { InstrumentationRegistry.getInstrumentation().targetContext }
+        firestoreAdapter = DefaultFirestoreAdapter(contextSupplier = { InstrumentationRegistry.getInstrumentation().targetContext })
     }
 
     private fun createAndSignInUser(email: String, name: String): String = runBlocking {

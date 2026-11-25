@@ -81,12 +81,13 @@ class AccountSessionManager(
 
             if (result is OperationResult.Success) {
                 val newUid = result.data
-                if (!oldUid.isNullOrBlank() && oldUid != newUid) {
+                if (!oldUid.isNullOrBlank() || isCleanupPending()) {
                     sessionTracker.clearSession()
-                    val cleanupRes = onAccountCleared?.invoke(oldUid)
-                    if (cleanupRes is OperationResult.Unavailable) {
+                    val targetUid = if (!oldUid.isNullOrBlank()) oldUid else ""
+                    val cleanupRes = onAccountCleared?.invoke(targetUid)
+                    if (cleanupRes is OperationResult.Unavailable || isCleanupPending()) {
                         authAdapter.signOut()
-                        return@withLock OperationResult.Unavailable("Account cleanup failed. Cannot start new session.")
+                        return@withLock OperationResult.Unavailable("Account cleanup failed or pending. Cannot start new session.")
                     }
                 }
                 sessionTracker.startSession(newUid)
@@ -138,12 +139,13 @@ class AccountSessionManager(
 
             if (authResult is OperationResult.Success) {
                 val uid = authResult.data
-                if (!oldUid.isNullOrBlank() && oldUid != uid) {
+                if (!oldUid.isNullOrBlank() || isCleanupPending()) {
                     sessionTracker.clearSession()
-                    val cleanupRes = onAccountCleared?.invoke(oldUid)
-                    if (cleanupRes is OperationResult.Unavailable) {
+                    val targetUid = if (!oldUid.isNullOrBlank()) oldUid else ""
+                    val cleanupRes = onAccountCleared?.invoke(targetUid)
+                    if (cleanupRes is OperationResult.Unavailable || isCleanupPending()) {
                         authAdapter.signOut()
-                        return@withLock OperationResult.Unavailable("Account cleanup failed. Cannot start new session.")
+                        return@withLock OperationResult.Unavailable("Account cleanup failed or pending. Cannot start new session.")
                     }
                 }
                 sessionTracker.startSession(uid)

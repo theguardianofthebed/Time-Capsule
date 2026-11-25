@@ -294,12 +294,14 @@ class DefaultCapsuleRepository(
             val offlineRes = retention.readRetainedContent(activeUid, cleanId)
             if (offlineRes is OperationResult.Success) {
                 val retained = offlineRes.data
-                val photoPath = if (retained.photoBytes != null) "capsuleMedia/${retained.uid}/$cleanId/original" else null
+                val photoPath = if (retained.photoBytes != null) "retainedMedia/${retained.uid}/$cleanId" else null
                 return OperationResult.Success(
                     ProtectedCapsuleContent(
                         capsuleId = cleanId,
                         text = retained.text,
-                        photoObjectPath = photoPath
+                        photoObjectPath = photoPath,
+                        photoBytes = retained.photoBytes,
+                        photoFormat = retained.photoFormat
                     )
                 )
             }
@@ -310,20 +312,29 @@ class DefaultCapsuleRepository(
         if (!sessionTracker.isSessionValid(targetSession)) {
             return OperationResult.Denied("Account session changed during content read.")
         }
-        val serverUnlockedAt = if (reqResult is OperationResult.Success) {
-            reqResult.data.unlockAt
-        } else null
-
-        val unlockRes = verifyUnlockOutcome(cleanId, targetSession)
-        if (!sessionTracker.isSessionValid(targetSession)) {
-            return OperationResult.Denied("Account session changed during content read.")
+        if (reqResult !is OperationResult.Success) {
+            return OperationResult.Denied("Unlock requirements unreadable.")
         }
 
-        if (unlockRes !is OperationResult.Success || unlockRes.data.availability != Availability.AVAILABLE) {
-            return OperationResult.Denied("Unlock authorization required before reading content.")
+        val requirements = reqResult.data
+        var serverUnlockedAt = requirements.unlockedAt
+
+        if (!requirements.unlocked) {
+            val unlockRes = verifyUnlockOutcome(cleanId, targetSession)
+            if (!sessionTracker.isSessionValid(targetSession)) {
+                return OperationResult.Denied("Account session changed during content read.")
+            }
+            if (unlockRes !is OperationResult.Success || unlockRes.data.availability != Availability.AVAILABLE) {
+                return OperationResult.Denied("Unlock authorization required before reading content.")
+            }
+            val rechecked = firestoreAdapter.readRecipientUnlockRequirements(cleanId, activeUid)
+            if (rechecked is OperationResult.Success) {
+                serverUnlockedAt = rechecked.data.unlockedAt
+            }
         }
 
-        val verifiedTime = serverUnlockedAt ?: Instant.now()
+        val verifiedTime = serverUnlockedAt
+            ?: return OperationResult.Denied("Server unlock timestamp is missing.")
 
         val contentRes = firestoreAdapter.readProtectedContent(cleanId, activeUid)
         if (!sessionTracker.isSessionValid(targetSession)) {
@@ -337,8 +348,8 @@ class DefaultCapsuleRepository(
                 capsuleId = cleanId,
                 verifiedUnlockedAt = verifiedTime,
                 text = content.text,
-                photoBytes = null,
-                photoFormat = null
+                photoBytes = content.photoBytes,
+                photoFormat = content.photoFormat
             )
             return OperationResult.Success(content)
         }

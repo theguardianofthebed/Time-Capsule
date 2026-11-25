@@ -28,6 +28,7 @@ import com.example.timecapsule.data.publication.OriginalPublicationMedia
 import com.example.timecapsule.data.publication.PrivatePublicationDrafts
 import com.example.timecapsule.data.recovery.ForegroundRecoveryCoordinator
 import com.example.timecapsule.data.session.DefaultSessionTracker
+import com.example.timecapsule.domain.result.OperationResult
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
@@ -97,7 +98,12 @@ class TimeCapsuleApplication : Application() {
     private fun createContainer(context: Context): AppDependencyContainer {
         val sessionTracker = DefaultSessionTracker()
         val authAdapter = DefaultAuthAdapter()
-        val firestoreAdapter = DefaultFirestoreAdapter { context }
+        val storageAdapter = DefaultStorageAdapter(
+            FirebaseStorage.getInstance(),
+            FirebaseFirestore.getInstance(),
+            FirebaseAuth.getInstance()
+        )
+        val firestoreAdapter = DefaultFirestoreAdapter({ context }, storageAdapter)
 
         val noBackupDir = context.noBackupFilesDir ?: File(context.filesDir, "no_backup")
 
@@ -109,7 +115,10 @@ class TimeCapsuleApplication : Application() {
             sessionTracker = sessionTracker
         )
 
-        val retentionAdapter = DefaultLocalRetentionAdapter(File(noBackupDir, "retained-content"))
+        val retentionAdapter = DefaultLocalRetentionAdapter(
+            root = File(noBackupDir, "retained-content"),
+            session = sessionTracker::currentSession
+        )
         val operationJournal = FrozenOperationJournal(File(noBackupDir, "capsule-operations"))
         val originalPhotoStore = OriginalPhotoStore(File(noBackupDir, "original-photos"), AndroidOriginalImageProbe())
         val photoDraftJournal = PhotoDraftJournal(File(noBackupDir, "photo-drafts"))
@@ -135,11 +144,6 @@ class TimeCapsuleApplication : Application() {
             isCleanupPending = accountCleanupOrchestrator::hasPendingCleanup
         )
 
-        val storageAdapter = DefaultStorageAdapter(
-            FirebaseStorage.getInstance(),
-            FirebaseFirestore.getInstance(),
-            FirebaseAuth.getInstance()
-        )
         val photoUploads = OriginalPhotoUploads(
             originalPhotoStore,
             File(noBackupDir, "frozen-photos"),
@@ -156,20 +160,26 @@ class TimeCapsuleApplication : Application() {
                 session = sessionTracker::currentSession,
                 drafts = PrivatePublicationDrafts(
                     originalPhotoStore,
-                    photoDraftJournal
+                    photoDraftJournal,
+                    sessionTracker::currentSession
                 )
             )
         }
 
-        runBlocking {
+        val startupCleanupResult = runBlocking {
             accountCleanupOrchestrator.cleanupInterruptedSessions(authAdapter.activeUid())
         }
+        if (startupCleanupResult !is OperationResult.Success) {
+            sessionTracker.clearSession()
+        }
+
         val repository = DefaultCapsuleRepository(
             sessionTracker = sessionTracker,
             authAdapter = authAdapter,
             firestoreAdapter = firestoreAdapter,
             publicationCoordinator = publication,
-            locationAdapter = locationAdapter
+            locationAdapter = locationAdapter,
+            retentionAdapter = retentionAdapter
         )
 
         val recoveryCoordinator = ForegroundRecoveryCoordinator(
