@@ -13,6 +13,7 @@ import kotlinx.coroutines.sync.withLock
 import java.io.IOException
 import com.example.timecapsule.data.AccountSessionManager
 import com.example.timecapsule.data.CapsuleRepository
+import com.example.timecapsule.data.recovery.ForegroundRecoveryCoordinator
 import com.example.timecapsule.domain.model.PublicationPhase
 import com.example.timecapsule.domain.model.RecoveredPublication
 import com.example.timecapsule.domain.model.CapsuleDraft
@@ -91,7 +92,8 @@ data class CapsuleDraftUiState(
  */
 class CapsuleDraftViewModel(
     private val accountSessionManager: AccountSessionManager,
-    private val repository: CapsuleRepository? = null
+    private var repository: CapsuleRepository? = null,
+    private var recoveryCoordinator: ForegroundRecoveryCoordinator? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CapsuleDraftUiState())
@@ -352,7 +354,13 @@ class CapsuleDraftViewModel(
      * Re-evaluates session state to prevent cross-session leakage.
      * Clears draft or recipient confirmation if user session has changed.
      */
-    fun syncSessionState() {
+    fun syncSessionState(
+        latestRepository: CapsuleRepository? = repository,
+        latestRecoveryCoordinator: ForegroundRecoveryCoordinator? = recoveryCoordinator
+    ) {
+        if (latestRepository != null) this.repository = latestRepository
+        if (latestRecoveryCoordinator != null) this.recoveryCoordinator = latestRecoveryCoordinator
+
         val activeUid = accountSessionManager.restoreSessionIfAuthenticated()
         val currentSession = accountSessionManager.currentSession()
         if (activeUid != _uiState.value.activeSessionUid || currentSession != observedSession) {
@@ -883,8 +891,9 @@ class CapsuleDraftViewModel(
 
     /** Bounds read-only recovery waiting without canceling the independently owned send task. */
     private suspend fun recoverSaved(backend: CapsuleRepository) =
-        withTimeoutOrNull(15_000L) { backend.recoverPublications() }
-            ?: OperationResult.Unavailable("Saved send recovery timed out.")
+        withTimeoutOrNull(15_000L) {
+            recoveryCoordinator?.recoverPublications() ?: backend.recoverPublications()
+        } ?: OperationResult.Unavailable("Saved send recovery timed out.")
 
     /** Resets draft state with a new unique capsule ID. */
     fun discardDraft() {

@@ -1,0 +1,106 @@
+{
+  "issue": 18,
+  "checked_at": "2026-11-24T20:35:00Z",
+  "selected_base": "ed1460ad6435969e43f4faef7e85327342536710",
+  "owner": "User J",
+  "owner_confirmation": "Confirmed User J as acting student owner for Issue #18 implementation",
+  "branch": "feature/18-foreground-recovery",
+  "period": "24 November 2026",
+  "scope": "MVP",
+  "reviewer": "User G",
+  "components": [
+    "app/src/main/java/com/example/timecapsule/data/publication/CapsulePublicationCoordinator.kt",
+    "app/src/main/java/com/example/timecapsule/data/CapsuleRepository.kt",
+    "app/src/main/java/com/example/timecapsule/data/DefaultCapsuleRepository.kt",
+    "app/src/main/java/com/example/timecapsule/ui/draft/CapsuleDraftViewModel.kt",
+    "app/src/main/java/com/example/timecapsule/MainActivity.kt"
+  ],
+  "deliverable": "Recheck unlock through the supported foreground recovery path",
+  "contract_approval": "FR-09, NFR-05, AC-07, DD-08, T-24, T-25, T-32",
+  "blocking_failures": [],
+  "inventory": {
+    "issues": "Issue #18 Recheck unlock through the supported foreground recovery path",
+    "branches": "feature/18-foreground-recovery based on main at ed1460ad6435969e43f4faef7e85327342536710",
+    "prs": "PR #43 merged for Issue 17",
+    "handoffs": "issue-18-foreground-recovery-20261124.md",
+    "compatible": true,
+    "compatibility_evidence": "No active competing claims or overlapping file modifications for foreground recovery coordinator",
+    "active_claims": [
+      {
+        "issue": 18,
+        "owner": "User J",
+        "branch": "feature/18-foreground-recovery",
+        "overlaps": false,
+        "agreement": "Explicit prompt allocating Issue #18 implementation to User J"
+      }
+    ]
+  },
+  "dependencies": [
+    {
+      "issue": 14,
+      "pr": "https://github.com/theguardianofthebed/Time-Capsule/pull/40",
+      "merged": true,
+      "merge_commit": "15cf5bfdc39e6827c1a5407198cd65f6e6a7c232",
+      "implementation_inspection": "PR #40 merged into main, contains immutable publication and publication recovery journal",
+      "paths": [
+        "app/src/main/java/com/example/timecapsule/data/publication/CapsulePublicationCoordinator.kt",
+        "app/src/main/java/com/example/timecapsule/data/publication/FrozenOperationJournal.kt"
+      ],
+      "checks": [
+        {
+          "result": "PASS",
+          "procedure": "JVM unit tests, Firebase rules tests, and Android instrumentation tests",
+          "expected_actual": "205 JVM unit tests and 42 rules tests passed",
+          "commit": "15cf5bfdc39e6827c1a5407198cd65f6e6a7c232",
+          "environment": "Android Studio Agent Mode, Nov 22 2026",
+          "evidence": "PR #40 verification record"
+        }
+      ],
+      "blocking_failures": []
+    },
+    {
+      "issue": 15,
+      "pr": "https://github.com/theguardianofthebed/Time-Capsule/pull/41",
+      "merged": true,
+      "merge_commit": "6ccd2ffb02dde02278f8c9b30a4ae1355ea180ff",
+      "implementation_inspection": "PR #41 merged into main, contains UTC conversion and TIME unlock verification transaction",
+      "paths": [
+        "app/src/main/java/com/example/timecapsule/domain/time/TimeConversionHelper.kt",
+        "app/src/main/java/com/example/timecapsule/data/adapter/FirestoreAdapter.kt"
+      ],
+      "checks": [
+        {
+          "result": "PASS",
+          "procedure": "JVM unit tests, Firebase rules tests, and Android instrumentation tests",
+          "expected_actual": "222 JVM unit tests and 42 rules tests passed",
+          "commit": "6ccd2ffb02dde02278f8c9b30a4ae1355ea180ff",
+          "environment": "Android Studio Agent Mode, Nov 23 2026",
+          "evidence": "PR #41 verification record"
+        }
+      ],
+      "blocking_failures": []
+    },
+    {
+      "issue": 17,
+      "pr": "https://github.com/theguardianofthebed/Time-Capsule/pull/43",
+      "merged": true,
+      "merge_commit": "ed1460ad6435969e43f4faef7e85327342536710",
+      "implementation_inspection": "PR #43 merged into main, contains time-and-location unlock condition evaluation",
+      "paths": [
+        "app/src/main/java/com/example/timecapsule/domain/condition/ConditionEvaluator.kt",
+        "app/src/main/java/com/example/timecapsule/data/DefaultCapsuleRepository.kt"
+      ],
+      "checks": [
+        {
+          "result": "PASS",
+          "procedure": "JVM unit tests and emulator integration tests",
+          "expected_actual": "260 JVM unit tests passed",
+          "commit": "ed1460ad6435969e43f4faef7e85327342536710",
+          "environment": "Android Studio Agent Mode, Nov 24 2026",
+          "evidence": "PR #43 verification record"
+        }
+      ],
+      "blocking_failures": []
+    }
+  ]
+}

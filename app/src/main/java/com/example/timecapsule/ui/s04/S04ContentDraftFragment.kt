@@ -74,10 +74,11 @@ class S04ContentDraftFragment : Fragment() {
         viewModel = ViewModelProvider(
             requireActivity(),
             ViewModelFactory(mainActivity.container.accountSessionManager,
-                requireContext().applicationContext, mainActivity.container.repository)
+                requireContext().applicationContext, mainActivity.container.repository,
+                mainActivity.container.recoveryCoordinator)
         )[CapsuleDraftViewModel::class.java]
 
-        viewModel.syncSessionState()
+        viewModel.syncSessionState(mainActivity.container.repository, mainActivity.container.recoveryCoordinator)
 
         setupTextWatchers()
         setupClickListeners()
@@ -86,7 +87,12 @@ class S04ContentDraftFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
-        viewModel.syncSessionState()
+        val mainActivity = activity as? MainActivity
+        if (mainActivity != null) {
+            viewModel.syncSessionState(mainActivity.container.repository, mainActivity.container.recoveryCoordinator)
+        } else {
+            viewModel.syncSessionState()
+        }
     }
 
     private fun setupTextWatchers() {

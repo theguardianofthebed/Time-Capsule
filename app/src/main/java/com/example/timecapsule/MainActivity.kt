@@ -26,6 +26,7 @@ import com.example.timecapsule.data.adapter.DefaultLocationAdapter
 import com.example.timecapsule.data.adapter.LocalRetentionAdapter
 import com.example.timecapsule.data.adapter.LocationAdapter
 import com.example.timecapsule.data.di.AppDependencyContainer
+import com.example.timecapsule.data.recovery.ForegroundRecoveryCoordinator
 import com.example.timecapsule.data.session.DefaultSessionTracker
 import com.example.timecapsule.databinding.ActivityMainBinding
 import com.example.timecapsule.ui.s01.S01SignInFragment
@@ -99,6 +100,8 @@ class MainActivity : AppCompatActivity() {
         }
         val repository = DefaultCapsuleRepository(sessionTracker, authAdapter, firestoreAdapter,
             publication, locationAdapter)
+        val recoveryCoordinator = ForegroundRecoveryCoordinator(
+            repository, sessionTracker)
 
         container = AppDependencyContainer(
             sessionTracker = sessionTracker,
@@ -109,11 +112,15 @@ class MainActivity : AppCompatActivity() {
             retentionAdapter = retentionAdapter,
             repository = repository,
             accountSessionManager = accountSessionManager,
-            photoUploads = photoUploads
+            photoUploads = photoUploads,
+            recoveryCoordinator = recoveryCoordinator
         )
 
         // Unconditionally restore session into SessionTracker on every Activity/container creation
         val activeUid = container.accountSessionManager.restoreSessionIfAuthenticated()
+        if (!activeUid.isNullOrBlank()) {
+            recoveryCoordinator.triggerForegroundRecovery()
+        }
 
         // Register Fragment attach listener to re-wire navigation callbacks on Activity recreation/rotation
         supportFragmentManager.addFragmentOnAttachListener { _, fragment ->
@@ -134,14 +141,37 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /** Rechecks saved outcomes on foreground return without automatically publishing again. */
+    override fun onResume() {
+        super.onResume()
+        if (::container.isInitialized) {
+            val activeUid = container.accountSessionManager.restoreSessionIfAuthenticated()
+            if (!activeUid.isNullOrBlank()) {
+                container.recoveryCoordinator?.triggerForegroundRecovery()
+            }
+        }
+    }
+
     private fun attachFragmentListeners(fragment: Fragment) {
         when (fragment) {
             is S01SignInFragment -> {
                 fragment.onGoToRegisterListener = { navigateToRegister() }
-                fragment.onSignInSuccessListener = { navigateToContentDraft() }
+                fragment.onSignInSuccessListener = {
+                    val uid = container.accountSessionManager.restoreSessionIfAuthenticated()
+                    if (!uid.isNullOrBlank()) {
+                        container.recoveryCoordinator?.triggerForegroundRecovery()
+                    }
+                    navigateToContentDraft()
+                }
             }
             is S02RegisterFragment -> {
-                fragment.onRegisterSuccessListener = { navigateToContentDraft() }
+                fragment.onRegisterSuccessListener = {
+                    val uid = container.accountSessionManager.restoreSessionIfAuthenticated()
+                    if (!uid.isNullOrBlank()) {
+                        container.recoveryCoordinator?.triggerForegroundRecovery()
+                    }
+                    navigateToContentDraft()
+                }
                 fragment.onGoToSignInListener = { navigateToSignIn() }
             }
             is S04ContentDraftFragment -> {

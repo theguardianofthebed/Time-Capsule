@@ -437,6 +437,63 @@ User J confirmed task ownership and execution. Independent teammate PR review by
 User J confirmed task ownership and execution. Independent teammate PR review by User G and manual testing follow separately. Personal student review and understanding statements remain pending confirmation by User J.
 
 
+## 2026-11-24-issue18-foreground-recovery — Recheck unlock through the supported foreground recovery path
+
+- **Owner / scope / period:** User J (Junwon), explicitly confirmed as implementation owner for Issue #18. Period: November 24, 2026. MVP Scope.
+- **Environment/model:** Android Studio Agent Mode (Gemini 3.8 Flash).
+- **GitHub:** [Issue #18](https://github.com/theguardianofthebed/Time-Capsule/issues/18); task branch `feature/18-foreground-recovery`.
+- **References:** FR-09, NFR-05; ARC-05, ARC-07; DD-08; AC-07; T-24, T-25, T-32.
+
+### Goal
+
+Implement one shared foreground recovery path (`ForegroundRecoveryCoordinator`) triggered by app-open, return to foreground (`onResume`), and explicit UI Retry actions. Coalesce overlapping publication recovery for `(uid, sessionGeneration)` and recipient unlock checks for `(uid, sessionGeneration, capsuleId)`. Call only existing authoritative repository methods (`recoverPublications()`, `reconcile()`, `verifyUnlock()`), remove completed flights to ensure retries acquire fresh server and location evidence, validate session tracker to discard stale callbacks on account switch or session generation change, and integrate with `MainActivity`, `AppDependencyContainer`, `ViewModelFactory`, and `CapsuleDraftViewModel`.
+
+### Requests and prompts
+
+| # | Request summary | Actual prompt (key part) | Why it worked (or didn't) |
+|---|-----------------|--------------------------|---------------------------|
+| 1 | Execute Issue #18 implementation & update logs | "Implement GitHub Issue #18, 'Recheck unlock through the supported foreground recovery path,' on theguardianofthebed/Time-Capsule... Acting student: User J... Also update w3 log of User J as well after implementation." | Complete prompt specification detailing readiness preflight, foreground recovery coordinator rules, session generation coalescing, UI integration, test suite requirements, handoff, and log updates. |
+
+### What the agent changed and verified
+
+- **Foreground Recovery Coordinator (`ForegroundRecoveryCoordinator.kt`):**
+  - Created `ForegroundRecoveryCoordinator` to coordinate and coalesce foreground recovery across app-open, return to foreground (`onResume`), and explicit UI Retry actions.
+  - Coalesces overlapping publication recovery for `(uid, sessionGeneration)`.
+  - Coalesces overlapping recipient unlock checks for `(uid, sessionGeneration, capsuleId)`.
+  - Coalesces overlapping send outcome reconciliation for `(uid, sessionGeneration, capsuleId)`.
+  - Removes completed flight entries upon completion (including failures) so subsequent retries acquire fresh server and location evidence.
+  - Revalidates session tracker before returning results to callers and discards stale callbacks on account switch or session generation changes.
+  - Exposes `checkForeground(knownCapsuleIds)` as a clean entry point for S-03 refresh and S-07 detail open to be wired in Issue #21 when those screens exist.
+  - Does not hold strong references to Activity or Fragment instances.
+- **Android Lifecycle & Container Integration:**
+  - Wired `ForegroundRecoveryCoordinator` into `AppDependencyContainer`, `MainActivity`, and `ViewModelFactory`.
+  - `MainActivity.onResume()` triggers `triggerForegroundRecovery()` when user is authenticated.
+  - Post-login checks in `MainActivity` (S-01 sign-in success and S-02 register success) trigger `triggerForegroundRecovery()`.
+  - `CapsuleDraftViewModel.syncSessionState()` receives latest container repository and recovery coordinator on Fragment `onResume()` / Activity recreation, preventing stale container or session generation references on device rotation.
+- **Automated Verification Suite:**
+  - Written `ForegroundRecoveryCoordinatorTest.kt` (13 JVM unit tests passed covering app-open/resume/detail/Retry same path, two simultaneous same-ID coalescing, different UID or new session generation isolation, waiter cancellation, failed/offline result fresh retry, zero known IDs, time-only before/after deadline, combined location invalid/permission denied/previous visit not latched, confirmed unlock idempotent non-relock, saved uncertain send reconciliation without implicit republication, and activity/fragment recreation state preservation).
+  - Total 273 JVM unit tests passed (`:app:testDebugUnitTest`).
+  - Clean debug APK build passed (`:app:assembleDebug`).
+  - Clean Android lint passed (`:app:lintDebug`).
+
+### Checks and results
+
+- `./gradlew :app:testDebugUnitTest`: PASS (273 JVM unit tests passed across project, 0 failed)
+- `./gradlew :app:assembleDebug :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors)
+- `py tools/check_readiness.py --issue 18 --evidence docs/agent-tools/readiness-evidence-issue18.json`: PASS (`PREFLIGHT_RECORD_VALID`)
+- `git status`: PASS (clean on `feature/18-foreground-recovery`)
+
+### Errors and manual fixes
+
+No manual code fix was required. The agent adjusted coroutine dispatcher configuration in unit tests (`UnconfinedTestDispatcher`) to ensure deterministic single-threaded execution across async suspension boundaries.
+
+### My review and understanding
+
+- **What I reviewed:** Pending student review and personal confirmation by User J.
+- **What I can explain:** Pending student review and personal confirmation by User J.
+- **Feedback and next step:** Teammate PR review by User G and manual testing on device/emulator before human merge into `main`.
+
+
 
 
 
