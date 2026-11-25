@@ -142,13 +142,14 @@ class FakeLocalRetentionAdapter : LocalRetentionAdapter {
     private val memoryStore = mutableMapOf<String, RetainedContent>()
 
     override suspend fun saveRetainedContent(
-        uid: String,
+        targetSession: SessionSnapshot,
         capsuleId: String,
         verifiedUnlockedAt: Instant,
         text: String?,
         photoBytes: ByteArray?,
         photoFormat: OriginalPhotoFormat?
     ): OperationResult<Unit> {
+        val uid = targetSession.uid ?: ""
         val key = "$uid:$capsuleId"
         memoryStore[key] = RetainedContent(
             uid = uid,
@@ -161,10 +162,27 @@ class FakeLocalRetentionAdapter : LocalRetentionAdapter {
         return OperationResult.Success(Unit)
     }
 
-    override suspend fun readRetainedContent(
+    override suspend fun saveRetainedContent(
         uid: String,
+        capsuleId: String,
+        verifiedUnlockedAt: Instant,
+        text: String?,
+        photoBytes: ByteArray?,
+        photoFormat: OriginalPhotoFormat?
+    ): OperationResult<Unit> = saveRetainedContent(
+        targetSession = SessionSnapshot(uid),
+        capsuleId = capsuleId,
+        verifiedUnlockedAt = verifiedUnlockedAt,
+        text = text,
+        photoBytes = photoBytes,
+        photoFormat = photoFormat
+    )
+
+    override suspend fun readRetainedContent(
+        targetSession: SessionSnapshot,
         capsuleId: String
     ): OperationResult<RetainedContent> {
+        val uid = targetSession.uid ?: ""
         val key = "$uid:$capsuleId"
         val content = memoryStore[key]
         return if (content != null && content.uid == uid) {
@@ -173,6 +191,14 @@ class FakeLocalRetentionAdapter : LocalRetentionAdapter {
             OperationResult.Denied("No retained content for $capsuleId")
         }
     }
+
+    override suspend fun readRetainedContent(
+        uid: String,
+        capsuleId: String
+    ): OperationResult<RetainedContent> = readRetainedContent(
+        targetSession = SessionSnapshot(uid),
+        capsuleId = capsuleId
+    )
 
     override suspend fun clearAccountData(uid: String) {
         val keysToRemove = memoryStore.keys.filter { it.startsWith("$uid:") }

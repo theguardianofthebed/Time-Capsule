@@ -343,8 +343,11 @@ class DefaultCapsuleRepository(
 
         if (contentRes is OperationResult.Success) {
             val content = contentRes.data
+            if (!content.photoObjectPath.isNullOrBlank() && content.photoBytes == null) {
+                return OperationResult.Unavailable("Photo download failed for photo capsule.")
+            }
             retentionAdapter?.saveRetainedContent(
-                uid = activeUid,
+                targetSession = targetSession,
                 capsuleId = cleanId,
                 verifiedUnlockedAt = verifiedTime,
                 text = content.text,
@@ -354,6 +357,6 @@ class DefaultCapsuleRepository(
             return OperationResult.Success(content)
         }
 
-        return OperationResult.Denied("Unlock authorization required before reading content.")
+        return if (contentRes is OperationResult.Unavailable) contentRes else OperationResult.Denied("Unlock authorization required before reading content.")
     }
 }

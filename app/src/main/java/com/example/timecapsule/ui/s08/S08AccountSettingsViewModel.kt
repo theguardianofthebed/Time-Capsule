@@ -20,6 +20,9 @@ class S08AccountSettingsViewModel(
     private val _updateState = MutableLiveData<OperationResult<Unit>?>()
     val updateState: LiveData<OperationResult<Unit>?> = _updateState
 
+    private val _signOutState = MutableLiveData<OperationResult<Unit>?>()
+    val signOutState: LiveData<OperationResult<Unit>?> = _signOutState
+
     private val _profileCheckState = MutableLiveData<OperationResult<RecipientProfile>?>()
     val profileCheckState: LiveData<OperationResult<RecipientProfile>?> = _profileCheckState
 
@@ -65,7 +68,8 @@ class S08AccountSettingsViewModel(
      */
     fun signOut() {
         viewModelScope.launch {
-            accountSessionManager.signOut()
+            val result = accountSessionManager.signOut()
+            _signOutState.postValue(result)
         }
     }
 

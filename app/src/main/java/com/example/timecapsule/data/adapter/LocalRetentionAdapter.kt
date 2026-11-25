@@ -2,6 +2,7 @@ package com.example.timecapsule.data.adapter
 
 import com.example.timecapsule.domain.model.OriginalPhotoFormat
 import com.example.timecapsule.domain.result.OperationResult
+import com.example.timecapsule.domain.session.SessionSnapshot
 import java.time.Instant
 
 /**
@@ -54,18 +55,10 @@ data class RetainedContent(
  */
 interface LocalRetentionAdapter {
     /**
-     * Persists verified recipient unlocked content with an authoritative server timestamp.
-     *
-     * @param uid Authenticated recipient UID.
-     * @param capsuleId Target capsule identifier.
-     * @param verifiedUnlockedAt Authoritative server unlock timestamp.
-     * @param text Message text to retain, or null if text is absent.
-     * @param photoBytes Photo binary bytes to retain, or null if photo is absent.
-     * @param photoFormat Photo format, or null if photo is absent.
-     * @return Success if saved durably; Invalid or Unavailable on error.
+     * Persists verified recipient unlocked content with an authoritative server timestamp and session snapshot.
      */
     suspend fun saveRetainedContent(
-        uid: String,
+        targetSession: SessionSnapshot,
         capsuleId: String,
         verifiedUnlockedAt: Instant,
         text: String?,
@@ -73,14 +66,37 @@ interface LocalRetentionAdapter {
         photoFormat: OriginalPhotoFormat?
     ): OperationResult<Unit>
 
+    suspend fun saveRetainedContent(
+        uid: String,
+        capsuleId: String,
+        verifiedUnlockedAt: Instant,
+        text: String?,
+        photoBytes: ByteArray?,
+        photoFormat: OriginalPhotoFormat?
+    ): OperationResult<Unit> = saveRetainedContent(
+        targetSession = SessionSnapshot(uid),
+        capsuleId = capsuleId,
+        verifiedUnlockedAt = verifiedUnlockedAt,
+        text = text,
+        photoBytes = photoBytes,
+        photoFormat = photoFormat
+    )
+
     /**
      * Reads verified retained content for the active account if marker and content files are complete.
-     *
-     * @param uid Active authenticated account UID.
-     * @param capsuleId Target capsule identifier.
-     * @return Success with [RetainedContent] if verified; Denied or Unavailable if missing or corrupted.
      */
-    suspend fun readRetainedContent(uid: String, capsuleId: String): OperationResult<RetainedContent>
+    suspend fun readRetainedContent(
+        targetSession: SessionSnapshot,
+        capsuleId: String
+    ): OperationResult<RetainedContent>
+
+    suspend fun readRetainedContent(
+        uid: String,
+        capsuleId: String
+    ): OperationResult<RetainedContent> = readRetainedContent(
+        targetSession = SessionSnapshot(uid),
+        capsuleId = capsuleId
+    )
 
     /** Clears account-scoped retained content for [uid]. */
     suspend fun clearAccountData(uid: String)

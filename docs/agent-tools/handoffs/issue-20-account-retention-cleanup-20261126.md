@@ -32,14 +32,13 @@
    - Purges compose buffers and local photo files upon confirmed publication.
 5. **Backup Exclusions (`backup_rules.xml`, `data_extraction_rules.xml`):**
    - Configured XML rules to exclude all app-private protected directories (`retained-content`, `capsule-operations`, `original-photos`, `frozen-photos`, `photo-drafts`, `notification-attempts.json`, `no_backup`).
-6. **Third Review Mandatory Corrections (1–5):**
-   - **Correction 1**: Connected `sessionTracker::currentSession` to `DefaultLocalRetentionAdapter` and `PrivatePublicationDrafts`, and injected `retentionAdapter` into `DefaultCapsuleRepository` in `TimeCapsuleApplication.kt`. Handle startup cleanup failure by clearing session.
-   - **Correction 2**: Added `unlockedAt` timestamp to `RecipientUnlockRequirements`. In `DefaultCapsuleRepository.readContent()`, extracted server-confirmed `unlockedAt` timestamp (no `Instant.now()` fallback) and downloaded photo bytes via `StorageAdapter.downloadPhotoBytes()`.
-   - **Correction 3**: Updated `AccountCleanupOrchestrator.cleanupAccount("")` to resolve pending cleanup from `pending-cleanup.properties`. Enforced pending cleanup checks in `signIn()`, `signUpAndCreateProfile()`, and `restoreSessionIfAuthenticated()`.
-   - **Correction 4**: Re-validated active `SessionSnapshot` and `sessionGeneration` inside storage locks across all 5 protected stores (`OriginalPhotoUploads`, `PrivatePublicationDrafts`, `DefaultLocalRetentionAdapter`, `FrozenOperationJournal`). Added `SessionGuardWriteRaceTest.kt` verifying A→B→A same-UID reauthentication generation invalidation.
-   - **Correction 5**: Verified `frozen-photos/<capsuleId>/<hashedUid>.properties` layout cleanup and fallback `hadPhoto = true` for legacy opaque records missing `hadPhoto` flag.
+6. **Fourth Review Test-Driven Corrections:**
+   - **Task 1**: Added deterministic failing regression tests in `StorageRaceRegressionTest.kt` verifying session generation write gates, PNG format retention, and fail-closed photo downloads.
+   - **Task 2**: Updated `saveRetainedContent` and `readRetainedContent` in `LocalRetentionAdapter.kt` / `DefaultLocalRetentionAdapter.kt` to validate `targetSession.sessionGeneration` inside `synchronized(lock)`.
+   - **Task 3**: Implemented PNG magic byte header check (`0x89 0x50 0x4E 0x47`) in `DefaultFirestoreAdapter.kt` and fail-closed photo download handling in `DefaultCapsuleRepository.kt`.
+   - **Task 4**: Wired S08 sign-out navigation to observe `signOutState` LiveData in `S08AccountSettingsFragment.kt` and navigate only on `OperationResult.Success`.
 7. **Automated Verification:**
-   - 333 JVM unit tests passing (`./gradlew :app:testDebugUnitTest`).
+   - 336 JVM unit tests passing (`./gradlew :app:testDebugUnitTest`).
    - Clean debug APK build (`./gradlew :app:assembleDebug`).
    - Clean AndroidTest APK build (`./gradlew :app:assembleDebugAndroidTest`).
    - Clean Android lint (`./gradlew :app:lintDebug`).

@@ -43,21 +43,17 @@ class DefaultLocalRetentionAdapter(
     }
 
     override suspend fun saveRetainedContent(
-        uid: String,
+        targetSession: SessionSnapshot,
         capsuleId: String,
         verifiedUnlockedAt: Instant,
         text: String?,
         photoBytes: ByteArray?,
         photoFormat: OriginalPhotoFormat?
     ): OperationResult<Unit> = withContext(Dispatchers.IO) {
-        val cleanUid = uid.trim()
+        val cleanUid = (targetSession.uid ?: "").trim()
         val cleanCapsuleId = capsuleId.trim()
         if (cleanUid.isBlank() || cleanCapsuleId.isBlank()) {
             return@withContext OperationResult.Invalid("UID and capsule ID must not be blank for retention.")
-        }
-        val activeSession = session?.invoke()
-        if (activeSession != null && (!activeSession.isAuthenticated || activeSession.uid != cleanUid)) {
-            return@withContext OperationResult.Denied("Retained content save denied for foreign or unauthenticated session.")
         }
         if (!cleanCapsuleId.matches(Regex("[A-Za-z0-9_-]+"))) {
             return@withContext OperationResult.Invalid("Invalid capsule ID format for storage.")
@@ -70,6 +66,13 @@ class DefaultLocalRetentionAdapter(
         }
 
         synchronized(lock) {
+            val activeSession = session?.invoke()
+            if (activeSession != null) {
+                if (!activeSession.isAuthenticated || activeSession.uid != cleanUid ||
+                    (targetSession.sessionGeneration != 0L && activeSession.sessionGeneration != targetSession.sessionGeneration)) {
+                    return@synchronized OperationResult.Denied("Retained content save denied for stale or unauthenticated session generation.")
+                }
+            }
             try {
                 val directory = targetCapsuleDirectory(cleanUid, cleanCapsuleId)
                 if (!directory.isDirectory && !directory.mkdirs()) {
@@ -124,20 +127,23 @@ class DefaultLocalRetentionAdapter(
     }
 
     override suspend fun readRetainedContent(
-        uid: String,
+        targetSession: SessionSnapshot,
         capsuleId: String
     ): OperationResult<RetainedContent> = withContext(Dispatchers.IO) {
-        val cleanUid = uid.trim()
+        val cleanUid = (targetSession.uid ?: "").trim()
         val cleanCapsuleId = capsuleId.trim()
         if (cleanUid.isBlank() || cleanCapsuleId.isBlank()) {
             return@withContext OperationResult.Denied("Authenticated UID and capsule ID are required.")
         }
-        val activeSession = session?.invoke()
-        if (activeSession != null && (!activeSession.isAuthenticated || activeSession.uid != cleanUid)) {
-            return@withContext OperationResult.Denied("Retained content read denied for foreign or unauthenticated session.")
-        }
 
         synchronized(lock) {
+            val activeSession = session?.invoke()
+            if (activeSession != null) {
+                if (!activeSession.isAuthenticated || activeSession.uid != cleanUid ||
+                    (targetSession.sessionGeneration != 0L && activeSession.sessionGeneration != targetSession.sessionGeneration)) {
+                    return@synchronized OperationResult.Denied("Retained content read denied for stale or unauthenticated session generation.")
+                }
+            }
             try {
                 val directory = targetCapsuleDirectory(cleanUid, cleanCapsuleId)
                 val markerFile = File(directory, MARKER_FILE_NAME)
