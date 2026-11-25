@@ -27,6 +27,9 @@ class AccountSessionManager(
     /** Exposes immutable identity/generation evidence for rejecting stale foreground UI callbacks. */
     fun currentSession(): SessionSnapshot = sessionTracker.currentSession()
 
+    /** Validates whether [session] matches the current active session in SessionTracker. */
+    fun isSessionValid(session: SessionSnapshot): Boolean = sessionTracker.isSessionValid(session)
+
     /**
      * Restores active user session from [authAdapter] on application restart or container recreation.
      * Changes generation only on an identity transition; foreground checks preserve in-flight work.

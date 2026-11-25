@@ -108,16 +108,17 @@ class ForegroundRecoveryLifecycleTest {
         val coordinator = initialContainer?.recoveryCoordinator
         assertNotNull(coordinator)
 
-        // Trigger foreground recovery on the active container
+        // 1. Trigger foreground recovery on the active container
         coordinator?.triggerForegroundRecovery()
 
-        // Recreate Activity while recovery is active
+        // 2. Recreate Activity (which executes onResume() and triggers foreground recovery again)
         scenario.recreate()
 
         scenario.onActivity { activity ->
             val app = activity.application as TimeCapsuleApplication
-            // Verify container and coordinator remain identical and session generation is preserved
+            // 3. Verify container and coordinator remain identical and session generation is preserved
             assertSame("Coordinator instance must be preserved across recreation", coordinator, app.container?.recoveryCoordinator)
+            assertSame("SessionTracker instance must be preserved across recreation", initialContainer?.sessionTracker, app.container?.sessionTracker)
         }
 
         scenario.close()

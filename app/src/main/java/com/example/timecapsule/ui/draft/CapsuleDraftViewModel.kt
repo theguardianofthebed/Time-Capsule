@@ -23,6 +23,7 @@ import com.example.timecapsule.domain.model.LockMode
 import com.example.timecapsule.domain.model.RecipientConfirmation
 import com.example.timecapsule.domain.model.RecipientProfile
 import com.example.timecapsule.domain.result.OperationResult
+import com.example.timecapsule.domain.session.SessionSnapshot
 import java.time.Instant
 import java.util.UUID
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -698,12 +699,15 @@ class CapsuleDraftViewModel(
         val uid = state.activeSessionUid ?: return
         if (state.publicationBusy || state.recoveryBusy) return
         val token = ++publicationToken
-        publicationSession = accountSessionManager.currentSession()
+        val capturedSession = accountSessionManager.currentSession()
+        publicationSession = capturedSession
         _uiState.update { it.copy(recoveryBusy = true) }
         viewModelScope.launch {
             try {
-                val result = photoSaveMutex.withLock { recoverSaved(backend) }
-                if (!isCurrentPublication(uid, token)) return@launch
+                photoSaveMutex.withLock { /* Drain earlier compose saves before final cleanup. */ }
+                if (!isCurrentPublication(uid, token, capturedSession)) return@launch
+                val result = recoverSaved(backend, capturedSession)
+                if (!isCurrentPublication(uid, token, capturedSession)) return@launch
                 if (result is OperationResult.Success) {
                     val pending = result.data.firstOrNull { it.phase != PublicationPhase.SENT }
                     val completed = result.data.firstOrNull {
@@ -720,7 +724,7 @@ class CapsuleDraftViewModel(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                if (isCurrentPublication(uid, token)) _uiState.update {
+                if (isCurrentPublication(uid, token, capturedSession)) _uiState.update {
                     it.copy(recoveryBusy = false, recoveryBlocked = true,
                         publicationMessage = R.string.publication_recovery_failure)
                 }
@@ -769,7 +773,8 @@ class CapsuleDraftViewModel(
             return
         }
         val draft = buildCapsuleDraft()
-        startPublicationAction(uid) { backend.publish(draft) }
+        val capturedSession = accountSessionManager.currentSession()
+        startPublicationAction(uid, capturedSession) { session -> backend.publish(draft, session) }
     }
 
     /** Replays only the coordinator's persisted snapshot, never fields edited in the UI. */
@@ -779,13 +784,18 @@ class CapsuleDraftViewModel(
         val uid = state.activeSessionUid ?: return
         if (state.publicationPhase == null || state.publicationPhase == PublicationPhase.SENT ||
             state.publicationBusy || state.recoveryBusy || state.recoveryBlocked) return
-        startPublicationAction(uid) { backend.retryPublication(state.capsuleId) }
+        val capturedSession = accountSessionManager.currentSession()
+        startPublicationAction(uid, capturedSession) { session -> backend.retryPublication(state.capsuleId, session) }
     }
 
     /** Waits for queued draft writes before publication; obsolete account results never repaint UI. */
-    private fun startPublicationAction(uid: String, action: suspend () -> OperationResult<String>) {
+    private fun startPublicationAction(
+        uid: String,
+        capturedSession: SessionSnapshot,
+        action: suspend (SessionSnapshot) -> OperationResult<String>
+    ) {
         val token = ++publicationToken
-        publicationSession = accountSessionManager.currentSession()
+        publicationSession = capturedSession
         photoToken++
         activeLookupToken++
         _uiState.update { it.copy(publicationBusy = true, publicationPhase = PublicationPhase.PREPARED,
@@ -793,8 +803,9 @@ class CapsuleDraftViewModel(
         viewModelScope.launch {
             try {
                 photoSaveMutex.withLock { /* Drain earlier compose saves before final cleanup. */ }
-                val result = action()
-                if (!isCurrentPublication(uid, token)) return@launch
+                if (!isCurrentPublication(uid, token, capturedSession)) return@launch
+                val result = action(capturedSession)
+                if (!isCurrentPublication(uid, token, capturedSession)) return@launch
                 if (result is OperationResult.Success) {
                     _uiState.update { it.copy(
                         publicationPhase = PublicationPhase.SENT, text = "", originalPhoto = null,
@@ -807,8 +818,8 @@ class CapsuleDraftViewModel(
                 }
                 // Even a rejected request can have an older pending write; only saved evidence
                 // may enable abandonment or restore editability after a preflight validation error.
-                val recovered = repository?.let { recoverSaved(it) }
-                if (!isCurrentPublication(uid, token)) return@launch
+                val recovered = repository?.let { recoverSaved(it, capturedSession) }
+                if (!isCurrentPublication(uid, token, capturedSession)) return@launch
                 if (recovered is OperationResult.Success) {
                     val record = recovered.data.firstOrNull { it.capsuleId == _uiState.value.capsuleId }
                     if (record != null) applyRecovered(record)
@@ -821,7 +832,7 @@ class CapsuleDraftViewModel(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                if (isCurrentPublication(uid, token)) _uiState.update {
+                if (isCurrentPublication(uid, token, capturedSession)) _uiState.update {
                     // A cleanup/read failure cannot revoke an already received publication ACK.
                     val sent = it.publicationPhase == PublicationPhase.SENT
                     it.copy(publicationBusy = false,
@@ -839,12 +850,15 @@ class CapsuleDraftViewModel(
         val uid = state.activeSessionUid ?: return
         if (!state.canAbandon || state.publicationBusy || state.recoveryBusy || state.recoveryBlocked) return
         val token = ++publicationToken
-        publicationSession = accountSessionManager.currentSession()
+        val capturedSession = accountSessionManager.currentSession()
+        publicationSession = capturedSession
         _uiState.update { it.copy(publicationBusy = true) }
         viewModelScope.launch {
             try {
-                val result = backend.abandonPublication(state.capsuleId)
-                if (!isCurrentPublication(uid, token)) return@launch
+                photoSaveMutex.withLock { /* Drain earlier compose saves before final cleanup. */ }
+                if (!isCurrentPublication(uid, token, capturedSession)) return@launch
+                val result = backend.abandonPublication(state.capsuleId, capturedSession)
+                if (!isCurrentPublication(uid, token, capturedSession)) return@launch
                 if (result is OperationResult.Success) {
                     val draft = result.data
                     _uiState.value = CapsuleDraftUiState(activeSessionUid = uid,
@@ -866,7 +880,7 @@ class CapsuleDraftViewModel(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                if (isCurrentPublication(uid, token)) _uiState.update {
+                if (isCurrentPublication(uid, token, capturedSession)) _uiState.update {
                     it.copy(publicationBusy = false, publicationMessage = R.string.publication_recovery_failure)
                 }
             }
@@ -884,15 +898,22 @@ class CapsuleDraftViewModel(
     }
 
     /** Validates both generation token and live Auth UID before applying asynchronous results. */
-    private fun isCurrentPublication(uid: String, token: Long): Boolean =
+    private fun isCurrentPublication(
+        uid: String,
+        token: Long,
+        capturedSession: SessionSnapshot
+    ): Boolean =
         token == publicationToken && _uiState.value.activeSessionUid == uid &&
             accountSessionManager.restoreSessionIfAuthenticated() == uid &&
-            accountSessionManager.currentSession() == publicationSession
+            accountSessionManager.isSessionValid(capturedSession)
 
     /** Bounds read-only recovery waiting without canceling the independently owned send task. */
-    private suspend fun recoverSaved(backend: CapsuleRepository) =
+    private suspend fun recoverSaved(
+        backend: CapsuleRepository,
+        capturedSession: SessionSnapshot
+    ) =
         withTimeoutOrNull(15_000L) {
-            recoveryCoordinator?.recoverPublications() ?: backend.recoverPublications()
+            recoveryCoordinator?.recoverPublications(capturedSession) ?: backend.recoverPublications(capturedSession)
         } ?: OperationResult.Unavailable("Saved send recovery timed out.")
 
     /** Resets draft state with a new unique capsule ID. */
