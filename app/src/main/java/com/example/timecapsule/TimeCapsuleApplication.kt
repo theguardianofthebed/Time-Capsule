@@ -1,6 +1,8 @@
 package com.example.timecapsule
 
 import android.app.Application
+import android.content.Context
+import com.example.timecapsule.config.FirebaseConfig
 import com.example.timecapsule.data.AccountSessionManager
 import com.example.timecapsule.data.DefaultCapsuleRepository
 import com.example.timecapsule.data.adapter.DefaultAuthAdapter
@@ -32,20 +34,67 @@ import java.io.File
  */
 class TimeCapsuleApplication : Application() {
 
-    lateinit var container: AppDependencyContainer
+    @Volatile
+    var container: AppDependencyContainer? = null
         private set
 
     override fun onCreate() {
         super.onCreate()
-        container = createContainer()
+        initializeFirebaseAndContainer()
+    }
+
+    /**
+     * Initializes Firebase configuration and creates the process-wide [AppDependencyContainer].
+     *
+     * Ordering & Safety Rules:
+     * 1. In DEBUG builds: Connects Auth, Firestore, and Storage to local emulators BEFORE instantiating Firebase SDK singletons.
+     * 2. In RELEASE builds: Verifies default FirebaseApp availability before accessing services.
+     * 3. Applies [com.example.timecapsule.data.adapter.FirestoreCachePolicy.applyMemoryOnlyCache] via [FirebaseConfig.getMemoryOnlyFirestore].
+     * 4. Returns true on success; if Firebase initialization fails, leaves [container] null and fails closed without crashing.
+     */
+    @Synchronized
+    fun initializeFirebaseAndContainer(context: Context? = null): Boolean {
+        if (container != null) {
+            return true
+        }
+
+        val targetContext = context ?: try { applicationContext } catch (_: Exception) { null }
+        if (targetContext == null) {
+            container = null
+            return false
+        }
+
+        val isDebug = BuildConfig.DEBUG
+        if (isDebug) {
+            val emulatorInitialized = FirebaseConfig.setupDebugEmulatorConnection(targetContext, true)
+            if (!emulatorInitialized) {
+                container = null
+                return false
+            }
+        } else {
+            if (!FirebaseConfig.isFirebaseAvailable(targetContext)) {
+                container = null
+                return false
+            }
+        }
+
+        return try {
+            container = createContainer(targetContext)
+            true
+        } catch (_: Exception) {
+            container = null
+            false
+        }
     }
 
     /** Creates the process-wide [AppDependencyContainer] with application context dependencies. */
-    private fun createContainer(): AppDependencyContainer {
+    private fun createContainer(context: Context): AppDependencyContainer {
         val sessionTracker = DefaultSessionTracker()
         val authAdapter = DefaultAuthAdapter()
-        val firestoreAdapter = DefaultFirestoreAdapter { applicationContext }
+        val firestoreAdapter = DefaultFirestoreAdapter { context }
         val accountSessionManager = AccountSessionManager(authAdapter, firestoreAdapter, sessionTracker)
+
+        val noBackupDir = context.noBackupFilesDir ?: File(context.filesDir, "no_backup")
 
         val storageAdapter = DefaultStorageAdapter(
             FirebaseStorage.getInstance(),
@@ -53,25 +102,25 @@ class TimeCapsuleApplication : Application() {
             FirebaseAuth.getInstance()
         )
         val photoUploads = OriginalPhotoUploads(
-            OriginalPhotoStore(File(noBackupFilesDir, "original-photos"), AndroidOriginalImageProbe()),
-            File(noBackupFilesDir, "frozen-photos"),
+            OriginalPhotoStore(File(noBackupDir, "original-photos"), AndroidOriginalImageProbe()),
+            File(noBackupDir, "frozen-photos"),
             storageAdapter,
             sessionTracker::currentSession
         )
-        val locationAdapter = DefaultLocationAdapter(applicationContext)
+        val locationAdapter = DefaultLocationAdapter(context)
         val retentionAdapter = object : LocalRetentionAdapter {
             override suspend fun clearAccountData(uid: String) {}
         }
 
         val publication = firestoreAdapter.firestoreInstance()?.let { firestore ->
             CapsulePublicationCoordinator(
-                journal = FrozenOperationJournal(File(noBackupFilesDir, "capsule-operations")),
+                journal = FrozenOperationJournal(File(noBackupDir, "capsule-operations")),
                 backend = FirestoreCapsulePublication(firestore, FirebaseAuth.getInstance()),
                 media = OriginalPublicationMedia(photoUploads),
                 session = sessionTracker::currentSession,
                 drafts = PrivatePublicationDrafts(
-                    OriginalPhotoStore(File(noBackupFilesDir, "original-photos"), AndroidOriginalImageProbe()),
-                    PhotoDraftJournal(File(noBackupFilesDir, "photo-drafts"))
+                    OriginalPhotoStore(File(noBackupDir, "original-photos"), AndroidOriginalImageProbe()),
+                    PhotoDraftJournal(File(noBackupDir, "photo-drafts"))
                 )
             )
         }

@@ -16,6 +16,7 @@ import com.example.timecapsule.domain.model.LockMode
 import com.example.timecapsule.domain.model.ProtectedCapsuleContent
 import com.example.timecapsule.domain.model.QualificationFailureReason
 import com.example.timecapsule.domain.model.RecipientProfile
+import com.example.timecapsule.domain.model.RecoveredPublication
 import com.example.timecapsule.domain.model.SendStatus
 import com.example.timecapsule.domain.result.OperationResult
 import com.example.timecapsule.domain.session.SessionSnapshot
@@ -48,20 +49,44 @@ class DefaultCapsuleRepository(
         publicationCoordinator?.publish(frozenOperation)
             ?: OperationResult.Unavailable("Capsule publication service is unavailable.")
 
-    /** Resolves server-only matching evidence without treating a missing record as a failed write. */
-    override suspend fun reconcile(capsuleId: String): OperationResult<SendStatus> =
-        publicationCoordinator?.reconcile(capsuleId)
+    override suspend fun reconcile(capsuleId: String): OperationResult<SendStatus> {
+        return reconcile(capsuleId, sessionTracker.currentSession())
+    }
+
+    /** Resolves server-only matching evidence bound to [targetSession]. */
+    override suspend fun reconcile(capsuleId: String, targetSession: SessionSnapshot): OperationResult<SendStatus> {
+        if (!sessionTracker.isSessionValid(targetSession)) {
+            return OperationResult.Denied("Account session changed before reconciliation started.")
+        }
+        val res = publicationCoordinator?.reconcile(capsuleId)
             ?: OperationResult.Unavailable("Publication reconciliation is unavailable.")
+        if (!sessionTracker.isSessionValid(targetSession)) {
+            return OperationResult.Denied("Account session changed during reconciliation execution.")
+        }
+        return res
+    }
 
     /** Replays the original saved snapshot only after the coordinator's server check. */
     override suspend fun retryPublication(capsuleId: String): OperationResult<String> =
         publicationCoordinator?.retry(capsuleId)
             ?: OperationResult.Unavailable("Publication retry is unavailable.")
 
-    /** Restores private operations through server reconciliation without implicit replay. */
-    override suspend fun recoverPublications() =
-        publicationCoordinator?.recoverPublications()
+    override suspend fun recoverPublications(): OperationResult<List<RecoveredPublication>> {
+        return recoverPublications(sessionTracker.currentSession())
+    }
+
+    /** Restores private operations bound to [targetSession] through server reconciliation without implicit replay. */
+    override suspend fun recoverPublications(targetSession: SessionSnapshot): OperationResult<List<RecoveredPublication>> {
+        if (!sessionTracker.isSessionValid(targetSession)) {
+            return OperationResult.Denied("Account session changed before publication recovery started.")
+        }
+        val res = publicationCoordinator?.recoverPublications()
             ?: OperationResult.Unavailable("Publication recovery is unavailable.")
+        if (!sessionTracker.isSessionValid(targetSession)) {
+            return OperationResult.Denied("Account session changed during publication recovery execution.")
+        }
+        return res
+    }
 
     /** Retains failed content under a new identity only when safe abandonment is established. */
     override suspend fun abandonPublication(capsuleId: String) =
@@ -72,36 +97,26 @@ class DefaultCapsuleRepository(
         return OperationResult.Unavailable("Capsule lists query requires Issue #21 implementation.")
     }
 
-    /**
-     * Orchestrates recipient unlock verification for TIME, LOCATION, and TIME_AND_LOCATION (BOTH) capsules (Issue #17).
-     *
-     * Execution Flow & Security Rules:
-     * 1. Validates authenticated session snapshot (`initialSession`).
-     * 2. Reads live server unlock requirements (`firestoreAdapter.readRecipientUnlockRequirements`).
-     * 3. Idempotency: If server record is already `unlocked == true`, returns [Availability.AVAILABLE] without requesting location.
-     * 4. For LOCATION / BOTH modes: Validates permission and location services before AND after location acquisition.
-     * 5. Requests fresh ephemeral foreground location fix from [locationAdapter].
-     * 6. Revalidates session tracker across suspension boundaries (`sessionTracker.currentSession() == initialSession`).
-     * 7. Evaluates client-side sample quality, age (0..60s), accuracy (<=100m), and distance (<=150m) via [ConditionEvaluator].
-     * 8. Executes atomic Firestore transaction ([firestoreAdapter.verifyRecipientUnlock]), where server rules enforce
-     *    `request.time >= resource.data.unlockAt` for TIME and BOTH modes.
-     * 9. Never persists `locationOK` or past geofence ENTER as future authorization.
-     */
     override suspend fun verifyUnlock(capsuleId: String): OperationResult<Availability> {
+        return verifyUnlock(capsuleId, sessionTracker.currentSession())
+    }
+
+    /**
+     * Orchestrates recipient unlock verification for TIME, LOCATION, and TIME_AND_LOCATION (BOTH) capsules bound to [targetSession].
+     */
+    override suspend fun verifyUnlock(capsuleId: String, targetSession: SessionSnapshot): OperationResult<Availability> {
         val cleanId = capsuleId.trim()
         if (cleanId.isBlank()) {
             return OperationResult.Invalid("Capsule ID must not be blank for unlock verification.")
         }
-        val initialSession = sessionTracker.currentSession()
-        if (!initialSession.isAuthenticated || initialSession.uid.isNullOrBlank()) {
+        if (!sessionTracker.isSessionValid(targetSession) || !targetSession.isAuthenticated || targetSession.uid.isNullOrBlank()) {
             return OperationResult.Denied("Authentication required to verify capsule unlock.")
         }
-        val activeUid = initialSession.uid
+        val activeUid = targetSession.uid
 
         // 1. Authoritative server read for lock mode, unlock target, and existing unlocked status
         val reqResult = firestoreAdapter.readRecipientUnlockRequirements(cleanId, activeUid)
-        val postReadSession = sessionTracker.currentSession()
-        if (!postReadSession.isAuthenticated || postReadSession != initialSession) {
+        if (!sessionTracker.isSessionValid(targetSession)) {
             return OperationResult.Denied("Account session changed during unlock verification.")
         }
 
@@ -128,8 +143,7 @@ class DefaultCapsuleRepository(
             }
 
             val locResult = adapter.getCurrentLocation()
-            val postLocSession = sessionTracker.currentSession()
-            if (!postLocSession.isAuthenticated || postLocSession != initialSession) {
+            if (!sessionTracker.isSessionValid(targetSession)) {
                 return OperationResult.Denied("Account session changed during location acquisition.")
             }
 
@@ -180,8 +194,7 @@ class DefaultCapsuleRepository(
 
         // 2. Submit transaction to Firestore with location sample and monotonic timestamp supplier
         val result = firestoreAdapter.verifyRecipientUnlock(cleanId, activeUid, sample, clockNanosSupplier)
-        val postSession = sessionTracker.currentSession()
-        if (!postSession.isAuthenticated || postSession != initialSession) {
+        if (!sessionTracker.isSessionValid(targetSession)) {
             return OperationResult.Denied("Account session changed during unlock verification.")
         }
         return result

@@ -355,6 +355,31 @@ class ForegroundRecoveryCoordinatorTest {
         assertFalse(callbackInvoked.get())
     }
 
+    @Test
+    fun sessionSwitchDuringRepositoryDispatch_assertsNoOperationStartsUnderWrongAccount() = runTest {
+        val sessionTrack = DefaultSessionTracker()
+        sessionTrack.startSession("user-1")
+
+        val capturedSession = sessionTrack.currentSession()
+
+        val fakeAuth = FakeAuthAdapterUnlock(sessionTrack)
+        val fakeFirestore = FakeFirestoreAdapterUnlock()
+        val repository = DefaultCapsuleRepository(
+            sessionTracker = sessionTrack,
+            authAdapter = fakeAuth,
+            firestoreAdapter = fakeFirestore,
+            locationAdapter = null
+        )
+
+        // Session switches to user-2 before repository dispatch begins
+        sessionTrack.startSession("user-2")
+
+        val res = repository.verifyUnlock("capsule-time", capturedSession)
+
+        assertTrue(res is OperationResult.Denied)
+        assertTrue((res as OperationResult.Denied).message.contains("Authentication required") || res.message.contains("changed"))
+    }
+
     // --- Domain Business Logic Tests ---
 
     @Test

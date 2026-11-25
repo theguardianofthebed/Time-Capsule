@@ -54,25 +54,21 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Connect debug emulator endpoints in DEBUG builds; verify config availability in RELEASE builds
+        // Initialize Firebase configuration and retrieve application-scoped dependency container
         val isDebug = BuildConfig.DEBUG
-        if (isDebug) {
-            val emulatorInitialized = FirebaseConfig.setupDebugEmulatorConnection(applicationContext, true)
-            if (!emulatorInitialized) {
-                binding.tvInitError.text = "Firebase Initialization Failed (Fail-Closed)"
-                binding.tvInitError.visibility = View.VISIBLE
-                return
-            }
-        } else {
-            if (!FirebaseConfig.isFirebaseAvailable(applicationContext)) {
-                binding.tvInitError.text = "Firebase Configuration Missing (Fail-Closed)"
-                binding.tvInitError.visibility = View.VISIBLE
-                return
-            }
+        val app = application as TimeCapsuleApplication
+        val initSuccess = app.initializeFirebaseAndContainer()
+        val appContainer = app.container
+        if (!initSuccess || appContainer == null) {
+            binding.tvInitError.text = if (isDebug)
+                "Firebase Initialization Failed (Fail-Closed)"
+            else
+                "Firebase Configuration Missing (Fail-Closed)"
+            binding.tvInitError.visibility = View.VISIBLE
+            return
         }
 
-        // Retrieve application-scoped dependency container to survive Activity recreation/rotation
-        container = (application as TimeCapsuleApplication).container
+        container = appContainer
 
         // Unconditionally restore session into SessionTracker on every Activity/container creation
         val activeUid = container.accountSessionManager.restoreSessionIfAuthenticated()
