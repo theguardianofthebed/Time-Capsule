@@ -39,7 +39,7 @@ class FakeFirestoreAdapterForSession : FirestoreAdapter {
 class SessionRestorationTest {
 
     /** Repeated foreground authentication checks preserve active work's generation evidence. */
-    @Test fun repeatedRestorationDoesNotCreateNewSession() {
+    @Test fun repeatedRestorationDoesNotCreateNewSession() = runBlocking {
         val tracker = DefaultSessionTracker()
         val manager = AccountSessionManager(FakeAuthAdapterWithActiveUid("same"),
             FakeFirestoreAdapterForSession(), tracker)
@@ -50,7 +50,7 @@ class SessionRestorationTest {
     }
 
     /** An already-signed-out foreground check does not invalidate the same empty session repeatedly. */
-    @Test fun repeatedSignedOutChecksPreserveGeneration() {
+    @Test fun repeatedSignedOutChecksPreserveGeneration() = runBlocking {
         val tracker = DefaultSessionTracker()
         val manager = AccountSessionManager(FakeAuthAdapterWithActiveUid(null),
             FakeFirestoreAdapterForSession(), tracker)
@@ -60,7 +60,7 @@ class SessionRestorationTest {
     }
 
     @Test
-    fun restoredSessionPopulatesSessionTrackerAndActiveUid() {
+    fun restoredSessionPopulatesSessionTrackerAndActiveUid() = runBlocking {
         val authAdapter = FakeAuthAdapterWithActiveUid("user-restored-123")
         val sessionTracker = DefaultSessionTracker()
         val manager = AccountSessionManager(authAdapter, FakeFirestoreAdapterForSession(), sessionTracker)
@@ -73,7 +73,7 @@ class SessionRestorationTest {
     }
 
     @Test
-    fun unauthenticatedRestartClearsSessionTracker() {
+    fun unauthenticatedRestartClearsSessionTracker() = runBlocking {
         val authAdapter = FakeAuthAdapterWithActiveUid(null)
         val sessionTracker = DefaultSessionTracker()
         val manager = AccountSessionManager(authAdapter, FakeFirestoreAdapterForSession(), sessionTracker)
@@ -85,20 +85,20 @@ class SessionRestorationTest {
     }
 
     @Test
-    fun signOutClearsRestoredSession() {
+    fun signOutClearsRestoredSession() = runBlocking {
         val authAdapter = FakeAuthAdapterWithActiveUid("user-restored-123")
         val sessionTracker = DefaultSessionTracker()
         val manager = AccountSessionManager(authAdapter, FakeFirestoreAdapterForSession(), sessionTracker)
 
         manager.restoreSessionIfAuthenticated()
-        runBlocking { manager.signOut() }
+        manager.signOut()
 
         assertNull(authAdapter.activeUid())
         assertFalse(sessionTracker.currentSession().isAuthenticated)
     }
 
     @Test
-    fun repeatedRestorePreservesSessionGeneration() {
+    fun repeatedRestorePreservesSessionGeneration() = runBlocking {
         val authAdapter = FakeAuthAdapterWithActiveUid("user-restored-123")
         val sessionTracker = DefaultSessionTracker()
         val manager = AccountSessionManager(authAdapter, FakeFirestoreAdapterForSession(), sessionTracker)
@@ -115,7 +115,7 @@ class SessionRestorationTest {
     }
 
     @Test
-    fun repeatedUnauthenticatedRestorePreservesGeneration() {
+    fun repeatedUnauthenticatedRestorePreservesGeneration() = runBlocking {
         val authAdapter = FakeAuthAdapterWithActiveUid(null)
         val sessionTracker = DefaultSessionTracker()
         val manager = AccountSessionManager(authAdapter, FakeFirestoreAdapterForSession(), sessionTracker)
@@ -131,7 +131,7 @@ class SessionRestorationTest {
     }
 
     @Test
-    fun accountTransitionIncrementsGenerationAndInvalidatesPreviousSession() {
+    fun accountTransitionIncrementsGenerationAndInvalidatesPreviousSession() = runBlocking {
         val authAdapter = FakeAuthAdapterWithActiveUid("user-1")
         val sessionTracker = DefaultSessionTracker()
         val manager = AccountSessionManager(authAdapter, FakeFirestoreAdapterForSession(), sessionTracker)

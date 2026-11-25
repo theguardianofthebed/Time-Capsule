@@ -362,8 +362,8 @@ class CapsuleDraftViewModel(
         if (latestRepository != null) this.repository = latestRepository
         if (latestRecoveryCoordinator != null) this.recoveryCoordinator = latestRecoveryCoordinator
 
-        val activeUid = accountSessionManager.restoreSessionIfAuthenticated()
         val currentSession = accountSessionManager.currentSession()
+        val activeUid = currentSession.uid
         if (activeUid != _uiState.value.activeSessionUid || currentSession != observedSession) {
             observedSession = currentSession
             photoToken++
@@ -376,6 +376,22 @@ class CapsuleDraftViewModel(
             }
         } else if (!_uiState.value.publicationBusy && !_uiState.value.recoveryBusy) {
             recoverPublicationState()
+        }
+
+        viewModelScope.launch {
+            val restoredUid = accountSessionManager.restoreSessionIfAuthenticated()
+            if (restoredUid != _uiState.value.activeSessionUid) {
+                val newSession = accountSessionManager.currentSession()
+                observedSession = newSession
+                photoToken++
+                publicationToken++
+                activeLookupToken++
+                _uiState.value = CapsuleDraftUiState(activeSessionUid = restoredUid)
+                if (!restoredUid.isNullOrBlank()) {
+                    selectFutureMe(restoredUid)
+                    recoverPublicationState(restoreEditable = true)
+                }
+            }
         }
     }
 
@@ -734,31 +750,59 @@ class CapsuleDraftViewModel(
 
     /** Renders a frozen operation without revalidating an elapsed unlock time or restoring SENT text. */
     private fun applyRecovered(recovered: RecoveredPublication) {
-        require(recovered.phase == PublicationPhase.SENT || recovered.snapshot != null) {
-            "An unfinished send requires its frozen snapshot."
-        }
         val operation = recovered.snapshot
         photoToken++
         activeLookupToken++
         _uiState.update { state ->
-            if (operation == null) state.copy(capsuleId = recovered.capsuleId,
-                text = "", localPhotoUri = null, originalPhoto = null, photoName = null,
-                photoSizeBytes = null, photoBusy = false, publicationPhase = recovered.phase,
-                publicationBusy = false, recoveryBusy = false, recoveryBlocked = false,
-                canAbandon = false, publicationMessage = R.string.publication_sent)
-            else state.copy(capsuleId = operation.capsuleId, title = operation.title ?: "",
-                text = operation.text, originalPhoto = operation.photo,
-                localPhotoUri = operation.photo?.let { photoInput?.file(it)?.toURI()?.toString() },
-                photoName = operation.photo?.let { "Photo" }, photoSizeBytes = operation.photo?.sizeBytes,
-                photoBusy = false, recipientUidInput = operation.recipientUid,
-                resolvedProfile = RecipientProfile(operation.recipientUid, operation.recipientUid),
-                isRecipientConfirmed = true, lockMode = operation.lock.mode,
-                unlockAt = operation.lock.unlockAt, creationZone = operation.creationZone,
-                locationTarget = operation.lock.location,
-                publicationPhase = recovered.phase, canAbandon = recovered.canAbandon,
-                publicationBusy = false, recoveryBusy = false, recoveryBlocked = false,
-                publicationMessage = if (recovered.canAbandon) R.string.publication_failed
-                    else R.string.publication_unknown)
+            if (operation == null) {
+                val messageRes = when (recovered.phase) {
+                    PublicationPhase.SENT -> R.string.publication_sent
+                    PublicationPhase.FAILED -> if (recovered.canAbandon) R.string.publication_failed else R.string.publication_unknown
+                    else -> R.string.publication_unknown
+                }
+                state.copy(
+                    capsuleId = recovered.capsuleId,
+                    text = "",
+                    title = "",
+                    localPhotoUri = null,
+                    originalPhoto = null,
+                    photoName = null,
+                    photoSizeBytes = null,
+                    photoBusy = false,
+                    publicationPhase = recovered.phase,
+                    canAbandon = recovered.canAbandon,
+                    publicationBusy = false,
+                    recoveryBusy = false,
+                    recoveryBlocked = false,
+                    publicationMessage = messageRes
+                )
+            } else {
+                state.copy(
+                    capsuleId = operation.capsuleId,
+                    title = operation.title ?: "",
+                    text = operation.text,
+                    originalPhoto = operation.photo,
+                    localPhotoUri = operation.photo?.let { photoInput?.file(it)?.toURI()?.toString() },
+                    photoName = operation.photo?.let { "Photo" },
+                    photoSizeBytes = operation.photo?.sizeBytes,
+                    photoBusy = false,
+                    recipientUidInput = operation.recipientUid,
+                    resolvedProfile = if (operation.recipientUid.isNotBlank()) RecipientProfile(operation.recipientUid, operation.recipientUid) else state.resolvedProfile,
+                    isRecipientConfirmed = operation.recipientUid.isNotBlank(),
+                    lockMode = operation.lock.mode,
+                    unlockAt = operation.lock.unlockAt,
+                    creationZone = operation.creationZone,
+                    locationTarget = operation.lock.location,
+                    publicationPhase = recovered.phase,
+                    canAbandon = recovered.canAbandon,
+                    publicationBusy = false,
+                    recoveryBusy = false,
+                    recoveryBlocked = false,
+                    publicationMessage = if (recovered.phase == PublicationPhase.SENT) R.string.publication_sent
+                        else if (recovered.canAbandon) R.string.publication_failed
+                        else R.string.publication_unknown
+                )
+            }
         }
     }
 

@@ -21,7 +21,8 @@ class AccountSessionManager(
     private val firestoreAdapter: FirestoreAdapter,
     private val sessionTracker: SessionTracker,
     private val sessionGuard: SessionGuard = SessionGuard(sessionTracker),
-    private val onAccountCleared: (suspend (String) -> OperationResult<Unit>)? = null
+    private val onAccountCleared: (suspend (String) -> OperationResult<Unit>)? = null,
+    private val isCleanupPending: () -> Boolean = { false }
 ) {
 
     private val authMutex = Mutex()
@@ -37,32 +38,33 @@ class AccountSessionManager(
      * Changes generation only on an identity transition; foreground checks preserve in-flight work.
      * Enforces session invalidation and account cleanup BEFORE activating a new session.
      */
-    fun restoreSessionIfAuthenticated(): String? = runBlocking {
-        authMutex.withLock {
-            val activeUid = authAdapter.activeUid()
-            val currentUid = sessionTracker.currentSession().uid
+    suspend fun restoreSessionIfAuthenticated(): String? = authMutex.withLock {
+        val activeUid = authAdapter.activeUid()
+        val currentUid = sessionTracker.currentSession().uid
 
-            if (!activeUid.isNullOrBlank()) {
-                if (currentUid != activeUid) {
-                    sessionTracker.clearSession()
-                    if (!currentUid.isNullOrBlank()) {
-                        val cleanupRes = onAccountCleared?.invoke(currentUid)
-                        if (cleanupRes is OperationResult.Unavailable) {
-                            return@withLock null
-                        }
-                    }
-                    sessionTracker.startSession(activeUid)
+        if (!activeUid.isNullOrBlank()) {
+            if (currentUid != activeUid || isCleanupPending()) {
+                sessionTracker.clearSession()
+                val targetUid = currentUid ?: ""
+                val cleanupRes = onAccountCleared?.invoke(targetUid)
+                if (cleanupRes is OperationResult.Unavailable) {
+                    return@withLock null
                 }
-                return@withLock activeUid
-            } else {
-                if (sessionTracker.currentSession().isAuthenticated) {
-                    sessionTracker.clearSession()
-                    if (!currentUid.isNullOrBlank()) {
-                        onAccountCleared?.invoke(currentUid)
-                    }
-                }
-                return@withLock null
+                sessionTracker.startSession(activeUid)
             }
+            return@withLock activeUid
+        } else {
+            if (sessionTracker.currentSession().isAuthenticated || isCleanupPending()) {
+                sessionTracker.clearSession()
+                val targetUid = currentUid ?: ""
+                if (targetUid.isNotBlank() || isCleanupPending()) {
+                    val cleanupRes = onAccountCleared?.invoke(targetUid)
+                    if (cleanupRes is OperationResult.Unavailable) {
+                        return@withLock null
+                    }
+                }
+            }
+            return@withLock null
         }
     }
 
@@ -241,19 +243,17 @@ class AccountSessionManager(
     }
 
     /** Signs out the current user and clears session tracker before executing cleanup. */
-    fun signOut(): OperationResult<Unit> = runBlocking {
-        authMutex.withLock {
-            val oldUid = sessionTracker.currentSession().uid
-            authAdapter.signOut()
-            sessionTracker.clearSession()
-            if (!oldUid.isNullOrBlank()) {
-                val cleanupRes = onAccountCleared?.invoke(oldUid)
-                if (cleanupRes is OperationResult.Unavailable) {
-                    return@withLock cleanupRes
-                }
+    suspend fun signOut(): OperationResult<Unit> = authMutex.withLock {
+        val oldUid = sessionTracker.currentSession().uid
+        authAdapter.signOut()
+        sessionTracker.clearSession()
+        if (!oldUid.isNullOrBlank()) {
+            val cleanupRes = onAccountCleared?.invoke(oldUid)
+            if (cleanupRes is OperationResult.Unavailable) {
+                return@withLock cleanupRes
             }
-            OperationResult.Success(Unit)
         }
+        OperationResult.Success(Unit)
     }
 
     private fun checkAndHandleStaleCallback(capturedSession: SessionSnapshot): Boolean {

@@ -68,6 +68,7 @@ class AccountCleanupOrchestratorTest {
     }
 
     private lateinit var noBackupDir: File
+    private lateinit var frozenPhotosDir: File
     private lateinit var fakeNotificationAdapter: FakeNotificationAdapter
     private lateinit var unlockNotificationCoordinator: UnlockNotificationCoordinator
 
@@ -78,6 +79,7 @@ class AccountCleanupOrchestratorTest {
         photoStoreDir = temporaryFolder.newFolder("original-photos")
         photoDraftDir = temporaryFolder.newFolder("photo-drafts")
         noBackupDir = temporaryFolder.newFolder("no_backup")
+        frozenPhotosDir = temporaryFolder.newFolder("frozen-photos")
         attemptFile = temporaryFolder.newFile("notification-attempts.json")
 
         retentionAdapter = DefaultLocalRetentionAdapter(retentionDir)
@@ -101,7 +103,8 @@ class AccountCleanupOrchestratorTest {
             photoDraftJournal = photoDraftJournal,
             unlockNotificationCoordinator = unlockNotificationCoordinator,
             sessionTracker = sessionTracker,
-            noBackupDir = noBackupDir
+            noBackupDir = noBackupDir,
+            frozenPhotosDir = frozenPhotosDir
         )
     }
 
@@ -155,6 +158,12 @@ class AccountCleanupOrchestratorTest {
         // 5. Record notification attempt
         attemptStore.atomicallyClaimAttempt(uid, capsuleId1)
 
+        // 6. Save frozen photo record in real layout: frozen-photos/<capsuleId>/<hashedUid>.properties
+        val frozenCapsuleDir = File(frozenPhotosDir, capsuleId1)
+        val frozenJournal = PhotoDraftJournal(frozenCapsuleDir)
+        frozenJournal.save(uid, PhotoDraftRecord(capsuleId1, "Frozen Title", "Frozen Text", null))
+        assertNotNull(frozenJournal.load(uid))
+
         // EXECUTE CLEANUP
         orchestrator.cleanupAccount(uid)
 
@@ -166,7 +175,10 @@ class AccountCleanupOrchestratorTest {
         // B. Photo draft journal is cleared
         assertNull(photoDraftJournal.load(uid))
 
-        // C. SENT operation is deleted from journal
+        // C. Frozen photo journal in capsule dir is cleared
+        assertNull(frozenJournal.load(uid))
+
+        // D. SENT operation is deleted from journal
         assertNull(journal.load(uid, capsuleId2))
 
         // D. Unresolved operation is COMPACTED to opaque recovery record (text="", title=null)

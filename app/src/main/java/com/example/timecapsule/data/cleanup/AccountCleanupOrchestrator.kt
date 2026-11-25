@@ -7,6 +7,7 @@ import com.example.timecapsule.data.notification.UnlockNotificationCoordinator
 import com.example.timecapsule.data.publication.FrozenOperationJournal
 import com.example.timecapsule.data.session.SessionTracker
 import com.example.timecapsule.domain.result.OperationResult
+import kotlinx.coroutines.CancellationException
 import java.io.File
 import java.io.IOException
 import java.nio.file.Files
@@ -72,8 +73,15 @@ class AccountCleanupOrchestrator(
         }
     }
 
+    /** Returns true if a pending cleanup marker file exists on disk. */
+    fun hasPendingCleanup(): Boolean {
+        val markerFile = pendingMarkerFile() ?: return false
+        return markerFile.exists()
+    }
+
     /**
      * Checks for interrupted cleanup sessions on application startup and ensures former account state is clean.
+     * Fails closed: Returns [OperationResult.Unavailable] if malformed marker or startup cleanup fails.
      *
      * @param activeUid The currently authenticated UID restored from Auth, or null if unauthenticated.
      */
@@ -82,15 +90,21 @@ class AccountCleanupOrchestrator(
             try {
                 val markerFile = pendingMarkerFile()
                 if (markerFile != null && markerFile.exists()) {
-                    val properties = Properties().apply {
-                        markerFile.inputStream().use { load(it) }
+                    val pendingUid = try {
+                        val properties = Properties().apply {
+                            markerFile.inputStream().use { load(it) }
+                        }
+                        properties.getProperty("pendingUid") ?: ""
+                    } catch (_: Exception) {
+                        ""
                     }
-                    val pendingUid = properties.getProperty("pendingUid")
-                    if (!pendingUid.isNullOrBlank()) {
+                    if (pendingUid.isNotBlank()) {
                         val result = performCleanupInternal(pendingUid)
                         if (result !is OperationResult.Success) {
                             return@withLock result
                         }
+                    } else {
+                        return@withLock OperationResult.Unavailable("Malformed pending cleanup marker found on startup.")
                     }
                 }
 
@@ -101,6 +115,7 @@ class AccountCleanupOrchestrator(
                     OperationResult.Success(Unit)
                 }
             } catch (error: Exception) {
+                if (error is CancellationException) throw error
                 OperationResult.Unavailable("Startup cleanup recovery failed: ${error.message}")
             }
         }
@@ -153,13 +168,28 @@ class AccountCleanupOrchestrator(
             if (firstErrorMessage == null) firstErrorMessage = "Photo draft cleanup failed: ${e.message}"
         }
 
-        // 6. Purge frozen photo uploads directory if specified
+        // 6. Purge frozen photo upload journals across all capsule directories
         try {
             frozenPhotosDir?.let { dir ->
                 if (dir.exists()) {
-                    val userFrozenDir = File(dir, cleanUid)
-                    if (userFrozenDir.exists() && !userFrozenDir.deleteRecursively()) {
-                        throw IOException("Cannot delete frozen photo upload directory for $cleanUid")
+                    val capsuleDirs = dir.listFiles()
+                    if (capsuleDirs != null) {
+                        for (capsuleDir in capsuleDirs) {
+                            if (capsuleDir.isDirectory) {
+                                val journal = PhotoDraftJournal(capsuleDir)
+                                val draft = try { journal.load(cleanUid) } catch (_: Exception) { null }
+                                draft?.photo?.let { photo ->
+                                    try {
+                                        originalPhotoStore?.file(photo)?.delete()
+                                    } catch (_: Exception) {}
+                                }
+                                journal.clearAccountData(cleanUid)
+                                val remainingFiles = capsuleDir.listFiles()
+                                if (remainingFiles != null && remainingFiles.isEmpty()) {
+                                    capsuleDir.delete()
+                                }
+                            }
+                        }
                     }
                 }
             }

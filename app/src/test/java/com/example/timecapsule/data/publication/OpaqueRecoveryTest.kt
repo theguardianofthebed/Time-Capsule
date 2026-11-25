@@ -11,6 +11,7 @@ import java.io.File
 import java.time.Instant
 import kotlinx.coroutines.runBlocking
 import org.junit.After
+import org.junit.Assert
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -34,13 +35,14 @@ class OpaqueRecoveryTest {
 
     private class FakeCapsulePublicationBackend : CapsulePublicationBackend {
         val inspectionResults = mutableMapOf<String, PublicationInspection>()
+        var publishCalls = 0
 
-        override suspend fun publish(operation: FrozenCapsuleOperation) {}
+        override suspend fun publish(operation: FrozenCapsuleOperation) {
+            publishCalls++
+        }
 
         override suspend fun inspect(operation: FrozenCapsuleOperation): PublicationInspection {
-            val res = inspectionResults[operation.capsuleId] ?: PublicationInspection.ABSENT
-            println("FakeCapsulePublicationBackend.inspect(${operation.capsuleId}) = $res")
-            return res
+            return inspectionResults[operation.capsuleId] ?: PublicationInspection.ABSENT
         }
     }
 
@@ -194,12 +196,44 @@ class OpaqueRecoveryTest {
 
         val session = SessionSnapshot(uid = uid, sessionGeneration = 1L)
         val res = coordinator.retry(capsuleId, session)
-        println("RETRY RESULT: $res")
+
+        assertEquals("Zero publish calls expected for opaque retry", 0, fakeBackend.publishCalls)
         assertTrue("Expected OutcomeUnknown, Denied, or Unavailable but got $res", res is OperationResult.OutcomeUnknown || res is OperationResult.Denied || res is OperationResult.Unavailable)
         val loadedAfter = journal.load(uid, capsuleId)
         assertNotNull(loadedAfter)
         assertTrue(loadedAfter!!.operation.isOpaque)
         assertEquals("", loadedAfter.operation.text)
+    }
+
+    @Test
+    fun testRealMatcherWithOpaqueRecord() {
+        val rawOp = FrozenCapsuleOperation(
+            capsuleId = "capsule-opaque-matcher",
+            senderUid = "sender-1",
+            recipientUid = "recipient-1",
+            title = "Title",
+            text = "Secret Text",
+            lock = CapsuleLock(LockMode.TIME, unlockAt = Instant.now().plusSeconds(3600)),
+            creationZone = "UTC",
+            photo = null,
+            snapshotDigest = ""
+        )
+        val op = rawOp.copy(snapshotDigest = rawOp.calculateDigest(), isOpaque = true, text = "", title = null)
+
+        val matchingDoc = mapOf(
+            "capsuleId" to "capsule-opaque-matcher",
+            "senderId" to "sender-1",
+            "snapshotDigest" to op.snapshotDigest,
+            "lockMode" to "TIME",
+            "creationZone" to "UTC",
+            "createdAt" to Instant.now(),
+            "unlocked" to false
+        )
+
+        assertTrue(PublicationRecordMatcher.matchesOpaque(op, matchingDoc))
+
+        val mismatchedDoc = matchingDoc + ("snapshotDigest" to "different-digest")
+        Assert.assertFalse(PublicationRecordMatcher.matchesOpaque(op, mismatchedDoc))
     }
 
     @Test

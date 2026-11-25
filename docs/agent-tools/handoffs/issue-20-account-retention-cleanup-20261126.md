@@ -32,19 +32,20 @@
    - Purges compose buffers and local photo files upon confirmed publication.
 5. **Backup Exclusions (`backup_rules.xml`, `data_extraction_rules.xml`):**
    - Configured XML rules to exclude all app-private protected directories (`retained-content`, `capsule-operations`, `original-photos`, `frozen-photos`, `photo-drafts`, `notification-attempts.json`, `no_backup`).
-6. **Code Review Corrections (A–I):**
-   - **Correction A**: Separated opaque recovery from full publication payloads. Added `matchesOpaque` in `PublicationRecordMatcher` and handled opaque operations in `FirestoreCapsulePublication` and `CapsulePublicationCoordinator`.
-   - **Correction B**: Fail-closed account cleanup in `AccountCleanupOrchestrator` returning `OperationResult.Unavailable` on error and persisting `pending-cleanup.properties`.
-   - **Correction C**: Session-aware write authorization checking `sessionTracker.isSessionValid(targetSession)` inside storage mutexes.
-   - **Correction D**: Session authorization for retained content in `DefaultLocalRetentionAdapter`.
-   - **Correction E**: Interrupted cleanup recovery on process restart (`cleanupInterruptedSessions`).
-   - **Correction F**: Marker flag and byte validation in `DefaultLocalRetentionAdapter`.
-   - **Correction G**: Asynchronous non-blocking account sign-out/switch.
-   - **Correction H**: Server-confirmed retention handoff in `DefaultCapsuleRepository.readContent`.
-   - **Correction I**: Suppressed raw snapshot exposure for uncertain self-sends.
+6. **Second Review Corrections (1–9):**
+   - **Defect 1**: Connected `sessionTracker::currentSession` to `DefaultLocalRetentionAdapter` and injected `retentionAdapter` into `DefaultCapsuleRepository` in `TimeCapsuleApplication.kt`.
+   - **Defect 2**: Implemented `DefaultFirestoreAdapter.readProtectedContent()` reading `protectedContent/{capsuleId}` with `Source.SERVER`. In `DefaultCapsuleRepository.kt`, extracted authoritative `unlockAt` server timestamp and persisted/retrieved protected content to/from `LocalRetentionAdapter`.
+   - **Defect 3**: Updated `AccountCleanupOrchestrator.kt`, `AccountSessionManager.kt`, and `TimeCapsuleApplication.kt` so `pending-cleanup.properties` blocks session activation across sign-in, sign-out, restore, and startup paths even when current UID is null/empty. Malformed markers fail closed.
+   - **Defect 4**: Enforced `sessionTracker.isSessionValid(targetSession)` and `sessionGeneration` checks inside storage locks across `OriginalPhotoUploads`, `PrivatePublicationDrafts`, `DefaultLocalRetentionAdapter`, and `CapsulePublicationCoordinator`.
+   - **Defect 5**: Updated `AccountCleanupOrchestrator.kt` step 6 to purge `frozen-photos/<capsuleId>/<hashedUid>.properties` and delete empty capsule directories.
+   - **Defect 6**: Updated `FrozenOperationJournal.kt` to serialize minimal opaque records omitting payload/location fields. Added `hadPhoto` to `FrozenOperationRecord` so `hasPhotoProof()` requires photo ACK for opaque photo operations.
+   - **Defect 7**: Updated `CapsuleDraftViewModel.applyRecovered()` to handle `snapshot == null` for opaque recovery and uncertain self-sends without throwing `IllegalArgumentException`, setting status-only messages and clearing protected fields.
+   - **Defect 8**: Removed `runBlocking` from `AccountSessionManager.signOut()`, `restoreSessionIfAuthenticated()`, and `MainActivity.kt`. Refactored into non-blocking suspending functions and `lifecycleScope.launch`.
+   - **Defect 9**: Added unit tests for real matcher (`matchesOpaque`), zero publication calls for opaque retry, frozen photo layout cleanup, malformed startup cleanup, and same-UID re-authentication generation invalidation.
 7. **Automated Verification:**
-   - 330 JVM unit tests passing (`./gradlew :app:testDebugUnitTest`).
+   - 331 JVM unit tests passing (`./gradlew :app:testDebugUnitTest`).
    - Clean debug APK build (`./gradlew :app:assembleDebug`).
+   - Clean AndroidTest APK build (`./gradlew :app:assembleDebugAndroidTest`).
    - Clean Android lint (`./gradlew :app:lintDebug`).
 
 ## Remaining work

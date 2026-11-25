@@ -101,7 +101,7 @@ class S08AccountSettingsViewModelTest {
         firestoreAdapter = FakeFirestoreAdapterForS08()
         sessionTracker = DefaultSessionTracker()
         accountSessionManager = AccountSessionManager(authAdapter, firestoreAdapter, sessionTracker)
-        accountSessionManager.restoreSessionIfAuthenticated()
+        runBlocking { accountSessionManager.restoreSessionIfAuthenticated() }
 
         viewModel = S08AccountSettingsViewModel(accountSessionManager)
     }
@@ -193,6 +193,7 @@ class S08AccountSettingsViewModelTest {
     @Test
     fun signOutClearsSessionInManager() = runBlockingTest {
         viewModel.signOut()
+        testDispatcher.scheduler.advanceUntilIdle()
         assertNull(authAdapter.activeUid())
     }
 

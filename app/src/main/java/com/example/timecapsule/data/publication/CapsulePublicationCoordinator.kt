@@ -554,8 +554,10 @@ class CapsulePublicationCoordinator(
             (record.phase == PublicationPhase.OUTCOME_UNKNOWN && !record.terminalRejectionConfirmed)
 
     /** Text-only operations do not need a photo ACK; photo operations require its durable evidence. */
-    private fun hasPhotoProof(record: FrozenOperationRecord): Boolean =
-        record.operation.photo == null || record.photoAcknowledged
+    private fun hasPhotoProof(record: FrozenOperationRecord): Boolean {
+        val requiresPhoto = if (record.operation.isOpaque) record.hadPhoto else record.operation.photo != null
+        return !requiresPhoto || record.photoAcknowledged
+    }
 
     /** Builds the process-wide operation key without changing its frozen ID. */
     private fun key(operation: FrozenCapsuleOperation): AttemptKey =

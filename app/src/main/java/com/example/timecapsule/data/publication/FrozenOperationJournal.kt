@@ -77,8 +77,34 @@ class FrozenOperationJournal(private val root: File) {
             require(fields.required("senderUid") == uid)
             require(fields.required("capsuleId") == capsuleId)
             val isOpaque = fields.getProperty("isOpaque", "false").toBooleanStrict()
-            val recipientUid = if (isOpaque) fields.getProperty("recipientUid", "") else fields.required("recipientUid")
-            val text = if (isOpaque) fields.getProperty("text", "") else fields.required("text")
+            if (isOpaque) {
+                val lockMode = LockMode.valueOf(fields.required("lockMode"))
+                val operation = FrozenCapsuleOperation(
+                    capsuleId = capsuleId,
+                    senderUid = uid,
+                    recipientUid = "",
+                    title = null,
+                    text = "",
+                    lock = CapsuleLock(lockMode),
+                    creationZone = fields.required("creationZone"),
+                    photo = null,
+                    snapshotDigest = fields.required("snapshotDigest"),
+                    isOpaque = true
+                )
+                operation.verify()
+                return@synchronized FrozenOperationRecord(
+                    operation = operation,
+                    phase = PublicationPhase.valueOf(fields.required("phase")),
+                    photoAcknowledged = fields.getProperty("photoAcknowledged", "false").toBooleanStrict(),
+                    hasUnresolvedWrite = fields.getProperty("hasUnresolvedWrite", "false").toBooleanStrict(),
+                    terminalRejectionConfirmed = fields.getProperty("terminalRejectionConfirmed", "false").toBooleanStrict(),
+                    replacementDraftId = fields.getProperty("replacementDraftId"),
+                    replacementPrepared = fields.getProperty("replacementPrepared", "false").toBooleanStrict(),
+                    hadPhoto = fields.getProperty("hadPhoto", "false").toBooleanStrict()
+                )
+            }
+            val recipientUid = fields.required("recipientUid")
+            val text = fields.required("text")
             val photo = fields.getProperty("photoFile")?.let { name ->
                 RetainedOriginalPhoto(uid, capsuleId, name,
                     OriginalPhotoFormat.valueOf(fields.required("photoFormat")),
@@ -93,7 +119,7 @@ class FrozenOperationJournal(private val root: File) {
                 text, CapsuleLock(LockMode.valueOf(fields.required("lockMode")),
                     fields.getProperty("unlockAt")?.let(Instant::parse), location),
                 fields.required("creationZone"), photo, fields.required("snapshotDigest"),
-                isOpaque = isOpaque
+                isOpaque = false
             )
             operation.verify()
             FrozenOperationRecord(operation, PublicationPhase.valueOf(fields.required("phase")),
@@ -101,7 +127,8 @@ class FrozenOperationJournal(private val root: File) {
                 fields.getProperty("hasUnresolvedWrite", "false").toBooleanStrict(),
                 fields.getProperty("terminalRejectionConfirmed", "false").toBooleanStrict(),
                 fields.getProperty("replacementDraftId"),
-                fields.getProperty("replacementPrepared", "false").toBooleanStrict())
+                fields.getProperty("replacementPrepared", "false").toBooleanStrict(),
+                hadPhoto = photo != null)
         } catch (error: RuntimeException) {
             throw IOException("Saved capsule operation is invalid; do not start a new send.", error)
         }
@@ -148,13 +175,14 @@ class FrozenOperationJournal(private val root: File) {
                     throw IOException("Cannot delete resolved operation file: $destination")
                 }
             } else {
+                val hadPhoto = record.hadPhoto || operation.photo != null
                 val opaqueOperation = operation.copy(
                     text = "",
                     title = null,
                     photo = null,
                     isOpaque = true
                 )
-                val opaqueRecord = record.copy(operation = opaqueOperation)
+                val opaqueRecord = record.copy(operation = opaqueOperation, hadPhoto = hadPhoto)
                 save(opaqueRecord)
                 opaqueIds.add(operation.capsuleId)
             }
@@ -177,6 +205,19 @@ class FrozenOperationJournal(private val root: File) {
         setProperty("version", "1")
         if (operation.isOpaque) {
             setProperty("isOpaque", "true")
+            setProperty("capsuleId", operation.capsuleId)
+            setProperty("senderUid", operation.senderUid)
+            setProperty("snapshotDigest", operation.snapshotDigest)
+            setProperty("phase", record.phase.name)
+            setProperty("hadPhoto", (record.hadPhoto || operation.photo != null).toString())
+            setProperty("photoAcknowledged", record.photoAcknowledged.toString())
+            setProperty("hasUnresolvedWrite", record.hasUnresolvedWrite.toString())
+            setProperty("terminalRejectionConfirmed", record.terminalRejectionConfirmed.toString())
+            setProperty("lockMode", operation.lock.mode.name)
+            setProperty("creationZone", operation.creationZone)
+            record.replacementDraftId?.let { setProperty("replacementDraftId", it) }
+            setProperty("replacementPrepared", record.replacementPrepared.toString())
+            return@apply
         }
         setProperty("capsuleId", operation.capsuleId)
         setProperty("senderUid", operation.senderUid)

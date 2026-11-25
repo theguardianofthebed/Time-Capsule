@@ -305,7 +305,15 @@ class DefaultCapsuleRepository(
             }
         }
 
-        // 2. Online unlock verification & remote content read
+        // 2. Authoritative server check for unlock requirements & unlock timestamp
+        val reqResult = firestoreAdapter.readRecipientUnlockRequirements(cleanId, activeUid)
+        if (!sessionTracker.isSessionValid(targetSession)) {
+            return OperationResult.Denied("Account session changed during content read.")
+        }
+        val serverUnlockedAt = if (reqResult is OperationResult.Success) {
+            reqResult.data.unlockAt
+        } else null
+
         val unlockRes = verifyUnlockOutcome(cleanId, targetSession)
         if (!sessionTracker.isSessionValid(targetSession)) {
             return OperationResult.Denied("Account session changed during content read.")
@@ -314,6 +322,8 @@ class DefaultCapsuleRepository(
         if (unlockRes !is OperationResult.Success || unlockRes.data.availability != Availability.AVAILABLE) {
             return OperationResult.Denied("Unlock authorization required before reading content.")
         }
+
+        val verifiedTime = serverUnlockedAt ?: Instant.now()
 
         val contentRes = firestoreAdapter.readProtectedContent(cleanId, activeUid)
         if (!sessionTracker.isSessionValid(targetSession)) {
@@ -325,7 +335,7 @@ class DefaultCapsuleRepository(
             retentionAdapter?.saveRetainedContent(
                 uid = activeUid,
                 capsuleId = cleanId,
-                verifiedUnlockedAt = Instant.now(),
+                verifiedUnlockedAt = verifiedTime,
                 text = content.text,
                 photoBytes = null,
                 photoFormat = null

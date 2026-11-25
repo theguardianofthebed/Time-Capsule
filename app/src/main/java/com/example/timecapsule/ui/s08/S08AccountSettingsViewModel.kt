@@ -61,10 +61,12 @@ class S08AccountSettingsViewModel(
     }
 
     /**
-     * Signs out current user and terminates session.
+     * Signs out current user asynchronously in viewModelScope and terminates session.
      */
     fun signOut() {
-        accountSessionManager.signOut()
+        viewModelScope.launch {
+            accountSessionManager.signOut()
+        }
     }
 
     /** Clears active update state notification. */

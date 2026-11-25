@@ -131,7 +131,8 @@ class TimeCapsuleApplication : Application() {
             sessionTracker = sessionTracker,
             onAccountCleared = { uid ->
                 accountCleanupOrchestrator.cleanupAccount(uid)
-            }
+            },
+            isCleanupPending = accountCleanupOrchestrator::hasPendingCleanup
         )
 
         val storageAdapter = DefaultStorageAdapter(

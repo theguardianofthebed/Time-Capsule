@@ -137,7 +137,8 @@ data class FrozenOperationRecord(
     val hasUnresolvedWrite: Boolean = false,
     val terminalRejectionConfirmed: Boolean = false,
     val replacementDraftId: String? = null,
-    val replacementPrepared: Boolean = false
+    val replacementPrepared: Boolean = false,
+    val hadPhoto: Boolean = false
 )
 
 /** Authenticated recovery state; completed operations never expose their raw compose snapshot. */

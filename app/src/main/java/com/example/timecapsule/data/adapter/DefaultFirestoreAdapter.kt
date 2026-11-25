@@ -7,6 +7,7 @@ import com.example.timecapsule.domain.model.Availability
 import com.example.timecapsule.domain.model.ForegroundLocationSample
 import com.example.timecapsule.domain.model.LocationTarget
 import com.example.timecapsule.domain.model.LockMode
+import com.example.timecapsule.domain.model.ProtectedCapsuleContent
 import com.example.timecapsule.domain.model.QualificationFailureReason
 import com.example.timecapsule.domain.model.RecipientProfile
 import com.example.timecapsule.domain.model.RecipientUnlockRequirements
@@ -19,7 +20,9 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Source
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 
 private sealed interface TransactionUnlockResult {
     object AlreadyUnlocked : TransactionUnlockResult
@@ -325,6 +328,46 @@ class DefaultFirestoreAdapter(
             is OperationResult.Denied -> OperationResult.Denied(res.message)
             is OperationResult.Unavailable -> OperationResult.Unavailable(res.message)
             is OperationResult.OutcomeUnknown -> OperationResult.OutcomeUnknown(res.capsuleId, res.message)
+        }
+    }
+
+    override suspend fun readProtectedContent(
+        capsuleId: String,
+        recipientUid: String
+    ): OperationResult<ProtectedCapsuleContent> = withContext(Dispatchers.IO) {
+        val cleanCapsuleId = capsuleId.trim()
+        val cleanRecipientUid = recipientUid.trim()
+        if (cleanCapsuleId.isBlank() || cleanRecipientUid.isBlank()) {
+            return@withContext OperationResult.Invalid("Capsule ID and recipient UID must not be blank.")
+        }
+        val firestore = firestoreInstance()
+            ?: return@withContext OperationResult.Unavailable("Firestore is unavailable.")
+
+        try {
+            val doc = firestore.collection("protectedContent").document(cleanCapsuleId)
+                .get(Source.SERVER).await()
+
+            if (!doc.exists()) {
+                return@withContext OperationResult.Denied("Protected content document does not exist.")
+            }
+
+            if (doc.metadata.isFromCache || doc.metadata.hasPendingWrites()) {
+                return@withContext OperationResult.Unavailable("Authoritative server response required for protected content.")
+            }
+
+            val text = doc.getString("text")
+            val photoObjectPath = doc.getString("photoObjectPath")
+
+            OperationResult.Success(
+                ProtectedCapsuleContent(
+                    capsuleId = cleanCapsuleId,
+                    text = text,
+                    photoObjectPath = photoObjectPath
+                )
+            )
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            mapFirestoreException(e)
         }
     }
 

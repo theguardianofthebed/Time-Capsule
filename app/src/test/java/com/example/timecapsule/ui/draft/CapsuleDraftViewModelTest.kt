@@ -23,6 +23,7 @@ import com.example.timecapsule.domain.model.RecipientProfile
 import com.example.timecapsule.domain.result.OperationResult
 import com.google.firebase.firestore.FirebaseFirestore
 import java.time.Instant
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CompletableDeferred
@@ -63,7 +64,7 @@ class CapsuleDraftViewModelTest {
         mockAuthAdapter = FakeAuthAdapter(initialUid = "sender-uid")
         mockFirestoreAdapter = FakeFirestoreAdapter()
         accountSessionManager = AccountSessionManager(mockAuthAdapter, mockFirestoreAdapter, sessionTracker)
-        accountSessionManager.restoreSessionIfAuthenticated()
+        runBlocking { accountSessionManager.restoreSessionIfAuthenticated() }
 
         viewModel = CapsuleDraftViewModel(accountSessionManager)
     }
