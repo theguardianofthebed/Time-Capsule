@@ -32,6 +32,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
@@ -63,7 +64,7 @@ class ForegroundRecoveryCoordinatorTest {
         Dispatchers.setMain(UnconfinedTestDispatcher())
         sessionTracker = DefaultSessionTracker()
         sessionTracker.startSession("user-1")
-        fakeRepository = FakeCapsuleRepository()
+        fakeRepository = FakeCapsuleRepository(sessionTracker)
     }
 
     @After
@@ -325,34 +326,33 @@ class ForegroundRecoveryCoordinatorTest {
         val coordinator = createCoordinator()
         fakeRepository.unlockResults["capsule-cb"] = OperationResult.Success(Availability.AVAILABLE)
 
-        val callbackInvoked = AtomicBoolean(false)
-        coordinator.triggerForegroundRecovery(listOf("capsule-cb")) { summary ->
-            callbackInvoked.set(true)
-            assertTrue(summary.publicationRecoveryResult is OperationResult.Success)
-        }
-
-        runCurrent()
-        assertTrue(callbackInvoked.get())
+        val summary = coordinator.checkForeground(listOf("capsule-cb"))
+        assertTrue(summary.publicationRecoveryResult is OperationResult.Success)
     }
 
     @Test
-    fun triggerForegroundRecovery_suppressesCallbackIfSessionChanged() = runTest {
-        val coordinator = createCoordinator()
-        val gate = CompletableDeferred<OperationResult<List<RecoveredPublication>>>()
-        fakeRepository.onRecoverDeferred = { gate }
+    fun sessionSwitchAfterTriggerForegroundRecoveryCalled_beforeCoroutineExecutes_suppressesOperationAndCallback() = runTest {
+        val standardDispatcher = StandardTestDispatcher(testScheduler)
+        val coordinator = ForegroundRecoveryCoordinator(
+            repository = fakeRepository,
+            sessionTracker = sessionTracker,
+            ioDispatcher = standardDispatcher,
+            scope = this,
+            responseTimeoutMillis = 15_000L
+        )
 
-        val callbackInvoked = AtomicBoolean(false)
-        coordinator.triggerForegroundRecovery(listOf("capsule-cb")) {
-            callbackInvoked.set(true)
-        }
+        // 1. Trigger foreground recovery while session is user-1 (queued on StandardTestDispatcher)
+        coordinator.triggerForegroundRecovery(listOf("capsule-1"))
 
-        runCurrent()
-        // Account changes before recovery finishes
+        // 2. Immediately switch session to user-2 before launched coroutine executes
         sessionTracker.startSession("user-2")
-        gate.complete(OperationResult.Success(emptyList()))
 
+        // 3. Execute queued coroutine
         runCurrent()
-        assertFalse(callbackInvoked.get())
+
+        // 4. Assert no repository calls were executed for the stale trigger
+        assertEquals(0, fakeRepository.recoverPublicationsCallCount.get())
+        assertEquals(0, fakeRepository.verifyUnlockCallCount.get())
     }
 
     @Test
@@ -544,7 +544,7 @@ class ForegroundRecoveryCoordinatorTest {
 
     // --- Fakes for Test Isolation ---
 
-    private class FakeCapsuleRepository : CapsuleRepository {
+    private class FakeCapsuleRepository(private val tracker: SessionTracker) : CapsuleRepository {
         val recoverPublicationsCallCount = AtomicInteger(0)
         val verifyUnlockCallCount = AtomicInteger(0)
         val publishCallCount = AtomicInteger(0)
@@ -557,20 +557,32 @@ class ForegroundRecoveryCoordinatorTest {
         var onVerifyUnlockException: Exception? = null
         var onRecoverDeferred: (() -> CompletableDeferred<OperationResult<List<RecoveredPublication>>>)? = null
 
-        override fun session(): SessionSnapshot = SessionSnapshot("user-1", 1)
+        override fun session(): SessionSnapshot = tracker.currentSession()
 
         override suspend fun getRecipient(uid: String): OperationResult<RecipientProfile> =
             OperationResult.Success(RecipientProfile(uid, "User $uid"))
 
-        override suspend fun publish(frozenOperation: CapsuleDraft): OperationResult<String> {
+        override suspend fun publish(frozenOperation: CapsuleDraft, targetSession: SessionSnapshot): OperationResult<String> {
+            if (!tracker.isSessionValid(targetSession)) return OperationResult.Denied("Account session changed.")
             publishCallCount.incrementAndGet()
             return OperationResult.Success(frozenOperation.capsuleId)
         }
 
-        override suspend fun reconcile(capsuleId: String): OperationResult<SendStatus> =
-            OperationResult.Success(SendStatus.SENT)
+        override suspend fun publish(frozenOperation: CapsuleDraft): OperationResult<String> {
+            return publish(frozenOperation, tracker.currentSession())
+        }
 
-        override suspend fun recoverPublications(): OperationResult<List<RecoveredPublication>> {
+        override suspend fun reconcile(capsuleId: String, targetSession: SessionSnapshot): OperationResult<SendStatus> {
+            if (!tracker.isSessionValid(targetSession)) return OperationResult.Denied("Account session changed.")
+            return OperationResult.Success(SendStatus.SENT)
+        }
+
+        override suspend fun reconcile(capsuleId: String): OperationResult<SendStatus> {
+            return reconcile(capsuleId, tracker.currentSession())
+        }
+
+        override suspend fun recoverPublications(targetSession: SessionSnapshot): OperationResult<List<RecoveredPublication>> {
+            if (!tracker.isSessionValid(targetSession)) return OperationResult.Denied("Account session changed.")
             recoverPublicationsCallCount.incrementAndGet()
             val deferred = onRecoverDeferred?.invoke()
             if (deferred != null) {
@@ -579,7 +591,12 @@ class ForegroundRecoveryCoordinatorTest {
             return OperationResult.Success(recoveredList)
         }
 
-        override suspend fun verifyUnlock(capsuleId: String): OperationResult<Availability> {
+        override suspend fun recoverPublications(): OperationResult<List<RecoveredPublication>> {
+            return recoverPublications(tracker.currentSession())
+        }
+
+        override suspend fun verifyUnlock(capsuleId: String, targetSession: SessionSnapshot): OperationResult<Availability> {
+            if (!tracker.isSessionValid(targetSession)) return OperationResult.Denied("Account session changed.")
             verifyUnlockCallCount.incrementAndGet()
             onVerifyUnlockCallback?.invoke(capsuleId)
             val exc = onVerifyUnlockException
@@ -589,6 +606,10 @@ class ForegroundRecoveryCoordinatorTest {
                 return deferred.await()
             }
             return unlockResults[capsuleId] ?: OperationResult.Success(Availability.AVAILABLE)
+        }
+
+        override suspend fun verifyUnlock(capsuleId: String): OperationResult<Availability> {
+            return verifyUnlock(capsuleId, tracker.currentSession())
         }
 
         override suspend fun lists(uid: String): OperationResult<CapsuleListsSnapshot> =

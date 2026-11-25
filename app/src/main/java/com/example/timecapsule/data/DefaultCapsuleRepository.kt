@@ -44,53 +44,63 @@ class DefaultCapsuleRepository(
         return firestoreAdapter.getRecipientProfile(cleanUid)
     }
 
-    /** Persists and submits through the shared publication coordinator; success requires server ACK. */
-    override suspend fun publish(frozenOperation: CapsuleDraft): OperationResult<String> =
-        publicationCoordinator?.publish(frozenOperation)
+    override suspend fun publish(frozenOperation: CapsuleDraft): OperationResult<String> {
+        return publish(frozenOperation, sessionTracker.currentSession())
+    }
+
+    override suspend fun publish(
+        frozenOperation: CapsuleDraft,
+        targetSession: SessionSnapshot
+    ): OperationResult<String> =
+        if (!sessionTracker.isSessionValid(targetSession)) OperationResult.Denied("Account session changed.")
+        else publicationCoordinator?.publish(frozenOperation, targetSession)
             ?: OperationResult.Unavailable("Capsule publication service is unavailable.")
 
     override suspend fun reconcile(capsuleId: String): OperationResult<SendStatus> {
         return reconcile(capsuleId, sessionTracker.currentSession())
     }
 
-    /** Resolves server-only matching evidence bound to [targetSession]. */
-    override suspend fun reconcile(capsuleId: String, targetSession: SessionSnapshot): OperationResult<SendStatus> {
-        if (!sessionTracker.isSessionValid(targetSession)) {
-            return OperationResult.Denied("Account session changed before reconciliation started.")
-        }
-        val res = publicationCoordinator?.reconcile(capsuleId)
+    override suspend fun reconcile(
+        capsuleId: String,
+        targetSession: SessionSnapshot
+    ): OperationResult<SendStatus> =
+        if (!sessionTracker.isSessionValid(targetSession)) OperationResult.Denied("Account session changed.")
+        else publicationCoordinator?.reconcile(capsuleId, targetSession)
             ?: OperationResult.Unavailable("Publication reconciliation is unavailable.")
-        if (!sessionTracker.isSessionValid(targetSession)) {
-            return OperationResult.Denied("Account session changed during reconciliation execution.")
-        }
-        return res
+
+    override suspend fun retryPublication(capsuleId: String): OperationResult<String> {
+        return retryPublication(capsuleId, sessionTracker.currentSession())
     }
 
-    /** Replays the original saved snapshot only after the coordinator's server check. */
-    override suspend fun retryPublication(capsuleId: String): OperationResult<String> =
-        publicationCoordinator?.retry(capsuleId)
+    override suspend fun retryPublication(
+        capsuleId: String,
+        targetSession: SessionSnapshot
+    ): OperationResult<String> =
+        if (!sessionTracker.isSessionValid(targetSession)) OperationResult.Denied("Account session changed.")
+        else publicationCoordinator?.retry(capsuleId, targetSession)
             ?: OperationResult.Unavailable("Publication retry is unavailable.")
 
     override suspend fun recoverPublications(): OperationResult<List<RecoveredPublication>> {
         return recoverPublications(sessionTracker.currentSession())
     }
 
-    /** Restores private operations bound to [targetSession] through server reconciliation without implicit replay. */
-    override suspend fun recoverPublications(targetSession: SessionSnapshot): OperationResult<List<RecoveredPublication>> {
-        if (!sessionTracker.isSessionValid(targetSession)) {
-            return OperationResult.Denied("Account session changed before publication recovery started.")
-        }
-        val res = publicationCoordinator?.recoverPublications()
+    override suspend fun recoverPublications(
+        targetSession: SessionSnapshot
+    ): OperationResult<List<RecoveredPublication>> =
+        if (!sessionTracker.isSessionValid(targetSession)) OperationResult.Denied("Account session changed.")
+        else publicationCoordinator?.recoverPublications(targetSession)
             ?: OperationResult.Unavailable("Publication recovery is unavailable.")
-        if (!sessionTracker.isSessionValid(targetSession)) {
-            return OperationResult.Denied("Account session changed during publication recovery execution.")
-        }
-        return res
+
+    override suspend fun abandonPublication(capsuleId: String): OperationResult<CapsuleDraft> {
+        return abandonPublication(capsuleId, sessionTracker.currentSession())
     }
 
-    /** Retains failed content under a new identity only when safe abandonment is established. */
-    override suspend fun abandonPublication(capsuleId: String) =
-        publicationCoordinator?.abandonForNewDraft(capsuleId)
+    override suspend fun abandonPublication(
+        capsuleId: String,
+        targetSession: SessionSnapshot
+    ): OperationResult<CapsuleDraft> =
+        if (!sessionTracker.isSessionValid(targetSession)) OperationResult.Denied("Account session changed.")
+        else publicationCoordinator?.abandonForNewDraft(capsuleId, targetSession)
             ?: OperationResult.Unavailable("Publication replacement is unavailable.")
 
     override suspend fun lists(uid: String): OperationResult<CapsuleListsSnapshot> {
@@ -104,7 +114,10 @@ class DefaultCapsuleRepository(
     /**
      * Orchestrates recipient unlock verification for TIME, LOCATION, and TIME_AND_LOCATION (BOTH) capsules bound to [targetSession].
      */
-    override suspend fun verifyUnlock(capsuleId: String, targetSession: SessionSnapshot): OperationResult<Availability> {
+    override suspend fun verifyUnlock(
+        capsuleId: String,
+        targetSession: SessionSnapshot
+    ): OperationResult<Availability> {
         val cleanId = capsuleId.trim()
         if (cleanId.isBlank()) {
             return OperationResult.Invalid("Capsule ID must not be blank for unlock verification.")
