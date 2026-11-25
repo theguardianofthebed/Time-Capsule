@@ -16,6 +16,9 @@ import com.example.timecapsule.data.media.AndroidOriginalImageProbe
 import com.example.timecapsule.data.media.OriginalPhotoStore
 import com.example.timecapsule.data.media.OriginalPhotoUploads
 import com.example.timecapsule.data.media.PhotoDraftJournal
+import com.example.timecapsule.data.notification.DefaultNotificationAdapter
+import com.example.timecapsule.data.notification.NotificationAttemptStore
+import com.example.timecapsule.data.notification.UnlockNotificationCoordinator
 import com.example.timecapsule.data.publication.CapsulePublicationCoordinator
 import com.example.timecapsule.data.publication.FrozenOperationJournal
 import com.example.timecapsule.data.publication.OriginalPublicationMedia
@@ -92,9 +95,25 @@ class TimeCapsuleApplication : Application() {
         val sessionTracker = DefaultSessionTracker()
         val authAdapter = DefaultAuthAdapter()
         val firestoreAdapter = DefaultFirestoreAdapter { context }
-        val accountSessionManager = AccountSessionManager(authAdapter, firestoreAdapter, sessionTracker)
 
         val noBackupDir = context.noBackupFilesDir ?: File(context.filesDir, "no_backup")
+
+        val notificationAdapter = DefaultNotificationAdapter(context)
+        val notificationAttemptStore = NotificationAttemptStore(File(noBackupDir, "notification-attempts.json"))
+        val unlockNotificationCoordinator = UnlockNotificationCoordinator(
+            notificationAdapter = notificationAdapter,
+            attemptStore = notificationAttemptStore,
+            sessionTracker = sessionTracker
+        )
+
+        val accountSessionManager = AccountSessionManager(
+            authAdapter = authAdapter,
+            firestoreAdapter = firestoreAdapter,
+            sessionTracker = sessionTracker,
+            onAccountCleared = { uid ->
+                unlockNotificationCoordinator.invalidateAccount(uid)
+            }
+        )
 
         val storageAdapter = DefaultStorageAdapter(
             FirebaseStorage.getInstance(),
@@ -134,7 +153,8 @@ class TimeCapsuleApplication : Application() {
 
         val recoveryCoordinator = ForegroundRecoveryCoordinator(
             repository = repository,
-            sessionTracker = sessionTracker
+            sessionTracker = sessionTracker,
+            unlockNotificationCoordinator = unlockNotificationCoordinator
         )
 
         return AppDependencyContainer(
@@ -147,7 +167,10 @@ class TimeCapsuleApplication : Application() {
             repository = repository,
             accountSessionManager = accountSessionManager,
             photoUploads = photoUploads,
-            recoveryCoordinator = recoveryCoordinator
+            recoveryCoordinator = recoveryCoordinator,
+            notificationAdapter = notificationAdapter,
+            notificationAttemptStore = notificationAttemptStore,
+            unlockNotificationCoordinator = unlockNotificationCoordinator
         )
     }
 

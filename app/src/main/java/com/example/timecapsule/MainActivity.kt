@@ -1,33 +1,16 @@
 package com.example.timecapsule
 
+import android.content.Intent
 import android.os.Bundle
-import com.example.timecapsule.data.adapter.FirestoreCapsulePublication
-import com.example.timecapsule.data.publication.CapsulePublicationCoordinator
-import com.example.timecapsule.data.publication.FrozenOperationJournal
-import com.example.timecapsule.data.publication.OriginalPublicationMedia
-import com.example.timecapsule.data.adapter.DefaultStorageAdapter
-import com.example.timecapsule.data.media.OriginalPhotoStore
-import com.example.timecapsule.data.media.OriginalPhotoUploads
-import com.example.timecapsule.data.media.AndroidOriginalImageProbe
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.storage.FirebaseStorage
-import java.io.File
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
-import com.example.timecapsule.config.FirebaseConfig
-import com.example.timecapsule.data.AccountSessionManager
-import com.example.timecapsule.data.DefaultCapsuleRepository
-import com.example.timecapsule.data.adapter.DefaultAuthAdapter
-import com.example.timecapsule.data.adapter.DefaultFirestoreAdapter
-import com.example.timecapsule.data.adapter.DefaultLocationAdapter
-import com.example.timecapsule.data.adapter.LocalRetentionAdapter
-import com.example.timecapsule.data.adapter.LocationAdapter
+import androidx.lifecycle.lifecycleScope
 import com.example.timecapsule.data.di.AppDependencyContainer
-import com.example.timecapsule.data.recovery.ForegroundRecoveryCoordinator
-import com.example.timecapsule.data.session.DefaultSessionTracker
+import com.example.timecapsule.data.notification.DefaultNotificationAdapter
+import com.example.timecapsule.data.notification.NotificationEntryResult
+import com.example.timecapsule.data.notification.NotificationEntryValidator
 import com.example.timecapsule.databinding.ActivityMainBinding
 import com.example.timecapsule.ui.s01.S01SignInFragment
 import com.example.timecapsule.ui.s02.S02RegisterFragment
@@ -35,6 +18,7 @@ import com.example.timecapsule.ui.s04.S04ContentDraftFragment
 import com.example.timecapsule.ui.s05.S05RecipientLockFragment
 import com.example.timecapsule.ui.s06.S06ConfirmSendFragment
 import com.example.timecapsule.ui.s08.S08AccountSettingsFragment
+import kotlinx.coroutines.launch
 
 /**
  * Main activity for the TimeCapsule application using native Views and ViewBinding.
@@ -43,6 +27,7 @@ import com.example.timecapsule.ui.s08.S08AccountSettingsFragment
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
+    private var lastProcessedNotificationIntentKey: String? = null
     lateinit var container: AppDependencyContainer
         private set
 
@@ -91,6 +76,60 @@ class MainActivity : AppCompatActivity() {
                 navigateToSignIn()
             } else {
                 navigateToContentDraft()
+            }
+        } else {
+            lastProcessedNotificationIntentKey = savedInstanceState.getString("KEY_PROCESSED_NOTIFICATION_INTENT")
+        }
+
+        handleNotificationIntent(intent)
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putString("KEY_PROCESSED_NOTIFICATION_INTENT", lastProcessedNotificationIntentKey)
+    }
+
+    /** Processes incoming singleTop notification entry intent. */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleNotificationIntent(intent)
+    }
+
+    /**
+     * Inspects and authoritatively revalidates notification entry [intent] against current active session.
+     * Prevents duplicate intent processing after Activity recreation.
+     */
+    private fun handleNotificationIntent(intent: Intent?) {
+        if (intent == null || !::container.isInitialized) return
+        val action = intent.action ?: return
+        if (action != DefaultNotificationAdapter.ACTION_NOTIFICATION_TAP) return
+
+        val uid = intent.getStringExtra(DefaultNotificationAdapter.EXTRA_ACCOUNT_UID) ?: ""
+        val capsuleId = intent.getStringExtra(DefaultNotificationAdapter.EXTRA_CAPSULE_ID) ?: ""
+        val intentKey = "$action:$uid:$capsuleId"
+
+        if (lastProcessedNotificationIntentKey == intentKey) return
+        lastProcessedNotificationIntentKey = intentKey
+
+        val currentSession = container.sessionTracker.currentSession()
+        val validator = NotificationEntryValidator(container.repository, container.sessionTracker)
+
+        lifecycleScope.launch {
+            when (val result = validator.validateEntryIntent(intent)) {
+                is NotificationEntryResult.Valid -> {
+                    if (container.sessionTracker.isSessionValid(currentSession) &&
+                        container.sessionTracker.currentSession() == currentSession) {
+                        Toast.makeText(
+                            this@MainActivity,
+                            getString(R.string.s07_title_capsule_ready),
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+                is NotificationEntryResult.Invalid -> {
+                    // Stale, malformed, or cross-account notification tap rejected safely without navigation
+                }
             }
         }
     }

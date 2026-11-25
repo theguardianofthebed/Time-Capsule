@@ -1,18 +1,21 @@
 package com.example.timecapsule.ui.s08
 
 import android.Manifest
+import android.app.NotificationManager
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.core.widget.doOnTextChanged
@@ -20,6 +23,7 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
 import com.example.timecapsule.MainActivity
 import com.example.timecapsule.R
+import com.example.timecapsule.data.notification.DefaultNotificationAdapter
 import com.example.timecapsule.databinding.FragmentS08AccountSettingsBinding
 import com.example.timecapsule.domain.result.OperationResult
 import com.example.timecapsule.ui.ViewModelFactory
@@ -40,6 +44,19 @@ class S08AccountSettingsFragment : Fragment() {
 
     var onSignOutSuccessListener: (() -> Unit)? = null
     var onCreateCapsuleListener: (() -> Unit)? = null
+
+    private val requestNotificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        checkAndroidPermissionsStatus()
+        if (!isGranted) {
+            Toast.makeText(
+                context,
+                "You can still open eligible capsules in the app.",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -165,7 +182,13 @@ class S08AccountSettingsFragment : Fragment() {
         }
 
         binding.btnOpenNotificationSettings.setOnClickListener {
-            openSystemAppSettings()
+            val ctx = context ?: return@setOnClickListener
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                requestNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            } else {
+                openSystemNotificationSettings()
+            }
         }
 
         // Navigate to S-04 Content Draft
@@ -238,8 +261,21 @@ class S08AccountSettingsFragment : Fragment() {
 
         // Notification permission & system settings check across all Android versions
         val notificationsEnabled = NotificationManagerCompat.from(context).areNotificationsEnabled()
+        val postPermissionGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        } else {
+            true
+        }
 
-        if (notificationsEnabled) {
+        val channelEnabled = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+            val channel = manager?.getNotificationChannel(DefaultNotificationAdapter.CHANNEL_ID)
+            channel == null || channel.importance != NotificationManager.IMPORTANCE_NONE
+        } else {
+            true
+        }
+
+        if (notificationsEnabled && postPermissionGranted && channelEnabled) {
             binding.tvNotificationStatusBadge.text = getString(R.string.s08_badge_allowed)
             binding.tvNotificationStatusBadge.setBackgroundResource(R.drawable.bg_badge_success)
             binding.tvNotificationStatusBadge.setTextColor(ContextCompat.getColor(context, R.color.capsule_success_text))
@@ -247,6 +283,23 @@ class S08AccountSettingsFragment : Fragment() {
             binding.tvNotificationStatusBadge.text = getString(R.string.s08_badge_denied)
             binding.tvNotificationStatusBadge.setBackgroundResource(R.drawable.bg_badge_neutral)
             binding.tvNotificationStatusBadge.setTextColor(ContextCompat.getColor(context, R.color.capsule_text_muted))
+        }
+    }
+
+    /** Launches system application notification or details settings page for permission management. */
+    private fun openSystemNotificationSettings() {
+        val context = context ?: return
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                    putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                }
+                startActivity(intent)
+            } else {
+                openSystemAppSettings()
+            }
+        } catch (_: Exception) {
+            openSystemAppSettings()
         }
     }
 

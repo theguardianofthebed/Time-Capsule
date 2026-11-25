@@ -5,6 +5,8 @@ import com.example.timecapsule.domain.model.Availability
 import com.example.timecapsule.domain.model.ForegroundLocationSample
 import com.example.timecapsule.domain.model.RecipientProfile
 import com.example.timecapsule.domain.model.RecipientUnlockRequirements
+import com.example.timecapsule.domain.model.UnlockConfirmationKind
+import com.example.timecapsule.domain.model.UnlockVerificationOutcome
 import com.example.timecapsule.domain.result.OperationResult
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreSettings
@@ -53,6 +55,24 @@ interface FirestoreAdapter {
         recipientUid: String
     ): OperationResult<RecipientUnlockRequirements> {
         return OperationResult.Unavailable("Unlock requirements lookup is not implemented in this adapter.")
+    }
+
+    /** Requests server-authoritative recipient unlock verification for [capsuleId] with detailed outcome. */
+    suspend fun verifyRecipientUnlockDetailed(
+        capsuleId: String,
+        recipientUid: String,
+        locationSample: ForegroundLocationSample? = null,
+        clockNanosSupplier: () -> Long = { SystemClock.elapsedRealtimeNanos() }
+    ): OperationResult<UnlockVerificationOutcome> {
+        return when (val result = verifyRecipientUnlock(capsuleId, recipientUid, locationSample, clockNanosSupplier)) {
+            is OperationResult.Success -> OperationResult.Success(
+                UnlockVerificationOutcome(result.data, UnlockConfirmationKind.ALREADY_UNLOCKED)
+            )
+            is OperationResult.Invalid -> OperationResult.Invalid(result.message)
+            is OperationResult.Denied -> OperationResult.Denied(result.message)
+            is OperationResult.Unavailable -> OperationResult.Unavailable(result.message)
+            is OperationResult.OutcomeUnknown -> OperationResult.OutcomeUnknown(result.capsuleId, result.message)
+        }
     }
 
     /** Requests server-authoritative recipient unlock verification for [capsuleId]. */

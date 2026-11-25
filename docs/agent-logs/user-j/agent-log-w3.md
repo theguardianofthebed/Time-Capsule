@@ -407,3 +407,105 @@ Implement one shared foreground recovery path (`ForegroundRecoveryCoordinator`) 
 - **What I reviewed:** Pending student review and personal confirmation by User J.
 - **What I can explain:** Pending student review and personal confirmation by User J.
 - **Feedback and next step:** Teammate PR review by User G and manual testing on device/emulator before human merge into `main`.
+
+## Feature or task: Issue #19 Attempt account-safe local notifications after confirmed first unlock
+
+- **Task and purpose:** Implementation of Issue #19 (Attempt account-safe local notifications after confirmed first unlock), delivering typed first-unlock confirmation provenance, deduplicating persistent attempt store, session-isolated notification coordinator, and entry intent validation, with User J as acting implementation owner and User G as reviewer.
+- **Session date(s):** November 25, 2026.
+- **Issue and PR:** [Issue #19](https://github.com/theguardianofthebed/Time-Capsule/issues/19), task branch `feature/19-local-notifications`.
+- **Requirement/design references:** FR-10, NFR-02; ARC-06, ARC-07; DD-09, DD-24; AC-08; T-26, T-32.
+- **Agent environment:** Android Studio Agent Mode.
+- **Model used:** Gemini 3.8 Flash.
+
+### Goal
+
+Implement account-safe local notifications for confirmed first unlocks without turning `Availability.AVAILABLE` into false alerts. Introduce `UnlockVerificationOutcome` (`FIRST_UNLOCK_CONFIRMED`, `ALREADY_UNLOCKED`, `RECONCILED_AVAILABLE`). Implement `NotificationAttemptStore` persisting markers (`ABSENT`, `PENDING_PERMISSION`, `ATTEMPTED`) in a backup-excluded JSON file. Implement `UnlockNotificationCoordinator` enforcing session validity, decision table logic, and error isolation. Implement `NotificationAdapter` & `DefaultNotificationAdapter` using Android NotificationChannel and immutable PendingIntent with Uri payload. Declare `POST_NOTIFICATIONS` in `AndroidManifest.xml` and integrate runtime permission request launcher in S-08 Account Settings fragment. Implement `NotificationEntryValidator` for untrusted tap intent re-validation.
+
+### Requests and prompts
+
+| # | Request summary | Actual prompt (key part) | Why it worked (or didn't) |
+|---|-----------------|--------------------------|---------------------------|
+| 1 | Execute Issue #19 implementation & update w3 log | "Issue #19 Implementation and Engineering Handoff... update w3 log of user J as user J is in charge of this session after implementation" | Detailed handoff document specifying architecture, decision table, deduplication, PendingIntent safety, test requirements, and log update. |
+
+### What the agent changed and verified
+
+- **Unlock Outcome Provenance (`UnlockVerificationOutcome.kt`, `FirestoreAdapter.kt`, `CapsuleRepository.kt`):**
+  - Introduced `UnlockConfirmationKind` (`FIRST_UNLOCK_CONFIRMED`, `ALREADY_UNLOCKED`, `RECONCILED_AVAILABLE`) and `UnlockVerificationOutcome`.
+  - Updated `FirestoreAdapter` and `DefaultFirestoreAdapter` to return `verifyRecipientUnlockDetailed` with exact confirmation provenance.
+  - Updated `CapsuleRepository` and `DefaultCapsuleRepository` to expose `verifyUnlockOutcome(capsuleId, targetSession)`.
+- **Persistent Notification Attempt Store (`NotificationAttemptStore.kt`):**
+  - Implemented `NotificationAttemptStore` storing opaque keys `(accountUid, capsuleId)` with states `ABSENT`, `PENDING_PERMISSION`, `ATTEMPTED`.
+  - Implemented thread-safe `atomicallyClaimAttempt` ensuring at most one claim per candidate.
+  - Excludes all private message body, photo, email, location, or credential data.
+  - Durably persists entries in backup-excluded `notification-attempts.json` file.
+- **Session-Safe Notification Coordinator (`UnlockNotificationCoordinator.kt`):**
+  - Implemented `UnlockNotificationCoordinator` consuming `verifyUnlockOutcome` results.
+  - Enforces decision table:
+    - `FIRST_UNLOCK_CONFIRMED` + allowed -> claims attempt and posts notification.
+    - `FIRST_UNLOCK_CONFIRMED` + denied -> records `PENDING_PERMISSION` candidate.
+    - `ALREADY_UNLOCKED` / `RECONCILED_AVAILABLE` + `PENDING_PERMISSION` candidate + allowed -> posts notification once.
+    - `ALREADY_UNLOCKED` + `ABSENT` -> suppresses historical notification.
+  - Validates `SessionSnapshot` identity before claiming attempt and posting.
+  - Isolates notification/storage exceptions so unlock results are never corrupted or reversed.
+- **System Notification Adapter & Channel (`NotificationAdapter.kt`, `DefaultNotificationAdapter.kt`):**
+  - Implemented `DefaultNotificationAdapter` creating channel `capsule_unlock_channel`.
+  - Posts generic alert ("A capsule is ready.") without disclosing private message or photo data.
+  - Sets lockscreen visibility to `NotificationCompat.VISIBILITY_PRIVATE`.
+  - Builds explicit `PendingIntent` targeting `MainActivity` with `ACTION_NOTIFICATION_TAP`, `FLAG_IMMUTABLE`, and unique `data` URI (`timecapsule://notification/$accountUid/$capsuleId`) to prevent PendingIntent overwriting across capsules.
+- **Untrusted Entry Intent Re-validation (`NotificationEntryValidator.kt` & `MainActivity.kt`):**
+  - Implemented `NotificationEntryValidator` revalidating incoming tap intents against active session UID and authoritative repository `verifyUnlockOutcome` check.
+  - Handled cold start (`onCreate`) and `onNewIntent` in `MainActivity`.
+- **Runtime Permissions & Manifest (`AndroidManifest.xml`, `S08AccountSettingsFragment.kt`):**
+  - Declared `POST_NOTIFICATIONS` permission in `AndroidManifest.xml`.
+  - Added runtime permission request launcher (`ActivityResultContracts.RequestPermission`) in `S08AccountSettingsFragment` for API 33+ (Android 13 Tiramisu).
+- **Automated Verification Suite:**
+  - Written `NotificationAttemptStoreTest.kt` (8 unit tests).
+  - Written `UnlockNotificationCoordinatorTest.kt` (7 unit tests).
+  - Written `NotificationEntryValidatorTest.kt` (5 unit tests).
+  - Total 305 JVM unit tests passed (`:app:testDebugUnitTest`).
+  - Clean debug APK assemble passed (`:app:assembleDebug`).
+  - Clean Android lint passed (`:app:lintDebug`).
+
+### P1 & P2 Review Corrections Applied (November 25, 2026)
+
+- **P1-01 Durable Notification Attempt Claims:** Updated `NotificationAttemptStore.kt` to write updates via atomic temporary-file replacement and verify `saveToFile()` success before returning `true` on attempt claims. Reverts in-memory state on write failure. Replaced colon key concatenation with structured URL-encoded keys (`uid:<uid>:capsule:<capsuleId>`). Added unwritable storage test in `NotificationAttemptStoreTest.kt`.
+- **P1-02 Read-Only Notification Tap Authorization:** Introduced `checkUnlockStatus(capsuleId, targetSession)` in `CapsuleRepository` and `DefaultCapsuleRepository`, which authoritatively checks `readRecipientUnlockRequirements` without executing an unlock transaction, acquiring location samples, or mutating backend state. Updated `NotificationEntryValidator` to call `checkUnlockStatus`. Added regression test verifying locked capsules do not trigger unlock transactions on notification tap.
+- **P1-03 Conservative Fallback Provenance:** Updated interface default implementations in `CapsuleRepository.kt` and `FirestoreAdapter.kt` to map legacy `verifyUnlock` / `verifyRecipientUnlock` success to `ALREADY_UNLOCKED` (conservative, non-notifying fallback) instead of `FIRST_UNLOCK_CONFIRMED`.
+- **P1-04 Account-Switch Invalidation & Functional Cancellation:** Implemented functional account notification cancellation in `DefaultNotificationAdapter.cancelAccountNotifications(uid)`. Added `UnlockNotificationCoordinator.invalidateAccount(uid)` and wired `AccountSessionManager.onAccountCleared` to cancel posted notifications and clear attempt markers upon logout/switch.
+- **P1-05 Complete Permission Evaluation:** Updated `areNotificationsPermitted()` in `DefaultNotificationAdapter` to evaluate app-wide notification settings, API 33+ `POST_NOTIFICATIONS` runtime permission, and API 26+ channel importance (`IMPORTANCE_NONE`). Updated `S08AccountSettingsFragment` to open system app/channel notification settings via `Settings.ACTION_APP_NOTIFICATION_SETTINGS`.
+- **P1-06 Distinguish Attempts from Permission-Blocked Non-Attempts:** Introduced `NotificationPostResult` enum (`NOT_ATTEMPTED_PERMISSION_DENIED`, `NOT_ATTEMPTED_CHANNEL_BLOCKED`, `ATTEMPTED_SUCCESS`, `ATTEMPTED_FAILED`). `UnlockNotificationCoordinator` records/preserves `PENDING_PERMISSION` on non-attempts, preserving candidate retryability, and claims `ATTEMPTED` only on actual posting attempts.
+- **P2 Correctness & Maintainability:** Built Uri data payloads safely with `Uri.Builder()`, prevented duplicate notification intent processing in `MainActivity`, rechecked active session snapshot before returning valid entry result, moved strings to `res/values/strings.xml`, added KDoc, and re-threw `CancellationException`.
+
+### Second Review Corrections Applied (November 25, 2026)
+
+- **1. Durable Claim-Before-Post Ordering:** Enforced exact claim-before-post ordering in `UnlockNotificationCoordinator.kt`. `attemptStore.atomicallyClaimAttempt(uid, capsuleId)` executes FIRST using atomic journal persistence. Notification posting executes ONLY after successful claim persistence. If posting returns a definite non-attempt (`NOT_ATTEMPTED_PERMISSION_DENIED` or `NOT_ATTEMPTED_CHANNEL_BLOCKED`), `restorePendingPermissionIfClaimed` restores `PENDING_PERMISSION` marker.
+- **2. Reused Atomic Journal Persistence:** Adapted `FrozenOperationJournal`'s atomic persistence pattern (`File.createTempFile`, `stream.fd.sync()`, `Files.move(..., StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)`) in `NotificationAttemptStore.kt`. Removed destination-deleting fallback. Failed loads or corrupt records set `persistentLoadFailed` and fail claims closed without clearing memory state.
+- **3. Corrected Legacy Fallback Provenance:** Corrected `FirestoreAdapter.kt` default interface fallback `verifyRecipientUnlockDetailed` to map legacy `verifyRecipientUnlock` success to `ALREADY_UNLOCKED` (conservative non-notifying fallback), eliminating false `FIRST_UNLOCK_CONFIRMED` alerts from legacy code.
+- **4. Process Recreation Account Cancellation:** Updated `DefaultNotificationAdapter.cancelAccountNotifications` to query OS `NotificationManager.activeNotifications` on API 23+ in addition to memory tracking, cancelling matching tag prefixes (`capsule_unlock:<encodedUid>:`) across process restarts. Connected all session invalidation paths in `AccountSessionManager` (`signOut`, `signIn`, `signUpAndCreateProfile`, `restoreSessionIfAuthenticated`, `checkAndHandleStaleCallback`) to trigger account cleanup.
+- **5. Complete UI & Lifecycle Fixes:** Added duplicate intent key tracking in `MainActivity.kt` with `onSaveInstanceState` / `onCreate` state restoration. Updated `S08AccountSettingsFragment` to evaluate channel importance (`IMPORTANCE_NONE`) and route to `Settings.ACTION_APP_NOTIFICATION_SETTINGS`. Moved all user-facing strings into `res/values/strings.xml`.
+- **6. Regression Verification:** Added 3 new unit tests in `UnlockNotificationCoordinatorTest.kt` (310 total passed in `:app:testDebugUnitTest`). Clean debug APK, test APK, and Android lint (`:app:assembleDebug`, `:app:assembleDebugAndroidTest`, `:app:lintDebug`).
+
+### Final Focused Review Corrections Applied (November 25, 2026)
+
+- **1. Malformed Journal Recovery:** Updated `loadFromFile()` in `NotificationAttemptStore.kt` to validate structure and enum constants strictly. Malformed lines set `persistentLoadFailed = true`. `clearAccount` is guarded by `if (persistentLoadFailed) return` to prevent overwriting corrupted persistent files with empty/partial in-memory state. Added `corrupted or malformed file fails claims closed and preserves file` unit test.
+- **2. Session Invalidation Wiring:** Connected all session invalidation and account replacement paths in `AccountSessionManager.kt` (`signOut`, `signIn`, `signUpAndCreateProfile`, `restoreSessionIfAuthenticated`, `checkAndHandleStaleCallback`) to invoke `onAccountCleared`, cancelling active notifications and clearing attempt store markers. Same-session restoration (`currentUid == activeUid`) preserves in-flight work. Added `testSignOutTriggersOnAccountClearedCallback` unit test.
+- **3. UI & Lifecycle Intent Fixes:** Updated intent processing in `MainActivity.kt` so that intent key tracking only retains successful/valid authorizations, ensuring transient entry failures do not permanently block subsequent legitimate notification taps. Verified system notification settings route in `S08AccountSettingsFragment.kt` and moved remaining user-facing strings to `res/values/strings.xml`.
+
+### Minimal Final Correction Applied (November 25, 2026)
+
+- **1. Account Invalidation Ordering:** Corrected invalidation ordering in `AccountSessionManager.kt` (`signIn`, `signUpAndCreateProfile`). `sessionTracker.startSession(newUid)` is executed FIRST, and `onAccountCleared(oldUid)` is invoked immediately after. Ensures the old session snapshot is invalidated in `SessionTracker` before notification cleanup runs, blocking any in-flight old-session callbacks. Corrected `checkAndHandleStaleCallback` to clean up the UID being invalidated. Added `testAccountReplacementInvalidatesOldSessionBeforeOnAccountClearedCallback` unit test in `AccountSessionManagerTest.kt`.
+- **2. Notification Permission Settings:** Verified system notification settings routing in `S08AccountSettingsFragment.kt` via `openSystemNotificationSettings()`.
+- **3. Verification:** Executed full test suite (313 JVM unit tests passed), clean debug build, lint, and test APK build.
+
+### Checks and results
+
+- `./gradlew :app:testDebugUnitTest`: PASS (313 JVM unit tests passed across project, 0 failed)
+- `./gradlew :app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest`: PASS (`BUILD SUCCESSFUL`, 0 lint errors)
+- `py tools/check_readiness.py --issue 19 --evidence docs/agent-tools/readiness-evidence-issue19.json`: PASS (`PREFLIGHT_RECORD_VALID`)
+- `git status`: PASS (clean on `feature/19-local-notifications`)
+
+### My review and understanding
+
+- **What I reviewed:** Pending student review and personal confirmation by User J.
+- **What I can explain:** Pending student review and personal confirmation by User J.
+- **Feedback and next step:** Teammate PR review by User G and manual testing on device/emulator before human merge into `main`.

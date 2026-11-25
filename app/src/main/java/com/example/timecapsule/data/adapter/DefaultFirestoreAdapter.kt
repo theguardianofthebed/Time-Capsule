@@ -10,6 +10,8 @@ import com.example.timecapsule.domain.model.LockMode
 import com.example.timecapsule.domain.model.QualificationFailureReason
 import com.example.timecapsule.domain.model.RecipientProfile
 import com.example.timecapsule.domain.model.RecipientUnlockRequirements
+import com.example.timecapsule.domain.model.UnlockConfirmationKind
+import com.example.timecapsule.domain.model.UnlockVerificationOutcome
 import com.example.timecapsule.domain.result.OperationResult
 import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.firestore.FieldValue
@@ -180,12 +182,12 @@ class DefaultFirestoreAdapter(
         }
     }
 
-    override suspend fun verifyRecipientUnlock(
+    override suspend fun verifyRecipientUnlockDetailed(
         capsuleId: String,
         recipientUid: String,
         locationSample: ForegroundLocationSample?,
         clockNanosSupplier: () -> Long
-    ): OperationResult<Availability> {
+    ): OperationResult<UnlockVerificationOutcome> {
         val cleanCapsuleId = capsuleId.trim()
         val cleanRecipientUid = recipientUid.trim()
         if (cleanCapsuleId.isBlank() || cleanRecipientUid.isBlank()) {
@@ -266,8 +268,12 @@ class DefaultFirestoreAdapter(
             }.await()
 
             when (result) {
-                is TransactionUnlockResult.AlreadyUnlocked,
-                is TransactionUnlockResult.UnlockedSuccess -> OperationResult.Success(Availability.AVAILABLE)
+                is TransactionUnlockResult.UnlockedSuccess -> OperationResult.Success(
+                    UnlockVerificationOutcome(Availability.AVAILABLE, UnlockConfirmationKind.FIRST_UNLOCK_CONFIRMED)
+                )
+                is TransactionUnlockResult.AlreadyUnlocked -> OperationResult.Success(
+                    UnlockVerificationOutcome(Availability.AVAILABLE, UnlockConfirmationKind.ALREADY_UNLOCKED)
+                )
                 is TransactionUnlockResult.NotFound -> OperationResult.Invalid("Capsule not found with ID: $cleanCapsuleId")
                 is TransactionUnlockResult.NotRecipient -> OperationResult.Denied("Only the designated recipient can unlock this capsule.")
                 is TransactionUnlockResult.LocationSampleMissing -> OperationResult.Denied("Location sample is required to unlock location-restricted capsule.")
@@ -295,7 +301,9 @@ class DefaultFirestoreAdapter(
                     !checkDoc.metadata.isFromCache &&
                     checkDoc.getString("recipientId") == cleanRecipientUid &&
                     checkDoc.getBoolean("unlocked") == true) {
-                    return OperationResult.Success(Availability.AVAILABLE)
+                    return OperationResult.Success(
+                        UnlockVerificationOutcome(Availability.AVAILABLE, UnlockConfirmationKind.RECONCILED_AVAILABLE)
+                    )
                 }
             } catch (nested: Exception) {
                 if (nested is CancellationException) throw nested
@@ -305,7 +313,22 @@ class DefaultFirestoreAdapter(
         }
     }
 
-    private fun mapFirestoreUnlockException(e: Exception): OperationResult<Availability> {
+    override suspend fun verifyRecipientUnlock(
+        capsuleId: String,
+        recipientUid: String,
+        locationSample: ForegroundLocationSample?,
+        clockNanosSupplier: () -> Long
+    ): OperationResult<Availability> {
+        return when (val res = verifyRecipientUnlockDetailed(capsuleId, recipientUid, locationSample, clockNanosSupplier)) {
+            is OperationResult.Success -> OperationResult.Success(res.data.availability)
+            is OperationResult.Invalid -> OperationResult.Invalid(res.message)
+            is OperationResult.Denied -> OperationResult.Denied(res.message)
+            is OperationResult.Unavailable -> OperationResult.Unavailable(res.message)
+            is OperationResult.OutcomeUnknown -> OperationResult.OutcomeUnknown(res.capsuleId, res.message)
+        }
+    }
+
+    private fun <T> mapFirestoreUnlockException(e: Exception): OperationResult<T> {
         if (e is CancellationException) throw e
         return when (e) {
             is FirebaseNetworkException -> {

@@ -1,0 +1,71 @@
+{
+  "issue": 19,
+  "checked_at": "2026-11-25T03:50:00Z",
+  "selected_base": "1d3bf6090f566e4ab5eec990a4bc082f0dbf6fc3",
+  "owner": "User J",
+  "owner_confirmation": "Confirmed User J as acting student owner for Issue #19 implementation",
+  "branch": "feature/19-local-notifications",
+  "period": "25 November 2026",
+  "scope": "MVP",
+  "reviewer": "User G",
+  "components": [
+    "app/src/main/java/com/example/timecapsule/data/notification/NotificationAdapter.kt",
+    "app/src/main/java/com/example/timecapsule/data/notification/DefaultNotificationAdapter.kt",
+    "app/src/main/java/com/example/timecapsule/data/notification/NotificationAttemptStore.kt",
+    "app/src/main/java/com/example/timecapsule/data/notification/UnlockNotificationCoordinator.kt",
+    "app/src/main/java/com/example/timecapsule/data/adapter/FirestoreAdapter.kt",
+    "app/src/main/java/com/example/timecapsule/data/adapter/DefaultFirestoreAdapter.kt",
+    "app/src/main/java/com/example/timecapsule/data/CapsuleRepository.kt",
+    "app/src/main/java/com/example/timecapsule/data/DefaultCapsuleRepository.kt",
+    "app/src/main/java/com/example/timecapsule/data/recovery/ForegroundRecoveryCoordinator.kt",
+    "app/src/main/java/com/example/timecapsule/data/di/AppDependencyContainer.kt",
+    "app/src/main/java/com/example/timecapsule/TimeCapsuleApplication.kt",
+    "app/src/main/java/com/example/timecapsule/MainActivity.kt",
+    "app/src/main/java/com/example/timecapsule/ui/s08/S08AccountSettingsFragment.kt",
+    "app/src/main/AndroidManifest.xml"
+  ],
+  "deliverable": "Attempt account-safe local notifications after confirmed first unlock",
+  "contract_approval": "FR-10, NFR-02, DD-09, DD-24, AC-08, T-26, T-32",
+  "blocking_failures": [],
+  "inventory": {
+    "issues": "Issue #19 Attempt account-safe local notifications after confirmed first unlock",
+    "branches": "feature/19-local-notifications based on main at 1d3bf6090f566e4ab5eec990a4bc082f0dbf6fc3",
+    "prs": "PR #44 merged for Issue 18",
+    "handoffs": "issue-18-foreground-recovery-20261124.md",
+    "compatible": true,
+    "compatibility_evidence": "No active competing claims or overlapping file modifications for local notifications",
+    "active_claims": [
+      {
+        "issue": 19,
+        "owner": "User J",
+        "branch": "feature/19-local-notifications",
+        "overlaps": false,
+        "agreement": "Explicit prompt allocating Issue #19 implementation to User J"
+      }
+    ]
+  },
+  "dependencies": [
+    {
+      "issue": 18,
+      "pr": "https://github.com/theguardianofthebed/Time-Capsule/pull/44",
+      "merged": true,
+      "merge_commit": "1d3bf6090f566e4ab5eec990a4bc082f0dbf6fc3",
+      "implementation_inspection": "PR #44 merged into main, contains foreground recovery coordinator and session-safe unlock rechecking",
+      "paths": [
+        "app/src/main/java/com/example/timecapsule/data/recovery/ForegroundRecoveryCoordinator.kt",
+        "app/src/main/java/com/example/timecapsule/data/DefaultCapsuleRepository.kt"
+      ],
+      "checks": [
+        {
+          "result": "PASS",
+          "procedure": "JVM unit tests, debug build, lint, and manual testing",
+          "expected_actual": "285 JVM unit tests reported passing",
+          "commit": "1d3bf6090f566e4ab5eec990a4bc082f0dbf6fc3",
+          "environment": "Android Studio Agent Mode, Nov 25 2026",
+          "evidence": "PR #44 verification record"
+        }
+      ],
+      "blocking_failures": []
+    }
+  ]
+}

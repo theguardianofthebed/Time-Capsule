@@ -19,7 +19,8 @@ class AccountSessionManager(
     private val authAdapter: AuthAdapter,
     private val firestoreAdapter: FirestoreAdapter,
     private val sessionTracker: SessionTracker,
-    private val sessionGuard: SessionGuard = SessionGuard(sessionTracker)
+    private val sessionGuard: SessionGuard = SessionGuard(sessionTracker),
+    private val onAccountCleared: ((String) -> Unit)? = null
 ) {
 
     private val authMutex = Mutex()
@@ -36,14 +37,22 @@ class AccountSessionManager(
      */
     fun restoreSessionIfAuthenticated(): String? {
         val activeUid = authAdapter.activeUid()
+        val currentUid = sessionTracker.currentSession().uid
+
         if (!activeUid.isNullOrBlank()) {
-            if (sessionTracker.currentSession().uid != activeUid) {
+            if (currentUid != activeUid) {
                 sessionTracker.startSession(activeUid)
+                if (!currentUid.isNullOrBlank()) {
+                    onAccountCleared?.invoke(currentUid)
+                }
             }
             return activeUid
         } else {
             if (sessionTracker.currentSession().isAuthenticated) {
                 sessionTracker.clearSession()
+                if (!currentUid.isNullOrBlank()) {
+                    onAccountCleared?.invoke(currentUid)
+                }
             }
             return null
         }
@@ -52,6 +61,7 @@ class AccountSessionManager(
     /** Performs user sign in and updates SessionTracker exactly once on success. */
     suspend fun signIn(email: String, password: String): OperationResult<String> = authMutex.withLock {
         val capturedSession = sessionTracker.currentSession()
+        val oldUid = capturedSession.uid
         val result = authAdapter.signIn(email, password)
 
         if (checkAndHandleStaleCallback(capturedSession)) {
@@ -59,7 +69,11 @@ class AccountSessionManager(
         }
 
         if (result is OperationResult.Success) {
-            sessionTracker.startSession(result.data)
+            val newUid = result.data
+            sessionTracker.startSession(newUid)
+            if (!oldUid.isNullOrBlank() && oldUid != newUid) {
+                onAccountCleared?.invoke(oldUid)
+            }
         }
         return@withLock result
     }
@@ -83,6 +97,7 @@ class AccountSessionManager(
         }
 
         val capturedSession = sessionTracker.currentSession()
+        val oldUid = capturedSession.uid
 
         // If user is already authenticated in Auth, attempt profile repair directly without duplicate Auth creation
         val activeUid = authAdapter.activeUid()
@@ -104,6 +119,9 @@ class AccountSessionManager(
         if (authResult is OperationResult.Success) {
             val uid = authResult.data
             sessionTracker.startSession(uid)
+            if (!oldUid.isNullOrBlank() && oldUid != uid) {
+                onAccountCleared?.invoke(oldUid)
+            }
             val postAuthSession = sessionTracker.currentSession()
 
             val profile = RecipientProfile(uid = uid, displayName = trimmedName)
@@ -200,18 +218,26 @@ class AccountSessionManager(
 
     /** Signs out the current user and clears session tracker exactly once. */
     fun signOut() {
+        val oldUid = sessionTracker.currentSession().uid
         authAdapter.signOut()
         sessionTracker.clearSession()
+        if (!oldUid.isNullOrBlank()) {
+            onAccountCleared?.invoke(oldUid)
+        }
     }
 
     private fun checkAndHandleStaleCallback(capturedSession: SessionSnapshot): Boolean {
         val currentSession = sessionTracker.currentSession()
         if (currentSession.sessionGeneration != capturedSession.sessionGeneration) {
             val activeUid = authAdapter.activeUid()
+            val oldUid = currentSession.uid ?: capturedSession.uid
             if (activeUid != null && activeUid != currentSession.uid) {
                 authAdapter.signOut()
                 if (currentSession.isAuthenticated) {
                     sessionTracker.clearSession()
+                }
+                if (!oldUid.isNullOrBlank()) {
+                    onAccountCleared?.invoke(oldUid)
                 }
             }
             return true
