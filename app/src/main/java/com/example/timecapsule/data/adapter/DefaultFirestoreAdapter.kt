@@ -7,6 +7,7 @@ import com.example.timecapsule.domain.model.Availability
 import com.example.timecapsule.domain.model.ForegroundLocationSample
 import com.example.timecapsule.domain.model.LocationTarget
 import com.example.timecapsule.domain.model.LockMode
+import com.example.timecapsule.data.media.AndroidOriginalImageProbe
 import com.example.timecapsule.domain.model.OriginalPhotoFormat
 import com.example.timecapsule.domain.model.OriginalPhotoLimits
 import com.example.timecapsule.domain.model.ProtectedCapsuleContent
@@ -376,20 +377,8 @@ class DefaultFirestoreAdapter(
                     )
                     if (downloadRes is OperationResult.Success) {
                         val downloaded = downloadRes.data
-                        if (!OriginalPhotoLimits.acceptsSize(downloaded.size.toLong())) {
-                            return@withContext OperationResult.Unavailable("Downloaded photo size is invalid.")
-                        }
-                        photoFormat = if (downloaded.size >= 4 &&
-                            downloaded[0] == 0x89.toByte() && downloaded[1] == 0x50.toByte() &&
-                            downloaded[2] == 0x4E.toByte() && downloaded[3] == 0x47.toByte()) {
-                            OriginalPhotoFormat.PNG
-                        } else if (downloaded.size >= 3 &&
-                            downloaded[0] == 0xFF.toByte() && downloaded[1] == 0xD8.toByte() &&
-                            downloaded[2] == 0xFF.toByte()) {
-                            OriginalPhotoFormat.JPEG
-                        } else {
-                            return@withContext OperationResult.Unavailable("Downloaded photo bytes have unsupported format signature.")
-                        }
+                        photoFormat = AndroidOriginalImageProbe.inspect(downloaded)
+                            ?: return@withContext OperationResult.Unavailable("Downloaded photo cannot be decoded.")
                         photoBytes = downloaded
                     } else {
                         return@withContext OperationResult.Unavailable("Photo download failed.")

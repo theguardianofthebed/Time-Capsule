@@ -6,6 +6,12 @@ import com.example.timecapsule.domain.session.SessionSnapshot
 import java.io.File
 import java.time.Instant
 import kotlinx.coroutines.runBlocking
+import android.app.Application
+import com.example.timecapsule.data.imageFixture
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -21,6 +27,9 @@ import java.security.MessageDigest
  * Unit tests verifying [DefaultLocalRetentionAdapter] retention storage, verified markers,
  * offline read contracts, and account cleanup boundaries.
  */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35], application = Application::class, manifest = Config.NONE)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class DefaultLocalRetentionAdapterTest {
 
     @get:Rule
@@ -81,7 +90,7 @@ class DefaultLocalRetentionAdapterTest {
         val uid = "user-recipient-2"
         val capsuleId = "capsule-photo-202"
         val unlockTime = Instant.parse("2026-11-25T14:30:00Z")
-        val samplePhotoBytes = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A)
+        val samplePhotoBytes = imageFixture("png")
 
         val saveRes = retentionAdapter.saveRetainedContent(
             targetSession = signIn(uid),
@@ -101,6 +110,26 @@ class DefaultLocalRetentionAdapterTest {
         assertNotNull(content.photoBytes)
         assertTrue(samplePhotoBytes.contentEquals(content.photoBytes!!))
         assertEquals(OriginalPhotoFormat.PNG, content.photoFormat)
+    }
+
+    @Test
+    fun legacyTextRemainsReadableAndLegacyPhotoRequiresAuthoritativeRefresh() = runBlocking {
+        val session = signIn("reader")
+        for ((id, bytes) in listOf("text" to null, "photo" to imageFixture("png"))) {
+            val result = retentionAdapter.saveRetainedContent(session, id, Instant.now(),
+                "caption", bytes, bytes?.let { OriginalPhotoFormat.PNG })
+            assertTrue(result is OperationResult.Success)
+            val marker = rootDir.walk().single { it.parentFile?.name == id && it.name == "verified-marker.properties" }
+            val legacy = java.util.Properties().apply {
+                marker.inputStream().use { load(it) }
+                setProperty("version", "1")
+                remove("photoSha256")
+            }
+            marker.outputStream().use { legacy.store(it, null) }
+            val read = retentionAdapter.readRetainedContent(session, id)
+            if (bytes == null) assertTrue(read is OperationResult.Success)
+            else assertTrue(read is OperationResult.Unavailable)
+        }
     }
 
     @Test

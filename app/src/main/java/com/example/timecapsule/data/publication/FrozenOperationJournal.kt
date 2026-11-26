@@ -48,9 +48,9 @@ class FrozenOperationJournal(
         }
         require(!record.replacementPrepared || record.replacementDraftId != null)
         val previous = load(operation.senderUid, operation.capsuleId)
-        require(previous == null ||
-            previous.operation.canonicalPayload() == operation.canonicalPayload() ||
-            operation.isOpaque) {
+        require(previous == null || (previous.operation.snapshotDigest == operation.snapshotDigest &&
+            (operation.isOpaque || (!previous.operation.isOpaque &&
+                previous.operation.canonicalPayload() == operation.canonicalPayload())))) {
             "This capsule ID already belongs to different frozen content."
         }
         saveOpaqueCompaction(record)
@@ -80,42 +80,36 @@ class FrozenOperationJournal(
     }
 
     /** Reads and validates one identity; corrupted data is an error, never an absent operation. */
-    fun load(uid: String, capsuleId: String): FrozenOperationRecord? = synchronized(access) {
+    fun load(uid: String, capsuleId: String): FrozenOperationRecord? = read(uid, capsuleId, null)
+
+    private fun read(uid: String, capsuleId: String, migrationSession: StorageSession?): FrozenOperationRecord? = synchronized(access) {
         val source = target(uid, capsuleId)
         if (!source.exists()) return@synchronized null
         try {
             val fields = Properties().apply { source.inputStream().use { load(it) } }
-            require(fields.required("version") == "1") { "Unsupported operation format." }
+            val version = fields.required("version")
             require(fields.required("senderUid") == uid)
             require(fields.required("capsuleId") == capsuleId)
             val isOpaque = fields.getProperty("isOpaque", "false").toBooleanStrict()
+            require(version == "1" || (isOpaque && version == "2")) { "Unsupported operation format." }
             if (isOpaque) {
-                val lockMode = LockMode.valueOf(fields.required("lockMode"))
-                val operation = FrozenCapsuleOperation(
-                    capsuleId = capsuleId,
-                    senderUid = uid,
-                    recipientUid = "",
-                    title = null,
-                    text = "",
-                    lock = CapsuleLock(lockMode),
-                    creationZone = fields.required("creationZone"),
-                    photo = null,
-                    snapshotDigest = fields.required("snapshotDigest"),
-                    isOpaque = true
-                )
+                val operation = FrozenCapsuleOperation.opaque(uid, capsuleId, fields.required("snapshotDigest"))
                 operation.verify()
                 val hadPhotoProp = fields.getProperty("hadPhoto")
                 val hadPhoto = hadPhotoProp?.toBooleanStrictOrNull() ?: true
-                return@synchronized FrozenOperationRecord(
+                val record = FrozenOperationRecord(
                     operation = operation,
                     phase = PublicationPhase.valueOf(fields.required("phase")),
                     photoAcknowledged = fields.getProperty("photoAcknowledged", "false").toBooleanStrict(),
                     hasUnresolvedWrite = fields.getProperty("hasUnresolvedWrite", "false").toBooleanStrict(),
                     terminalRejectionConfirmed = fields.getProperty("terminalRejectionConfirmed", "false").toBooleanStrict(),
-                    replacementDraftId = fields.getProperty("replacementDraftId"),
-                    replacementPrepared = fields.getProperty("replacementPrepared", "false").toBooleanStrict(),
                     hadPhoto = hadPhoto
                 )
+                if (version == "1" && migrationSession != null) {
+                    migrationSession.requireOwner(uid)
+                    saveOpaqueCompaction(record)
+                }
+                return@synchronized record
             }
             val recipientUid = fields.required("recipientUid")
             val text = fields.required("text")
@@ -163,12 +157,12 @@ class FrozenOperationJournal(
     }
 
     /** Lists only the current UID's durable operations for foreground recovery. */
-    fun list(uid: String): List<FrozenOperationRecord> = synchronized(access) {
+    fun list(uid: String, migrationSession: StorageSession? = null): List<FrozenOperationRecord> = synchronized(access) {
         val directory = accountDirectory(uid)
         if (!directory.exists()) return@synchronized emptyList()
         val files = directory.listFiles() ?: throw IOException("Cannot read operation storage.")
         files.filter { it.isFile && it.extension == "properties" }.sortedBy { it.name }.map {
-            load(uid, it.nameWithoutExtension)
+            read(uid, it.nameWithoutExtension, migrationSession)
                 ?: throw IOException("Operation disappeared during recovery.")
         }
     }
@@ -197,13 +191,9 @@ class FrozenOperationJournal(
                 }
             } else {
                 val hadPhoto = record.hadPhoto || operation.photo != null
-                val opaqueOperation = operation.copy(
-                    text = "",
-                    title = null,
-                    photo = null,
-                    isOpaque = true
-                )
-                val opaqueRecord = record.copy(operation = opaqueOperation, hadPhoto = hadPhoto)
+                val opaqueOperation = FrozenCapsuleOperation.opaque(uid, operation.capsuleId, operation.snapshotDigest)
+                val opaqueRecord = record.copy(operation = opaqueOperation, hadPhoto = hadPhoto,
+                    replacementDraftId = null, replacementPrepared = false)
                 saveOpaqueCompaction(opaqueRecord)
                 opaqueIds.add(operation.capsuleId)
             }
@@ -225,7 +215,7 @@ class FrozenOperationJournal(
     /** Encodes explicit versioned fields; provider URIs and server-generated timestamps are excluded. */
     private fun encode(record: FrozenOperationRecord): Properties = Properties().apply {
         val operation = record.operation
-        setProperty("version", "1")
+        setProperty("version", if (operation.isOpaque) "2" else "1")
         if (operation.isOpaque) {
             setProperty("isOpaque", "true")
             setProperty("capsuleId", operation.capsuleId)
@@ -236,10 +226,6 @@ class FrozenOperationJournal(
             setProperty("photoAcknowledged", record.photoAcknowledged.toString())
             setProperty("hasUnresolvedWrite", record.hasUnresolvedWrite.toString())
             setProperty("terminalRejectionConfirmed", record.terminalRejectionConfirmed.toString())
-            setProperty("lockMode", operation.lock.mode.name)
-            setProperty("creationZone", operation.creationZone)
-            record.replacementDraftId?.let { setProperty("replacementDraftId", it) }
-            setProperty("replacementPrepared", record.replacementPrepared.toString())
             return@apply
         }
         setProperty("capsuleId", operation.capsuleId)

@@ -28,6 +28,7 @@ class PrivatePublicationDrafts(
     /** Persists a replacement before releasing any previous editable photo reference. */
     override suspend fun replacement(session: StorageSession, operation: FrozenCapsuleOperation, newId: String): CapsuleDraft =
         withContext(Dispatchers.IO) {
+            require(!operation.isOpaque) { "Opaque evidence cannot create an editable draft." }
             require(newId != operation.capsuleId && newId.matches(Regex("[A-Za-z0-9_-]+")))
             synchronized(StorageSession.lock) { session.requireOwner(operation.senderUid) }
             val current = drafts.load(operation.senderUid)

@@ -226,7 +226,7 @@ class CapsulePublicationCoordinator(
         }
         try {
             val recovered = mutableListOf<RecoveredPublication>()
-            for (record in journal.list(uid)) {
+            for (record in journal.list(uid, StorageSession(targetSession, session))) {
                 if (session() != targetSession) return@withContext denied()
                 if (record.phase == PublicationPhase.ABANDONED) {
                     if (!record.replacementPrepared && record.replacementDraftId != null) {
@@ -251,7 +251,7 @@ class CapsulePublicationCoordinator(
                 val snapshotToExpose = if (latest.phase == PublicationPhase.SENT || isUncertainSelfSend || latest.operation.isOpaque) null else latest.operation
                 recovered += RecoveredPublication(latest.operation.capsuleId, latest.phase,
                     snapshotToExpose,
-                    latest.phase == PublicationPhase.FAILED && !mayHaveEarlierWrite(latest) &&
+                    !latest.operation.isOpaque && latest.phase == PublicationPhase.FAILED && !mayHaveEarlierWrite(latest) &&
                         active[key(latest.operation, targetSession)]?.isActive != true, cleared)
             }
             OperationResult.Success(recovered)

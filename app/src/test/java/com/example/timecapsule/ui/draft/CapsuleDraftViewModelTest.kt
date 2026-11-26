@@ -522,6 +522,7 @@ class CapsuleDraftViewModelTest {
         repository.onPublish = { ack.await() }
         val model = publicationModel(repository)
         val id = model.uiState.value.capsuleId
+        val pending = recovered(model, PublicationPhase.OUTCOME_UNKNOWN)
         model.sendCapsule()
         model.sendCapsule()
         model.updateText("Changed")
@@ -532,13 +533,63 @@ class CapsuleDraftViewModelTest {
         testDispatcher.scheduler.runCurrent()
         assertEquals(1, repository.published.size)
         assertEquals(id, repository.published.single().capsuleId)
-        assertEquals("Frozen message", model.uiState.value.text)
+        assertEquals("", model.uiState.value.text)
+        assertEquals("Frozen message", repository.published.single().text)
         assertTrue(model.uiState.value.publicationBusy)
-        repository.recovered = OperationResult.Success(listOf(
-            recovered(model, PublicationPhase.OUTCOME_UNKNOWN)))
+        repository.recovered = OperationResult.Success(listOf(pending))
         ack.complete(OperationResult.OutcomeUnknown(id, "Uncertain"))
         testDispatcher.scheduler.advanceUntilIdle()
         assertFalse(model.uiState.value.editable)
+    }
+
+    @Test fun committedSelfSendWithLostAckStaysStatusOnlyAcrossFailedRecovery() {
+        val failures: List<suspend () -> OperationResult<List<RecoveredPublication>>> = listOf(
+            { OperationResult.Unavailable("Offline") },
+            { throw java.io.IOException("Recovery failed") },
+            { kotlinx.coroutines.awaitCancellation() },
+            { OperationResult.Success(emptyList()) }
+        )
+        for (failure in failures) {
+            val repository = PublicationRepository()
+            val model = publicationModel(repository)
+            model.updateTitle("Private title")
+            model.selectPhoto(FakePhotoStorage(3), "content://private-photo")
+            testDispatcher.scheduler.advanceUntilIdle()
+            val remote = mutableMapOf<String, CapsuleDraft>()
+            repository.onPublish = { draft ->
+                remote[draft.capsuleId] = draft
+                OperationResult.OutcomeUnknown(draft.capsuleId, "Acknowledgment lost")
+            }
+            repository.onRecover = failure
+            val id = model.uiState.value.capsuleId
+            model.sendCapsule()
+            testDispatcher.scheduler.advanceUntilIdle()
+            assertEquals("Frozen message", remote.getValue(id).text)
+            assertNotNull(remote.getValue(id).originalPhoto)
+            fun checkStatus() {
+                val state = model.uiState.value
+                assertTrue(state.statusOnly)
+                assertFalse(state.editable)
+                assertFalse(state.canAbandon)
+                assertFalse(state.publicationBusy)
+                assertEquals(PublicationPhase.OUTCOME_UNKNOWN, state.publicationPhase)
+                assertEquals("", state.text)
+                assertEquals("", state.title)
+                assertNull(state.originalPhoto)
+                assertNull(state.localPhotoUri)
+                assertNull(state.photoName)
+                assertNull(state.photoSizeBytes)
+            }
+            checkStatus()
+            model.recoverPublicationState(restoreEditable = true)
+            testDispatcher.scheduler.advanceUntilIdle()
+            checkStatus()
+            model.retryPublication()
+            testDispatcher.scheduler.advanceUntilIdle()
+            assertEquals(listOf(id), repository.retried)
+            assertEquals(1, repository.published.size)
+            checkStatus()
+        }
     }
 
     /** Confirmed publication removes protected compose values and only then allows a new ID. */
@@ -564,7 +615,8 @@ class CapsuleDraftViewModelTest {
     @Test fun recoveredUnknownCanRetryButCannotEditOrDiscard() {
         val repository = PublicationRepository()
         val model = publicationModel(repository)
-        val record = recovered(model, PublicationPhase.OUTCOME_UNKNOWN)
+        val self = recovered(model, PublicationPhase.OUTCOME_UNKNOWN)
+        val record = self.copy(snapshot = self.snapshot!!.copy(recipientUid = "another-recipient"))
         repository.recovered = OperationResult.Success(listOf(record))
         model.recoverPublicationState()
         testDispatcher.scheduler.advanceUntilIdle()
@@ -733,7 +785,7 @@ class CapsuleDraftViewModelTest {
         val repository = PublicationRepository()
         val model = publicationModel(repository)
         val oldTime = Instant.parse("2020-01-02T00:00:00Z")
-        val operation = FrozenCapsuleOperation.freeze(model.buildCapsuleDraft().copy(
+        val operation = FrozenCapsuleOperation.freeze(model.buildCapsuleDraft().copy(recipientUid = "another-recipient",
             lock = com.example.timecapsule.domain.model.CapsuleLock(LockMode.TIME, oldTime)),
             "sender-uid", "UTC", Instant.parse("2020-01-01T00:00:00Z"))
         repository.recovered = OperationResult.Success(listOf(RecoveredPublication(

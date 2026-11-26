@@ -73,7 +73,7 @@ class OpaqueRecoveryTest {
     }
 
     @Test
-    fun testJournalCompactionScrubsPayloadAndRetainsOpaqueMetadata() = runBlocking {
+    fun testJournalCompactionScrubsPayloadAndRetainsOpaqueMetadata() = runBlocking<Unit> {
         val uid = "user-sender-1"
         val capsuleId = "capsule-unresolved-100"
 
@@ -105,6 +105,37 @@ class OpaqueRecoveryTest {
         assertEquals(uid, loadedOp.senderUid)
         assertEquals(op.snapshotDigest, loadedOp.snapshotDigest)
         assertTrue(loaded.photoAcknowledged)
+        val disk = journalDir.walkTopDown().single { it.name == "$capsuleId.properties" }
+        fun fields() = java.util.Properties().apply { disk.inputStream().use { load(it) } }
+        val allowed = setOf("version", "isOpaque", "capsuleId", "senderUid", "snapshotDigest",
+            "phase", "hadPhoto", "photoAcknowledged", "hasUnresolvedWrite", "terminalRejectionConfirmed")
+        assertEquals(allowed, fields().stringPropertyNames())
+
+        // A legacy opaque file can carry stale display fields and lack explicit photo evidence.
+        val legacy = fields().apply {
+            setProperty("version", "1")
+            setProperty("lockMode", "LOCATION")
+            setProperty("creationZone", "Asia/Seoul")
+            setProperty("replacementDraftId", "old-copy")
+            setProperty("replacementPrepared", "true")
+            setProperty("hasUnresolvedWrite", "true")
+            remove("hadPhoto")
+        }
+        disk.outputStream().use { legacy.store(it, null) }
+        val migrated = journal.list(uid, fixtureSession(uid)).single()
+        assertTrue(migrated.hadPhoto)
+        assertTrue(migrated.photoAcknowledged)
+        assertTrue(migrated.hasUnresolvedWrite)
+        assertNull(migrated.replacementDraftId)
+        assertEquals(allowed, fields().stringPropertyNames())
+        assertEquals("2", fields().getProperty("version"))
+        Assert.assertThrows(IllegalArgumentException::class.java) {
+            CapsulePublicationPayload.from(migrated.operation)
+        }
+        Assert.assertThrows(IllegalArgumentException::class.java) {
+            journal.save(fixtureSession(uid), FrozenOperationRecord(op))
+        }
+
     }
 
     @Test
@@ -219,7 +250,7 @@ class OpaqueRecoveryTest {
             photo = null,
             snapshotDigest = ""
         )
-        val op = rawOp.copy(snapshotDigest = rawOp.calculateDigest(), isOpaque = true, text = "", title = null)
+        val op = FrozenCapsuleOperation.opaque(rawOp.senderUid, rawOp.capsuleId, rawOp.calculateDigest())
 
         val matchingDoc = mapOf(
             "capsuleId" to "capsule-opaque-matcher",

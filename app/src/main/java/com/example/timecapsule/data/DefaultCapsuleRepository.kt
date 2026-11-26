@@ -304,7 +304,8 @@ class DefaultCapsuleRepository(
                         text = retained.text,
                         photoObjectPath = photoPath,
                         photoBytes = retained.photoBytes,
-                        photoFormat = retained.photoFormat
+                        photoFormat = retained.photoFormat,
+                        availableOffline = true
                     )
                 )
             }
@@ -349,18 +350,21 @@ class DefaultCapsuleRepository(
             if (!content.photoObjectPath.isNullOrBlank() && content.photoBytes == null) {
                 return OperationResult.Unavailable("Photo download failed for photo capsule.")
             }
-            retentionAdapter?.saveRetainedContent(
-                targetSession = targetSession,
-                capsuleId = cleanId,
-                verifiedUnlockedAt = verifiedTime,
-                text = content.text,
-                photoBytes = content.photoBytes,
-                photoFormat = content.photoFormat
-            )
+            if (content.text.isNullOrBlank() && content.photoBytes == null) {
+                return OperationResult.Unavailable("Capsule has no readable content.")
+            }
+            val saveResult = try {
+                retention?.saveRetainedContent(targetSession, cleanId, verifiedTime, content.text,
+                    content.photoBytes, content.photoFormat)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (error: java.io.IOException) {
+                OperationResult.Unavailable("Offline storage is unavailable.")
+            }
             if (!sessionTracker.isSessionValid(targetSession)) {
                 return OperationResult.Denied("Account session changed during content retention.")
             }
-            return OperationResult.Success(content)
+            return OperationResult.Success(content.copy(availableOffline = saveResult is OperationResult.Success))
         }
 
         return if (contentRes is OperationResult.Unavailable) contentRes else OperationResult.Denied("Unlock authorization required before reading content.")

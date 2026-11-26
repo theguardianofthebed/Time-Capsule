@@ -2,30 +2,45 @@ package com.example.timecapsule.data.media
 
 import android.graphics.BitmapFactory
 import com.example.timecapsule.domain.model.OriginalPhotoFormat
+import com.example.timecapsule.domain.model.OriginalPhotoLimits
 import java.io.File
 
-/** Checks decoded MIME/dimensions and decodes a sampled preview instead of the full image. */
+/** Uses the same bounded Android decode for selected, downloaded and retained originals. */
 class AndroidOriginalImageProbe : OriginalImageProbe {
-    /** Returns the actual JPEG/PNG format only when a bounded preview can be decoded. */
-    override fun inspect(file: File): OriginalPhotoFormat? {
-        return try {
-            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            BitmapFactory.decodeFile(file.absolutePath, bounds)
-            val format = OriginalPhotoFormat.entries.firstOrNull { it.mimeType == bounds.outMimeType }
-                ?: return null
-            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-            var sample = 1
-            // Power-of-two sampling bounds memory even for highly compressed large dimensions.
-            while (bounds.outWidth / sample > 512 || bounds.outHeight / sample > 512) {
-                sample *= 2
+    override fun inspect(file: File): OriginalPhotoFormat? =
+        if (OriginalPhotoLimits.acceptsSize(file.length())) inspect(file.readBytes()) else null
+
+    companion object {
+        private val pngEnd = byteArrayOf(0, 0, 0, 0, 73, 69, 78, 68, -82, 66, 96, -126)
+
+        fun inspect(bytes: ByteArray): OriginalPhotoFormat? {
+            if (!OriginalPhotoLimits.acceptsSize(bytes.size.toLong())) return null
+            return try {
+                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+                val format = OriginalPhotoFormat.entries.find { it.mimeType == bounds.outMimeType }
+                    ?: return null
+                // Some decoders render a partial preview even when the download is truncated.
+                val complete = when (format) {
+                    OriginalPhotoFormat.JPEG -> bytes.size >= 2 &&
+                        bytes[bytes.lastIndex - 1] == (-1).toByte() && bytes.last() == (-39).toByte()
+                    OriginalPhotoFormat.PNG -> bytes.size >= pngEnd.size && pngEnd.indices.all {
+                        bytes[bytes.size - pngEnd.size + it] == pngEnd[it]
+                    }
+                }
+                if (!complete || bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+                val options = BitmapFactory.Options().apply {
+                    inSampleSize = 1
+                    while (maxOf(bounds.outWidth, bounds.outHeight) / inSampleSize > 512) {
+                        inSampleSize *= 2
+                    }
+                }
+                val preview = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options) ?: return null
+                preview.recycle()
+                format
+            } catch (_: OutOfMemoryError) {
+                null
             }
-            val options = BitmapFactory.Options().apply { inSampleSize = sample }
-            val preview = BitmapFactory.decodeFile(file.absolutePath, options) ?: return null
-            preview.recycle()
-            format
-        } catch (_: OutOfMemoryError) {
-            // A decoder allocation failure is an invalid selection, not an app-wide crash.
-            null
         }
     }
 }

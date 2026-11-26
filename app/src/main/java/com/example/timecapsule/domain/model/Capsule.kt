@@ -41,7 +41,8 @@ data class ProtectedCapsuleContent(
     val text: String?,
     val photoObjectPath: String?,
     val photoBytes: ByteArray? = null,
-    val photoFormat: OriginalPhotoFormat? = null
+    val photoFormat: OriginalPhotoFormat? = null,
+    val availableOffline: Boolean = false
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -54,7 +55,7 @@ data class ProtectedCapsuleContent(
             if (other.photoBytes == null) return false
             if (!photoBytes.contentEquals(other.photoBytes)) return false
         } else if (other.photoBytes != null) return false
-        if (photoFormat != other.photoFormat) return false
+        if (availableOffline != other.availableOffline || photoFormat != other.photoFormat) return false
         return true
     }
 
@@ -64,7 +65,7 @@ data class ProtectedCapsuleContent(
         result = 31 * result + (photoObjectPath?.hashCode() ?: 0)
         result = 31 * result + (photoBytes?.contentHashCode() ?: 0)
         result = 31 * result + (photoFormat?.hashCode() ?: 0)
-        return result
+        return 31 * result + availableOffline.hashCode()
     }
 }
 

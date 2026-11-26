@@ -95,16 +95,9 @@ object PublicationRecordMatcher {
     fun matchesOpaque(operation: FrozenCapsuleOperation, metadata: Map<String, Any?>): Boolean {
         if (!operation.isOpaque) return false
         if (metadata["createdAt"] !is Instant || metadata["unlocked"] !is Boolean) return false
-        val expectedLockMode = when (operation.lock.mode) {
-            LockMode.TIME -> "TIME"
-            LockMode.LOCATION -> "LOCATION"
-            LockMode.TIME_AND_LOCATION -> "BOTH"
-        }
         return metadata["capsuleId"] == operation.capsuleId &&
             metadata["senderId"] == operation.senderUid &&
-            metadata["snapshotDigest"] == operation.snapshotDigest &&
-            metadata["lockMode"] == expectedLockMode &&
-            metadata["creationZone"] == operation.creationZone
+            metadata["snapshotDigest"] == operation.snapshotDigest
     }
 
     /** Normalizes Firestore numeric representations, keeping exact field sets and other types. */

@@ -1,5 +1,6 @@
 package com.example.timecapsule.data.adapter
 
+import com.example.timecapsule.data.media.AndroidOriginalImageProbe
 import com.example.timecapsule.data.session.StorageSession
 import com.example.timecapsule.domain.model.OriginalPhotoFormat
 import com.example.timecapsule.domain.model.OriginalPhotoLimits
@@ -37,7 +38,7 @@ class DefaultLocalRetentionAdapter(
 
     companion object {
         private val lock = StorageSession.lock
-        private const val MARKER_VERSION = "1"
+        private const val MARKER_VERSION = "2"
         private const val MARKER_FILE_NAME = "verified-marker.properties"
         private const val TEXT_FILE_NAME = "content.text"
         private const val PHOTO_FILE_NAME = "content.photo"
@@ -59,11 +60,13 @@ class DefaultLocalRetentionAdapter(
         if (!cleanCapsuleId.matches(Regex("[A-Za-z0-9_-]+"))) {
             return@withContext OperationResult.Invalid("Invalid capsule ID format for storage.")
         }
-        if (text == null && photoBytes == null) {
+        val retainedText = text?.takeIf { it.isNotBlank() }
+        if (retainedText == null && photoBytes == null) {
             return@withContext OperationResult.Invalid("Retained content must contain text, photo, or both.")
         }
-        if (photoBytes != null && photoFormat == null) {
-            return@withContext OperationResult.Invalid("Photo format is required when retaining photo bytes.")
+        if ((photoBytes == null) != (photoFormat == null) ||
+            (photoBytes != null && AndroidOriginalImageProbe.inspect(photoBytes) != photoFormat)) {
+            return@withContext OperationResult.Invalid("Retained photo bytes must decode in the declared format.")
         }
 
         synchronized(lock) {
@@ -76,27 +79,24 @@ class DefaultLocalRetentionAdapter(
                     return@synchronized OperationResult.Unavailable("Cannot create retained content directory.")
                 }
 
-                // Write text content if present
-                if (text != null) {
-                    val textFile = File(directory, TEXT_FILE_NAME)
-                    writeAtomic(textFile, text.toByteArray(Charsets.UTF_8))
-                }
-
-                // Write photo content if present
-                if (photoBytes != null) {
-                    val photoFile = File(directory, PHOTO_FILE_NAME)
-                    writeAtomic(photoFile, photoBytes)
-                }
-
-                // Write verified marker metadata
+                // A failed replacement must never authorize a mixture of old and new files.
                 val markerFile = File(directory, MARKER_FILE_NAME)
+                Files.deleteIfExists(markerFile.toPath())
+                val textFile = File(directory, TEXT_FILE_NAME)
+                if (retainedText == null) Files.deleteIfExists(textFile.toPath())
+                else writeAtomic(textFile, retainedText.toByteArray(Charsets.UTF_8))
+                val photoFile = File(directory, PHOTO_FILE_NAME)
+                if (photoBytes == null) Files.deleteIfExists(photoFile.toPath())
+                else writeAtomic(photoFile, photoBytes)
+
                 val properties = Properties().apply {
                     setProperty("version", MARKER_VERSION)
                     setProperty("uid", cleanUid)
                     setProperty("capsuleId", cleanCapsuleId)
                     setProperty("verifiedUnlockedAt", verifiedUnlockedAt.toString())
-                    setProperty("hasText", (text != null).toString())
+                    setProperty("hasText", (retainedText != null).toString())
                     setProperty("hasPhoto", (photoBytes != null).toString())
+                    photoBytes?.let { setProperty("photoSha256", sha256(it)) }
                     photoFormat?.let { setProperty("photoFormat", it.name) }
                 }
 
@@ -153,7 +153,7 @@ class DefaultLocalRetentionAdapter(
                 val markerCapsuleId = properties.getProperty("capsuleId")
                 val unlockTimeStr = properties.getProperty("verifiedUnlockedAt")
 
-                if (version != MARKER_VERSION || markerUid != cleanUid || markerCapsuleId != cleanCapsuleId || unlockTimeStr == null) {
+                if ((version != MARKER_VERSION && version != "1") || markerUid != cleanUid || markerCapsuleId != cleanCapsuleId || unlockTimeStr == null) {
                     return@synchronized OperationResult.Denied("Retained marker is invalid or belongs to another account.")
                 }
 
@@ -197,12 +197,13 @@ class DefaultLocalRetentionAdapter(
 
                 val photoBytes = if (hasPhoto) {
                     val photoFile = File(directory, PHOTO_FILE_NAME)
-                    if (!photoFile.exists()) {
+                    if (!photoFile.isFile || !OriginalPhotoLimits.acceptsSize(photoFile.length())) {
                         return@synchronized OperationResult.Unavailable("Retained photo file is missing.")
                     }
                     val bytes = photoFile.readBytes()
-                    if (!OriginalPhotoLimits.acceptsSize(bytes.size.toLong())) {
-                        return@synchronized OperationResult.Unavailable("Retained photo size is invalid.")
+                    if (properties.getProperty("photoSha256") != sha256(bytes) ||
+                        AndroidOriginalImageProbe.inspect(bytes) != photoFormat) {
+                        return@synchronized OperationResult.Unavailable("Retained photo integrity could not be verified.")
                     }
                     bytes
                 } else null
@@ -271,9 +272,9 @@ class DefaultLocalRetentionAdapter(
 
     /** Computes SHA-256 hash of [uid] to prevent account names in file system paths. */
     private fun accountDirectory(uid: String): File {
-        val hash = MessageDigest.getInstance("SHA-256")
-            .digest(uid.toByteArray(Charsets.UTF_8))
-            .joinToString("") { "%02x".format(it) }
-        return File(root, hash)
+        return File(root, sha256(uid.toByteArray(Charsets.UTF_8)))
     }
+
+    private fun sha256(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256")
+        .digest(bytes).joinToString("") { "%02x".format(it) }
 }

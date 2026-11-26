@@ -29,6 +29,12 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
+import android.app.Application
+import com.example.timecapsule.data.media.AndroidOriginalImageProbe
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -44,6 +50,9 @@ import org.junit.rules.TemporaryFolder
  * Test-driven regression suite verifying session generation write gates,
  * fail-closed cleanup gates, PNG photo format preservation, and failed photo download handling.
  */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35], application = Application::class, manifest = Config.NONE)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class StorageRaceRegressionTest {
 
     @get:Rule
@@ -122,11 +131,18 @@ class StorageRaceRegressionTest {
     }
 
     @Test
-    fun testPNGPhotoDownloadAndFormatRetention() = runBlocking {
+    fun onlineReadRetainsEveryValidContentCombinationForOfflineReview() = runBlocking {
         sessionTracker.startSession("user-recipient")
         val session = sessionTracker.currentSession()
 
-        val samplePngBytes = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00)
+        val png = imageFixture("png")
+        var online = true
+        val serverContent = mapOf(
+            "text" to ProtectedCapsuleContent("text", "  message  ", null),
+            "photo" to ProtectedCapsuleContent("photo", "", "remote/photo", png, OriginalPhotoFormat.PNG),
+            "both" to ProtectedCapsuleContent("both", "caption", "remote/both", png, OriginalPhotoFormat.PNG),
+            "no-cache" to ProtectedCapsuleContent("no-cache", "online only", null)
+        )
 
         val fakeFirestore = object : FirestoreAdapter {
             override fun isAvailable(): Boolean = true
@@ -139,7 +155,7 @@ class StorageRaceRegressionTest {
                 capsuleId: String,
                 recipientUid: String
             ): OperationResult<RecipientUnlockRequirements> =
-                OperationResult.Success(
+                if (!online) OperationResult.Unavailable("Offline") else OperationResult.Success(
                     RecipientUnlockRequirements(
                         capsuleId = capsuleId,
                         recipientUid = recipientUid,
@@ -153,15 +169,7 @@ class StorageRaceRegressionTest {
                 capsuleId: String,
                 recipientUid: String
             ): OperationResult<ProtectedCapsuleContent> =
-                OperationResult.Success(
-                    ProtectedCapsuleContent(
-                        capsuleId = capsuleId,
-                        text = "PNG Capsule Text",
-                        photoObjectPath = "capsuleMedia/sender/capsule-png/original",
-                        photoBytes = samplePngBytes,
-                        photoFormat = OriginalPhotoFormat.PNG
-                    )
-                )
+                OperationResult.Success(serverContent.getValue(capsuleId))
         }
 
         val repository = DefaultCapsuleRepository(
@@ -179,14 +187,35 @@ class StorageRaceRegressionTest {
             retentionAdapter = retentionAdapter
         )
 
-        val contentRes = repository.readContent("capsule-png", session)
-        assertTrue(contentRes is OperationResult.Success)
+        for (id in listOf("text", "photo", "both")) {
+            val read = repository.readContent(id, session) as OperationResult.Success
+            assertTrue(read.data.availableOffline)
+        }
+        // A file in place of the directory forces an actual persistence failure.
+        val accountDir = rootDir.listFiles()!!.single()
+        File(accountDir, "no-cache").writeText("obstruction")
+        val onlineOnly = repository.readContent("no-cache", session) as OperationResult.Success
+        assertEquals("online only", onlineOnly.data.text)
+        assertFalse(onlineOnly.data.availableOffline)
 
-        val content = (contentRes as OperationResult.Success).data
-        assertEquals("PNG Capsule Text", content.text)
-        assertNotNull(content.photoBytes)
-        assertTrue(samplePngBytes.contentEquals(content.photoBytes!!))
-        assertEquals(OriginalPhotoFormat.PNG, content.photoFormat)
+        online = false
+        for (id in listOf("text", "photo", "both")) {
+            val read = repository.readContent(id, session) as OperationResult.Success
+            val expected = serverContent.getValue(id)
+            assertEquals(expected.text?.takeIf { it.isNotBlank() }, read.data.text)
+            org.junit.Assert.assertArrayEquals(expected.photoBytes, read.data.photoBytes)
+            assertEquals(expected.photoFormat, read.data.photoFormat)
+            assertTrue(read.data.availableOffline)
+        }
+        assertFalse(File(accountDir, "photo/content.text").exists())
+        assertTrue(File(accountDir, "both/content.photo").delete())
+        assertFalse(repository.readContent("both", session) is OperationResult.Success)
+        // An intact, readable substitute still differs from the originally retained bytes.
+        File(accountDir, "photo/content.photo").writeBytes(imageFixture("png", 0xffffff))
+        assertFalse(repository.readContent("photo", session) is OperationResult.Success)
+        assertTrue(File(accountDir, "text/content.text").delete())
+        assertFalse(repository.readContent("text", session) is OperationResult.Success)
+        assertFalse(repository.readContent("no-cache", session) is OperationResult.Success)
     }
 
     @Test
@@ -273,26 +302,23 @@ class StorageRaceRegressionTest {
     }
 
     @Test
-    fun testProductionImageValidationHeaderDetection() = runBlocking {
-        val pngBytes = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00)
-        val jpegBytes = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xE0.toByte(), 0x00)
-        val malformedBytes = byteArrayOf(0x00, 0x01, 0x02, 0x03, 0x04)
+    fun nativeDecoderValidatesDownloadedAndRetainedPhotoFormats() {
+        for ((extension, format) in listOf("png" to OriginalPhotoFormat.PNG, "jpg" to OriginalPhotoFormat.JPEG)) {
+            val bytes = imageFixture(extension)
+            assertEquals(format, AndroidOriginalImageProbe.inspect(bytes))
+            assertNull(AndroidOriginalImageProbe.inspect(bytes.copyOf(8)))
+            assertNull(AndroidOriginalImageProbe.inspect(bytes.copyOf(bytes.size - 1)))
+            assertNull(AndroidOriginalImageProbe.inspect(bytes.take(8).toByteArray() + bytes.takeLast(12).toByteArray()))
+        }
+    }
+}
 
-        // Test PNG detection
-        val pngFormat = if (pngBytes.size >= 4 &&
-            pngBytes[0] == 0x89.toByte() && pngBytes[1] == 0x50.toByte() &&
-            pngBytes[2] == 0x4E.toByte() && pngBytes[3] == 0x47.toByte()) OriginalPhotoFormat.PNG else OriginalPhotoFormat.JPEG
-        assertEquals(OriginalPhotoFormat.PNG, pngFormat)
-
-        // Test JPEG detection
-        val jpegFormat = if (jpegBytes.size >= 3 &&
-            jpegBytes[0] == 0xFF.toByte() && jpegBytes[1] == 0xD8.toByte() &&
-            jpegBytes[2] == 0xFF.toByte()) OriginalPhotoFormat.JPEG else OriginalPhotoFormat.PNG
-        assertEquals(OriginalPhotoFormat.JPEG, jpegFormat)
-
-        // Test malformed header rejection
-        val isMalformedValid = (malformedBytes.size >= 4 && malformedBytes[0] == 0x89.toByte() && malformedBytes[1] == 0x50.toByte()) ||
-                (malformedBytes.size >= 3 && malformedBytes[0] == 0xFF.toByte() && malformedBytes[1] == 0xD8.toByte())
-        assertFalse("Malformed image bytes must be rejected", isMalformedValid)
+/** Produces complete image streams with a decoder independent of the Android code under test. */
+internal fun imageFixture(format: String, color: Int = 0x112233): ByteArray {
+    val image = java.awt.image.BufferedImage(2, 2, java.awt.image.BufferedImage.TYPE_INT_RGB)
+    image.setRGB(0, 0, color)
+    return java.io.ByteArrayOutputStream().use {
+        check(javax.imageio.ImageIO.write(image, format, it))
+        it.toByteArray()
     }
 }

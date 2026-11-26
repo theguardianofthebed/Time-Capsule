@@ -117,7 +117,7 @@ class S06ConfirmSendFragment : Fragment() {
                     val busy = state.publicationBusy || state.recoveryBusy || state.photoBusy
                     val sent = state.publicationPhase == PublicationPhase.SENT
                     binding.layoutSummaryCard.visibility =
-                        if (sent || state.recoveryBusy || state.recoveryBlocked) View.GONE else View.VISIBLE
+                        if (state.statusOnly || sent || state.recoveryBusy || state.recoveryBlocked) View.GONE else View.VISIBLE
                     binding.btnSendCapsule.isEnabled = !busy && !state.recoveryBlocked
                     binding.btnSendCapsule.setText(when {
                         sent -> R.string.publication_new
@@ -158,6 +158,7 @@ class S06ConfirmSendFragment : Fragment() {
                         binding.tvReviewPhotoInfo.text = "Attached photo: ${state.photoName ?: "photo"}"
                         binding.tvReviewPhotoInfo.visibility = View.VISIBLE
                     } else {
+                        binding.tvReviewPhotoInfo.text = ""
                         binding.tvReviewPhotoInfo.visibility = View.GONE
                     }
 

@@ -67,6 +67,7 @@ data class FrozenCapsuleOperation(
      * Null and empty strings are distinct; delimiters/newlines inside user text cannot collide.
      */
     fun canonicalPayload(): String = buildString {
+        require(!isOpaque) { "Opaque evidence has no publication payload." }
         append("timecapsule-operation-v1\n")
         val location = lock.location
         val values = listOf(
@@ -96,6 +97,11 @@ data class FrozenCapsuleOperation(
         .joinToString("") { "%02x".format(it) }
 
     companion object {
+        /** Only identity and digest survive compaction. Empty fields cannot form a valid draft. */
+        fun opaque(uid: String, capsuleId: String, digest: String) = FrozenCapsuleOperation(
+            capsuleId, uid, "", null, "", CapsuleLock(LockMode.TIME), "", null, digest, isOpaque = true
+        )
+
         /**
          * Validates and freezes one confirmed draft; repeated submission must retain its ID.
          * [now] is input validation only, not authoritative server time or unlock authorization.
