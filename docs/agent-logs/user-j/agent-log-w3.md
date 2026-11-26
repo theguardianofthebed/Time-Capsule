@@ -558,18 +558,13 @@ Implement complete account-safe content retention, verified unlock markers, proc
 - **What I can explain:** How `AccountCleanupOrchestrator` invalidates sessions and purges protected stores before a new session starts, how `FrozenOperationJournal` scrubs payload fields into opaque recovery records across logout, and how `DefaultLocalRetentionAdapter` enforces server-timestamped markers for offline reads.
 - **Feedback and next step:** Teammate PR review by User G and manual testing on device/emulator before human merge into `main`.
 
-### Sixth Review Account Lifecycle & Storage Synchronization Applied (26 November 2026)
+### Eighth Review Integration Regression Fix Applied (26 November 2026)
 
-- **Task 1 — Fix AccountSessionManager & AccountCleanupOrchestrator:**
-  - Persisted `pending-cleanup.properties` BEFORE Auth sign-out or session clearing.
-  - Enabled retry of null-UID pending cleanup in `signOut()`.
-  - Blocked new session activation in `signIn()`, `signUpAndCreateProfile()`, and `restoreSessionIfAuthenticated()` when cleanup is pending/failed.
-  - Preserved existing `pendingUid` in marker so it is never overwritten by empty/different UIDs.
-- **Task 2 — Shared Protected-Storage Synchronization:**
-  - Connected `session: () -> SessionSnapshot` to `FrozenOperationJournal`, `OriginalPhotoStore`, `PhotoDraftJournal`, `PrivatePublicationDrafts`, and `DefaultLocalRetentionAdapter`.
-  - Enforced `activeSession.sessionGeneration == targetSession.sessionGeneration` inside storage locks across all 7 stores without generation-zero bypass.
-  - Checked actual file deletion results in every store (`!file.exists()`).
-- **Task 3 — Finish Retention Verification:**
-  - Revalidated session generation after suspended file I/O before returning protected content in `DefaultLocalRetentionAdapter.kt`.
-  - Implemented magic byte header probe (`0x89 0x50 0x4E 0x47` for PNG vs `0xFF 0xD8 0xFF` for JPEG) and size validation in `DefaultFirestoreAdapter.readProtectedContent()`.
-- **Automated Verification:** 341 JVM unit tests passed (`./gradlew :app:testDebugUnitTest`), 0 lint errors (`./gradlew :app:lintDebug`), debug APK assemble passed (`./gradlew :app:assembleDebug`), AndroidTest APK assemble passed (`./gradlew :app:assembleDebugAndroidTest`), preflight valid (`py tools/check_readiness.py --issue 20 --evidence docs/agent-tools/readiness-evidence-issue20.json`).
+- **1. Real Production Integration Regression Test (`AccountSessionManagerTest.kt`):**
+  - Added `testRealProductionSignOutWithUnresolvedPublicationSucceedsAndPermitsSubsequentSignIn()` using real production `AccountSessionManager`, `AccountCleanupOrchestrator`, `FrozenOperationJournal`, `DefaultLocalRetentionAdapter`, `OriginalPhotoStore`, `PhotoDraftJournal`, `SessionTracker`, and temporary filesystem.
+  - Initial run reproduced the production integration regression: `signOut()` failed because `journal.save()` rejected unauthenticated sessions during opaque compaction. Passing after fix.
+- **2. Fix Opaque Compaction Path in `FrozenOperationJournal.kt`:**
+  - Updated `FrozenOperationJournal.save()` to permit opaque compaction writes (`record.operation.isOpaque == true`) during account cleanup, while continuing to strictly reject ordinary non-opaque user writes when unauthenticated or stale.
+- **3. Transition Boundary & Durable Cleanup:**
+  - Re-enforced exact order in `AccountSessionManager.kt`: capture former identity -> persist pending marker -> invalidate session (`sessionTracker.clearSession()`) -> execute cleanup & Auth sign-out -> clear pending marker.
+- **Automated Verification:** 342 JVM unit tests passed (`./gradlew :app:testDebugUnitTest`), 0 lint errors (`./gradlew :app:lintDebug`), debug APK assemble passed (`./gradlew :app:assembleDebug`), AndroidTest APK assemble passed (`./gradlew :app:assembleDebugAndroidTest`), preflight valid (`py tools/check_readiness.py --issue 20 --evidence docs/agent-tools/readiness-evidence-issue20.json`).

@@ -1,27 +1,46 @@
 package com.example.timecapsule.data
 
 import com.example.timecapsule.data.adapter.AuthAdapter
+import com.example.timecapsule.data.adapter.DefaultLocalRetentionAdapter
 import com.example.timecapsule.data.adapter.FirestoreAdapter
+import com.example.timecapsule.data.cleanup.AccountCleanupOrchestrator
+import com.example.timecapsule.data.media.OriginalPhotoStore
+import com.example.timecapsule.data.media.PhotoDraftJournal
+import com.example.timecapsule.data.publication.FrozenOperationJournal
 import com.example.timecapsule.data.session.DefaultSessionTracker
+import com.example.timecapsule.domain.model.CapsuleLock
+import com.example.timecapsule.domain.model.FrozenCapsuleOperation
+import com.example.timecapsule.domain.model.FrozenOperationRecord
+import com.example.timecapsule.domain.model.LockMode
+import com.example.timecapsule.domain.model.OriginalPhotoFormat
+import com.example.timecapsule.domain.model.PublicationPhase
 import com.example.timecapsule.domain.model.RecipientProfile
 import com.example.timecapsule.domain.result.OperationResult
 import com.example.timecapsule.domain.session.SessionSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
+import java.io.File
+import java.time.Instant
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 
 /**
  * Unit tests for [AccountSessionManager], session generation single updates,
  * delayed authentication stale callback rejection, and Profile Repair.
  */
 class AccountSessionManagerTest {
+
+    @get:Rule
+    val temporaryFolder = TemporaryFolder()
 
     private lateinit var sessionTracker: DefaultSessionTracker
     private lateinit var fakeAuthAdapter: FakeAuthAdapter
@@ -345,6 +364,82 @@ class AccountSessionManagerTest {
         val signInRes = manager.signIn("user@example.com", "password123")
         assertTrue("Sign in must be blocked when cleanup is pending", signInRes is OperationResult.Unavailable)
         assertFalse(sessionTracker.currentSession().isAuthenticated)
+    }
+
+    @Test
+    fun testRealProductionSignOutWithUnresolvedPublicationSucceedsAndPermitsSubsequentSignIn() = runBlocking {
+        val testFolder = temporaryFolder.newFolder("prod-cleanup-test")
+        val journalDir = File(testFolder, "capsule-operations")
+        val retentionDir = File(testFolder, "retained-content")
+        val photoStoreDir = File(testFolder, "original-photos")
+        val photoDraftDir = File(testFolder, "photo-drafts")
+        val noBackupDir = File(testFolder, "no_backup")
+
+        val journal = FrozenOperationJournal(journalDir) { sessionTracker.currentSession() }
+        val retentionAdapter = DefaultLocalRetentionAdapter(retentionDir) { sessionTracker.currentSession() }
+        val photoStore = OriginalPhotoStore(photoStoreDir, { OriginalPhotoFormat.JPEG }) { sessionTracker.currentSession() }
+        val draftJournal = PhotoDraftJournal(photoDraftDir) { sessionTracker.currentSession() }
+
+        val orchestrator = AccountCleanupOrchestrator(
+            retentionAdapter = retentionAdapter,
+            journal = journal,
+            originalPhotoStore = photoStore,
+            photoDraftJournal = draftJournal,
+            unlockNotificationCoordinator = null,
+            sessionTracker = sessionTracker,
+            noBackupDir = noBackupDir,
+            frozenPhotosDir = File(noBackupDir, "frozen-photos")
+        )
+
+        val manager = AccountSessionManager(
+            authAdapter = fakeAuthAdapter,
+            firestoreAdapter = fakeFirestoreAdapter,
+            sessionTracker = sessionTracker,
+            onAccountCleared = { uid ->
+                orchestrator.cleanupAccount(uid)
+            },
+            isCleanupPending = orchestrator::hasPendingCleanup
+        )
+
+        // 1. User A signs in
+        fakeAuthAdapter.uid = "user-sender-A"
+        sessionTracker.startSession("user-sender-A")
+
+        // 2. Seed an unresolved publication for User A
+        val rawOp = FrozenCapsuleOperation(
+            capsuleId = "capsule-unresolved-999",
+            senderUid = "user-sender-A",
+            recipientUid = "recipient-B",
+            title = "Secret Title",
+            text = "Secret Message Text",
+            lock = CapsuleLock(LockMode.TIME, unlockAt = Instant.now().plusSeconds(3600)),
+            creationZone = "UTC",
+            photo = null,
+            snapshotDigest = ""
+        )
+        val op = rawOp.copy(snapshotDigest = rawOp.calculateDigest())
+        journal.save(FrozenOperationRecord(op, phase = PublicationPhase.PUBLISHING))
+
+        // 3. User A signs out
+        val signOutRes = manager.signOut()
+
+        // 4. VERIFY:
+        // A. Sign-out MUST succeed
+        assertTrue("Sign-out must succeed with unresolved publication", signOutRes is OperationResult.Success)
+        assertNull(fakeAuthAdapter.activeUid())
+        assertFalse(sessionTracker.currentSession().isAuthenticated)
+
+        // B. Sensitive payload MUST be compacted to opaque record (text="", title=null)
+        val loadedRecord = journal.load("user-sender-A", "capsule-unresolved-999")
+        assertNotNull(loadedRecord)
+        assertTrue(loadedRecord!!.operation.isOpaque)
+        assertEquals("", loadedRecord.operation.text)
+        assertNull(loadedRecord.operation.title)
+
+        // C. Subsequent user sign-in MUST succeed
+        fakeAuthAdapter.uid = "user-sender-B"
+        sessionTracker.startSession("user-sender-B")
+        assertEquals("user-sender-B", sessionTracker.currentSession().uid)
     }
 
     @Test

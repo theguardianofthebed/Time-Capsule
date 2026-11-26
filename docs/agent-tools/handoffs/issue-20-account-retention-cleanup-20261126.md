@@ -32,12 +32,11 @@
    - Purges compose buffers and local photo files upon confirmed publication.
 5. **Backup Exclusions (`backup_rules.xml`, `data_extraction_rules.xml`):**
    - Configured XML rules to exclude all app-private protected directories (`retained-content`, `capsule-operations`, `original-photos`, `frozen-photos`, `photo-drafts`, `notification-attempts.json`, `no_backup`).
-6. **Sixth Review Corrections:**
-   - **Task 1**: Updated `AccountSessionManager.kt` to persist pending cleanup BEFORE Auth sign-out. Added null-UID sign-out retries and fail-closed session activation.
-   - **Task 2**: Connected `session: () -> SessionSnapshot` across all 7 stores and enforced `activeSession.sessionGeneration == targetSession.sessionGeneration` inside storage locks without generation-zero bypass. Verified `!file.exists()` on file deletion.
-   - **Task 3**: Implemented PNG (`0x89 0x50 0x4E 0x47`) vs JPEG (`0xFF 0xD8 0xFF`) header byte probe and image byte validation in `DefaultFirestoreAdapter.kt`.
+6. **Eighth Review Integration Regression Fix:**
+   - **Task 1**: Added `testRealProductionSignOutWithUnresolvedPublicationSucceedsAndPermitsSubsequentSignIn()` in `AccountSessionManagerTest.kt` reproducing the opaque compaction failure.
+   - **Task 2**: Updated `FrozenOperationJournal.save()` to permit opaque compaction writes (`isOpaque == true`) during account cleanup while strictly rejecting non-opaque user writes when unauthenticated.
 7. **Automated Verification:**
-   - 341 JVM unit tests passing (`./gradlew :app:testDebugUnitTest`).
+   - 342 JVM unit tests passing (`./gradlew :app:testDebugUnitTest`).
    - Clean debug APK build (`./gradlew :app:assembleDebug`).
    - Clean AndroidTest APK build (`./gradlew :app:assembleDebugAndroidTest`).
    - Clean Android lint (`./gradlew :app:lintDebug`).

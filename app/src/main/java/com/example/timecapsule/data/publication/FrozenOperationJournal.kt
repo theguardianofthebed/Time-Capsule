@@ -41,8 +41,10 @@ class FrozenOperationJournal(
      */
     fun save(record: FrozenOperationRecord) = synchronized(access) {
         val activeSession = session?.invoke()
-        if (activeSession != null && (!activeSession.isAuthenticated || (record.operation.senderUid.isNotBlank() && activeSession.uid != record.operation.senderUid))) {
-            throw IOException("Stale or unauthenticated session: cannot write operation record.")
+        if (activeSession != null && !record.operation.isOpaque) {
+            if (!activeSession.isAuthenticated || (record.operation.senderUid.isNotBlank() && activeSession.uid != record.operation.senderUid)) {
+                throw IOException("Stale or unauthenticated session: cannot write operation record.")
+            }
         }
         val operation = record.operation
         operation.verify()
