@@ -571,3 +571,14 @@ Implement complete account-safe content retention, verified unlock markers, proc
   - Updated `testRealProductionSignOutWithUnresolvedPublicationSucceedsAndPermitsSubsequentSignIn()` to invoke `manager.signIn()` for Account B.
   - Verified pending cleanup is cleared, Account B session activates, and User A's former protected content is inaccessible to User B.
 - **Automated Verification:** 342 JVM unit tests passed (`./gradlew :app:testDebugUnitTest`), 0 lint errors (`./gradlew :app:lintDebug`), debug APK assemble passed (`./gradlew :app:assembleDebug`), AndroidTest APK assemble passed (`./gradlew :app:assembleDebugAndroidTest`), preflight valid (`py tools/check_readiness.py --issue 20 --evidence docs/agent-tools/readiness-evidence-issue20.json`).
+
+
+## 26 November 2026 · Issue #20 tenth review
+
+User J continued the MVP account-storage work on PR #46 from `7cc60c3`. User G is the designated reviewer. [PR #46](https://github.com/theguardianofthebed/Time-Capsule/pull/46)
+
+- Carried the originating session generation through publication, compose drafts, original photos, frozen uploads and retained content. Generation changes and protected file commits use the same lock. Removed the UID-only retention overloads.
+- Updated account sign-in, sign-up, logout, restoration and late callbacks to record and drain durable cleanup obligations. The application and integration tests share the account-manager wiring. A pending UID survives cleanup of a different account.
+- Verified interrupted logout against real files, including the marker before invalidation, deletion of protected content, opaque compaction and subsequent sign-in. Paused photo and publication operations were released after same-UID reauthentication.
+- The first JVM run exposed four UI fixture failures. Connecting the transition dispatcher to the test scheduler made the intended ordering reproducible. Final pinned checks passed with 353 JVM tests, both debug APKs and lint reporting 0 errors and 144 warnings on the fresh checkout. Issue #20 readiness passed.
+- User G's review, User J's device tests and personal log confirmation are pending. [Implementation](https://github.com/theguardianofthebed/Time-Capsule/commit/7eab1b9dd245cbc2ce03fa899fabde4895e36ecb) · [Handoff](../../agent-tools/handoffs/issue-20-account-retention-cleanup-20261126.md)

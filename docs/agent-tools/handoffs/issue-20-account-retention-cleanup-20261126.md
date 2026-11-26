@@ -2,7 +2,7 @@
 
 - **Confirmed owner:** User J (Feasibility & Implementation)
 - **Scope / period / different human reviewer:** MVP; 26 November 2026; User G (Requirements & Design)
-- **Issue / PR:** Issue #20 (https://github.com/theguardianofthebed/Time-Capsule/issues/20); PR pending on branch `feature/20-account-retention-cleanup`
+- **Issue / PR:** Issue #20 (https://github.com/theguardianofthebed/Time-Capsule/issues/20); [PR #46](https://github.com/theguardianofthebed/Time-Capsule/pull/46) on `feature/20-account-retention-cleanup`
 - **Branch / base / head:** `feature/20-account-retention-cleanup` / base `ff24346b8a83f802a4e6ef7eaa41a774057d8aee`
 - **State:** AWAITING_REVIEW
 - **Boundary:** Retained content storage, account cleanup orchestrator, transition ordering, opaque recovery records, backup exclusions
@@ -16,7 +16,29 @@
 - **Overlap inspection:** 26 November 2026, no overlapping active claims on account retention or cleanup components
 - **Readiness:** Eight gates passed, `docs/agent-tools/readiness-evidence-issue20.json`, `PREFLIGHT_RECORD_VALID`
 
-## Completed work
+## Tenth review · 26 November 2026
+
+User J continued from `7cc60c3`. User G's human review is pending. The implementation and regression tests are in [7eab1b9](https://github.com/theguardianofthebed/Time-Capsule/commit/7eab1b9dd245cbc2ce03fa899fabde4895e36ecb).
+
+| Boundary | What the committed implementation does | Automated evidence |
+|---|---|---|
+| Publication and draft writes | The coordinator carries the originating session through submission, acknowledgements, recovery and replacement. Journal writes compare the UID and generation while holding the same lock that changes the tracker generation. Cleanup retains the private opaque-compaction path. | A paused initial submission cannot create a journal after same-UID login. A delayed acknowledgement leaves the compacted operation opaque and unresolved. A stale replacement cannot recreate the draft. |
+| Photos and retention | The compose UI captures its session before queueing work. The original-photo store buffers at most the 5 MiB input limit, then checks the session under the lock before creating a file. Frozen uploads pass the original session through the copy and draft record. Retained content requires an exact live snapshot on reads and writes. | A paused provider read resumes after logout and same-UID login. Protected files stay absent. A queued freeze and a generation-zero retention request are rejected. |
+| Account transitions | Sign-in and sign-up record former accounts before changing credentials and keep their obligations during the SDK request. Logout verifies SDK sign-out before purging. Restoration drains the on-disk queue, and a stale callback retires displaced accounts. A marker-write failure returns a retryable result. Finishing B removes only B from the queue. | Tests inspect the marker before invalidation, interrupt logout before SDK sign-out, recreate the manager and stores, then sign in again. Other cases cover an unreadable journal, a failed marker write, a failed SDK sign-out, stale authentication, and recovery of A while restoring B. |
+| Production wiring | The application and integrated tests both create the account manager through `AccountCleanupOrchestrator.sessionManager`. It connects the marker writer and pending-UID reader to the same store that performs the purge. Application startup uses suspending foreground restoration. | The integrated logout test seeds an actual retained file, original photo, compose draft and unresolved operation. It checks on-disk removal and opaque recovery before signing in through the real manager. Firebase services are represented by test adapters. |
+
+The pinned Gradle 9.6.0 wrapper, AGP 9.3.0, JDK 25 and Android SDK 37 produced the following results for the implementation commit.
+
+| Gradle task | Result |
+|---|---|
+| `:app:testDebugUnitTest` | 353 passed, 0 failed, 0 skipped |
+| `:app:assembleDebug` | Debug APK built |
+| `:app:assembleDebugAndroidTest` | Instrumentation APK built |
+| `:app:lintDebug` | 0 errors, 144 warnings on the fresh checkout |
+
+The Issue #20 readiness check returned `PREFLIGHT_RECORD_VALID`. User G's review and User J's device scenarios T-02, T-29 and T-44 remain open. The automated results cover the storage and transition behavior exercised by this revision.
+
+## Earlier work through the ninth review
 
 1. **UID-Scoped Retained Content Adapter (`DefaultLocalRetentionAdapter.kt`):**
    - Manages UID-scoped directory structure under `noBackupFilesDir/retained-content/<hashed-uid>/<capsule-id>/`.
@@ -55,7 +77,7 @@
   ```powershell
   .\gradlew.bat :app:testDebugUnitTest
   .\gradlew.bat :app:lintDebug
-  .\gradlew.bat :app:assembleDebug
+  .\gradlew.bat :app:assembleDebug :app:assembleDebugAndroidTest
   py tools/check_readiness.py --issue 20 --evidence docs/agent-tools/readiness-evidence-issue20.json
   ```
 
