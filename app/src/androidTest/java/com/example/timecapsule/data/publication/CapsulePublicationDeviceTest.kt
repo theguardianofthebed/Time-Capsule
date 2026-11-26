@@ -1,5 +1,6 @@
 package com.example.timecapsule.data.publication
 
+import com.example.timecapsule.data.session.fixtureSession
 import android.content.Context
 import android.graphics.Bitmap
 import androidx.lifecycle.ViewModelProvider
@@ -155,7 +156,7 @@ class CapsulePublicationDeviceTest {
             } finally { image.recycle() }
             val draft = draft()
             val photo = OriginalPhotoStore(File(root, "photos"), AndroidOriginalImageProbe())
-                .retain(uid, draft.capsuleId, "image/png", bytes.inputStream())
+                .retain(fixtureSession(uid), uid, draft.capsuleId, "image/png", bytes.inputStream())
             assertTrue(coordinator().publish(draft.copy(originalPhoto = photo)) is OperationResult.Success)
             val metadata = firestore.collection("capsules").document(draft.capsuleId)
                 .get(Source.SERVER).await()
@@ -191,7 +192,7 @@ class CapsulePublicationDeviceTest {
     @Test fun rejectedBatchCreatesSafeEditableReplacement() = runBlocking {
         withTimeout(60_000) {
             val draft = draft().copy(lock = CapsuleLock(LockMode.TIME, Instant.now().plusSeconds(2)))
-            PhotoDraftJournal(File(root, "drafts")).save(uid,
+            PhotoDraftJournal(File(root, "drafts")).save(fixtureSession(uid), uid,
                 PhotoDraftRecord(draft.capsuleId, "", draft.text, null))
             val delayed = object : CapsulePublicationBackend {
                 override suspend fun publish(operation: com.example.timecapsule.domain.model.FrozenCapsuleOperation) {

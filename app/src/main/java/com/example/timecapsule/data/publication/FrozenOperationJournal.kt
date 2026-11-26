@@ -1,5 +1,6 @@
 package com.example.timecapsule.data.publication
 
+import com.example.timecapsule.data.session.StorageSession
 import com.example.timecapsule.domain.model.CapsuleLock
 import com.example.timecapsule.domain.model.FrozenCapsuleOperation
 import com.example.timecapsule.domain.model.FrozenOperationRecord
@@ -8,7 +9,6 @@ import com.example.timecapsule.domain.model.LockMode
 import com.example.timecapsule.domain.model.OriginalPhotoFormat
 import com.example.timecapsule.domain.model.PublicationPhase
 import com.example.timecapsule.domain.model.RetainedOriginalPhoto
-import com.example.timecapsule.domain.session.SessionSnapshot
 import java.io.File
 import java.io.IOException
 import java.nio.file.Files
@@ -23,15 +23,14 @@ import java.util.Properties
  * A process-wide lock also serializes independent instances during Activity recreation.
  */
 class FrozenOperationJournal(
-    private val root: File,
-    private val session: (() -> SessionSnapshot)? = null
+    private val root: File
 ) {
     /** Identifies the private store when coordinating attempts across recreated instances. */
     val storageIdentity: String
         get() = root.canonicalPath
 
     companion object {
-        private val access = Any()
+        private val access = StorageSession.lock
     }
 
     /**
@@ -39,13 +38,8 @@ class FrozenOperationJournal(
      * A different snapshot for an existing ID is rejected, including after FAILED or SENT.
      * Phase changes must be authorized by the publication coordinator's actual network results.
      */
-    fun save(record: FrozenOperationRecord) = synchronized(access) {
-        val activeSession = session?.invoke()
-        if (activeSession != null) {
-            if (!activeSession.isAuthenticated || (record.operation.senderUid.isNotBlank() && activeSession.uid != record.operation.senderUid)) {
-                throw IOException("Stale or unauthenticated session: cannot write operation record.")
-            }
-        }
+    fun save(session: StorageSession, record: FrozenOperationRecord) = synchronized(access) {
+        session.requireOwner(record.operation.senderUid)
         val operation = record.operation
         operation.verify()
         record.replacementDraftId?.let {
@@ -156,6 +150,7 @@ class FrozenOperationJournal(
 
     /** Atomically reads and updates progress without allowing a timeout to overwrite a later ACK. */
     fun update(
+        session: StorageSession,
         uid: String,
         capsuleId: String,
         change: (FrozenOperationRecord) -> FrozenOperationRecord
@@ -163,7 +158,7 @@ class FrozenOperationJournal(
         val current = load(uid, capsuleId) ?: throw IOException("Saved operation is missing.")
         val updated = change(current)
         require(updated.operation.senderUid == uid && updated.operation.capsuleId == capsuleId)
-        save(updated)
+        save(session, updated)
         updated
     }
 
@@ -185,6 +180,12 @@ class FrozenOperationJournal(
      */
     fun compactAccountDataToOpaque(uid: String): List<String> = synchronized(access) {
         if (uid.isBlank()) return@synchronized emptyList()
+        val directory = accountDirectory(uid)
+        if (directory.isDirectory) {
+            val partials = directory.listFiles { file -> file.extension == "partial" }
+                ?: throw IOException("Cannot inspect operation storage.")
+            partials.forEach { Files.deleteIfExists(it.toPath()) }
+        }
         val records = list(uid)
         val opaqueIds = mutableListOf<String>()
         for (record in records) {

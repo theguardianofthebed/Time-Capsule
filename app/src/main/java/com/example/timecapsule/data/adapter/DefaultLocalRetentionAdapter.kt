@@ -1,5 +1,6 @@
 package com.example.timecapsule.data.adapter
 
+import com.example.timecapsule.data.session.StorageSession
 import com.example.timecapsule.domain.model.OriginalPhotoFormat
 import com.example.timecapsule.domain.model.OriginalPhotoLimits
 import com.example.timecapsule.domain.result.OperationResult
@@ -27,15 +28,15 @@ import kotlinx.coroutines.withContext
  *    Missing text or photo files cause the read to fail closed ([OperationResult.Unavailable]).
  *
  * @param root Base directory for retained content storage, typically `File(noBackupFilesDir, "retained-content")`.
- * @param session Optional session supplier for active session validation.
+ * @param session Live session supplier for active session validation.
  */
 class DefaultLocalRetentionAdapter(
     private val root: File,
-    private val session: (() -> SessionSnapshot)? = null
+    private val session: () -> SessionSnapshot
 ) : LocalRetentionAdapter {
 
     companion object {
-        private val lock = Any()
+        private val lock = StorageSession.lock
         private const val MARKER_VERSION = "1"
         private const val MARKER_FILE_NAME = "verified-marker.properties"
         private const val TEXT_FILE_NAME = "content.text"
@@ -66,12 +67,8 @@ class DefaultLocalRetentionAdapter(
         }
 
         synchronized(lock) {
-            val activeSession = session?.invoke()
-            if (activeSession != null) {
-                if (!activeSession.isAuthenticated || activeSession.uid != cleanUid ||
-                    (targetSession.sessionGeneration != 0L && activeSession.sessionGeneration != targetSession.sessionGeneration)) {
-                    return@synchronized OperationResult.Denied("Retained content save denied for stale or unauthenticated session generation.")
-                }
+            if (!targetSession.isAuthenticated || session() != targetSession) {
+                return@synchronized OperationResult.Denied("Retained content save denied for stale or unauthenticated session generation.")
             }
             try {
                 val directory = targetCapsuleDirectory(cleanUid, cleanCapsuleId)
@@ -137,12 +134,8 @@ class DefaultLocalRetentionAdapter(
         }
 
         synchronized(lock) {
-            val activeSession = session?.invoke()
-            if (activeSession != null) {
-                if (!activeSession.isAuthenticated || activeSession.uid != cleanUid ||
-                    (targetSession.sessionGeneration != 0L && activeSession.sessionGeneration != targetSession.sessionGeneration)) {
-                    return@synchronized OperationResult.Denied("Retained content read denied for stale or unauthenticated session generation.")
-                }
+            if (!targetSession.isAuthenticated || session() != targetSession) {
+                return@synchronized OperationResult.Denied("Retained content read denied for stale or unauthenticated session generation.")
             }
             try {
                 val directory = targetCapsuleDirectory(cleanUid, cleanCapsuleId)

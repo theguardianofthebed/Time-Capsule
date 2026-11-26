@@ -1,11 +1,14 @@
 package com.example.timecapsule.data.cleanup
 
+import com.example.timecapsule.data.session.SessionTracker
+import com.example.timecapsule.data.adapter.FirestoreAdapter
+import com.example.timecapsule.data.adapter.AuthAdapter
+import com.example.timecapsule.data.AccountSessionManager
 import com.example.timecapsule.data.adapter.LocalRetentionAdapter
 import com.example.timecapsule.data.media.OriginalPhotoStore
 import com.example.timecapsule.data.media.PhotoDraftJournal
 import com.example.timecapsule.data.notification.UnlockNotificationCoordinator
 import com.example.timecapsule.data.publication.FrozenOperationJournal
-import com.example.timecapsule.data.session.SessionTracker
 import com.example.timecapsule.domain.result.OperationResult
 import kotlinx.coroutines.CancellationException
 import java.io.File
@@ -36,7 +39,6 @@ import kotlinx.coroutines.withContext
  * @param originalPhotoStore Store holding private original photo files.
  * @param photoDraftJournal Store holding editable compose photo drafts.
  * @param unlockNotificationCoordinator Coordinator managing account notifications.
- * @param sessionTracker Process-wide session tracker for active session validation.
  * @param noBackupDir Non-backed-up directory for storing durable pending cleanup markers.
  * @param frozenPhotosDir Base directory holding frozen photo uploads.
  */
@@ -46,14 +48,22 @@ class AccountCleanupOrchestrator(
     private val originalPhotoStore: OriginalPhotoStore? = null,
     private val photoDraftJournal: PhotoDraftJournal? = null,
     private val unlockNotificationCoordinator: UnlockNotificationCoordinator? = null,
-    private val sessionTracker: SessionTracker? = null,
-    private val noBackupDir: File? = null,
+    private val noBackupDir: File,
     private val frozenPhotosDir: File? = null
 ) {
 
-    private val cleanupMutex = Mutex()
+    /** Connects auth transitions to the same durable store for marking, recovery and purging. */
+    fun sessionManager(auth: AuthAdapter, firestore: FirestoreAdapter, tracker: SessionTracker) =
+        AccountSessionManager(
+            auth, firestore, tracker,
+            onAccountCleared = ::cleanupAccount,
+            isCleanupPending = ::hasPendingCleanup,
+            markCleanupPending = ::markCleanupPending,
+            getPendingCleanupUid = ::getPendingCleanupUid
+        )
 
     companion object {
+        private val cleanupMutex = Mutex()
         private const val PENDING_CLEANUP_FILE = "pending-cleanup.properties"
     }
 
@@ -65,37 +75,26 @@ class AccountCleanupOrchestrator(
      * @return [OperationResult.Success] on complete cleanup; [OperationResult.Unavailable] on failure.
      */
     suspend fun cleanupAccount(uid: String): OperationResult<Unit> = withContext(Dispatchers.IO) {
-        val cleanUid = uid.trim()
-        if (cleanUid.isBlank()) {
-            if (hasPendingCleanup()) {
-                val markerFile = pendingMarkerFile()
-                if (markerFile != null && markerFile.exists()) {
-                    val pendingUid = try {
-                        val properties = Properties().apply {
-                            markerFile.inputStream().use { load(it) }
-                        }
-                        properties.getProperty("pendingUid") ?: ""
-                    } catch (_: Exception) { "" }
-                    if (pendingUid.isNotBlank()) {
-                        return@withContext cleanupMutex.withLock {
-                            performCleanupInternal(pendingUid)
-                        }
-                    } else {
-                        return@withContext OperationResult.Unavailable("Malformed pending cleanup marker found.")
-                    }
-                }
-            }
-            return@withContext OperationResult.Success(Unit)
-        }
-
         cleanupMutex.withLock {
-            performCleanupInternal(cleanUid)
+            try {
+                val obligations = pendingUids()
+                val target = uid.ifBlank { obligations.firstOrNull().orEmpty() }
+                if (target.isBlank()) return@withLock OperationResult.Success(Unit)
+                if (target !in obligations) persistUids(obligations + target)
+                val result = performCleanupInternal(target)
+                if (result is OperationResult.Success) persistUids(pendingUids() - target)
+                result
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                OperationResult.Unavailable("Cannot complete account cleanup: ${error.message}")
+            }
         }
     }
 
     /** Returns true if a pending cleanup marker file exists on disk. */
     fun hasPendingCleanup(): Boolean {
-        val markerFile = pendingMarkerFile() ?: return false
+        val markerFile = pendingMarkerFile()
         return markerFile.exists()
     }
 
@@ -103,12 +102,11 @@ class AccountCleanupOrchestrator(
      * Reads the pending cleanup UID from `pending-cleanup.properties` if present.
      */
     fun getPendingCleanupUid(): String {
-        val markerFile = pendingMarkerFile() ?: return ""
-        if (!markerFile.exists()) return ""
         return try {
-            val properties = Properties().apply { markerFile.inputStream().use { load(it) } }
-            properties.getProperty("pendingUid") ?: ""
-        } catch (_: Exception) {
+            pendingUids().firstOrNull().orEmpty()
+        } catch (_: IOException) {
+            ""
+        } catch (_: IllegalArgumentException) {
             ""
         }
     }
@@ -120,49 +118,8 @@ class AccountCleanupOrchestrator(
         val cleanUid = uid.trim()
         if (cleanUid.isNotBlank()) {
             cleanupMutex.withLock {
-                writePendingMarker(cleanUid)
-            }
-        }
-    }
-
-    /**
-     * Checks for interrupted cleanup sessions on application startup and ensures former account state is clean.
-     * Fails closed: Returns [OperationResult.Unavailable] if malformed marker or startup cleanup fails.
-     *
-     * @param activeUid The currently authenticated UID restored from Auth, or null if unauthenticated.
-     */
-    suspend fun cleanupInterruptedSessions(activeUid: String?): OperationResult<Unit> = withContext(Dispatchers.IO) {
-        cleanupMutex.withLock {
-            try {
-                val markerFile = pendingMarkerFile()
-                if (markerFile != null && markerFile.exists()) {
-                    val pendingUid = try {
-                        val properties = Properties().apply {
-                            markerFile.inputStream().use { load(it) }
-                        }
-                        properties.getProperty("pendingUid") ?: ""
-                    } catch (_: Exception) {
-                        ""
-                    }
-                    if (pendingUid.isNotBlank()) {
-                        val result = performCleanupInternal(pendingUid)
-                        if (result !is OperationResult.Success) {
-                            return@withLock result
-                        }
-                    } else {
-                        return@withLock OperationResult.Unavailable("Malformed pending cleanup marker found on startup.")
-                    }
-                }
-
-                val currentSessionUid = sessionTracker?.currentSession()?.uid
-                if (!activeUid.isNullOrBlank() && currentSessionUid != null && currentSessionUid != activeUid) {
-                    performCleanupInternal(currentSessionUid)
-                } else {
-                    OperationResult.Success(Unit)
-                }
-            } catch (error: Exception) {
-                if (error is CancellationException) throw error
-                OperationResult.Unavailable("Startup cleanup recovery failed: ${error.message}")
+                val existing = pendingUids()
+                if (cleanUid !in existing) persistUids(existing + cleanUid)
             }
         }
     }
@@ -174,120 +131,103 @@ class AccountCleanupOrchestrator(
         var hasError = false
         var firstErrorMessage: String? = null
 
-        // 1. Record durable pending cleanup marker before modifying stores
-        try {
-            writePendingMarker(cleanUid)
-        } catch (e: Exception) {
-            hasError = true
-            firstErrorMessage = "Failed to record pending cleanup marker: ${e.message}"
-        }
-
-        // 2. Purge retained content and verified markers
+        // Purge retained content and verified markers
         try {
             retentionAdapter.clearAccountData(cleanUid)
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             hasError = true
             if (firstErrorMessage == null) firstErrorMessage = "Retained content cleanup failed: ${e.message}"
         }
 
-        // 3. Compact publication journal to opaque recovery records for unresolved sends
+        // Compact publication journal to opaque recovery records for unresolved sends
         try {
             journal?.compactAccountDataToOpaque(cleanUid)
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             hasError = true
             if (firstErrorMessage == null) firstErrorMessage = "Journal compaction failed: ${e.message}"
         }
 
-        // 4. Purge private original photos
+        // Purge private original photos
         try {
             originalPhotoStore?.clearAccountData(cleanUid)
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             hasError = true
             if (firstErrorMessage == null) firstErrorMessage = "Original photo store cleanup failed: ${e.message}"
         }
 
-        // 5. Purge compose draft journal
+        // Purge compose draft journal
         try {
             photoDraftJournal?.clearAccountData(cleanUid)
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             hasError = true
             if (firstErrorMessage == null) firstErrorMessage = "Photo draft cleanup failed: ${e.message}"
         }
 
-        // 6. Purge frozen photo upload journals across all capsule directories
+        // Purge frozen photo upload journals across all capsule directories
         try {
             frozenPhotosDir?.let { dir ->
                 if (dir.exists()) {
-                    val capsuleDirs = dir.listFiles()
-                    if (capsuleDirs != null) {
-                        for (capsuleDir in capsuleDirs) {
-                            if (capsuleDir.isDirectory) {
-                                val journal = PhotoDraftJournal(capsuleDir)
-                                val draft = try { journal.load(cleanUid) } catch (_: Exception) { null }
-                                draft?.photo?.let { photo ->
-                                    try {
-                                        originalPhotoStore?.file(photo)?.delete()
-                                    } catch (_: Exception) {}
-                                }
-                                journal.clearAccountData(cleanUid)
-                                val remainingFiles = capsuleDir.listFiles()
-                                if (remainingFiles != null && remainingFiles.isEmpty()) {
-                                    if (!capsuleDir.delete() && capsuleDir.exists()) {
-                                        hasError = true
-                                        if (firstErrorMessage == null) firstErrorMessage = "Failed to delete frozen capsule directory."
-                                    }
-                                }
-                            }
+                    val capsuleDirs = dir.listFiles() ?: throw IOException("Cannot enumerate frozen uploads.")
+                    for (capsuleDir in capsuleDirs.filter { it.isDirectory }) {
+                        PhotoDraftJournal(capsuleDir).clearAccountData(cleanUid)
+                        val remaining = capsuleDir.listFiles() ?: throw IOException("Cannot inspect frozen upload.")
+                        if (remaining.isEmpty() && !capsuleDir.delete() && capsuleDir.exists()) {
+                            throw IOException("Cannot remove empty frozen upload directory.")
                         }
                     }
                 }
             }
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             hasError = true
             if (firstErrorMessage == null) firstErrorMessage = "Frozen photo upload cleanup failed: ${e.message}"
         }
 
-        // 7. Invalidate notifications and cancel alerts
+        // Invalidate notifications and cancel alerts
         try {
             unlockNotificationCoordinator?.invalidateAccount(cleanUid)
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             hasError = true
             if (firstErrorMessage == null) firstErrorMessage = "Notification invalidation failed: ${e.message}"
         }
 
         return if (!hasError) {
-            removePendingMarker()
             OperationResult.Success(Unit)
         } else {
             OperationResult.Unavailable(firstErrorMessage ?: "Account cleanup failed for $cleanUid")
         }
     }
 
-    private fun pendingMarkerFile(): File? {
-        val dir = noBackupDir ?: return null
-        return File(dir, PENDING_CLEANUP_FILE)
+    private fun pendingMarkerFile(): File = File(noBackupDir, PENDING_CLEANUP_FILE)
+
+    /** Reads the oldest obligation first, including markers written by earlier releases. */
+    private fun pendingUids(): List<String> {
+        val file = pendingMarkerFile()
+        if (!file.exists()) return emptyList()
+        val fields = Properties().apply { file.inputStream().use { load(it) } }
+        val first = fields.getProperty("pendingUid")?.takeIf { it.isNotBlank() }
+            ?: throw IOException("Malformed pending cleanup marker.")
+        return listOf(first) + fields.stringPropertyNames().filter { it.startsWith("additional.") }
+            .sorted().map { fields.getProperty(it).also { uid -> require(uid.isNotBlank()) } }
     }
 
-    private fun writePendingMarker(uid: String) {
-        val markerFile = pendingMarkerFile() ?: return
-        val parent = markerFile.parentFile ?: return
-        if (!parent.isDirectory && !parent.mkdirs()) {
-            throw IOException("Cannot create directory for pending cleanup marker.")
+    /** Atomically replaces the queue after recording an account or finishing its last purge. */
+    private fun persistUids(uids: List<String>) {
+        val markerFile = pendingMarkerFile()
+        if (uids.isEmpty()) {
+            removePendingMarker()
+            return
         }
-        var uidToPersist = uid
-        if (markerFile.exists()) {
-            val existingUid = try {
-                val props = Properties().apply { markerFile.inputStream().use { load(it) } }
-                props.getProperty("pendingUid") ?: ""
-            } catch (_: Exception) { "" }
-            if (existingUid.isNotBlank()) {
-                uidToPersist = existingUid
-            }
-        }
-        if (uidToPersist.isBlank()) return
+        val parent = markerFile.parentFile ?: throw IOException("Invalid cleanup directory.")
+        if (!parent.isDirectory && !parent.mkdirs()) throw IOException("Cannot create cleanup directory.")
         val properties = Properties().apply {
-            setProperty("pendingUid", uidToPersist)
-            setProperty("timestamp", System.currentTimeMillis().toString())
+            setProperty("pendingUid", uids.first())
+            uids.drop(1).forEachIndexed { index, uid -> setProperty("additional.$index", uid) }
         }
         val temp = File.createTempFile("pending-", ".partial", parent)
         try {
@@ -310,7 +250,7 @@ class AccountCleanupOrchestrator(
     }
 
     private fun removePendingMarker() {
-        val markerFile = pendingMarkerFile() ?: return
+        val markerFile = pendingMarkerFile()
         if (markerFile.exists()) {
             try {
                 Files.deleteIfExists(markerFile.toPath())

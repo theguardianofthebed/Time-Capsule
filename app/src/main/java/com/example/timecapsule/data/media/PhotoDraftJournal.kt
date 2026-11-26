@@ -1,5 +1,6 @@
 package com.example.timecapsule.data.media
 
+import com.example.timecapsule.data.session.StorageSession
 import com.example.timecapsule.domain.model.OriginalPhotoFormat
 import com.example.timecapsule.domain.model.RetainedOriginalPhoto
 import java.io.File
@@ -8,7 +9,6 @@ import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import com.example.timecapsule.domain.model.LocationTarget
-import com.example.timecapsule.domain.session.SessionSnapshot
 import java.util.Properties
 import java.util.UUID
 
@@ -24,20 +24,15 @@ data class PhotoDraftRecord(
 
 /** Atomically replaces one UID-scoped draft record; callers serialize access and use I/O threads. */
 open class PhotoDraftJournal(
-    private val root: File,
-    private val session: (() -> SessionSnapshot)? = null
+    private val root: File
 ) {
     companion object {
-        private val access = Any()
+        private val access = StorageSession.lock
     }
 
     /** Persists a draft before old original bytes are eligible for local cleanup. */
-    open fun save(uid: String, draft: PhotoDraftRecord): Unit = synchronized(access) {
-        val activeSession = session?.invoke()
-        if (activeSession != null && (!activeSession.isAuthenticated || activeSession.uid != uid)) {
-            throw IOException("Stale or unauthenticated session: cannot write photo draft.")
-        }
-        require(uid.isNotBlank())
+    open fun save(session: StorageSession, uid: String, draft: PhotoDraftRecord): Unit = synchronized(access) {
+        session.requireOwner(uid)
         require(draft.photo == null || (draft.photo.ownerUid == uid &&
             draft.photo.capsuleId == draft.capsuleId))
         if (!root.isDirectory && !root.mkdirs()) throw IOException("Cannot create draft storage.")
@@ -109,30 +104,39 @@ open class PhotoDraftJournal(
 
     /** Replaces only the expected old draft; an already-created replacement keeps all later edits. */
     open fun replaceIfCurrent(
+        session: StorageSession,
         uid: String,
         expectedId: String,
         replacement: PhotoDraftRecord
     ): PhotoDraftRecord = synchronized(access) {
+        session.requireOwner(uid)
         val current = load(uid)
         if (current?.capsuleId == replacement.capsuleId) return@synchronized current
         if (current != null && current.capsuleId != expectedId) {
             throw IOException("A different editable draft already exists.")
         }
-        save(uid, replacement)
+        save(session, uid, replacement)
         replacement
     }
 
     /** Clears a completed compose buffer without removing a newer independent draft. */
-    open fun clearIfCurrent(uid: String, capsuleId: String): PhotoDraftRecord? = synchronized(access) {
+    open fun clearIfCurrent(session: StorageSession, uid: String, capsuleId: String): PhotoDraftRecord? = synchronized(access) {
+        session.requireOwner(uid)
         val current = load(uid) ?: return@synchronized null
         if (current.capsuleId != capsuleId) return@synchronized null
-        save(uid, PhotoDraftRecord(UUID.randomUUID().toString(), "", "", null))
+        save(session, uid, PhotoDraftRecord(UUID.randomUUID().toString(), "", "", null))
         current
     }
 
     /** Clears compose buffer journal for [uid] during account cleanup. */
     open fun clearAccountData(uid: String): Unit = synchronized(access) {
         if (uid.isBlank()) return@synchronized
+        // An interrupted atomic replace can leave an unowned temporary draft in this shared directory.
+        if (root.isDirectory) {
+            val partials = root.listFiles { file -> file.name.startsWith("draft-") && file.extension == "partial" }
+                ?: throw IOException("Cannot inspect private draft storage.")
+            partials.forEach { Files.deleteIfExists(it.toPath()) }
+        }
         val file = target(uid)
         if (file.exists()) {
             try {

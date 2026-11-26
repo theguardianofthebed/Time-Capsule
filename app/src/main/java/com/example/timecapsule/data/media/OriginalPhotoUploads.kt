@@ -1,5 +1,6 @@
 package com.example.timecapsule.data.media
 
+import com.example.timecapsule.data.session.StorageSession
 import com.example.timecapsule.domain.model.FrozenPhotoUpload
 import com.example.timecapsule.domain.model.PhotoUploadAcknowledgment
 import com.example.timecapsule.domain.model.RetainedOriginalPhoto
@@ -43,11 +44,10 @@ class OriginalPhotoUploads(
     }
 
     /** Makes a separate immutable copy and durable handoff before the first upload attempt. */
-    suspend fun freeze(photo: RetainedOriginalPhoto): OperationResult<FrozenPhotoUpload> =
+    suspend fun freeze(photo: RetainedOriginalPhoto, captured: SessionSnapshot = session()): OperationResult<FrozenPhotoUpload> =
         withContext(Dispatchers.IO) {
             attempts.withLock {
-                val captured = session()
-                if (captured.uid != photo.ownerUid) return@withLock denied()
+                if (session() != captured || captured.uid != photo.ownerUid) return@withLock denied()
                 var createdCopy: RetainedOriginalPhoto? = null
                 var savedDurably = false
                 try {
@@ -67,14 +67,14 @@ class OriginalPhotoUploads(
                         return@withLock OperationResult.Success(frozen(old))
                     }
                     val original = store.verify(photo)
-                    val copy = store.retain(photo.ownerUid, photo.capsuleId, photo.format.mimeType,
+                    val copy = store.retain(StorageSession(captured, session), photo.ownerUid, photo.capsuleId, photo.format.mimeType,
                         original.inputStream())
                     createdCopy = copy
                     if (session() != captured) {
                         store.file(copy).delete()
                         return@withLock denied()
                     }
-                    journal.save(photo.ownerUid, PhotoDraftRecord(photo.capsuleId, "", "", copy))
+                    journal.save(StorageSession(captured, session), photo.ownerUid, PhotoDraftRecord(photo.capsuleId, "", "", copy))
                     savedDurably = true
                     OperationResult.Success(frozen(copy))
                 } catch (cancelled: CancellationException) {
@@ -107,11 +107,10 @@ class OriginalPhotoUploads(
         }
 
     /** Uses the durable frozen copy on every retry and rejects stale-session acknowledgments. */
-    suspend fun upload(input: FrozenPhotoUpload): OperationResult<PhotoUploadAcknowledgment> =
+    suspend fun upload(input: FrozenPhotoUpload, captured: SessionSnapshot = session()): OperationResult<PhotoUploadAcknowledgment> =
         withContext(Dispatchers.IO) {
             attempts.withLock {
-                val captured = session()
-                if (captured.uid != input.original.ownerUid) return@withLock denied()
+                if (session() != captured || captured.uid != input.original.ownerUid) return@withLock denied()
                 try {
                     checkFrozen(input)
                     val file = store.verify(input.original)
@@ -132,11 +131,10 @@ class OriginalPhotoUploads(
         }
 
     /** Performs foreground cleanup only after #14 resolves publication and its outstanding writes. */
-    suspend fun cleanup(input: FrozenPhotoUpload, outcome: PhotoPublicationOutcome): OperationResult<Unit> =
+    suspend fun cleanup(input: FrozenPhotoUpload, outcome: PhotoPublicationOutcome, captured: SessionSnapshot = session()): OperationResult<Unit> =
         withContext(Dispatchers.IO) {
             attempts.withLock {
-                val captured = session()
-                if (captured.uid != input.original.ownerUid) return@withLock denied()
+                if (session() != captured || captured.uid != input.original.ownerUid) return@withLock denied()
                 if (outcome == PhotoPublicationOutcome.UNCERTAIN) {
                     return@withLock OperationResult.Unavailable("Keep photo until publication is resolved.")
                 }
@@ -151,8 +149,11 @@ class OriginalPhotoUploads(
                         backend.deleteUnpublished(input.objectPath)
                     }
                     if (session() != captured) return@withLock denied()
-                    val file = store.file(input.original)
-                    if (file.exists() && !file.delete()) throw IOException("Local photo cleanup failed.")
+                    synchronized(StorageSession.lock) {
+                        StorageSession(captured, session).requireOwner(input.original.ownerUid)
+                        val file = store.file(input.original)
+                        if (file.exists() && !file.delete()) throw IOException("Local photo cleanup failed.")
+                    }
                     OperationResult.Success(Unit)
                 } catch (cancelled: CancellationException) {
                     throw cancelled

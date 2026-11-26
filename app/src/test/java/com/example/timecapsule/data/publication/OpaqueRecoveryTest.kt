@@ -1,5 +1,6 @@
 package com.example.timecapsule.data.publication
 
+import com.example.timecapsule.data.session.fixtureSession
 import com.example.timecapsule.domain.model.CapsuleLock
 import com.example.timecapsule.domain.model.FrozenCapsuleOperation
 import com.example.timecapsule.domain.model.FrozenOperationRecord
@@ -88,7 +89,7 @@ class OpaqueRecoveryTest {
             snapshotDigest = ""
         )
         val op = rawOp.copy(snapshotDigest = rawOp.calculateDigest())
-        journal.save(FrozenOperationRecord(op, phase = PublicationPhase.PUBLISHING, photoAcknowledged = true))
+        journal.save(fixtureSession(uid), FrozenOperationRecord(op, phase = PublicationPhase.PUBLISHING, photoAcknowledged = true))
 
         // Compact account data to opaque (simulate logout)
         val compacted = journal.compactAccountDataToOpaque(uid)
@@ -123,7 +124,7 @@ class OpaqueRecoveryTest {
             snapshotDigest = ""
         )
         val op = rawOp.copy(snapshotDigest = rawOp.calculateDigest())
-        journal.save(FrozenOperationRecord(op, phase = PublicationPhase.PUBLISHING, photoAcknowledged = true))
+        journal.save(fixtureSession(uid), FrozenOperationRecord(op, phase = PublicationPhase.PUBLISHING, photoAcknowledged = true))
 
         // Compact to opaque
         journal.compactAccountDataToOpaque(uid)
@@ -158,7 +159,7 @@ class OpaqueRecoveryTest {
             snapshotDigest = ""
         )
         val op = rawOp.copy(snapshotDigest = rawOp.calculateDigest())
-        journal.save(FrozenOperationRecord(op, phase = PublicationPhase.PUBLISHING, photoAcknowledged = true))
+        journal.save(fixtureSession(uid), FrozenOperationRecord(op, phase = PublicationPhase.PUBLISHING, photoAcknowledged = true))
 
         journal.compactAccountDataToOpaque(uid)
         fakeBackend.inspectionResults[capsuleId] = PublicationInspection.MATCHING
@@ -189,7 +190,7 @@ class OpaqueRecoveryTest {
             snapshotDigest = ""
         )
         val op = rawOp.copy(snapshotDigest = rawOp.calculateDigest())
-        journal.save(FrozenOperationRecord(op, phase = PublicationPhase.FAILED, terminalRejectionConfirmed = true))
+        journal.save(fixtureSession(uid), FrozenOperationRecord(op, phase = PublicationPhase.FAILED, terminalRejectionConfirmed = true))
 
         journal.compactAccountDataToOpaque(uid)
         fakeBackend.inspectionResults[capsuleId] = PublicationInspection.ABSENT
@@ -253,7 +254,7 @@ class OpaqueRecoveryTest {
             snapshotDigest = ""
         )
         val op = rawOp.copy(snapshotDigest = rawOp.calculateDigest())
-        journal.save(FrozenOperationRecord(op, phase = PublicationPhase.PUBLISHING, hasUnresolvedWrite = true))
+        journal.save(fixtureSession(uid), FrozenOperationRecord(op, phase = PublicationPhase.PUBLISHING, hasUnresolvedWrite = true))
 
         journal.compactAccountDataToOpaque(uid)
         fakeBackend.inspectionResults[capsuleId] = PublicationInspection.ABSENT

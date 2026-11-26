@@ -117,7 +117,7 @@ class StorageRaceRegressionTest {
         assertTrue("Late write must be denied", writeResult is OperationResult.Denied)
 
         // No files must be created for capsule-race-1
-        val readRes = retentionAdapter.readRetainedContent("user-a", "capsule-race-1")
+        val readRes = retentionAdapter.readRetainedContent(gen2Session, "capsule-race-1")
         assertTrue(readRes is OperationResult.Denied)
     }
 
@@ -226,7 +226,7 @@ class StorageRaceRegressionTest {
         assertTrue("Read content must fail closed when photo download fails", contentRes is OperationResult.Unavailable)
 
         // Retention storage must NOT contain an incomplete text-only entry
-        val offlineRes = retentionAdapter.readRetainedContent("user-recipient-2", "capsule-failed-photo")
+        val offlineRes = retentionAdapter.readRetainedContent(sessionTracker.currentSession(), "capsule-failed-photo")
         assertTrue(offlineRes is OperationResult.Denied)
     }
 

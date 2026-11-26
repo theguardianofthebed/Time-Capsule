@@ -53,7 +53,7 @@ class SessionGuardWriteRaceTest {
 
         // Save content under Gen 1
         val saveGen1 = retentionAdapter.saveRetainedContent(
-            uid = "user-a",
+            targetSession = gen1Session,
             capsuleId = "capsule-gen1",
             verifiedUnlockedAt = Instant.now(),
             text = "Gen 1 Text",
@@ -86,13 +86,15 @@ class SessionGuardWriteRaceTest {
     fun testAccountSwitchRejectsDelayedOldSessionWrite() = runBlocking {
         sessionTracker.startSession("user-a")
 
+        val gen1Session = sessionTracker.currentSession()
+
         // Switch account to User B
         sessionTracker.clearSession()
         sessionTracker.startSession("user-b")
 
         // Delayed write capturing User A's old session must be denied
         val delayedWrite = retentionAdapter.saveRetainedContent(
-            uid = "user-a",
+            targetSession = gen1Session,
             capsuleId = "capsule-delayed",
             verifiedUnlockedAt = Instant.now(),
             text = "Delayed Write Text",

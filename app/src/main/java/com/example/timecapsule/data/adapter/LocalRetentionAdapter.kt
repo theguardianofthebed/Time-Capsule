@@ -66,22 +66,6 @@ interface LocalRetentionAdapter {
         photoFormat: OriginalPhotoFormat?
     ): OperationResult<Unit>
 
-    suspend fun saveRetainedContent(
-        uid: String,
-        capsuleId: String,
-        verifiedUnlockedAt: Instant,
-        text: String?,
-        photoBytes: ByteArray?,
-        photoFormat: OriginalPhotoFormat?
-    ): OperationResult<Unit> = saveRetainedContent(
-        targetSession = SessionSnapshot(uid),
-        capsuleId = capsuleId,
-        verifiedUnlockedAt = verifiedUnlockedAt,
-        text = text,
-        photoBytes = photoBytes,
-        photoFormat = photoFormat
-    )
-
     /**
      * Reads verified retained content for the active account if marker and content files are complete.
      */
@@ -89,14 +73,6 @@ interface LocalRetentionAdapter {
         targetSession: SessionSnapshot,
         capsuleId: String
     ): OperationResult<RetainedContent>
-
-    suspend fun readRetainedContent(
-        uid: String,
-        capsuleId: String
-    ): OperationResult<RetainedContent> = readRetainedContent(
-        targetSession = SessionSnapshot(uid),
-        capsuleId = capsuleId
-    )
 
     /** Clears account-scoped retained content for [uid]. */
     suspend fun clearAccountData(uid: String)

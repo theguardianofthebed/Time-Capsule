@@ -15,6 +15,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
 import org.junit.After
@@ -100,8 +101,8 @@ class S08AccountSettingsViewModelTest {
         authAdapter = FakeAuthAdapterForS08()
         firestoreAdapter = FakeFirestoreAdapterForS08()
         sessionTracker = DefaultSessionTracker()
-        accountSessionManager = AccountSessionManager(authAdapter, firestoreAdapter, sessionTracker)
-        runBlocking { accountSessionManager.restoreSessionIfAuthenticated() }
+        accountSessionManager = AccountSessionManager(authAdapter, firestoreAdapter, sessionTracker, storageDispatcher = testDispatcher)
+        runTest(testDispatcher) { accountSessionManager.restoreSessionIfAuthenticated() }
 
         viewModel = S08AccountSettingsViewModel(accountSessionManager)
     }

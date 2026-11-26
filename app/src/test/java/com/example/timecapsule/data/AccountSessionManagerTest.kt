@@ -1,5 +1,21 @@
 package com.example.timecapsule.data
 
+import org.junit.Assert.assertThrows
+import java.io.ByteArrayInputStream
+import java.io.IOException
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.CountDownLatch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import com.example.timecapsule.domain.model.CapsuleDraft
+import com.example.timecapsule.data.publication.PrivatePublicationDrafts
+import com.example.timecapsule.data.publication.CapsulePublicationBackend
+import com.example.timecapsule.data.publication.CapsulePublicationCoordinator
+import com.example.timecapsule.data.media.PhotoDraftRecord
+import com.example.timecapsule.data.session.SessionTracker
+import com.example.timecapsule.data.session.StorageSession
 import com.example.timecapsule.data.adapter.AuthAdapter
 import com.example.timecapsule.data.adapter.DefaultLocalRetentionAdapter
 import com.example.timecapsule.data.adapter.FirestoreAdapter
@@ -375,10 +391,10 @@ class AccountSessionManagerTest {
         val photoDraftDir = File(testFolder, "photo-drafts")
         val noBackupDir = File(testFolder, "no_backup")
 
-        val journal = FrozenOperationJournal(journalDir) { sessionTracker.currentSession() }
+        val journal = FrozenOperationJournal(journalDir)
         val retentionAdapter = DefaultLocalRetentionAdapter(retentionDir) { sessionTracker.currentSession() }
-        val photoStore = OriginalPhotoStore(photoStoreDir, { OriginalPhotoFormat.JPEG }) { sessionTracker.currentSession() }
-        val draftJournal = PhotoDraftJournal(photoDraftDir) { sessionTracker.currentSession() }
+        val photoStore = OriginalPhotoStore(photoStoreDir) { OriginalPhotoFormat.JPEG }
+        val draftJournal = PhotoDraftJournal(photoDraftDir)
 
         val orchestrator = AccountCleanupOrchestrator(
             retentionAdapter = retentionAdapter,
@@ -386,20 +402,18 @@ class AccountSessionManagerTest {
             originalPhotoStore = photoStore,
             photoDraftJournal = draftJournal,
             unlockNotificationCoordinator = null,
-            sessionTracker = sessionTracker,
             noBackupDir = noBackupDir,
             frozenPhotosDir = File(noBackupDir, "frozen-photos")
         )
 
-        val manager = AccountSessionManager(
-            authAdapter = fakeAuthAdapter,
-            firestoreAdapter = fakeFirestoreAdapter,
-            sessionTracker = sessionTracker,
-            onAccountCleared = { uid ->
-                orchestrator.cleanupAccount(uid)
-            },
-            isCleanupPending = orchestrator::hasPendingCleanup
-        )
+        val observer = object : SessionTracker by sessionTracker {
+            override fun clearSession() {
+                assertEquals(currentSession().uid, orchestrator.getPendingCleanupUid())
+                assertTrue(File(noBackupDir, "pending-cleanup.properties").isFile)
+                sessionTracker.clearSession()
+            }
+        }
+        val manager = orchestrator.sessionManager(fakeAuthAdapter, fakeFirestoreAdapter, observer)
 
         // 1. User A signs in
         fakeAuthAdapter.uid = "user-sender-A"
@@ -418,7 +432,14 @@ class AccountSessionManagerTest {
             snapshotDigest = ""
         )
         val op = rawOp.copy(snapshotDigest = rawOp.calculateDigest())
-        journal.save(FrozenOperationRecord(op, phase = PublicationPhase.PUBLISHING))
+        val original = sessionTracker.currentSession()
+        val write = StorageSession(original, sessionTracker::currentSession)
+        journal.save(write, FrozenOperationRecord(op, phase = PublicationPhase.PUBLISHING))
+        val photo = photoStore.retain(write, op.senderUid, op.capsuleId, "image/jpeg", byteArrayOf(1).inputStream())
+        draftJournal.save(write, op.senderUid, PhotoDraftRecord(op.capsuleId, "title", "body", photo))
+        assertTrue(retentionAdapter.saveRetainedContent(original, op.capsuleId, Instant.now(),
+            "verified", null, null) is OperationResult.Success)
+        assertTrue(retentionDir.walk().any { it.name == "content.text" })
 
         // 3. User A signs out
         val signOutRes = manager.signOut()
@@ -428,6 +449,10 @@ class AccountSessionManagerTest {
         assertTrue("Sign-out must succeed with unresolved publication", signOutRes is OperationResult.Success)
         assertNull(fakeAuthAdapter.activeUid())
         assertFalse(sessionTracker.currentSession().isAuthenticated)
+
+        assertFalse(photoStore.file(photo).exists())
+        assertNull(draftJournal.load(op.senderUid))
+        assertFalse(retentionDir.walk().any { it.isFile })
 
         // B. Sensitive payload MUST be compacted to opaque record (text="", title=null)
         val loadedRecord = journal.load("user-sender-A", "capsule-unresolved-999")
@@ -447,6 +472,287 @@ class AccountSessionManagerTest {
         val userBSession = sessionTracker.currentSession()
         val readUserB = retentionAdapter.readRetainedContent(userBSession, "capsule-unresolved-999")
         assertTrue("Former user's protected content must be inaccessible to new user", readUserB is OperationResult.Denied)
+    }
+
+    /** Pauses production publication and provider input before their final write, then logs the same UID back in. */
+    @Test fun delayedWritesCannotRecreateFilesAfterSameUidLogin() = runBlocking {
+        val root = temporaryFolder.newFolder()
+        val ops = FrozenOperationJournal(File(root, "operations"))
+        val drafts = PhotoDraftJournal(File(root, "drafts"))
+        val photos = OriginalPhotoStore(File(root, "photos")) { OriginalPhotoFormat.JPEG }
+        val retained = DefaultLocalRetentionAdapter(File(root, "retained"), sessionTracker::currentSession)
+        val cleanup = AccountCleanupOrchestrator(retained, ops, photos, drafts, noBackupDir = root)
+        val manager = cleanup.sessionManager(fakeAuthAdapter, fakeFirestoreAdapter, sessionTracker)
+        val uid = "user-123"
+        assertEquals(OperationResult.Success(uid), manager.signIn("a@example.com", "validPass"))
+        val first = manager.currentSession()
+        val write = StorageSession(first, manager::currentSession)
+        val clockEntered = CompletableDeferred<Unit>()
+        val inputEntered = CompletableDeferred<Unit>()
+        val release = CountDownLatch(1)
+        val now = Instant.parse("2026-11-26T10:00:00Z")
+        val coordinator = CapsulePublicationCoordinator(ops,
+            CapsulePublicationBackend { throw AssertionError("Stale publication reached backend") },
+            null, manager::currentSession, now = {
+                clockEntered.complete(Unit)
+                check(release.await(10, TimeUnit.SECONDS))
+                now
+            })
+        val message = CapsuleDraft("one", "recipient", "private", null,
+            CapsuleLock(LockMode.TIME, now.plusSeconds(3600)), isRecipientConfirmed = true)
+        val draft = PhotoDraftRecord("one", "title", "body", null)
+        drafts.save(write, uid, draft)
+        val send = async { coordinator.publish(message, first) }
+        val input = object : ByteArrayInputStream(byteArrayOf(1, 2, 3)) {
+            override fun read(bytes: ByteArray, off: Int, len: Int): Int {
+                inputEntered.complete(Unit)
+                check(release.await(10, TimeUnit.SECONDS))
+                return super.read(bytes, off, len)
+            }
+        }
+        val selection = async(Dispatchers.IO) {
+            runCatching { photos.retain(write, uid, "one", "image/jpeg", input) }
+        }
+        try {
+            withTimeout(5000) {
+                clockEntered.await()
+                inputEntered.await()
+            }
+            assertTrue(manager.signOut() is OperationResult.Success)
+            assertEquals(OperationResult.Success(uid), manager.signIn("a@example.com", "validPass"))
+            assertTrue(manager.currentSession().sessionGeneration > first.sessionGeneration)
+        } finally {
+            release.countDown()
+        }
+        assertFalse(send.await() is OperationResult.Success)
+        assertTrue(selection.await().exceptionOrNull() is IOException)
+        assertThrows(IOException::class.java) { drafts.save(write, uid, draft) }
+        val abandoned = FrozenCapsuleOperation.freeze(message, uid, "UTC", now)
+        val replacement = runCatching { PrivatePublicationDrafts(photos, drafts).replacement(write, abandoned, "new") }
+        assertTrue(replacement.exceptionOrNull() is IOException)
+        assertFalse(root.walk().any { it.isFile })
+    }
+
+    /** Recreates the manager at the gap between invalidation and SDK sign-out. */
+    @Test fun interruptedLogoutRecoversFromDiskBeforeSameUidLogin() = runBlocking {
+        val root = temporaryFolder.newFolder()
+        val retained = File(root, "retained")
+        val uid = "user-123"
+        val snapshot = SessionSnapshot(uid, 0L)
+        sessionTracker.startSession(uid)
+        fakeAuthAdapter.uid = uid
+        val store = DefaultLocalRetentionAdapter(retained, sessionTracker::currentSession)
+        assertTrue(store.saveRetainedContent(sessionTracker.currentSession(), "one", Instant.now(),
+            "private", null, null) is OperationResult.Success)
+        assertTrue(store.saveRetainedContent(snapshot, "zero", Instant.now(), "old", null, null)
+            is OperationResult.Denied)
+        val cleanup = AccountCleanupOrchestrator(store, noBackupDir = root)
+        val interrupted = object : SessionTracker by sessionTracker {
+            override fun clearSession() {
+                assertEquals(uid, cleanup.getPendingCleanupUid())
+                sessionTracker.clearSession()
+                throw CancellationException("Interrupt before SDK sign-out")
+            }
+        }
+        val manager = cleanup.sessionManager(fakeAuthAdapter, fakeFirestoreAdapter, interrupted)
+        assertThrows(CancellationException::class.java) {
+            runBlocking { manager.signOut() }
+        }
+        assertEquals(uid, fakeAuthAdapter.activeUid())
+        assertTrue(retained.walk().any { it.name == "content.text" })
+        val restarted = DefaultSessionTracker()
+        val disk = AccountCleanupOrchestrator(DefaultLocalRetentionAdapter(retained, restarted::currentSession),
+            noBackupDir = root)
+        val recovered = disk.sessionManager(fakeAuthAdapter, fakeFirestoreAdapter, restarted)
+        assertNull(recovered.restoreSessionIfAuthenticated())
+        assertNull(fakeAuthAdapter.activeUid())
+        assertFalse(retained.walk().any { it.isFile })
+        assertFalse(disk.hasPendingCleanup())
+        assertEquals(OperationResult.Success(uid), recovered.signIn("user@example.com", "validPass"))
+        assertEquals(uid, restarted.currentSession().uid)
+    }
+
+    /** A server acknowledgement from an old generation cannot replace the opaque recovery record. */
+    @Test fun delayedPublicationAcknowledgementPreservesCompactedRecord() = runBlocking {
+        val root = temporaryFolder.newFolder()
+        val ops = FrozenOperationJournal(File(root, "operations"))
+        val cleanup = AccountCleanupOrchestrator(
+            DefaultLocalRetentionAdapter(File(root, "retained"), sessionTracker::currentSession),
+            journal = ops, noBackupDir = root)
+        val manager = cleanup.sessionManager(fakeAuthAdapter, fakeFirestoreAdapter, sessionTracker)
+        assertTrue(manager.signIn("a@example.com", "validPass") is OperationResult.Success)
+        val first = manager.currentSession()
+        val entered = CompletableDeferred<Unit>()
+        val ack = CompletableDeferred<Unit>()
+        val now = Instant.parse("2026-11-26T10:00:00Z")
+        val coordinator = CapsulePublicationCoordinator(ops, CapsulePublicationBackend {
+            entered.complete(Unit)
+            ack.await()
+        }, null, manager::currentSession, now = { now })
+        val draft = CapsuleDraft("one", "recipient", "private", null,
+            CapsuleLock(LockMode.TIME, now.plusSeconds(3600)), isRecipientConfirmed = true)
+        val send = async { coordinator.publish(draft, first) }
+        try {
+            withTimeout(5000) { entered.await() }
+            assertTrue(manager.signOut() is OperationResult.Success)
+            assertTrue(manager.signIn("a@example.com", "validPass") is OperationResult.Success)
+        } finally {
+            ack.complete(Unit)
+        }
+        assertTrue(send.await() is OperationResult.Denied)
+        val record = requireNotNull(ops.load("user-123", "one"))
+        assertTrue(record.operation.isOpaque)
+        assertEquals("", record.operation.text)
+        assertEquals(PublicationPhase.PUBLISHING, record.phase)
+    }
+
+    /** Sign-in and sign-up keep the former UID on disk while the SDK request is outstanding. */
+    @Test fun formerAccountMarkerSpansAuthenticationRequest() = runBlocking {
+        for (register in listOf(false, true)) {
+            val root = temporaryFolder.newFolder()
+            val tracker = DefaultSessionTracker()
+            tracker.startSession("former")
+            fakeAuthAdapter.uid = if (register) null else "former"
+            val disk = AccountCleanupOrchestrator(DefaultLocalRetentionAdapter(File(root, "retained"),
+                tracker::currentSession), noBackupDir = root)
+            val auth = object : AuthAdapter by fakeAuthAdapter {
+                override suspend fun signIn(email: String, password: String): OperationResult<String> {
+                    assertEquals("former", disk.getPendingCleanupUid())
+                    assertFalse(tracker.currentSession().isAuthenticated)
+                    return fakeAuthAdapter.signIn(email, password)
+                }
+                override suspend fun signUp(email: String, password: String, displayName: String): OperationResult<String> {
+                    assertEquals("former", disk.getPendingCleanupUid())
+                    assertFalse(tracker.currentSession().isAuthenticated)
+                    return fakeAuthAdapter.signUp(email, password, displayName)
+                }
+            }
+            val manager = disk.sessionManager(auth, fakeFirestoreAdapter, tracker)
+            val result = if (register) manager.signUpAndCreateProfile("a@example.com", "validPass", "Name")
+                else manager.signIn("a@example.com", "validPass")
+            assertTrue(result is OperationResult.Success)
+            assertFalse(disk.hasPendingCleanup())
+        }
+    }
+
+    /** A still-active SDK credential keeps its cleanup obligation until a later recovery. */
+    @Test fun failedSdkSignOutLeavesMarkerForRestoration() = runBlocking {
+        val root = temporaryFolder.newFolder()
+        val uid = "user-a"
+        val disk = AccountCleanupOrchestrator(DefaultLocalRetentionAdapter(root, sessionTracker::currentSession),
+            noBackupDir = File(root, "markers"))
+        fakeAuthAdapter.uid = uid
+        sessionTracker.startSession(uid)
+        val failing = object : AuthAdapter by fakeAuthAdapter {
+            override fun signOut() = Unit
+        }
+        val manager = disk.sessionManager(failing, fakeFirestoreAdapter, sessionTracker)
+        assertTrue(manager.signOut() is OperationResult.Unavailable)
+        assertEquals(uid, disk.getPendingCleanupUid())
+        assertFalse(manager.currentSession().isAuthenticated)
+        val recovered = disk.sessionManager(fakeAuthAdapter, fakeFirestoreAdapter, DefaultSessionTracker())
+        assertNull(recovered.restoreSessionIfAuthenticated())
+        assertNull(fakeAuthAdapter.activeUid())
+        assertFalse(disk.hasPendingCleanup())
+    }
+
+    /** Restoring B drains an outstanding obligation for A without purging B's own retained files. */
+    @Test fun restoreDifferentUidRecoversOnlyPendingAccount() = runBlocking {
+        val root = temporaryFolder.newFolder()
+        val store = DefaultLocalRetentionAdapter(File(root, "retained"), sessionTracker::currentSession)
+        val disk = AccountCleanupOrchestrator(store, noBackupDir = root)
+        sessionTracker.startSession("A")
+        assertTrue(store.saveRetainedContent(sessionTracker.currentSession(), "one", Instant.now(), "A",
+            null, null) is OperationResult.Success)
+        disk.markCleanupPending("A")
+        sessionTracker.startSession("B")
+        fakeAuthAdapter.uid = "B"
+        assertTrue(store.saveRetainedContent(sessionTracker.currentSession(), "two", Instant.now(), "B",
+            null, null) is OperationResult.Success)
+        val manager = disk.sessionManager(fakeAuthAdapter, fakeFirestoreAdapter, sessionTracker)
+        assertEquals("B", manager.restoreSessionIfAuthenticated())
+        assertTrue(store.readRetainedContent(manager.currentSession(), "two") is OperationResult.Success)
+        assertEquals(listOf("B"), root.walk().filter { it.name == "content.text" }.map { it.readText() }.toList())
+        assertFalse(disk.hasPendingCleanup())
+    }
+
+    /** A late SDK callback displacing B records B before invalidation and purges its actual files. */
+    @Test fun staleSdkCallbackDurablyRetiresDisplacedAccount() = runBlocking {
+        val root = temporaryFolder.newFolder()
+        val store = DefaultLocalRetentionAdapter(File(root, "retained"), sessionTracker::currentSession)
+        val disk = AccountCleanupOrchestrator(store, noBackupDir = root)
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val auth = object : AuthAdapter by fakeAuthAdapter {
+            override suspend fun signIn(email: String, password: String): OperationResult<String> {
+                entered.complete(Unit)
+                release.await()
+                return fakeAuthAdapter.signIn(email, password)
+            }
+        }
+        val observer = object : SessionTracker by sessionTracker {
+            override fun clearSession() {
+                assertEquals("B", disk.getPendingCleanupUid())
+                sessionTracker.clearSession()
+            }
+        }
+        val manager = disk.sessionManager(auth, fakeFirestoreAdapter, observer)
+        val late = async { manager.signIn("a@example.com", "validPass") }
+        withTimeout(5000) { entered.await() }
+        try {
+            sessionTracker.startSession("B")
+            fakeAuthAdapter.uid = "B"
+            assertTrue(store.saveRetainedContent(manager.currentSession(), "one", Instant.now(), "B",
+                null, null) is OperationResult.Success)
+        } finally {
+            release.complete(Unit)
+        }
+        assertTrue(late.await() is OperationResult.Denied)
+        assertFalse(root.walk().any { it.isFile })
+        assertFalse(manager.currentSession().isAuthenticated)
+        assertNull(auth.activeUid())
+    }
+
+    /** A real unreadable operation blocks account activation and keeps both cleanup obligations recoverable. */
+    @Test fun corruptFormerJournalBlocksReplacementUntilRetry() = runBlocking {
+        val root = temporaryFolder.newFolder()
+        val journalRoot = File(root, "operations")
+        val ops = FrozenOperationJournal(journalRoot)
+        val store = DefaultLocalRetentionAdapter(File(root, "retained"), sessionTracker::currentSession)
+        val disk = AccountCleanupOrchestrator(store, journal = ops, noBackupDir = root)
+        val manager = disk.sessionManager(fakeAuthAdapter, fakeFirestoreAdapter, sessionTracker)
+        assertTrue(manager.signIn("a@example.com", "validPass") is OperationResult.Success)
+        val first = manager.currentSession()
+        val now = Instant.parse("2026-11-26T10:00:00Z")
+        val draft = CapsuleDraft("one", "recipient", "private", null,
+            CapsuleLock(LockMode.TIME, now.plusSeconds(3600)), isRecipientConfirmed = true)
+        val op = FrozenCapsuleOperation.freeze(draft, "user-123", "UTC", now)
+        ops.save(StorageSession(first, manager::currentSession), FrozenOperationRecord(op))
+        val record = journalRoot.walk().single { it.isFile }
+        val saved = record.readBytes()
+        record.writeText("version=invalid")
+        assertTrue(manager.signIn("userB@example.com", "validPass") is OperationResult.Unavailable)
+        assertFalse(manager.currentSession().isAuthenticated)
+        assertNull(fakeAuthAdapter.activeUid())
+        assertEquals("user-123", disk.getPendingCleanupUid())
+        record.writeBytes(saved)
+        assertEquals(OperationResult.Success("user-b"), manager.signIn("userB@example.com", "validPass"))
+        assertTrue(requireNotNull(ops.load("user-123", "one")).operation.isOpaque)
+        assertFalse(disk.hasPendingCleanup())
+    }
+
+    /** A failed durable write leaves the current SDK identity and generation available for retry. */
+    @Test fun markerWriteFailureStopsReplacementBeforeSdkMutation() = runBlocking {
+        sessionTracker.startSession("user-a")
+        fakeAuthAdapter.uid = "user-a"
+        val original = sessionTracker.currentSession()
+        val root = temporaryFolder.newFile()
+        val disk = AccountCleanupOrchestrator(DefaultLocalRetentionAdapter(temporaryFolder.newFolder(),
+            sessionTracker::currentSession), noBackupDir = root)
+        val manager = disk.sessionManager(fakeAuthAdapter, fakeFirestoreAdapter, sessionTracker)
+        assertTrue(manager.signIn("userB@example.com", "pass123") is OperationResult.Unavailable)
+        assertEquals(original, manager.currentSession())
+        assertEquals(original.uid, fakeAuthAdapter.activeUid())
     }
 
     @Test

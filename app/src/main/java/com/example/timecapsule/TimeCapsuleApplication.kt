@@ -3,7 +3,6 @@ package com.example.timecapsule
 import android.app.Application
 import android.content.Context
 import com.example.timecapsule.config.FirebaseConfig
-import com.example.timecapsule.data.AccountSessionManager
 import com.example.timecapsule.data.DefaultCapsuleRepository
 import com.example.timecapsule.data.adapter.DefaultAuthAdapter
 import com.example.timecapsule.data.adapter.DefaultFirestoreAdapter
@@ -13,7 +12,6 @@ import com.example.timecapsule.data.adapter.DefaultStorageAdapter
 import com.example.timecapsule.data.adapter.FirestoreCapsulePublication
 import com.example.timecapsule.data.adapter.LocalRetentionAdapter
 import com.example.timecapsule.data.cleanup.AccountCleanupOrchestrator
-import kotlinx.coroutines.runBlocking
 import com.example.timecapsule.data.di.AppDependencyContainer
 import com.example.timecapsule.data.media.AndroidOriginalImageProbe
 import com.example.timecapsule.data.media.OriginalPhotoStore
@@ -28,7 +26,6 @@ import com.example.timecapsule.data.publication.OriginalPublicationMedia
 import com.example.timecapsule.data.publication.PrivatePublicationDrafts
 import com.example.timecapsule.data.recovery.ForegroundRecoveryCoordinator
 import com.example.timecapsule.data.session.DefaultSessionTracker
-import com.example.timecapsule.domain.result.OperationResult
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
@@ -120,17 +117,14 @@ class TimeCapsuleApplication : Application() {
             session = sessionTracker::currentSession
         )
         val operationJournal = FrozenOperationJournal(
-            root = File(noBackupDir, "capsule-operations"),
-            session = sessionTracker::currentSession
+            root = File(noBackupDir, "capsule-operations")
         )
         val originalPhotoStore = OriginalPhotoStore(
             root = File(noBackupDir, "original-photos"),
-            probe = AndroidOriginalImageProbe(),
-            session = sessionTracker::currentSession
+            probe = AndroidOriginalImageProbe()
         )
         val photoDraftJournal = PhotoDraftJournal(
-            root = File(noBackupDir, "photo-drafts"),
-            session = sessionTracker::currentSession
+            root = File(noBackupDir, "photo-drafts")
         )
 
         val accountCleanupOrchestrator = AccountCleanupOrchestrator(
@@ -139,22 +133,11 @@ class TimeCapsuleApplication : Application() {
             originalPhotoStore = originalPhotoStore,
             photoDraftJournal = photoDraftJournal,
             unlockNotificationCoordinator = unlockNotificationCoordinator,
-            sessionTracker = sessionTracker,
             noBackupDir = noBackupDir,
             frozenPhotosDir = File(noBackupDir, "frozen-photos")
         )
 
-        val accountSessionManager = AccountSessionManager(
-            authAdapter = authAdapter,
-            firestoreAdapter = firestoreAdapter,
-            sessionTracker = sessionTracker,
-            onAccountCleared = { uid ->
-                accountCleanupOrchestrator.cleanupAccount(uid)
-            },
-            isCleanupPending = accountCleanupOrchestrator::hasPendingCleanup,
-            markCleanupPending = accountCleanupOrchestrator::markCleanupPending,
-            getPendingCleanupUid = accountCleanupOrchestrator::getPendingCleanupUid
-        )
+        val accountSessionManager = accountCleanupOrchestrator.sessionManager(authAdapter, firestoreAdapter, sessionTracker)
 
         val photoUploads = OriginalPhotoUploads(
             originalPhotoStore,
@@ -172,17 +155,9 @@ class TimeCapsuleApplication : Application() {
                 session = sessionTracker::currentSession,
                 drafts = PrivatePublicationDrafts(
                     originalPhotoStore,
-                    photoDraftJournal,
-                    sessionTracker::currentSession
+                    photoDraftJournal
                 )
             )
-        }
-
-        val startupCleanupResult = runBlocking {
-            accountCleanupOrchestrator.cleanupInterruptedSessions(authAdapter.activeUid())
-        }
-        if (startupCleanupResult !is OperationResult.Success) {
-            sessionTracker.clearSession()
         }
 
         val repository = DefaultCapsuleRepository(

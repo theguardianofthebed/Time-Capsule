@@ -1,5 +1,6 @@
 package com.example.timecapsule.ui.draft
 
+import com.example.timecapsule.data.session.StorageSession
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.timecapsule.R
@@ -169,6 +170,7 @@ class CapsuleDraftViewModel(
         val input = photoInput ?: return
         val state = _uiState.value
         val uid = state.activeSessionUid ?: return
+        val storageSession = StorageSession(observedSession, accountSessionManager::currentSession)
         val capsuleId = state.capsuleId
         val record = PhotoDraftRecord(capsuleId, state.title, state.text, state.originalPhoto, state.locationTarget, state.locationName)
         viewModelScope.launch {
@@ -180,7 +182,7 @@ class CapsuleDraftViewModel(
                         _uiState.value.capsuleId != capsuleId) {
                         return@withLock
                     }
-                    input.save(uid, record)
+                    input.save(storageSession, uid, record)
                     if (released != null && released != record.photo) {
                         try {
                             input.remove(released)
@@ -204,13 +206,14 @@ class CapsuleDraftViewModel(
         if (!_uiState.value.editable) return
         val state = _uiState.value
         val uid = state.activeSessionUid ?: return
+        val storageSession = StorageSession(observedSession, accountSessionManager::currentSession)
         val capsuleId = state.capsuleId
         val token = ++photoToken
         _uiState.update { it.copy(photoBusy = true, photoError = null) }
         viewModelScope.launch {
             var retainedPhoto: RetainedOriginalPhoto? = null
             try {
-                val photo = input.retain(uid, capsuleId, uri)
+                val photo = input.retain(storageSession, uid, capsuleId, uri)
                 retainedPhoto = photo
                 if (!isCurrentPhotoOp(token, uid, capsuleId)) {
                     input.remove(photo)
@@ -227,7 +230,7 @@ class CapsuleDraftViewModel(
                     previousPhoto = latestState.originalPhoto
                     val record = PhotoDraftRecord(capsuleId, latestState.title, latestState.text, photo, latestState.locationTarget, latestState.locationName)
                     try {
-                        input.save(uid, record)
+                        input.save(storageSession, uid, record)
                     } catch (cancelled: CancellationException) {
                         throw cancelled
                     } catch (_: Exception) {
@@ -242,7 +245,7 @@ class CapsuleDraftViewModel(
                         try {
                             val currentInJournal = input.restore(uid)
                             if (currentInJournal?.capsuleId == capsuleId && currentInJournal.photo == photo) {
-                                input.save(uid, PhotoDraftRecord(capsuleId, latestState.title, latestState.text, previousPhoto, latestState.locationTarget, latestState.locationName))
+                                input.save(storageSession, uid, PhotoDraftRecord(capsuleId, latestState.title, latestState.text, previousPhoto, latestState.locationTarget, latestState.locationName))
                             }
                         } catch (cancelled: CancellationException) {
                             throw cancelled

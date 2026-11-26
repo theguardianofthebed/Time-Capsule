@@ -162,22 +162,6 @@ class FakeLocalRetentionAdapter : LocalRetentionAdapter {
         return OperationResult.Success(Unit)
     }
 
-    override suspend fun saveRetainedContent(
-        uid: String,
-        capsuleId: String,
-        verifiedUnlockedAt: Instant,
-        text: String?,
-        photoBytes: ByteArray?,
-        photoFormat: OriginalPhotoFormat?
-    ): OperationResult<Unit> = saveRetainedContent(
-        targetSession = SessionSnapshot(uid),
-        capsuleId = capsuleId,
-        verifiedUnlockedAt = verifiedUnlockedAt,
-        text = text,
-        photoBytes = photoBytes,
-        photoFormat = photoFormat
-    )
-
     override suspend fun readRetainedContent(
         targetSession: SessionSnapshot,
         capsuleId: String
@@ -191,14 +175,6 @@ class FakeLocalRetentionAdapter : LocalRetentionAdapter {
             OperationResult.Denied("No retained content for $capsuleId")
         }
     }
-
-    override suspend fun readRetainedContent(
-        uid: String,
-        capsuleId: String
-    ): OperationResult<RetainedContent> = readRetainedContent(
-        targetSession = SessionSnapshot(uid),
-        capsuleId = capsuleId
-    )
 
     override suspend fun clearAccountData(uid: String) {
         val keysToRemove = memoryStore.keys.filter { it.startsWith("$uid:") }

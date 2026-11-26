@@ -1,5 +1,6 @@
 package com.example.timecapsule.data.media
 
+import com.example.timecapsule.data.session.fixtureSession
 import com.example.timecapsule.domain.model.LocationTarget
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -33,7 +34,7 @@ class DraftLocationPersistenceTest {
             locationName = "37.5665, 126.9780"
         )
 
-        journal.save("user-a", record)
+        journal.save(fixtureSession("user-a"), "user-a", record)
 
         val restored = journal.load("user-a")
         assertNotNull(restored)
@@ -60,7 +61,7 @@ class DraftLocationPersistenceTest {
             photo = null
         )
 
-        journal.save("user-legacy", legacyRecord)
+        journal.save(fixtureSession("user-legacy"), "user-legacy", legacyRecord)
 
         val restored = journal.load("user-legacy")
         assertNotNull(restored)
@@ -84,7 +85,7 @@ class DraftLocationPersistenceTest {
             locationName = "Seoul"
         )
 
-        journal.save("user-a", record)
+        journal.save(fixtureSession("user-a"), "user-a", record)
 
         // User B attempts to restore User A's draft -> returns null
         val restoredB = journal.load("user-b")
@@ -106,10 +107,10 @@ class DraftLocationPersistenceTest {
             locationName = "Seoul"
         )
 
-        journal.save("user-a", initialRecord)
+        journal.save(fixtureSession("user-a"), "user-a", initialRecord)
 
         val updatedRecord = initialRecord.copy(text = "Updated Text")
-        journal.save("user-a", updatedRecord)
+        journal.save(fixtureSession("user-a"), "user-a", updatedRecord)
 
         val restored = journal.load("user-a")
         assertNotNull(restored)
@@ -132,7 +133,7 @@ class DraftLocationPersistenceTest {
             locationName = "Invalid Location"
         )
 
-        journal.save("user-corrupt", corruptRecord)
+        journal.save(fixtureSession("user-corrupt"), "user-corrupt", corruptRecord)
 
         val restored = journal.load("user-corrupt")
         assertNotNull(restored)

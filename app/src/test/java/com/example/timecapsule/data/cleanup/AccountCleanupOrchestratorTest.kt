@@ -1,5 +1,6 @@
 package com.example.timecapsule.data.cleanup
 
+import com.example.timecapsule.data.session.StorageSession
 import com.example.timecapsule.data.adapter.DefaultLocalRetentionAdapter
 import com.example.timecapsule.data.adapter.LocalRetentionAdapter
 import com.example.timecapsule.domain.model.OriginalPhotoFormat
@@ -82,7 +83,7 @@ class AccountCleanupOrchestratorTest {
         frozenPhotosDir = temporaryFolder.newFolder("frozen-photos")
         attemptFile = temporaryFolder.newFile("notification-attempts.json")
 
-        retentionAdapter = DefaultLocalRetentionAdapter(retentionDir)
+        retentionAdapter = DefaultLocalRetentionAdapter(retentionDir) { sessionTracker.currentSession() }
         journal = FrozenOperationJournal(journalDir)
         originalPhotoStore = OriginalPhotoStore(photoStoreDir) { OriginalPhotoFormat.JPEG }
         photoDraftJournal = PhotoDraftJournal(photoDraftDir)
@@ -102,7 +103,6 @@ class AccountCleanupOrchestratorTest {
             originalPhotoStore = originalPhotoStore,
             photoDraftJournal = photoDraftJournal,
             unlockNotificationCoordinator = unlockNotificationCoordinator,
-            sessionTracker = sessionTracker,
             noBackupDir = noBackupDir,
             frozenPhotosDir = frozenPhotosDir
         )
@@ -119,11 +119,15 @@ class AccountCleanupOrchestratorTest {
         val capsuleId1 = "capsule-unresolved-1"
         val capsuleId2 = "capsule-sent-2"
 
+        sessionTracker.startSession(uid)
+        val session = sessionTracker.currentSession()
+        val origin = StorageSession(session, sessionTracker::currentSession)
+
         // 1. Save retained content
-        retentionAdapter.saveRetainedContent(uid, capsuleId1, Instant.now(), "Retained Text", null, null)
+        retentionAdapter.saveRetainedContent(session, capsuleId1, Instant.now(), "Retained Text", null, null)
 
         // 2. Save draft
-        photoDraftJournal.save(uid, PhotoDraftRecord(capsuleId1, "Draft Title", "Draft Text", null))
+        photoDraftJournal.save(origin, uid, PhotoDraftRecord(capsuleId1, "Draft Title", "Draft Text", null))
 
         // 3. Save unresolved operation in journal
         val rawUnresolved = FrozenCapsuleOperation(
@@ -138,7 +142,7 @@ class AccountCleanupOrchestratorTest {
             snapshotDigest = ""
         )
         val unresolvedOp = rawUnresolved.copy(snapshotDigest = rawUnresolved.calculateDigest())
-        journal.save(FrozenOperationRecord(unresolvedOp, phase = PublicationPhase.PUBLISHING))
+        journal.save(origin, FrozenOperationRecord(unresolvedOp, phase = PublicationPhase.PUBLISHING))
 
         // 4. Save SENT operation in journal
         val rawSent = FrozenCapsuleOperation(
@@ -153,7 +157,7 @@ class AccountCleanupOrchestratorTest {
             snapshotDigest = ""
         )
         val sentOp = rawSent.copy(snapshotDigest = rawSent.calculateDigest())
-        journal.save(FrozenOperationRecord(sentOp, phase = PublicationPhase.SENT))
+        journal.save(origin, FrozenOperationRecord(sentOp, phase = PublicationPhase.SENT))
 
         // 5. Record notification attempt
         attemptStore.atomicallyClaimAttempt(uid, capsuleId1)
@@ -161,7 +165,7 @@ class AccountCleanupOrchestratorTest {
         // 6. Save frozen photo record in real layout: frozen-photos/<capsuleId>/<hashedUid>.properties
         val frozenCapsuleDir = File(frozenPhotosDir, capsuleId1)
         val frozenJournal = PhotoDraftJournal(frozenCapsuleDir)
-        frozenJournal.save(uid, PhotoDraftRecord(capsuleId1, "Frozen Title", "Frozen Text", null))
+        frozenJournal.save(origin, uid, PhotoDraftRecord(capsuleId1, "Frozen Title", "Frozen Text", null))
         assertNotNull(frozenJournal.load(uid))
 
         // EXECUTE CLEANUP
@@ -169,7 +173,7 @@ class AccountCleanupOrchestratorTest {
 
         // VERIFY:
         // A. Retained content is cleared
-        val readRetained = retentionAdapter.readRetainedContent(uid, capsuleId1)
+        val readRetained = retentionAdapter.readRetainedContent(session, capsuleId1)
         assertTrue(readRetained is OperationResult.Denied)
 
         // B. Photo draft journal is cleared
@@ -192,10 +196,23 @@ class AccountCleanupOrchestratorTest {
         assertTrue(fakeNotificationAdapter.canceledAccounts.contains(uid))
     }
 
+    /** Cleaning B finishes exactly B's obligation, even after recreating the disk reader. */
+    @Test fun completingAnotherAccountPreservesEarlierObligation() = runBlocking {
+        orchestrator.markCleanupPending("A")
+        orchestrator.markCleanupPending("B")
+        assertTrue(orchestrator.cleanupAccount("B") is OperationResult.Success)
+        val reopened = AccountCleanupOrchestrator(retentionAdapter, noBackupDir = noBackupDir)
+        assertEquals("A", reopened.getPendingCleanupUid())
+        assertTrue(reopened.cleanupAccount("A") is OperationResult.Success)
+        assertFalse(reopened.hasPendingCleanup())
+    }
+
     @Test
     fun testInterruptedCleanupRecoveryOnStartup() = runBlocking {
         val interruptedUid = "user-interrupted-1"
-        retentionAdapter.saveRetainedContent(interruptedUid, "capsule-int-1", Instant.now(), "Content Interrupted", null, null)
+        sessionTracker.startSession(interruptedUid)
+        val origin = sessionTracker.currentSession()
+        retentionAdapter.saveRetainedContent(origin, "capsule-int-1", Instant.now(), "Content Interrupted", null, null)
 
         // Simulate process death after pending marker was written
         val markerFile = File(noBackupDir, "pending-cleanup.properties")
@@ -203,14 +220,14 @@ class AccountCleanupOrchestratorTest {
         assertTrue(markerFile.exists())
 
         // Run startup recovery
-        val res = orchestrator.cleanupInterruptedSessions("active-user-2")
+        val res = orchestrator.cleanupAccount("")
         assertTrue(res is OperationResult.Success)
 
         // Pending marker must be deleted after successful recovery
         assertFalse(markerFile.exists())
 
         // Content of interrupted user must be purged
-        val readRes = retentionAdapter.readRetainedContent(interruptedUid, "capsule-int-1")
+        val readRes = retentionAdapter.readRetainedContent(origin, "capsule-int-1")
         assertTrue(readRes is OperationResult.Denied)
     }
 

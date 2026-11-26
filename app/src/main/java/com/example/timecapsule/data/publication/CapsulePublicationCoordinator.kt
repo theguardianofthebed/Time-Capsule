@@ -1,5 +1,6 @@
 package com.example.timecapsule.data.publication
 
+import com.example.timecapsule.data.session.StorageSession
 import com.example.timecapsule.data.media.OriginalPhotoUploads
 import com.example.timecapsule.domain.model.CapsuleDraft
 import com.example.timecapsule.domain.model.FrozenCapsuleOperation
@@ -31,17 +32,17 @@ import java.util.concurrent.ConcurrentHashMap
 /** Replaceable #13 handoff, keeping deterministic publication tests independent of Firebase. */
 interface PublicationMedia {
     /** Makes the stable private upload copy without starting network publication. */
-    suspend fun freeze(photo: RetainedOriginalPhoto): OperationResult<FrozenPhotoUpload>
+    suspend fun freeze(photo: RetainedOriginalPhoto, captured: SessionSnapshot): OperationResult<FrozenPhotoUpload>
     /** Returns only a matching confirmed upload, not a capsule publication result. */
-    suspend fun upload(photo: FrozenPhotoUpload): OperationResult<PhotoUploadAcknowledgment>
+    suspend fun upload(photo: FrozenPhotoUpload, captured: SessionSnapshot): OperationResult<PhotoUploadAcknowledgment>
 }
 
 /** Delegates photo handling to the existing #13 implementation instead of duplicating it. */
 class OriginalPublicationMedia(private val uploads: OriginalPhotoUploads) : PublicationMedia {
     /** Reuses #13's persisted frozen image identity. */
-    override suspend fun freeze(photo: RetainedOriginalPhoto) = uploads.freeze(photo)
+    override suspend fun freeze(photo: RetainedOriginalPhoto, captured: SessionSnapshot) = uploads.freeze(photo, captured)
     /** Reuses #13's authenticated byte/acknowledgment checks. */
-    override suspend fun upload(photo: FrozenPhotoUpload) = uploads.upload(photo)
+    override suspend fun upload(photo: FrozenPhotoUpload, captured: SessionSnapshot) = uploads.upload(photo, captured)
 }
 
 /**
@@ -61,7 +62,7 @@ class CapsulePublicationCoordinator(
     private val newId: () -> String = { UUID.randomUUID().toString() }
 ) {
     /** Identifies one shared attempt across recreated coordinators using the same private store. */
-    private data class AttemptKey(val store: String, val uid: String, val capsuleId: String)
+    private data class AttemptKey(val store: String, val uid: String, val capsuleId: String, val generation: Long)
 
     companion object {
         private val registration = Mutex()
@@ -108,13 +109,13 @@ class CapsulePublicationCoordinator(
                     previous.operation.canonicalPayload() == candidate.canonicalPayload()) {
                     "Submitted capsule cannot be edited. Resolve its outcome first."
                 }
-                val key = key(candidate)
+                val key = key(candidate, targetSession)
                 val existing = active[key]
                 if (existing != null && existing.isActive) {
                     existing
                 } else {
                     if (previous == null) {
-                        journal.save(FrozenOperationRecord(candidate))
+                        journal.save(StorageSession(targetSession, session), FrozenOperationRecord(candidate))
                         start(key) { execute(FrozenOperationRecord(candidate), targetSession) }
                     } else {
                         start(key) {
@@ -151,7 +152,7 @@ class CapsulePublicationCoordinator(
                 require(saved.phase != PublicationPhase.ABANDONED) {
                     "An abandoned operation cannot be retried."
                 }
-                val key = key(saved.operation)
+                val key = key(saved.operation, targetSession)
                 val existing = active[key]
                 if (existing != null && existing.isActive) existing
                 else start(key) { recover(saved, targetSession, replay = true) }
@@ -182,29 +183,29 @@ class CapsulePublicationCoordinator(
             val evidence = inspect(saved.operation)
             if (session() != targetSession) return@withContext denied()
             when (evidence) {
-                PublicationInspection.MATCHING -> when (val result = resolveMatching(saved.operation)) {
+                PublicationInspection.MATCHING -> when (val result = resolveMatching(targetSession, saved.operation)) {
                     is OperationResult.Success -> OperationResult.Success(SendStatus.SENT)
                     else -> unresolvedResult(capsuleId, result)
                 }
-                PublicationInspection.CONFLICT -> conflict(saved.operation)
+                PublicationInspection.CONFLICT -> conflict(targetSession, saved.operation)
                 PublicationInspection.ABSENT -> {
                     registration.withLock {
                         val latest = journal.load(uid, capsuleId) ?: saved
-                        if (active[key(saved.operation)]?.isActive != true &&
+                        if (active[key(saved.operation, targetSession)]?.isActive != true &&
                             !mayHaveEarlierWrite(latest) &&
                             (latest.phase == PublicationPhase.FAILED || latest.terminalRejectionConfirmed)) {
-                            val resolved = progress(latest.operation, PublicationPhase.FAILED,
+                            val resolved = progress(targetSession, latest.operation, PublicationPhase.FAILED,
                                 unresolved = false)
                             OperationResult.Success(if (resolved.phase == PublicationPhase.SENT)
                                 SendStatus.SENT else SendStatus.FAILED)
                         } else {
-                            markUnknown(saved.operation)
+                            markUnknown(targetSession, saved.operation)
                             unknown(capsuleId)
                         }
                     }
                 }
                 else -> {
-                    markUnknown(saved.operation)
+                    markUnknown(targetSession, saved.operation)
                     unknown(capsuleId)
                 }
             }
@@ -242,7 +243,7 @@ class CapsulePublicationCoordinator(
                 val latest = journal.load(uid, record.operation.capsuleId) ?: record
                 if (latest.phase == PublicationPhase.ABANDONED) continue
                 val cleared = if (latest.phase == PublicationPhase.SENT && hasPhotoProof(latest)) {
-                    drafts?.clearConfirmed(latest.operation) ?: false
+                    drafts?.clearConfirmed(StorageSession(targetSession, session), latest.operation) ?: false
                 } else false
                 if (session() != targetSession) return@withContext denied()
                 val isSelfSend = latest.operation.senderUid == latest.operation.recipientUid
@@ -251,7 +252,7 @@ class CapsulePublicationCoordinator(
                 recovered += RecoveredPublication(latest.operation.capsuleId, latest.phase,
                     snapshotToExpose,
                     latest.phase == PublicationPhase.FAILED && !mayHaveEarlierWrite(latest) &&
-                        active[key(latest.operation)]?.isActive != true, cleared)
+                        active[key(latest.operation, targetSession)]?.isActive != true, cleared)
             }
             OperationResult.Success(recovered)
         } catch (cancelled: CancellationException) {
@@ -286,7 +287,7 @@ class CapsulePublicationCoordinator(
             val evidence = inspect(saved.operation)
             if (session() != targetSession) return@withContext denied()
             if (evidence == PublicationInspection.MATCHING) {
-                resolveMatching(saved.operation)
+                resolveMatching(targetSession, saved.operation)
                 return@withContext OperationResult.Denied("This capsule is published; it cannot be abandoned.")
             }
             if (evidence != PublicationInspection.ABSENT) {
@@ -295,7 +296,7 @@ class CapsulePublicationCoordinator(
             val abandoned = registration.withLock {
                 val latest = journal.load(uid, capsuleId) ?: saved
                 if (latest.phase == PublicationPhase.ABANDONED) return@withLock latest
-                if (active[key(latest.operation)]?.isActive == true ||
+                if (active[key(latest.operation, targetSession)]?.isActive == true ||
                     latest.phase != PublicationPhase.FAILED || mayHaveEarlierWrite(latest)) {
                     return@withLock null
                 }
@@ -304,7 +305,7 @@ class CapsulePublicationCoordinator(
                     replacementId.matches(Regex("[A-Za-z0-9_-]+")) &&
                     journal.load(uid, replacementId) == null) { "Replacement ID is already used or invalid." }
                 latest.copy(phase = PublicationPhase.ABANDONED,
-                    replacementDraftId = replacementId).also { journal.save(it) }
+                    replacementDraftId = replacementId).also { journal.save(StorageSession(targetSession, session), it) }
             } ?: return@withContext unknown(capsuleId)
             prepareReplacement(abandoned, targetSession)
         } catch (cancelled: CancellationException) {
@@ -325,10 +326,10 @@ class CapsulePublicationCoordinator(
         val id = record.replacementDraftId
             ?: return OperationResult.Invalid("Replacement draft identity is missing.")
         if (session() != captured) return denied()
-        val replacement = handler.replacement(record.operation, id)
+        val replacement = handler.replacement(StorageSession(captured, session), record.operation, id)
         if (session() != captured) return denied()
         require(replacement.capsuleId == id && id != record.operation.capsuleId)
-        journal.update(record.operation.senderUid, record.operation.capsuleId) {
+        journal.update(StorageSession(captured, session), record.operation.senderUid, record.operation.capsuleId) {
             require(it.phase == PublicationPhase.ABANDONED)
             it.copy(replacementPrepared = true)
         }
@@ -361,7 +362,7 @@ class CapsulePublicationCoordinator(
         if (saved.phase == PublicationPhase.SENT && hasPhotoProof(saved)) {
             return OperationResult.Success(capsuleId)
         }
-        markUnknown(saved.operation)
+        markUnknown(captured, saved.operation)
         return unknown(capsuleId)
     }
 
@@ -376,20 +377,20 @@ class CapsulePublicationCoordinator(
         val evidence = inspect(operation)
         if (session() != captured) return denied()
         return when (evidence) {
-            PublicationInspection.MATCHING -> resolveMatching(operation)
-            PublicationInspection.CONFLICT -> conflict(operation)
+            PublicationInspection.MATCHING -> resolveMatching(captured, operation)
+            PublicationInspection.CONFLICT -> conflict(captured, operation)
             PublicationInspection.ABSENT -> {
                 if (replay && !operation.isOpaque && saved.phase != PublicationPhase.SENT &&
                     saved.phase != PublicationPhase.ABANDONED) {
                     // An absent record permits only unchanged replay, never edited/new-ID restart.
                     execute(journal.load(operation.senderUid, operation.capsuleId) ?: saved, captured)
                 } else {
-                    markUnknown(operation)
+                    markUnknown(captured, operation)
                     unknown(operation.capsuleId)
                 }
             }
             else -> {
-                markUnknown(operation)
+                markUnknown(captured, operation)
                 unknown(operation.capsuleId)
             }
         }
@@ -404,62 +405,63 @@ class CapsulePublicationCoordinator(
         val priorUncertain = mayHaveEarlierWrite(saved)
         var submitted = false
         try {
-            if (session() != captured) return failBeforePublication(operation, denied(), priorUncertain)
+            if (session() != captured) return denied()
             operation.photo?.let { original ->
-                val handler = media ?: return failBeforePublication(operation,
+                val handler = media ?: return failBeforePublication(captured, operation,
                     OperationResult.Unavailable("Photo service is unavailable."), priorUncertain)
-                val frozen = when (val result = handler.freeze(original)) {
+                val frozen = when (val result = handler.freeze(original, captured)) {
                     is OperationResult.Success -> result.data
-                    else -> return failBeforePublication(operation, photoFailure(result), priorUncertain)
+                    else -> return failBeforePublication(captured, operation, photoFailure(result), priorUncertain)
                 }
                 require(frozen.objectPath == operation.photoObjectPath)
                 require(frozen.original.sha256 == original.sha256 &&
                     frozen.original.sizeBytes == original.sizeBytes &&
                     frozen.original.format == original.format)
                 operation = operation.copy(photo = frozen.original)
-                progress(operation, PublicationPhase.UPLOADING)
-                if (session() != captured) return failBeforePublication(operation, denied(), priorUncertain)
-                val ack = when (val result = handler.upload(frozen)) {
+                progress(captured, operation, PublicationPhase.UPLOADING)
+                if (session() != captured) return denied()
+                val ack = when (val result = handler.upload(frozen, captured)) {
                     is OperationResult.Success -> result.data
-                    else -> return failBeforePublication(operation, photoFailure(result), priorUncertain)
+                    else -> return failBeforePublication(captured, operation, photoFailure(result), priorUncertain)
                 }
                 require(ack.objectPath == operation.photoObjectPath &&
                     ack.sizeBytes == original.sizeBytes && ack.sha256 == original.sha256) {
                     "Photo acknowledgment does not match the submitted original."
                 }
-                progress(operation, PublicationPhase.UPLOADING, photoAcknowledged = true)
+                progress(captured, operation, PublicationPhase.UPLOADING, photoAcknowledged = true)
             }
-            if (session() != captured) return failBeforePublication(operation, denied(), priorUncertain)
-            val publishing = progress(operation, PublicationPhase.PUBLISHING,
+            if (session() != captured) return denied()
+            val publishing = progress(captured, operation, PublicationPhase.PUBLISHING,
                 unresolved = true, rejected = false)
             if (publishing.phase == PublicationPhase.SENT) {
                 return OperationResult.Success(operation.capsuleId)
             }
-            if (session() != captured) return failBeforePublication(operation, denied(), priorUncertain)
+            if (session() != captured) return denied()
             submitted = true
             backend.publish(operation)
-            progress(operation, PublicationPhase.SENT, unresolved = false, rejected = false)
+            progress(captured, operation, PublicationPhase.SENT, unresolved = false, rejected = false)
             return if (session() == captured) OperationResult.Success(operation.capsuleId) else denied()
         } catch (cancelled: CancellationException) {
-            markUnknown(operation, unresolved = submitted || priorUncertain)
+            markUnknown(captured, operation, unresolved = submitted || priorUncertain)
             throw cancelled
         } catch (error: Exception) {
+            if (session() != captured) return denied()
             if (!submitted) {
-                return failBeforePublication(operation,
+                return failBeforePublication(captured, operation,
                     if (error is IllegalArgumentException) OperationResult.Invalid(
                         error.message ?: "Invalid photo.") else
                         OperationResult.Unavailable("Cannot prepare photo or save operation."),
                     priorUncertain)
             }
             val rejected = error is PublicationRejectedException
-            markUnknown(operation, unresolved = priorUncertain || !rejected, rejected = rejected)
+            markUnknown(captured, operation, unresolved = priorUncertain || !rejected, rejected = rejected)
             if (session() != captured) return denied()
             // A rejected replay cannot settle an older delayed write, even after an absent read.
             return when (inspect(operation)) {
-                PublicationInspection.MATCHING -> resolveMatching(operation)
-                PublicationInspection.CONFLICT -> conflict(operation)
+                PublicationInspection.MATCHING -> resolveMatching(captured, operation)
+                PublicationInspection.CONFLICT -> conflict(captured, operation)
                 PublicationInspection.ABSENT -> if (rejected && !priorUncertain) {
-                    val resolved = progress(operation, PublicationPhase.FAILED,
+                    val resolved = progress(captured, operation, PublicationPhase.FAILED,
                         unresolved = false, rejected = true)
                     if (resolved.phase == PublicationPhase.SENT) OperationResult.Success(operation.capsuleId)
                     else OperationResult.Invalid("Publication was rejected. Retry unchanged or review the failure.")
@@ -471,26 +473,28 @@ class CapsulePublicationCoordinator(
 
     /** A new media failure is definite only when no earlier publication can still arrive. */
     private fun failBeforePublication(
+        captured: SessionSnapshot,
         operation: FrozenCapsuleOperation,
         result: OperationResult<String>,
         priorUncertain: Boolean
     ): OperationResult<String> {
         if (priorUncertain) {
-            markUnknown(operation, unresolved = true)
+            markUnknown(captured, operation, unresolved = true)
             return unknown(operation.capsuleId)
         }
-        progress(operation, PublicationPhase.FAILED, unresolved = false)
+        progress(captured, operation, PublicationPhase.FAILED, unresolved = false)
         return result
     }
 
     /** Updates progress atomically while preserving a matching server success from another check. */
     private fun progress(
+        captured: SessionSnapshot,
         operation: FrozenCapsuleOperation,
         phase: PublicationPhase,
         unresolved: Boolean? = null,
         photoAcknowledged: Boolean? = null,
         rejected: Boolean? = null
-    ): FrozenOperationRecord = journal.update(operation.senderUid, operation.capsuleId) { current ->
+    ): FrozenOperationRecord = journal.update(StorageSession(captured, session), operation.senderUid, operation.capsuleId) { current ->
         if (current.phase == PublicationPhase.ABANDONED ||
             (current.phase == PublicationPhase.SENT && phase != PublicationPhase.SENT)) current
         else current.copy(operation = operation, phase = phase,
@@ -501,12 +505,13 @@ class CapsulePublicationCoordinator(
 
     /** Preserves earlier uncertainty and never overwrites a concurrent confirmed SENT record. */
     private fun markUnknown(
+        captured: SessionSnapshot,
         operation: FrozenCapsuleOperation,
         unresolved: Boolean? = null,
         rejected: Boolean? = null
     ) {
         try {
-            progress(operation, PublicationPhase.OUTCOME_UNKNOWN,
+            progress(captured, operation, PublicationPhase.OUTCOME_UNKNOWN,
                 unresolved = unresolved, rejected = rejected)
         } catch (_: Exception) {
             // Keep the previous durable record. A failed status write never proves remote failure.
@@ -514,7 +519,7 @@ class CapsulePublicationCoordinator(
     }
 
     /** Matches the saved photo proof as well as server content before resolving successful delivery. */
-    private fun resolveMatching(operation: FrozenCapsuleOperation): OperationResult<String> {
+    private fun resolveMatching(captured: SessionSnapshot, operation: FrozenCapsuleOperation): OperationResult<String> {
         val saved = journal.load(operation.senderUid, operation.capsuleId)
             ?: return unknown(operation.capsuleId)
         if (saved.phase == PublicationPhase.ABANDONED) {
@@ -525,7 +530,7 @@ class CapsulePublicationCoordinator(
                 "Publication matches, but the required saved photo acknowledgment is missing.")
         }
         return try {
-            progress(saved.operation, PublicationPhase.SENT, unresolved = false, rejected = false)
+            progress(captured, saved.operation, PublicationPhase.SENT, unresolved = false, rejected = false)
             OperationResult.Success(operation.capsuleId)
         } catch (_: Exception) {
             unknown(operation.capsuleId)
@@ -533,8 +538,8 @@ class CapsulePublicationCoordinator(
     }
 
     /** A conflicting existing ID is never overwritten or silently accepted as the same operation. */
-    private fun conflict(operation: FrozenCapsuleOperation): OperationResult.Invalid {
-        markUnknown(operation)
+    private fun conflict(captured: SessionSnapshot, operation: FrozenCapsuleOperation): OperationResult.Invalid {
+        markUnknown(captured, operation)
         return OperationResult.Invalid("Server capsule content conflicts with the saved operation.")
     }
 
@@ -560,8 +565,8 @@ class CapsulePublicationCoordinator(
     }
 
     /** Builds the process-wide operation key without changing its frozen ID. */
-    private fun key(operation: FrozenCapsuleOperation): AttemptKey =
-        AttemptKey(journal.storageIdentity, operation.senderUid, operation.capsuleId)
+    private fun key(operation: FrozenCapsuleOperation, captured: SessionSnapshot): AttemptKey =
+        AttemptKey(journal.storageIdentity, operation.senderUid, operation.capsuleId, captured.sessionGeneration)
 
     /** Converts unresolved reconciliation responses without converting them into a status success. */
     private fun unresolvedResult(

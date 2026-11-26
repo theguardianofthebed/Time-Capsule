@@ -1,5 +1,6 @@
 package com.example.timecapsule.data.publication
 
+import com.example.timecapsule.data.session.StorageSession
 import com.example.timecapsule.domain.model.CapsuleDraft
 import com.example.timecapsule.domain.model.CapsuleLock
 import com.example.timecapsule.domain.model.FrozenCapsuleOperation
@@ -72,11 +73,11 @@ class CapsulePublicationCoordinatorTest {
         val calls = AtomicInteger()
         val media = object : Media() {
             /** Holds the photo ACK so the test can inspect the publication boundary. */
-            override suspend fun upload(photo: FrozenPhotoUpload): OperationResult<PhotoUploadAcknowledgment> {
+            override suspend fun upload(photo: FrozenPhotoUpload, captured: SessionSnapshot): OperationResult<PhotoUploadAcknowledgment> {
                 assertEquals(PublicationPhase.UPLOADING, journal.load("sender", "one")?.phase)
                 uploadStarted.complete(Unit)
                 acknowledge.await()
-                return super.upload(photo)
+                return super.upload(photo, captured)
             }
         }
         val service = coordinator(CapsulePublicationBackend { calls.incrementAndGet(); Unit }, media)
@@ -94,7 +95,7 @@ class CapsulePublicationCoordinatorTest {
         val calls = AtomicInteger()
         val media = object : Media() {
             /** Injects a failed required upload. */
-            override suspend fun upload(photo: FrozenPhotoUpload) =
+            override suspend fun upload(photo: FrozenPhotoUpload, captured: SessionSnapshot) =
                 OperationResult.Unavailable("Upload failed")
         }
         val result = coordinator(CapsulePublicationBackend { calls.incrementAndGet(); Unit }, media)
@@ -109,7 +110,7 @@ class CapsulePublicationCoordinatorTest {
         val calls = AtomicInteger()
         val media = object : Media() {
             /** Returns an acknowledgment for another remote object. */
-            override suspend fun upload(photo: FrozenPhotoUpload) =
+            override suspend fun upload(photo: FrozenPhotoUpload, captured: SessionSnapshot) =
                 OperationResult.Success(PhotoUploadAcknowledgment("wrong/path", 3, "a".repeat(64)))
         }
         assertTrue(coordinator(CapsulePublicationBackend { calls.incrementAndGet(); Unit }, media)
@@ -177,7 +178,7 @@ class CapsulePublicationCoordinatorTest {
     /** A previously saved unresolved send cannot be re-created as a new attempt in this step. */
     @Test fun restoredUnknownRequiresReconciliation() = runBlocking {
         val operation = FrozenCapsuleOperation.freeze(draft(), "sender", "UTC", now)
-        journal.save(FrozenOperationRecord(operation, PublicationPhase.OUTCOME_UNKNOWN))
+        journal.save(StorageSession(session) { session }, FrozenOperationRecord(operation, PublicationPhase.OUTCOME_UNKNOWN))
         val calls = AtomicInteger()
         assertTrue(coordinator(CapsulePublicationBackend { calls.incrementAndGet(); Unit })
             .publish(draft()) is OperationResult.OutcomeUnknown)
@@ -208,7 +209,7 @@ class CapsulePublicationCoordinatorTest {
     @Test fun sessionChangeRejectsSuccessCallback() = runBlocking {
         val service = coordinator(CapsulePublicationBackend { session = SessionSnapshot("other", 2) })
         assertTrue(service.publish(draft()) is OperationResult.Denied)
-        assertEquals(PublicationPhase.SENT, journal.load("sender", "one")?.phase)
+        assertEquals(PublicationPhase.PUBLISHING, journal.load("sender", "one")?.phase)
     }
 
     /** Changing an in-flight snapshot is rejected without overwriting its durable identity. */
@@ -251,10 +252,10 @@ class CapsulePublicationCoordinatorTest {
     /** A media fixture returns the same approved bytes/path identity, without network I/O. */
     private open class Media : PublicationMedia {
         /** Returns a durable-upload identity fixture for the selected original. */
-        override suspend fun freeze(photo: RetainedOriginalPhoto) = OperationResult.Success(
+        override suspend fun freeze(photo: RetainedOriginalPhoto, captured: SessionSnapshot) = OperationResult.Success(
             FrozenPhotoUpload(photo, "capsuleMedia/${photo.ownerUid}/${photo.capsuleId}/original"))
         /** Confirms only the same path, byte count and hash. */
-        override suspend fun upload(photo: FrozenPhotoUpload): OperationResult<PhotoUploadAcknowledgment> =
+        override suspend fun upload(photo: FrozenPhotoUpload, captured: SessionSnapshot): OperationResult<PhotoUploadAcknowledgment> =
             OperationResult.Success(PhotoUploadAcknowledgment(photo.objectPath,
                 photo.original.sizeBytes, photo.original.sha256))
     }
