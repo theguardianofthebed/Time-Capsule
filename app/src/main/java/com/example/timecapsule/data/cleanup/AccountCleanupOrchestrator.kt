@@ -100,6 +100,32 @@ class AccountCleanupOrchestrator(
     }
 
     /**
+     * Reads the pending cleanup UID from `pending-cleanup.properties` if present.
+     */
+    fun getPendingCleanupUid(): String {
+        val markerFile = pendingMarkerFile() ?: return ""
+        if (!markerFile.exists()) return ""
+        return try {
+            val properties = Properties().apply { markerFile.inputStream().use { load(it) } }
+            properties.getProperty("pendingUid") ?: ""
+        } catch (_: Exception) {
+            ""
+        }
+    }
+
+    /**
+     * Durably persists a pending cleanup marker for [uid] BEFORE former session invalidation or store purges.
+     */
+    suspend fun markCleanupPending(uid: String): Unit = withContext(Dispatchers.IO) {
+        val cleanUid = uid.trim()
+        if (cleanUid.isNotBlank()) {
+            cleanupMutex.withLock {
+                writePendingMarker(cleanUid)
+            }
+        }
+    }
+
+    /**
      * Checks for interrupted cleanup sessions on application startup and ensures former account state is clean.
      * Fails closed: Returns [OperationResult.Unavailable] if malformed marker or startup cleanup fails.
      *

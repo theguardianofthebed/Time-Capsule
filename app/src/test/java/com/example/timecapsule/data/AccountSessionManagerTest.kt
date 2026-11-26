@@ -436,10 +436,17 @@ class AccountSessionManagerTest {
         assertEquals("", loadedRecord.operation.text)
         assertNull(loadedRecord.operation.title)
 
-        // C. Subsequent user sign-in MUST succeed
-        fakeAuthAdapter.uid = "user-sender-B"
-        sessionTracker.startSession("user-sender-B")
-        assertEquals("user-sender-B", sessionTracker.currentSession().uid)
+        // C. Subsequent user sign-in via manager.signIn MUST succeed
+        val signInRes = manager.signIn("userB@example.com", "passB123")
+        assertTrue("Subsequent user sign-in must succeed after cleanup", signInRes is OperationResult.Success)
+        val userBUid = (signInRes as OperationResult.Success).data
+        assertEquals(userBUid, sessionTracker.currentSession().uid)
+        assertFalse(orchestrator.hasPendingCleanup())
+
+        // D. User A's former protected content is inaccessible to User B
+        val userBSession = sessionTracker.currentSession()
+        val readUserB = retentionAdapter.readRetainedContent(userBSession, "capsule-unresolved-999")
+        assertTrue("Former user's protected content must be inaccessible to new user", readUserB is OperationResult.Denied)
     }
 
     @Test

@@ -22,7 +22,9 @@ class AccountSessionManager(
     private val sessionTracker: SessionTracker,
     private val sessionGuard: SessionGuard = SessionGuard(sessionTracker),
     private val onAccountCleared: (suspend (String) -> OperationResult<Unit>)? = null,
-    private val isCleanupPending: () -> Boolean = { false }
+    private val isCleanupPending: () -> Boolean = { false },
+    private val markCleanupPending: (suspend (String) -> Unit)? = null,
+    private val getPendingCleanupUid: () -> String = { "" }
 ) {
 
     private val authMutex = Mutex()
@@ -245,31 +247,43 @@ class AccountSessionManager(
     }
 
     /**
-     * Signs out current user following strict account transition lifecycle:
-     * 1. Capture former account identity.
-     * 2. Invalidate former session generation FIRST to block protected access immediately.
+     * Signs out current user following strict 4-step account transition lifecycle:
+     * 1. Capture former account identity and persist cleanup obligation FIRST.
+     * 2. Invalidate former session generation to block protected access immediately.
      * 3. Execute store cleanups and Auth sign-out.
      * 4. Confirm successful cleanup before removing pending obligation.
      */
     suspend fun signOut(): OperationResult<Unit> = authMutex.withLock {
         val capturedSession = sessionTracker.currentSession()
         val oldUid = capturedSession.uid ?: ""
+        val pendingUid = getPendingCleanupUid()
+        val targetUid = if (oldUid.isNotBlank()) oldUid else pendingUid
 
-        // 1. Invalidate former session generation FIRST to block protected access immediately
-        sessionTracker.clearSession()
-
-        val targetUid = if (oldUid.isNotBlank()) oldUid else ""
-
-        // 2. Execute cleanup for former account UID (or retry pending cleanup if oldUid is blank)
-        if (targetUid.isNotBlank() || isCleanupPending()) {
-            val cleanupRes = onAccountCleared?.invoke(targetUid)
-            if (cleanupRes is OperationResult.Unavailable || isCleanupPending()) {
-                authAdapter.signOut()
-                return@withLock OperationResult.Unavailable("Account cleanup failed or pending. Session remains invalidated.")
-            }
+        if (targetUid.isBlank() && !isCleanupPending()) {
+            authAdapter.signOut()
+            sessionTracker.clearSession()
+            return@withLock OperationResult.Success(Unit)
         }
 
-        // 3. Complete Auth sign-out and return Success
+        // 1. Persist former account's cleanup obligation FIRST
+        if (targetUid.isNotBlank()) {
+            markCleanupPending?.invoke(targetUid)
+        }
+
+        // 2. Invalidate former session generation to block protected access immediately
+        if (sessionTracker.currentSession().isAuthenticated) {
+            sessionTracker.clearSession()
+        }
+
+        // 3. Execute store cleanups
+        val cleanupRes = onAccountCleared?.invoke(targetUid)
+
+        if (cleanupRes is OperationResult.Unavailable || isCleanupPending()) {
+            authAdapter.signOut()
+            return@withLock OperationResult.Unavailable("Account cleanup failed or pending. Session remains invalidated.")
+        }
+
+        // 4. Complete Auth sign-out and return Success
         authAdapter.signOut()
         OperationResult.Success(Unit)
     }

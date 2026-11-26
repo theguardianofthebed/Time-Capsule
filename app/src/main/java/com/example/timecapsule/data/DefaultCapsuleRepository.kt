@@ -357,6 +357,9 @@ class DefaultCapsuleRepository(
                 photoBytes = content.photoBytes,
                 photoFormat = content.photoFormat
             )
+            if (!sessionTracker.isSessionValid(targetSession)) {
+                return OperationResult.Denied("Account session changed during content retention.")
+            }
             return OperationResult.Success(content)
         }
 

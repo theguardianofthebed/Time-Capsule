@@ -151,7 +151,9 @@ class TimeCapsuleApplication : Application() {
             onAccountCleared = { uid ->
                 accountCleanupOrchestrator.cleanupAccount(uid)
             },
-            isCleanupPending = accountCleanupOrchestrator::hasPendingCleanup
+            isCleanupPending = accountCleanupOrchestrator::hasPendingCleanup,
+            markCleanupPending = accountCleanupOrchestrator::markCleanupPending,
+            getPendingCleanupUid = accountCleanupOrchestrator::getPendingCleanupUid
         )
 
         val photoUploads = OriginalPhotoUploads(

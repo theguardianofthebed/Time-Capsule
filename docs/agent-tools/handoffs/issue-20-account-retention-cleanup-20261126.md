@@ -32,9 +32,11 @@
    - Purges compose buffers and local photo files upon confirmed publication.
 5. **Backup Exclusions (`backup_rules.xml`, `data_extraction_rules.xml`):**
    - Configured XML rules to exclude all app-private protected directories (`retained-content`, `capsule-operations`, `original-photos`, `frozen-photos`, `photo-drafts`, `notification-attempts.json`, `no_backup`).
-6. **Eighth Review Integration Regression Fix:**
-   - **Task 1**: Added `testRealProductionSignOutWithUnresolvedPublicationSucceedsAndPermitsSubsequentSignIn()` in `AccountSessionManagerTest.kt` reproducing the opaque compaction failure.
-   - **Task 2**: Updated `FrozenOperationJournal.save()` to permit opaque compaction writes (`isOpaque == true`) during account cleanup while strictly rejecting non-opaque user writes when unauthenticated.
+6. **Ninth Review Account-Safety Corrections:**
+   - **Task 1**: Persisted cleanup obligation via `markCleanupPending()` BEFORE session invalidation in `AccountSessionManager.signOut()`.
+   - **Task 2**: Restricted opaque compaction to internal `saveOpaqueCompaction()` method in `FrozenOperationJournal.kt`. Public `save()` strictly requires active authenticated session matching `senderUid`.
+   - **Task 3**: Re-validated session in `DefaultCapsuleRepository.readContent()` after `saveRetainedContent()` suspends before returning `OperationResult.Success(content)`.
+   - **Task 4**: Updated `testRealProductionSignOutWithUnresolvedPublicationSucceedsAndPermitsSubsequentSignIn()` in `AccountSessionManagerTest.kt` to call `manager.signIn()` for Account B.
 7. **Automated Verification:**
    - 342 JVM unit tests passing (`./gradlew :app:testDebugUnitTest`).
    - Clean debug APK build (`./gradlew :app:assembleDebug`).

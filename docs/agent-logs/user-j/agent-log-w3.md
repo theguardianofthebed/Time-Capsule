@@ -558,13 +558,16 @@ Implement complete account-safe content retention, verified unlock markers, proc
 - **What I can explain:** How `AccountCleanupOrchestrator` invalidates sessions and purges protected stores before a new session starts, how `FrozenOperationJournal` scrubs payload fields into opaque recovery records across logout, and how `DefaultLocalRetentionAdapter` enforces server-timestamped markers for offline reads.
 - **Feedback and next step:** Teammate PR review by User G and manual testing on device/emulator before human merge into `main`.
 
-### Eighth Review Integration Regression Fix Applied (26 November 2026)
+### Ninth Review Account-Safety Corrections Applied (26 November 2026)
 
-- **1. Real Production Integration Regression Test (`AccountSessionManagerTest.kt`):**
-  - Added `testRealProductionSignOutWithUnresolvedPublicationSucceedsAndPermitsSubsequentSignIn()` using real production `AccountSessionManager`, `AccountCleanupOrchestrator`, `FrozenOperationJournal`, `DefaultLocalRetentionAdapter`, `OriginalPhotoStore`, `PhotoDraftJournal`, `SessionTracker`, and temporary filesystem.
-  - Initial run reproduced the production integration regression: `signOut()` failed because `journal.save()` rejected unauthenticated sessions during opaque compaction. Passing after fix.
-- **2. Fix Opaque Compaction Path in `FrozenOperationJournal.kt`:**
-  - Updated `FrozenOperationJournal.save()` to permit opaque compaction writes (`record.operation.isOpaque == true`) during account cleanup, while continuing to strictly reject ordinary non-opaque user writes when unauthenticated or stale.
-- **3. Transition Boundary & Durable Cleanup:**
-  - Re-enforced exact order in `AccountSessionManager.kt`: capture former identity -> persist pending marker -> invalidate session (`sessionTracker.clearSession()`) -> execute cleanup & Auth sign-out -> clear pending marker.
+- **1. Durable Account Transition Ordering (`AccountSessionManager.kt`, `AccountCleanupOrchestrator.kt`):**
+  - Updated `AccountSessionManager.signOut()` to call `accountCleanupOrchestrator.markCleanupPending(targetUid)` *before* calling `sessionTracker.clearSession()`.
+  - Enforced strict transition order: 1) Persist pending cleanup marker → 2) Invalidate session generation → 3) Execute store cleanups and Auth sign-out → 4) Remove pending marker on success.
+- **2. Internal Opaque Compaction Isolation (`FrozenOperationJournal.kt`):**
+  - Restricted opaque compaction writes to dedicated internal method `saveOpaqueCompaction()` called solely by `compactAccountDataToOpaque()`. Public `save()` strictly requires active authenticated session matching `senderUid`.
+- **3. Repository Post-Retention Revalidation (`DefaultCapsuleRepository.kt`):**
+  - Re-validated `sessionTracker.isSessionValid(targetSession)` after `saveRetainedContent()` suspends before returning `OperationResult.Success(content)`.
+- **4. Production Integration Test Update (`AccountSessionManagerTest.kt`):**
+  - Updated `testRealProductionSignOutWithUnresolvedPublicationSucceedsAndPermitsSubsequentSignIn()` to invoke `manager.signIn()` for Account B.
+  - Verified pending cleanup is cleared, Account B session activates, and User A's former protected content is inaccessible to User B.
 - **Automated Verification:** 342 JVM unit tests passed (`./gradlew :app:testDebugUnitTest`), 0 lint errors (`./gradlew :app:lintDebug`), debug APK assemble passed (`./gradlew :app:assembleDebug`), AndroidTest APK assemble passed (`./gradlew :app:assembleDebugAndroidTest`), preflight valid (`py tools/check_readiness.py --issue 20 --evidence docs/agent-tools/readiness-evidence-issue20.json`).

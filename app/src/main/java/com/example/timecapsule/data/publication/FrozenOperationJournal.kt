@@ -41,7 +41,7 @@ class FrozenOperationJournal(
      */
     fun save(record: FrozenOperationRecord) = synchronized(access) {
         val activeSession = session?.invoke()
-        if (activeSession != null && !record.operation.isOpaque) {
+        if (activeSession != null) {
             if (!activeSession.isAuthenticated || (record.operation.senderUid.isNotBlank() && activeSession.uid != record.operation.senderUid)) {
                 throw IOException("Stale or unauthenticated session: cannot write operation record.")
             }
@@ -59,7 +59,15 @@ class FrozenOperationJournal(
             operation.isOpaque) {
             "This capsule ID already belongs to different frozen content."
         }
-        val destination = target(operation.senderUid, operation.capsuleId)
+        saveOpaqueCompaction(record)
+    }
+
+    /**
+     * Internal compaction helper saving opaque recovery records during account cleanup.
+     * Restricted to cleanup compaction only.
+     */
+    private fun saveOpaqueCompaction(record: FrozenOperationRecord) {
+        val destination = target(record.operation.senderUid, record.operation.capsuleId)
         val directory = destination.parentFile ?: throw IOException("Invalid journal directory.")
         if (!directory.isDirectory && !directory.mkdirs()) {
             throw IOException("Cannot create private operation storage.")
@@ -195,7 +203,7 @@ class FrozenOperationJournal(
                     isOpaque = true
                 )
                 val opaqueRecord = record.copy(operation = opaqueOperation, hadPhoto = hadPhoto)
-                save(opaqueRecord)
+                saveOpaqueCompaction(opaqueRecord)
                 opaqueIds.add(operation.capsuleId)
             }
         }
