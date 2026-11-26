@@ -619,3 +619,18 @@ User J continued the MVP account-storage work on PR #46 from `7cc60c3`. User G i
 - Verified interrupted logout against real files, including the marker before invalidation, deletion of protected content, opaque compaction and subsequent sign-in. Paused photo and publication operations were released after same-UID reauthentication.
 - The first JVM run exposed four UI fixture failures. Connecting the transition dispatcher to the test scheduler made the intended ordering reproducible. Final pinned checks passed with 353 JVM tests, both debug APKs and lint reporting 0 errors and 144 warnings on the fresh checkout. Issue #20 readiness passed.
 - User G's review, User J's device tests and personal log confirmation are pending. [Implementation](https://github.com/theguardianofthebed/Time-Capsule/commit/7eab1b9dd245cbc2ce03fa899fabde4895e36ecb) · [Handoff](../../agent-tools/handoffs/issue-20-account-retention-cleanup-20261126.md)
+
+## 26 November 2026 · Issue #20 eleventh review
+
+User J continued PR #46 from `83cbe1f`. User G is the human reviewer. MVP scope covers FR-01, FR-12, NFR-01, ARC-06 and DD-18.
+
+- Exercised text-only, empty-text photo-only and mixed capsules through the repository with the server offline. Missing files, a substituted photo and a disk write failure have distinct tested outcomes. Legacy photo entries need an authorized online refresh.
+- Cleared compose and review fields before a self-send could commit. A lost acknowledgment keeps the same ID available for retry after reconciliation fails, throws, times out or returns no record.
+- Used one sampled Android JPEG/PNG decoder for selection, download and offline validation. Added a photo digest and an explicit offline-availability result. Verified the post-retention session check in the committed repository code.
+- Reduced opaque journal records to identity, digest and recovery evidence. Verified legacy migration and rejection of payload reconstruction.
+
+On `0c18e07adc0786cdd1055a9f2985f870414fc230`, Gradle 9.6.0, AGP 9.3.0, JDK 25 and SDK 37 passed all four pinned checks. The JVM suite ran 355 tests across 39 suites with zero failures, errors or skips. Both debug APKs built. Lint reported 0 errors and 145 warnings, including one version-catalog style warning for the test-only Robolectric dependency. Robolectric 4.18.1 ran the production Android image decoder in native graphics mode on API 35. Issue #20 readiness returned `PREFLIGHT_RECORD_VALID`.
+
+The Firestore and Storage emulator suite passed all 42 tests on `540a1586de7cae8e45d6d71bad871b62c12a1b66` with local emulator traffic excluded from the proxy. That checkout differed only in the Gradle declaration of the same test dependency. The Android instrumentation APK was built, but no device was attached and no device test result is claimed. User G's review and the previously scheduled device scenarios T-02, T-29 and T-44 remain pending.
+
+[Implementation](https://github.com/theguardianofthebed/Time-Capsule/commit/0c18e07adc0786cdd1055a9f2985f870414fc230) · [Handoff](../../agent-tools/handoffs/issue-20-account-retention-cleanup-20261126.md)

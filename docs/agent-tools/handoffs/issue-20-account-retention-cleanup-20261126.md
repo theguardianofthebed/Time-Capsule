@@ -16,6 +16,22 @@
 - **Overlap inspection:** 26 November 2026, no overlapping active claims on account retention or cleanup components
 - **Readiness:** Eight gates passed, `docs/agent-tools/readiness-evidence-issue20.json`, `PREFLIGHT_RECORD_VALID`
 
+## Eleventh review · 26 November 2026
+
+User J continued from `83cbe1f`. [Implementation and regression tests](https://github.com/theguardianofthebed/Time-Capsule/commit/0c18e07adc0786cdd1055a9f2985f870414fc230)
+
+| Correction | Behavior to review |
+|---|---|
+| Offline content | Empty or whitespace-only text counts as absent. Nonblank text keeps its original spacing. Replacing a cache entry removes its old marker first. A complete entry gets a new marker after the byte writes succeed. |
+| Image validation | Selected, downloaded and retained photos use the same bounded Android decoder. Offline access requires a matching format and SHA-256 digest. An older photo marker without a digest requires one authorized online read to refresh it. Legacy text-only entries remain readable. |
+| Online viewing | `readContent` reports `availableOffline` after the retention result and generation check. A disk failure can leave the authorized online content viewable. A changed session denies the result. |
+| Uncertain self-send | The ViewModel clears the review title, message and photo references before the send suspends. S-06 hides the summary. Failed, thrown, timed-out and empty recovery results preserve the same ID for retry. A preflight rejection can restore the unsubmitted draft after recovery finds no record for its ID. Replacement still requires authoritative abandonment. |
+| Opaque journal | Version 2 stores the sender and capsule IDs, digest, phase, photo-presence and acknowledgment flags, and unresolved-write and terminal-rejection evidence. Authorized recovery removes legacy lock mode, zone and replacement fields. Legacy records missing the photo-presence flag require photo proof. Opaque records support reconciliation and cannot produce a payload or editable copy. |
+
+On `0c18e07adc0786cdd1055a9f2985f870414fc230`, Gradle 9.6.0, AGP 9.3.0, JDK 25 and SDK 37 passed all four pinned checks. The JVM suite ran 355 tests across 39 suites with zero failures, errors or skips. Both debug APKs built. Lint reported 0 errors and 145 warnings, including one version-catalog style warning for the test-only Robolectric dependency. Robolectric 4.18.1 ran the production Android image decoder in native graphics mode on API 35. Issue #20 readiness returned `PREFLIGHT_RECORD_VALID`.
+
+The Firestore and Storage emulator suite passed all 42 tests on `540a1586de7cae8e45d6d71bad871b62c12a1b66` with local emulator traffic excluded from the proxy. That checkout differed only in the Gradle declaration of the same test dependency. The Android instrumentation APK was built, but no device was attached and no device test result is claimed. User G's review and the previously scheduled device scenarios T-02, T-29 and T-44 remain pending.
+
 ## Tenth review · 26 November 2026
 
 User J continued from `7cc60c3`. User G's human review is pending. The implementation and regression tests are in [7eab1b9](https://github.com/theguardianofthebed/Time-Capsule/commit/7eab1b9dd245cbc2ce03fa899fabde4895e36ecb).
