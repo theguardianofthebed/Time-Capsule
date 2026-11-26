@@ -25,7 +25,8 @@ data class FrozenCapsuleOperation(
     val lock: CapsuleLock,
     val creationZone: String,
     val photo: RetainedOriginalPhoto?,
-    val snapshotDigest: String
+    val snapshotDigest: String,
+    val isOpaque: Boolean = false
 ) {
     /** Returns the one approved remote path, without exposing a public download URL. */
     val photoObjectPath: String?
@@ -35,6 +36,10 @@ data class FrozenCapsuleOperation(
     fun verify() {
         require(capsuleId.matches(Regex("[A-Za-z0-9_-]+"))) { "Invalid capsule ID." }
         require(senderUid.isNotBlank() && !senderUid.contains('/')) { "Invalid sender UID." }
+        if (isOpaque) {
+            require(snapshotDigest.isNotBlank()) { "Snapshot digest is required for opaque recovery." }
+            return
+        }
         require(recipientUid.isNotBlank()) { "Recipient is required." }
         require(text.isNotBlank() || photo != null) { "Message or photo is required." }
         ZoneId.of(creationZone)
@@ -62,6 +67,7 @@ data class FrozenCapsuleOperation(
      * Null and empty strings are distinct; delimiters/newlines inside user text cannot collide.
      */
     fun canonicalPayload(): String = buildString {
+        require(!isOpaque) { "Opaque evidence has no publication payload." }
         append("timecapsule-operation-v1\n")
         val location = lock.location
         val values = listOf(
@@ -91,6 +97,11 @@ data class FrozenCapsuleOperation(
         .joinToString("") { "%02x".format(it) }
 
     companion object {
+        /** Only identity and digest survive compaction. Empty fields cannot form a valid draft. */
+        fun opaque(uid: String, capsuleId: String, digest: String) = FrozenCapsuleOperation(
+            capsuleId, uid, "", null, "", CapsuleLock(LockMode.TIME), "", null, digest, isOpaque = true
+        )
+
         /**
          * Validates and freezes one confirmed draft; repeated submission must retain its ID.
          * [now] is input validation only, not authoritative server time or unlock authorization.
@@ -132,7 +143,8 @@ data class FrozenOperationRecord(
     val hasUnresolvedWrite: Boolean = false,
     val terminalRejectionConfirmed: Boolean = false,
     val replacementDraftId: String? = null,
-    val replacementPrepared: Boolean = false
+    val replacementPrepared: Boolean = false,
+    val hadPhoto: Boolean = false
 )
 
 /** Authenticated recovery state; completed operations never expose their raw compose snapshot. */

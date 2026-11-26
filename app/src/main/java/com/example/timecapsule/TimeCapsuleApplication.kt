@@ -3,14 +3,15 @@ package com.example.timecapsule
 import android.app.Application
 import android.content.Context
 import com.example.timecapsule.config.FirebaseConfig
-import com.example.timecapsule.data.AccountSessionManager
 import com.example.timecapsule.data.DefaultCapsuleRepository
 import com.example.timecapsule.data.adapter.DefaultAuthAdapter
 import com.example.timecapsule.data.adapter.DefaultFirestoreAdapter
+import com.example.timecapsule.data.adapter.DefaultLocalRetentionAdapter
 import com.example.timecapsule.data.adapter.DefaultLocationAdapter
 import com.example.timecapsule.data.adapter.DefaultStorageAdapter
 import com.example.timecapsule.data.adapter.FirestoreCapsulePublication
 import com.example.timecapsule.data.adapter.LocalRetentionAdapter
+import com.example.timecapsule.data.cleanup.AccountCleanupOrchestrator
 import com.example.timecapsule.data.di.AppDependencyContainer
 import com.example.timecapsule.data.media.AndroidOriginalImageProbe
 import com.example.timecapsule.data.media.OriginalPhotoStore
@@ -94,7 +95,12 @@ class TimeCapsuleApplication : Application() {
     private fun createContainer(context: Context): AppDependencyContainer {
         val sessionTracker = DefaultSessionTracker()
         val authAdapter = DefaultAuthAdapter()
-        val firestoreAdapter = DefaultFirestoreAdapter { context }
+        val storageAdapter = DefaultStorageAdapter(
+            FirebaseStorage.getInstance(),
+            FirebaseFirestore.getInstance(),
+            FirebaseAuth.getInstance()
+        )
+        val firestoreAdapter = DefaultFirestoreAdapter({ context }, storageAdapter)
 
         val noBackupDir = context.noBackupFilesDir ?: File(context.filesDir, "no_backup")
 
@@ -106,49 +112,61 @@ class TimeCapsuleApplication : Application() {
             sessionTracker = sessionTracker
         )
 
-        val accountSessionManager = AccountSessionManager(
-            authAdapter = authAdapter,
-            firestoreAdapter = firestoreAdapter,
-            sessionTracker = sessionTracker,
-            onAccountCleared = { uid ->
-                unlockNotificationCoordinator.invalidateAccount(uid)
-            }
+        val retentionAdapter = DefaultLocalRetentionAdapter(
+            root = File(noBackupDir, "retained-content"),
+            session = sessionTracker::currentSession
+        )
+        val operationJournal = FrozenOperationJournal(
+            root = File(noBackupDir, "capsule-operations")
+        )
+        val originalPhotoStore = OriginalPhotoStore(
+            root = File(noBackupDir, "original-photos"),
+            probe = AndroidOriginalImageProbe()
+        )
+        val photoDraftJournal = PhotoDraftJournal(
+            root = File(noBackupDir, "photo-drafts")
         )
 
-        val storageAdapter = DefaultStorageAdapter(
-            FirebaseStorage.getInstance(),
-            FirebaseFirestore.getInstance(),
-            FirebaseAuth.getInstance()
+        val accountCleanupOrchestrator = AccountCleanupOrchestrator(
+            retentionAdapter = retentionAdapter,
+            journal = operationJournal,
+            originalPhotoStore = originalPhotoStore,
+            photoDraftJournal = photoDraftJournal,
+            unlockNotificationCoordinator = unlockNotificationCoordinator,
+            noBackupDir = noBackupDir,
+            frozenPhotosDir = File(noBackupDir, "frozen-photos")
         )
+
+        val accountSessionManager = accountCleanupOrchestrator.sessionManager(authAdapter, firestoreAdapter, sessionTracker)
+
         val photoUploads = OriginalPhotoUploads(
-            OriginalPhotoStore(File(noBackupDir, "original-photos"), AndroidOriginalImageProbe()),
+            originalPhotoStore,
             File(noBackupDir, "frozen-photos"),
             storageAdapter,
             sessionTracker::currentSession
         )
         val locationAdapter = DefaultLocationAdapter(context)
-        val retentionAdapter = object : LocalRetentionAdapter {
-            override suspend fun clearAccountData(uid: String) {}
-        }
 
         val publication = firestoreAdapter.firestoreInstance()?.let { firestore ->
             CapsulePublicationCoordinator(
-                journal = FrozenOperationJournal(File(noBackupDir, "capsule-operations")),
+                journal = operationJournal,
                 backend = FirestoreCapsulePublication(firestore, FirebaseAuth.getInstance()),
                 media = OriginalPublicationMedia(photoUploads),
                 session = sessionTracker::currentSession,
                 drafts = PrivatePublicationDrafts(
-                    OriginalPhotoStore(File(noBackupDir, "original-photos"), AndroidOriginalImageProbe()),
-                    PhotoDraftJournal(File(noBackupDir, "photo-drafts"))
+                    originalPhotoStore,
+                    photoDraftJournal
                 )
             )
         }
+
         val repository = DefaultCapsuleRepository(
             sessionTracker = sessionTracker,
             authAdapter = authAdapter,
             firestoreAdapter = firestoreAdapter,
             publicationCoordinator = publication,
-            locationAdapter = locationAdapter
+            locationAdapter = locationAdapter,
+            retentionAdapter = retentionAdapter
         )
 
         val recoveryCoordinator = ForegroundRecoveryCoordinator(

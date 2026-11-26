@@ -2,6 +2,7 @@ package com.example.timecapsule.data.publication
 
 import com.example.timecapsule.domain.model.FrozenCapsuleOperation
 import com.example.timecapsule.domain.model.LockMode
+import java.time.Instant
 
 /** Explicit server-assigned values; client time must never substitute for creation acknowledgment. */
 enum class PublicationServerValue { TIMESTAMP }
@@ -14,6 +15,7 @@ data class CapsulePublicationPayload(
     companion object {
         /** Converts a validated snapshot into the shared #11 schema without changing its identity. */
         fun from(operation: FrozenCapsuleOperation): CapsulePublicationPayload {
+            require(!operation.isOpaque) { "Cannot create publication payload from an opaque recovery record." }
             operation.verify()
             val metadata = linkedMapOf<String, Any?>(
                 "capsuleId" to operation.capsuleId,
@@ -73,6 +75,7 @@ object PublicationRecordMatcher {
         metadata: Map<String, Any?>,
         content: Map<String, Any?>?
     ): Boolean {
+        if (operation.isOpaque) return matchesOpaque(operation, metadata)
         if (!matchesMetadata(operation, metadata)) return false
         if (content == null) return operation.senderUid == operation.recipientUid
         return equalFields(CapsulePublicationPayload.from(operation).content, content)
@@ -80,11 +83,21 @@ object PublicationRecordMatcher {
 
     /** Detects visible metadata conflicts before attempting a potentially protected content read. */
     fun matchesMetadata(operation: FrozenCapsuleOperation, metadata: Map<String, Any?>): Boolean {
+        if (operation.isOpaque) return matchesOpaque(operation, metadata)
         val expected = CapsulePublicationPayload.from(operation)
         val mutable = setOf("createdAt", "unlocked", "unlockedAt")
         if (metadata["createdAt"] !is java.time.Instant || metadata["unlocked"] !is Boolean) return false
         return equalFields(expected.metadata.filterKeys { it !in mutable },
             metadata.filterKeys { it !in mutable })
+    }
+
+    /** Verifies server metadata against minimal opaque recovery evidence without checking scrubbed fields. */
+    fun matchesOpaque(operation: FrozenCapsuleOperation, metadata: Map<String, Any?>): Boolean {
+        if (!operation.isOpaque) return false
+        if (metadata["createdAt"] !is Instant || metadata["unlocked"] !is Boolean) return false
+        return metadata["capsuleId"] == operation.capsuleId &&
+            metadata["senderId"] == operation.senderUid &&
+            metadata["snapshotDigest"] == operation.snapshotDigest
     }
 
     /** Normalizes Firestore numeric representations, keeping exact field sets and other types. */

@@ -1,5 +1,6 @@
 package com.example.timecapsule.data.media
 
+import com.example.timecapsule.data.session.fixtureSession
 import com.example.timecapsule.domain.model.OriginalPhotoFormat
 import com.example.timecapsule.domain.model.OriginalPhotoLimits
 import java.io.ByteArrayInputStream
@@ -26,7 +27,7 @@ class OriginalPhotoStoreTest {
         val bytes = ByteArray(OriginalPhotoLimits.MAX_BYTES.toInt()) { (it % 251).toByte() }
         val root = temporary.newFolder()
         val store = OriginalPhotoStore(root) { OriginalPhotoFormat.PNG }
-        val result = store.retain("owner", "capsule", "image/png", bytes.inputStream())
+        val result = store.retain(fixtureSession("owner"), "owner", "capsule", "image/png", bytes.inputStream())
         assertEquals(bytes.size.toLong(), result.sizeBytes)
         assertArrayEquals(bytes, root.walkTopDown().first { it.isFile }.readBytes())
         val hash = MessageDigest.getInstance("SHA-256").digest(bytes)
@@ -64,7 +65,7 @@ class OriginalPhotoStoreTest {
         }
         try {
             OriginalPhotoStore(root) { OriginalPhotoFormat.PNG }
-                .retain("owner", "capsule", "image/png", input)
+                .retain(fixtureSession("owner"), "owner", "capsule", "image/png", input)
             fail("Expected permission failure")
         } catch (_: SecurityException) {
             assertTrue(closed)
@@ -76,13 +77,13 @@ class OriginalPhotoStoreTest {
     @Test fun failedReplacementPreservesPreviousOriginal() = runBlocking {
         val root = temporary.newFolder()
         val store = OriginalPhotoStore(root) { OriginalPhotoFormat.PNG }
-        val old = store.retain("owner", "capsule", "image/png", byteArrayOf(1).inputStream())
+        val old = store.retain(fixtureSession("owner"), "owner", "capsule", "image/png", byteArrayOf(1).inputStream())
         val failing = object : InputStream() {
             /** Simulates a provider I/O failure. */
             override fun read(): Int = throw IOException("offline provider")
         }
         try {
-            store.retain("owner", "capsule", "image/png", failing)
+            store.retain(fixtureSession("owner"), "owner", "capsule", "image/png", failing)
             fail("Expected read failure")
         } catch (_: IOException) {
             assertEquals(listOf(old.privateFileName), root.walkTopDown().filter { it.isFile }
@@ -99,7 +100,7 @@ class OriginalPhotoStoreTest {
         }
         try {
             OriginalPhotoStore(root) { OriginalPhotoFormat.PNG }
-                .retain("owner", "capsule", "image/png", input)
+                .retain(fixtureSession("owner"), "owner", "capsule", "image/png", input)
             fail("Expected cancellation")
         } catch (_: CancellationException) {
             assertFalse(root.walkTopDown().any { it.isFile })
@@ -113,7 +114,7 @@ class OriginalPhotoStoreTest {
     ) {
         val root = temporary.newFolder()
         try {
-            OriginalPhotoStore(root) { decoded }.retain("owner", "capsule", "image/png", input)
+            OriginalPhotoStore(root) { decoded }.retain(fixtureSession("owner"), "owner", "capsule", "image/png", input)
             fail("Expected invalid photo")
         } catch (_: InvalidOriginalPhotoException) {
             assertFalse(root.walkTopDown().any { it.isFile })

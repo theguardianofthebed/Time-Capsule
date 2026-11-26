@@ -20,6 +20,9 @@ class S08AccountSettingsViewModel(
     private val _updateState = MutableLiveData<OperationResult<Unit>?>()
     val updateState: LiveData<OperationResult<Unit>?> = _updateState
 
+    private val _signOutState = MutableLiveData<OperationResult<Unit>?>()
+    val signOutState: LiveData<OperationResult<Unit>?> = _signOutState
+
     private val _profileCheckState = MutableLiveData<OperationResult<RecipientProfile>?>()
     val profileCheckState: LiveData<OperationResult<RecipientProfile>?> = _profileCheckState
 
@@ -61,10 +64,13 @@ class S08AccountSettingsViewModel(
     }
 
     /**
-     * Signs out current user and terminates session.
+     * Signs out current user asynchronously in viewModelScope and terminates session.
      */
     fun signOut() {
-        accountSessionManager.signOut()
+        viewModelScope.launch {
+            val result = accountSessionManager.signOut()
+            _signOutState.postValue(result)
+        }
     }
 
     /** Clears active update state notification. */

@@ -3,6 +3,7 @@ package com.example.timecapsule.data
 import android.os.SystemClock
 import com.example.timecapsule.data.adapter.AuthAdapter
 import com.example.timecapsule.data.adapter.FirestoreAdapter
+import com.example.timecapsule.data.adapter.LocalRetentionAdapter
 import com.example.timecapsule.data.adapter.LocationAdapter
 import com.example.timecapsule.data.publication.CapsulePublicationCoordinator
 import com.example.timecapsule.data.session.SessionTracker
@@ -22,6 +23,7 @@ import com.example.timecapsule.domain.model.UnlockConfirmationKind
 import com.example.timecapsule.domain.model.UnlockVerificationOutcome
 import com.example.timecapsule.domain.result.OperationResult
 import com.example.timecapsule.domain.session.SessionSnapshot
+import java.time.Instant
 
 /**
  * Default implementation of [CapsuleRepository] interacting with platform adapters and session tracker.
@@ -33,6 +35,7 @@ class DefaultCapsuleRepository(
     private val firestoreAdapter: FirestoreAdapter,
     private val publicationCoordinator: CapsulePublicationCoordinator? = null,
     private val locationAdapter: LocationAdapter? = null,
+    private val retentionAdapter: LocalRetentionAdapter? = null,
     private val clockNanosSupplier: () -> Long = { SystemClock.elapsedRealtimeNanos() }
 ) : CapsuleRepository {
 
@@ -269,6 +272,101 @@ class DefaultCapsuleRepository(
     }
 
     override suspend fun readContent(capsuleId: String): OperationResult<ProtectedCapsuleContent> {
-        return OperationResult.Invalid("Protected content read requires Issue #21 implementation.")
+        return readContent(capsuleId, sessionTracker.currentSession())
+    }
+
+    override suspend fun readContent(
+        capsuleId: String,
+        targetSession: SessionSnapshot
+    ): OperationResult<ProtectedCapsuleContent> {
+        val cleanId = capsuleId.trim()
+        if (cleanId.isBlank()) {
+            return OperationResult.Invalid("Capsule ID must not be blank for content read.")
+        }
+        if (!sessionTracker.isSessionValid(targetSession) || !targetSession.isAuthenticated || targetSession.uid.isNullOrBlank()) {
+            return OperationResult.Denied("Authentication required to read protected content.")
+        }
+        val activeUid = targetSession.uid!!
+
+        // 1. Check local retention first if adapter is present
+        val retention = retentionAdapter
+        if (retention != null) {
+            val offlineRes = retention.readRetainedContent(targetSession, cleanId)
+            if (!sessionTracker.isSessionValid(targetSession)) {
+                return OperationResult.Denied("Account session changed during content read.")
+            }
+            if (offlineRes is OperationResult.Success) {
+                val retained = offlineRes.data
+                val photoPath = if (retained.photoBytes != null) "retainedMedia/${retained.uid}/$cleanId" else null
+                return OperationResult.Success(
+                    ProtectedCapsuleContent(
+                        capsuleId = cleanId,
+                        text = retained.text,
+                        photoObjectPath = photoPath,
+                        photoBytes = retained.photoBytes,
+                        photoFormat = retained.photoFormat,
+                        availableOffline = true
+                    )
+                )
+            }
+        }
+
+        // 2. Authoritative server check for unlock requirements & unlock timestamp
+        val reqResult = firestoreAdapter.readRecipientUnlockRequirements(cleanId, activeUid)
+        if (!sessionTracker.isSessionValid(targetSession)) {
+            return OperationResult.Denied("Account session changed during content read.")
+        }
+        if (reqResult !is OperationResult.Success) {
+            return OperationResult.Denied("Unlock requirements unreadable.")
+        }
+
+        val requirements = reqResult.data
+        var serverUnlockedAt = requirements.unlockedAt
+
+        if (!requirements.unlocked) {
+            val unlockRes = verifyUnlockOutcome(cleanId, targetSession)
+            if (!sessionTracker.isSessionValid(targetSession)) {
+                return OperationResult.Denied("Account session changed during content read.")
+            }
+            if (unlockRes !is OperationResult.Success || unlockRes.data.availability != Availability.AVAILABLE) {
+                return OperationResult.Denied("Unlock authorization required before reading content.")
+            }
+            val rechecked = firestoreAdapter.readRecipientUnlockRequirements(cleanId, activeUid)
+            if (rechecked is OperationResult.Success) {
+                serverUnlockedAt = rechecked.data.unlockedAt
+            }
+        }
+
+        val verifiedTime = serverUnlockedAt
+            ?: return OperationResult.Denied("Server unlock timestamp is missing.")
+
+        val contentRes = firestoreAdapter.readProtectedContent(cleanId, activeUid)
+        if (!sessionTracker.isSessionValid(targetSession)) {
+            return OperationResult.Denied("Account session changed during content read.")
+        }
+
+        if (contentRes is OperationResult.Success) {
+            val content = contentRes.data
+            if (!content.photoObjectPath.isNullOrBlank() && content.photoBytes == null) {
+                return OperationResult.Unavailable("Photo download failed for photo capsule.")
+            }
+            if (content.text.isNullOrBlank() && content.photoBytes == null) {
+                return OperationResult.Unavailable("Capsule has no readable content.")
+            }
+            val saveResult = try {
+                retention?.saveRetainedContent(targetSession, cleanId, verifiedTime, content.text,
+                    content.photoBytes, content.photoFormat)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (error: java.io.IOException) {
+                OperationResult.Unavailable("Offline storage is unavailable.")
+            }
+            if (!sessionTracker.isSessionValid(targetSession)) {
+                return OperationResult.Denied("Account session changed during content retention.")
+            }
+            return OperationResult.Success(content.copy(availableOffline = saveResult is OperationResult.Success))
+        }
+
+        return if (contentRes is OperationResult.Unavailable) contentRes else OperationResult.Denied("Unlock authorization required before reading content.")
     }
 }

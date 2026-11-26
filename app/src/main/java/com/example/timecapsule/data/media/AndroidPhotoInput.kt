@@ -1,5 +1,6 @@
 package com.example.timecapsule.data.media
 
+import com.example.timecapsule.data.session.StorageSession
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -21,8 +22,8 @@ class AndroidPhotoInput(context: Context) : PhotoDraftStorage {
     private val journalMutex = Mutex()
 
     /** Serializes atomic draft writes so older state cannot overwrite a newer save. */
-    override suspend fun save(uid: String, draft: PhotoDraftRecord) = withContext(Dispatchers.IO) {
-        journalMutex.withLock { journal.save(uid, draft) }
+    override suspend fun save(session: StorageSession, uid: String, draft: PhotoDraftRecord) = withContext(Dispatchers.IO) {
+        journalMutex.withLock { journal.save(session, uid, draft) }
     }
 
     /** Restores an account draft and verifies its private original without reopening a provider URI. */
@@ -33,13 +34,13 @@ class AndroidPhotoInput(context: Context) : PhotoDraftStorage {
     }
 
     /** Copies and validates provider bytes on I/O; never trusts URI names or reported sizes. */
-    override suspend fun retain(uid: String, capsuleId: String, uri: String): RetainedOriginalPhoto =
+    override suspend fun retain(session: StorageSession, uid: String, capsuleId: String, uri: String): RetainedOriginalPhoto =
         withContext(Dispatchers.IO) {
             val resolver = context.contentResolver
             val source = Uri.parse(uri)
             val mime = resolver.getType(source)
             val input = resolver.openInputStream(source) ?: throw FileNotFoundException()
-            store.retain(uid, capsuleId, mime, input)
+            store.retain(session, uid, capsuleId, mime, input)
         }
 
     /** Resolves only a safe, identity-scoped original name under this store. */

@@ -1,5 +1,6 @@
 package com.example.timecapsule.data.media
 
+import com.example.timecapsule.data.session.fixtureSession
 import android.graphics.Bitmap
 import androidx.test.core.app.ApplicationProvider
 import android.content.Context
@@ -37,7 +38,7 @@ class OriginalPhotoDeviceTest {
                 Bitmap.CompressFormat.JPEG to OriginalPhotoFormat.JPEG)) {
                 val bytes = image(compression)
                 val store = OriginalPhotoStore(root, AndroidOriginalImageProbe())
-                val photo = store.retain("fixture-user", "capsule", format.mimeType, bytes.inputStream())
+                val photo = store.retain(fixtureSession("fixture-user"), "fixture-user", "capsule", format.mimeType, bytes.inputStream())
                 val recovered = OriginalPhotoStore(root, AndroidOriginalImageProbe()).verify(photo)
                 assertArrayEquals(bytes, recovered.readBytes())
                 assertEquals(format, photo.format)
@@ -50,7 +51,7 @@ class OriginalPhotoDeviceTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val root = File(context.noBackupFilesDir, "photo-device-test-${java.util.UUID.randomUUID()}")
         try {
-            OriginalPhotoStore(root, AndroidOriginalImageProbe()).retain("fixture-user", "capsule",
+            OriginalPhotoStore(root, AndroidOriginalImageProbe()).retain(fixtureSession("fixture-user"), "fixture-user", "capsule",
                 "image/jpeg", image(Bitmap.CompressFormat.PNG).inputStream())
             fail("Mismatched image should be rejected")
         } catch (_: InvalidOriginalPhotoException) {
@@ -63,7 +64,7 @@ class OriginalPhotoDeviceTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val root = File(context.noBackupFilesDir, "photo-device-test-${java.util.UUID.randomUUID()}")
         try {
-            OriginalPhotoStore(root, AndroidOriginalImageProbe()).retain("fixture-user", "capsule",
+            OriginalPhotoStore(root, AndroidOriginalImageProbe()).retain(fixtureSession("fixture-user"), "fixture-user", "capsule",
                 "image/png", byteArrayOf(1, 2, 3).inputStream())
             fail("Corrupt image should be rejected")
         } catch (_: InvalidOriginalPhotoException) {

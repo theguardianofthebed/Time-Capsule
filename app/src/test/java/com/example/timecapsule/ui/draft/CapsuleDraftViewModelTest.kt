@@ -1,5 +1,6 @@
 package com.example.timecapsule.ui.draft
 
+import com.example.timecapsule.data.session.StorageSession
 import com.example.timecapsule.R
 import com.example.timecapsule.data.AccountSessionManager
 import com.example.timecapsule.data.CapsuleRepository
@@ -23,6 +24,7 @@ import com.example.timecapsule.domain.model.RecipientProfile
 import com.example.timecapsule.domain.result.OperationResult
 import com.google.firebase.firestore.FirebaseFirestore
 import java.time.Instant
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CompletableDeferred
@@ -62,8 +64,8 @@ class CapsuleDraftViewModelTest {
         sessionTracker = DefaultSessionTracker()
         mockAuthAdapter = FakeAuthAdapter(initialUid = "sender-uid")
         mockFirestoreAdapter = FakeFirestoreAdapter()
-        accountSessionManager = AccountSessionManager(mockAuthAdapter, mockFirestoreAdapter, sessionTracker)
-        accountSessionManager.restoreSessionIfAuthenticated()
+        accountSessionManager = AccountSessionManager(mockAuthAdapter, mockFirestoreAdapter, sessionTracker, storageDispatcher = testDispatcher)
+        runTest(testDispatcher) { accountSessionManager.restoreSessionIfAuthenticated() }
 
         viewModel = CapsuleDraftViewModel(accountSessionManager)
     }
@@ -149,9 +151,9 @@ class CapsuleDraftViewModelTest {
         val delegate = FakePhotoStorage(3)
         val storage = object : PhotoDraftStorage by delegate {
             /** Waits for a simulated slow provider before returning the validated fixture. */
-            override suspend fun retain(uid: String, capsuleId: String, uri: String): RetainedOriginalPhoto {
+            override suspend fun retain(session: StorageSession, uid: String, capsuleId: String, uri: String): RetainedOriginalPhoto {
                 gate.await()
-                return delegate.retain(uid, capsuleId, uri)
+                return delegate.retain(session, uid, capsuleId, uri)
             }
         }
         viewModel.selectPhoto(storage, "content://slow")
@@ -170,9 +172,9 @@ class CapsuleDraftViewModelTest {
         val delegate = FakePhotoStorage(3)
         val storage = object : PhotoDraftStorage by delegate {
             /** Holds the old account's selection until after account switching. */
-            override suspend fun retain(uid: String, capsuleId: String, uri: String): RetainedOriginalPhoto {
+            override suspend fun retain(session: StorageSession, uid: String, capsuleId: String, uri: String): RetainedOriginalPhoto {
                 gate.await()
-                return delegate.retain(uid, capsuleId, uri)
+                return delegate.retain(session, uid, capsuleId, uri)
             }
         }
         viewModel.selectPhoto(storage, "content://slow")
@@ -409,7 +411,7 @@ class CapsuleDraftViewModelTest {
     }
 
     @Test
-    fun `sendCapsule_suspendedOperation_accountSwitchBeforeExecution_suppressesRepositoryCall`() = runTest {
+    fun `sendCapsule_suspendedOperation_accountSwitchBeforeExecution_suppressesRepositoryCall`() = runTest(testDispatcher) {
         val repoGate = CompletableDeferred<OperationResult<String>>()
         var publishCallCount = 0
 
@@ -434,7 +436,7 @@ class CapsuleDraftViewModelTest {
         // 2. Switch account session to user-2 before coroutine progresses to repository.publish
         accountSessionManager.signOut()
         mockAuthAdapter = FakeAuthAdapter(initialUid = "user-2")
-        accountSessionManager = AccountSessionManager(mockAuthAdapter, mockFirestoreAdapter, sessionTracker)
+        accountSessionManager = AccountSessionManager(mockAuthAdapter, mockFirestoreAdapter, sessionTracker, storageDispatcher = testDispatcher)
         sessionTracker.startSession("user-2")
 
         // 3. Release coroutines
@@ -520,6 +522,7 @@ class CapsuleDraftViewModelTest {
         repository.onPublish = { ack.await() }
         val model = publicationModel(repository)
         val id = model.uiState.value.capsuleId
+        val pending = recovered(model, PublicationPhase.OUTCOME_UNKNOWN)
         model.sendCapsule()
         model.sendCapsule()
         model.updateText("Changed")
@@ -530,13 +533,63 @@ class CapsuleDraftViewModelTest {
         testDispatcher.scheduler.runCurrent()
         assertEquals(1, repository.published.size)
         assertEquals(id, repository.published.single().capsuleId)
-        assertEquals("Frozen message", model.uiState.value.text)
+        assertEquals("", model.uiState.value.text)
+        assertEquals("Frozen message", repository.published.single().text)
         assertTrue(model.uiState.value.publicationBusy)
-        repository.recovered = OperationResult.Success(listOf(
-            recovered(model, PublicationPhase.OUTCOME_UNKNOWN)))
+        repository.recovered = OperationResult.Success(listOf(pending))
         ack.complete(OperationResult.OutcomeUnknown(id, "Uncertain"))
         testDispatcher.scheduler.advanceUntilIdle()
         assertFalse(model.uiState.value.editable)
+    }
+
+    @Test fun committedSelfSendWithLostAckStaysStatusOnlyAcrossFailedRecovery() {
+        val failures: List<suspend () -> OperationResult<List<RecoveredPublication>>> = listOf(
+            { OperationResult.Unavailable("Offline") },
+            { throw java.io.IOException("Recovery failed") },
+            { kotlinx.coroutines.awaitCancellation() },
+            { OperationResult.Success(emptyList()) }
+        )
+        for (failure in failures) {
+            val repository = PublicationRepository()
+            val model = publicationModel(repository)
+            model.updateTitle("Private title")
+            model.selectPhoto(FakePhotoStorage(3), "content://private-photo")
+            testDispatcher.scheduler.advanceUntilIdle()
+            val remote = mutableMapOf<String, CapsuleDraft>()
+            repository.onPublish = { draft ->
+                remote[draft.capsuleId] = draft
+                OperationResult.OutcomeUnknown(draft.capsuleId, "Acknowledgment lost")
+            }
+            repository.onRecover = failure
+            val id = model.uiState.value.capsuleId
+            model.sendCapsule()
+            testDispatcher.scheduler.advanceUntilIdle()
+            assertEquals("Frozen message", remote.getValue(id).text)
+            assertNotNull(remote.getValue(id).originalPhoto)
+            fun checkStatus() {
+                val state = model.uiState.value
+                assertTrue(state.statusOnly)
+                assertFalse(state.editable)
+                assertFalse(state.canAbandon)
+                assertFalse(state.publicationBusy)
+                assertEquals(PublicationPhase.OUTCOME_UNKNOWN, state.publicationPhase)
+                assertEquals("", state.text)
+                assertEquals("", state.title)
+                assertNull(state.originalPhoto)
+                assertNull(state.localPhotoUri)
+                assertNull(state.photoName)
+                assertNull(state.photoSizeBytes)
+            }
+            checkStatus()
+            model.recoverPublicationState(restoreEditable = true)
+            testDispatcher.scheduler.advanceUntilIdle()
+            checkStatus()
+            model.retryPublication()
+            testDispatcher.scheduler.advanceUntilIdle()
+            assertEquals(listOf(id), repository.retried)
+            assertEquals(1, repository.published.size)
+            checkStatus()
+        }
     }
 
     /** Confirmed publication removes protected compose values and only then allows a new ID. */
@@ -562,7 +615,8 @@ class CapsuleDraftViewModelTest {
     @Test fun recoveredUnknownCanRetryButCannotEditOrDiscard() {
         val repository = PublicationRepository()
         val model = publicationModel(repository)
-        val record = recovered(model, PublicationPhase.OUTCOME_UNKNOWN)
+        val self = recovered(model, PublicationPhase.OUTCOME_UNKNOWN)
+        val record = self.copy(snapshot = self.snapshot!!.copy(recipientUid = "another-recipient"))
         repository.recovered = OperationResult.Success(listOf(record))
         model.recoverPublicationState()
         testDispatcher.scheduler.advanceUntilIdle()
@@ -731,7 +785,7 @@ class CapsuleDraftViewModelTest {
         val repository = PublicationRepository()
         val model = publicationModel(repository)
         val oldTime = Instant.parse("2020-01-02T00:00:00Z")
-        val operation = FrozenCapsuleOperation.freeze(model.buildCapsuleDraft().copy(
+        val operation = FrozenCapsuleOperation.freeze(model.buildCapsuleDraft().copy(recipientUid = "another-recipient",
             lock = com.example.timecapsule.domain.model.CapsuleLock(LockMode.TIME, oldTime)),
             "sender-uid", "UTC", Instant.parse("2020-01-01T00:00:00Z"))
         repository.recovered = OperationResult.Success(listOf(RecoveredPublication(
@@ -1125,7 +1179,7 @@ private class TestablePhotoStorage(
     val savedRecords = mutableMapOf<String, PhotoDraftRecord>()
     var restoreCount = 0
 
-    override suspend fun retain(uid: String, capsuleId: String, uri: String): RetainedOriginalPhoto {
+    override suspend fun retain(session: StorageSession, uid: String, capsuleId: String, uri: String): RetainedOriginalPhoto {
         retainGate?.await()
         return RetainedOriginalPhoto(uid, capsuleId, "file-$uri.original", OriginalPhotoFormat.JPEG, 1024L, "hash-$uri")
     }
@@ -1139,7 +1193,7 @@ private class TestablePhotoStorage(
         removedPhotos.add(photo)
     }
 
-    override suspend fun save(uid: String, draft: PhotoDraftRecord) {
+    override suspend fun save(session: StorageSession, uid: String, draft: PhotoDraftRecord) {
         saveGate?.await()
         saveGatePredicate?.invoke(draft)?.await()
         if (failSavePredicate?.invoke(uid, draft) == true) {
@@ -1163,7 +1217,7 @@ private class TestablePhotoStorage(
 /** Emulates validated input without requiring Android's URI implementation. */
 private class FakePhotoStorage(private val size: Long) : PhotoDraftStorage {
     /** Rejects invalid fixtures or returns retained metadata for the requested identity. */
-    override suspend fun retain(uid: String, capsuleId: String, uri: String): RetainedOriginalPhoto {
+    override suspend fun retain(session: StorageSession, uid: String, capsuleId: String, uri: String): RetainedOriginalPhoto {
         if (size !in 1L..5_242_880L) throw InvalidOriginalPhotoException("Invalid size")
         return RetainedOriginalPhoto(uid, capsuleId, "fixture.original", OriginalPhotoFormat.JPEG,
             size, "fixture-hash")
@@ -1173,7 +1227,7 @@ private class FakePhotoStorage(private val size: Long) : PhotoDraftStorage {
     /** This fixture owns no actual files. */
     override suspend fun remove(photo: RetainedOriginalPhoto) {}
     /** Persistence has separate real-filesystem tests. */
-    override suspend fun save(uid: String, draft: PhotoDraftRecord) {}
+    override suspend fun save(session: StorageSession, uid: String, draft: PhotoDraftRecord) {}
     /** Starts without a saved draft. */
     override suspend fun restore(uid: String): PhotoDraftRecord? = null
 }

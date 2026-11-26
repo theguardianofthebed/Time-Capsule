@@ -60,6 +60,10 @@ class FirestoreCapsulePublication(
         if (!metadata.exists()) return PublicationInspection.ABSENT
         val fields = metadata.data?.mapValues { decodedValue(it.value) }
             ?: return PublicationInspection.CONFLICT
+        if (operation.isOpaque) {
+            return if (PublicationRecordMatcher.matchesOpaque(operation, fields))
+                PublicationInspection.MATCHING else PublicationInspection.CONFLICT
+        }
         if (!PublicationRecordMatcher.matchesMetadata(operation, fields)) {
             return PublicationInspection.CONFLICT
         }

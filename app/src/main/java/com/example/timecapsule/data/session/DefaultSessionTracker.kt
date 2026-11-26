@@ -19,7 +19,8 @@ class DefaultSessionTracker : SessionTracker {
 
     override fun observeSession(): Flow<SessionSnapshot> = sessionState.asStateFlow()
 
-    override fun startSession(uid: String?) {
+    /** A generation cannot change halfway through an authorized disk commit. */
+    override fun startSession(uid: String?) = synchronized(StorageSession.lock) {
         val nextGen = generationCounter.incrementAndGet()
         sessionState.value = SessionSnapshot(uid = uid, sessionGeneration = nextGen)
     }

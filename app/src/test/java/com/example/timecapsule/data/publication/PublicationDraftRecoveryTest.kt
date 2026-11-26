@@ -1,5 +1,7 @@
 package com.example.timecapsule.data.publication
 
+import com.example.timecapsule.data.session.fixtureSession
+import com.example.timecapsule.data.session.StorageSession
 import com.example.timecapsule.data.media.OriginalPhotoStore
 import com.example.timecapsule.data.media.PhotoDraftJournal
 import com.example.timecapsule.data.media.PhotoDraftRecord
@@ -64,8 +66,8 @@ class PublicationDraftRecoveryTest {
     @Test fun sentRecoveryClearsOnlyCompletedComposeBuffer() = runBlocking {
         val journal = FrozenOperationJournal(temporary.newFolder())
         val drafts = PhotoDraftJournal(temporary.newFolder())
-        drafts.save("sender", PhotoDraftRecord("old", "", "private text", null))
-        journal.save(FrozenOperationRecord(operation(), PublicationPhase.SENT))
+        drafts.save(fixtureSession("sender"), "sender", PhotoDraftRecord("old", "", "private text", null))
+        journal.save(fixtureSession("sender"), FrozenOperationRecord(operation(), PublicationPhase.SENT))
         val result = coordinator(journal, store(drafts)).recoverPublications()
             as OperationResult.Success
         assertNull(result.data.single().snapshot)
@@ -77,8 +79,8 @@ class PublicationDraftRecoveryTest {
     /** Cleaning an earlier send preserves a newer independent editable draft. */
     @Test fun sentRecoveryPreservesDifferentDraft() = runBlocking {
         val drafts = PhotoDraftJournal(temporary.newFolder())
-        drafts.save("sender", PhotoDraftRecord("newer", "", "new message", null))
-        assertFalse(store(drafts).clearConfirmed(operation()))
+        drafts.save(fixtureSession("sender"), "sender", PhotoDraftRecord("newer", "", "new message", null))
+        assertFalse(store(drafts).clearConfirmed(fixtureSession("sender"), operation()))
         assertEquals("new message", drafts.load("sender")?.text)
     }
 
@@ -86,13 +88,13 @@ class PublicationDraftRecoveryTest {
     @Test fun failedOperationGetsStableNewIdentity() = runBlocking {
         val journal = FrozenOperationJournal(temporary.newFolder())
         val drafts = PhotoDraftJournal(temporary.newFolder())
-        drafts.save("sender", PhotoDraftRecord("old", "", "private text", null))
-        journal.save(FrozenOperationRecord(operation(), PublicationPhase.FAILED))
+        drafts.save(fixtureSession("sender"), "sender", PhotoDraftRecord("old", "", "private text", null))
+        journal.save(fixtureSession("sender"), FrozenOperationRecord(operation(), PublicationPhase.FAILED))
         val service = coordinator(journal, store(drafts))
         val first = service.abandonForNewDraft("old") as OperationResult.Success
         assertEquals("replacement", first.data.capsuleId)
         assertFalse(first.data.isRecipientConfirmed)
-        drafts.save("sender", PhotoDraftRecord("replacement", "", "later edits", null))
+        drafts.save(fixtureSession("sender"), "sender", PhotoDraftRecord("replacement", "", "later edits", null))
         val second = service.abandonForNewDraft("old") as OperationResult.Success
         assertEquals("later edits", second.data.text)
         assertTrue(journal.load("sender", "old")!!.replacementPrepared)
@@ -103,7 +105,7 @@ class PublicationDraftRecoveryTest {
     /** Server absence cannot authorize abandoning an earlier uncertain write. */
     @Test fun unknownOperationCannotBeAbandoned() = runBlocking {
         val journal = FrozenOperationJournal(temporary.newFolder())
-        journal.save(FrozenOperationRecord(operation(), PublicationPhase.OUTCOME_UNKNOWN,
+        journal.save(fixtureSession("sender"), FrozenOperationRecord(operation(), PublicationPhase.OUTCOME_UNKNOWN,
             hasUnresolvedWrite = true))
         val result = coordinator(journal, store(PhotoDraftJournal(temporary.newFolder())))
             .abandonForNewDraft("old")
@@ -114,7 +116,7 @@ class PublicationDraftRecoveryTest {
     /** Even an old FAILED marker cannot override unavailable server evidence. */
     @Test fun unavailableServerBlocksAbandonment() = runBlocking {
         val journal = FrozenOperationJournal(temporary.newFolder())
-        journal.save(FrozenOperationRecord(operation(), PublicationPhase.FAILED))
+        journal.save(fixtureSession("sender"), FrozenOperationRecord(operation(), PublicationPhase.FAILED))
         val result = coordinator(journal, store(PhotoDraftJournal(temporary.newFolder())),
             PublicationInspection.UNAVAILABLE).abandonForNewDraft("old")
         assertTrue(result is OperationResult.OutcomeUnknown)
@@ -125,7 +127,7 @@ class PublicationDraftRecoveryTest {
     @Test fun interruptedReplacementResumesWithoutNewId() = runBlocking {
         val journal = FrozenOperationJournal(temporary.newFolder())
         val drafts = PhotoDraftJournal(temporary.newFolder())
-        journal.save(FrozenOperationRecord(operation(), PublicationPhase.ABANDONED,
+        journal.save(fixtureSession("sender"), FrozenOperationRecord(operation(), PublicationPhase.ABANDONED,
             replacementDraftId = "already-selected"))
         val result = coordinator(journal, store(drafts)).recoverPublications()
         assertTrue(result is OperationResult.Success)
@@ -137,9 +139,9 @@ class PublicationDraftRecoveryTest {
     @Test fun finishedReplacementDoesNotOverwriteLaterWork() = runBlocking {
         val journal = FrozenOperationJournal(temporary.newFolder())
         val drafts = PhotoDraftJournal(temporary.newFolder())
-        journal.save(FrozenOperationRecord(operation(), PublicationPhase.ABANDONED,
+        journal.save(fixtureSession("sender"), FrozenOperationRecord(operation(), PublicationPhase.ABANDONED,
             replacementDraftId = "replacement", replacementPrepared = true))
-        drafts.save("sender", PhotoDraftRecord("newer", "", "keep this", null))
+        drafts.save(fixtureSession("sender"), "sender", PhotoDraftRecord("newer", "", "keep this", null))
         assertTrue(coordinator(journal, store(drafts)).recoverPublications() is OperationResult.Success)
         assertEquals("keep this", drafts.load("sender")?.text)
     }
@@ -147,9 +149,9 @@ class PublicationDraftRecoveryTest {
     /** Replacement refuses to overwrite another draft instead of silently losing content. */
     @Test fun replacementPreservesUnrelatedDraft() = runBlocking {
         val drafts = PhotoDraftJournal(temporary.newFolder())
-        drafts.save("sender", PhotoDraftRecord("newer", "", "keep this", null))
+        drafts.save(fixtureSession("sender"), "sender", PhotoDraftRecord("newer", "", "keep this", null))
         try {
-            store(drafts).replacement(operation(), "replacement")
+            store(drafts).replacement(fixtureSession("sender"), operation(), "replacement")
             fail("An unrelated draft must remain intact.")
         } catch (expected: IOException) {
             assertEquals("keep this", drafts.load("sender")?.text)
@@ -159,7 +161,7 @@ class PublicationDraftRecoveryTest {
     /** Recovery lists only the authenticated owner's records, even within one shared journal root. */
     @Test fun recoveryDoesNotExposeAnotherAccount() = runBlocking {
         val journal = FrozenOperationJournal(temporary.newFolder())
-        journal.save(FrozenOperationRecord(operation(), PublicationPhase.FAILED))
+        journal.save(fixtureSession("sender"), FrozenOperationRecord(operation(), PublicationPhase.FAILED))
         val service = CapsulePublicationCoordinator(journal, backend(PublicationInspection.ABSENT),
             null, { SessionSnapshot("another", 1) })
         val result = service.recoverPublications() as OperationResult.Success
@@ -171,13 +173,13 @@ class PublicationDraftRecoveryTest {
     @Test fun replacementRetainsOriginalBytesWithNewCapsuleOwner() = runBlocking {
         val originals = OriginalPhotoStore(temporary.newFolder()) { OriginalPhotoFormat.JPEG }
         val bytes = byteArrayOf(1, 2, 3, 4)
-        val photo = originals.retain("sender", "old", "image/jpeg", bytes.inputStream())
+        val photo = originals.retain(fixtureSession("sender"), "sender", "old", "image/jpeg", bytes.inputStream())
         val draft = CapsuleDraft("old", "recipient", "", null, operation().lock,
             isRecipientConfirmed = true, originalPhoto = photo)
         val frozen = FrozenCapsuleOperation.freeze(draft, "sender", "UTC", now)
         val drafts = PhotoDraftJournal(temporary.newFolder())
-        drafts.save("sender", PhotoDraftRecord("old", "", "", photo))
-        val replacement = PrivatePublicationDrafts(originals, drafts).replacement(frozen, "new")
+        drafts.save(fixtureSession("sender"), "sender", PhotoDraftRecord("old", "", "", photo))
+        val replacement = PrivatePublicationDrafts(originals, drafts).replacement(fixtureSession("sender"), frozen, "new")
         val copied = replacement.originalPhoto!!
         assertEquals("new", copied.capsuleId)
         assertEquals(photo.sha256, copied.sha256)
@@ -191,7 +193,7 @@ class PublicationDraftRecoveryTest {
         val photoRootDir = temporary.newFolder()
         val originals = OriginalPhotoStore(photoRootDir) { OriginalPhotoFormat.JPEG }
         val bytes = byteArrayOf(5, 6, 7, 8)
-        val photo = originals.retain("sender", "old", "image/jpeg", bytes.inputStream())
+        val photo = originals.retain(fixtureSession("sender"), "sender", "old", "image/jpeg", bytes.inputStream())
         val draft = CapsuleDraft("old", "recipient", "test text", null, operation().lock,
             isRecipientConfirmed = true, originalPhoto = photo)
         val frozen = FrozenCapsuleOperation.freeze(draft, "sender", "UTC", now)
@@ -207,18 +209,18 @@ class PublicationDraftRecoveryTest {
         var copyExistedDuringFailure = false
         val badJournalFolder = temporary.newFile("unwritable-file")
         val badJournal = object : PhotoDraftJournal(badJournalFolder) {
-            override fun replaceIfCurrent(uid: String, expectedId: String, replacement: PhotoDraftRecord): PhotoDraftRecord {
+            override fun replaceIfCurrent(session: StorageSession, uid: String, expectedId: String, replacement: PhotoDraftRecord): PhotoDraftRecord {
                 // Verify that the replacement photo copy WAS created in replacementDir before journal write fails
                 if (replacementDir.listFiles()?.isNotEmpty() == true) {
                     copyExistedDuringFailure = true
                 }
-                return super.replaceIfCurrent(uid, expectedId, replacement)
+                return super.replaceIfCurrent(session, uid, expectedId, replacement)
             }
         }
         val store = PrivatePublicationDrafts(originals, badJournal)
 
         try {
-            store.replacement(frozen, "new")
+            store.replacement(fixtureSession("sender"), frozen, "new")
             fail("Expected replacement to fail due to unwritable journal.")
         } catch (expected: Exception) {
             // Verify replacement copy was created before failure
@@ -234,14 +236,14 @@ class PublicationDraftRecoveryTest {
     @Test fun interruptedReplacementPreservesCopiedPhotoIfJournalSavedIt() = runBlocking {
         val originals = OriginalPhotoStore(temporary.newFolder()) { OriginalPhotoFormat.JPEG }
         val bytes = byteArrayOf(9, 10, 11, 12)
-        val photo = originals.retain("sender", "old", "image/jpeg", bytes.inputStream())
+        val photo = originals.retain(fixtureSession("sender"), "sender", "old", "image/jpeg", bytes.inputStream())
         val draft = CapsuleDraft("old", "recipient", "text", null, operation().lock,
             isRecipientConfirmed = true, originalPhoto = photo)
         val frozen = FrozenCapsuleOperation.freeze(draft, "sender", "UTC", now)
         val draftRoot = temporary.newFolder()
         val journal = object : PhotoDraftJournal(draftRoot) {
-            override fun replaceIfCurrent(uid: String, expectedId: String, replacement: PhotoDraftRecord): PhotoDraftRecord {
-                super.replaceIfCurrent(uid, expectedId, replacement)
+            override fun replaceIfCurrent(session: StorageSession, uid: String, expectedId: String, replacement: PhotoDraftRecord): PhotoDraftRecord {
+                super.replaceIfCurrent(session, uid, expectedId, replacement)
                 // Inject post-commit cancellation after replacement record has been committed to disk
                 throw CancellationException("Simulated interruption after commit")
             }
@@ -249,7 +251,7 @@ class PublicationDraftRecoveryTest {
         val store = PrivatePublicationDrafts(originals, journal)
 
         try {
-            store.replacement(frozen, "new")
+            store.replacement(fixtureSession("sender"), frozen, "new")
             fail("Expected cancellation exception")
         } catch (expected: CancellationException) {
             // Verified that post-commit interruption occurred
@@ -268,16 +270,16 @@ class PublicationDraftRecoveryTest {
     @Test fun restartRecoveryResumesSameReplacementIdWithoutDuplicateCopy() = runBlocking {
         val originals = OriginalPhotoStore(temporary.newFolder()) { OriginalPhotoFormat.JPEG }
         val bytes = byteArrayOf(13, 14, 15, 16)
-        val photo = originals.retain("sender", "old", "image/jpeg", bytes.inputStream())
+        val photo = originals.retain(fixtureSession("sender"), "sender", "old", "image/jpeg", bytes.inputStream())
         val draft = CapsuleDraft("old", "recipient", "text", null, operation().lock,
             isRecipientConfirmed = true, originalPhoto = photo)
         val frozen = FrozenCapsuleOperation.freeze(draft, "sender", "UTC", now)
 
         val opJournal = FrozenOperationJournal(temporary.newFolder())
-        opJournal.save(FrozenOperationRecord(frozen, PublicationPhase.FAILED))
+        opJournal.save(fixtureSession("sender"), FrozenOperationRecord(frozen, PublicationPhase.FAILED))
 
         val draftJournal = PhotoDraftJournal(temporary.newFolder())
-        draftJournal.save("sender", PhotoDraftRecord("old", "", "text", photo))
+        draftJournal.save(fixtureSession("sender"), "sender", PhotoDraftRecord("old", "", "text", photo))
 
         val store = PrivatePublicationDrafts(originals, draftJournal)
         val coord = CapsulePublicationCoordinator(opJournal, backend(PublicationInspection.ABSENT), null,
@@ -307,14 +309,14 @@ class PublicationDraftRecoveryTest {
     @Test fun recoveryPreservesUnrelatedNewerDraft() = runBlocking {
         val originals = OriginalPhotoStore(temporary.newFolder()) { OriginalPhotoFormat.JPEG }
         val bytes = byteArrayOf(17, 18, 19, 20)
-        val photo = originals.retain("sender", "unrelated-newer", "image/jpeg", bytes.inputStream())
+        val photo = originals.retain(fixtureSession("sender"), "sender", "unrelated-newer", "image/jpeg", bytes.inputStream())
 
         val opJournal = FrozenOperationJournal(temporary.newFolder())
-        opJournal.save(FrozenOperationRecord(operation(), PublicationPhase.ABANDONED,
+        opJournal.save(fixtureSession("sender"), FrozenOperationRecord(operation(), PublicationPhase.ABANDONED,
             replacementDraftId = "new", replacementPrepared = true))
 
         val draftJournal = PhotoDraftJournal(temporary.newFolder())
-        draftJournal.save("sender", PhotoDraftRecord("unrelated-newer", "Newer Title", "keep this text", photo))
+        draftJournal.save(fixtureSession("sender"), "sender", PhotoDraftRecord("unrelated-newer", "Newer Title", "keep this text", photo))
 
         val store = PrivatePublicationDrafts(originals, draftJournal)
         val coord = CapsulePublicationCoordinator(opJournal, backend(PublicationInspection.ABSENT), null,
@@ -357,10 +359,10 @@ class PublicationDraftRecoveryTest {
         val frozen = FrozenCapsuleOperation.freeze(draft, "sender", "UTC", now)
 
         val opJournal = FrozenOperationJournal(opFolder)
-        opJournal.save(FrozenOperationRecord(frozen, PublicationPhase.FAILED))
+        opJournal.save(fixtureSession("sender"), FrozenOperationRecord(frozen, PublicationPhase.FAILED))
 
         val draftJournal = PhotoDraftJournal(draftFolder)
-        draftJournal.save("sender", PhotoDraftRecord("loc-old", "", "location message", null, locationTarget, "37.5665, 126.9780"))
+        draftJournal.save(fixtureSession("sender"), "sender", PhotoDraftRecord("loc-old", "", "location message", null, locationTarget, "37.5665, 126.9780"))
 
         val store = PrivatePublicationDrafts(originals, draftJournal)
         val coord = CapsulePublicationCoordinator(opJournal, backend(PublicationInspection.ABSENT), null,

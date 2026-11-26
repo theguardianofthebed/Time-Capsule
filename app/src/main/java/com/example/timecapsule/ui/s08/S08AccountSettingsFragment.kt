@@ -191,6 +191,29 @@ class S08AccountSettingsFragment : Fragment() {
             }
         }
 
+        // Sign out observer: awaits result and navigates to sign in only on Success
+        viewModel.signOutState.observe(viewLifecycleOwner) { result ->
+            if (result != null) {
+                binding.btnSignOut.isEnabled = true
+            }
+            when (result) {
+                is OperationResult.Success -> {
+                    binding.tvStatusMessage.text = getString(R.string.msg_signed_out)
+                    onSignOutSuccessListener?.invoke()
+                }
+                is OperationResult.Unavailable -> {
+                    binding.tvStatusMessage.text = result.message
+                    Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
+                }
+                is OperationResult.Denied -> {
+                    binding.tvStatusMessage.text = result.message
+                    Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
+                }
+                null -> {}
+                else -> {}
+            }
+        }
+
         // Navigate to S-04 Content Draft
         binding.btnCreateCapsule.setOnClickListener {
             onCreateCapsuleListener?.invoke()
@@ -198,9 +221,8 @@ class S08AccountSettingsFragment : Fragment() {
 
         // Sign out handler
         binding.btnSignOut.setOnClickListener {
+            binding.btnSignOut.isEnabled = false
             viewModel.signOut()
-            binding.tvStatusMessage.text = getString(R.string.msg_signed_out)
-            onSignOutSuccessListener?.invoke()
         }
     }
 

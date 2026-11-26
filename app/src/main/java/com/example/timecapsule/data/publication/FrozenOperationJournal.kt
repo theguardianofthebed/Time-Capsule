@@ -1,5 +1,6 @@
 package com.example.timecapsule.data.publication
 
+import com.example.timecapsule.data.session.StorageSession
 import com.example.timecapsule.domain.model.CapsuleLock
 import com.example.timecapsule.domain.model.FrozenCapsuleOperation
 import com.example.timecapsule.domain.model.FrozenOperationRecord
@@ -21,13 +22,15 @@ import java.util.Properties
  * Call on an I/O dispatcher. Every write completes and syncs before upload/publication may start.
  * A process-wide lock also serializes independent instances during Activity recreation.
  */
-class FrozenOperationJournal(private val root: File) {
+class FrozenOperationJournal(
+    private val root: File
+) {
     /** Identifies the private store when coordinating attempts across recreated instances. */
     val storageIdentity: String
         get() = root.canonicalPath
 
     companion object {
-        private val access = Any()
+        private val access = StorageSession.lock
     }
 
     /**
@@ -35,7 +38,8 @@ class FrozenOperationJournal(private val root: File) {
      * A different snapshot for an existing ID is rejected, including after FAILED or SENT.
      * Phase changes must be authorized by the publication coordinator's actual network results.
      */
-    fun save(record: FrozenOperationRecord) = synchronized(access) {
+    fun save(session: StorageSession, record: FrozenOperationRecord) = synchronized(access) {
+        session.requireOwner(record.operation.senderUid)
         val operation = record.operation
         operation.verify()
         record.replacementDraftId?.let {
@@ -44,11 +48,20 @@ class FrozenOperationJournal(private val root: File) {
         }
         require(!record.replacementPrepared || record.replacementDraftId != null)
         val previous = load(operation.senderUid, operation.capsuleId)
-        require(previous == null ||
-            previous.operation.canonicalPayload() == operation.canonicalPayload()) {
+        require(previous == null || (previous.operation.snapshotDigest == operation.snapshotDigest &&
+            (operation.isOpaque || (!previous.operation.isOpaque &&
+                previous.operation.canonicalPayload() == operation.canonicalPayload())))) {
             "This capsule ID already belongs to different frozen content."
         }
-        val destination = target(operation.senderUid, operation.capsuleId)
+        saveOpaqueCompaction(record)
+    }
+
+    /**
+     * Internal compaction helper saving opaque recovery records during account cleanup.
+     * Restricted to cleanup compaction only.
+     */
+    private fun saveOpaqueCompaction(record: FrozenOperationRecord) {
+        val destination = target(record.operation.senderUid, record.operation.capsuleId)
         val directory = destination.parentFile ?: throw IOException("Invalid journal directory.")
         if (!directory.isDirectory && !directory.mkdirs()) {
             throw IOException("Cannot create private operation storage.")
@@ -67,14 +80,39 @@ class FrozenOperationJournal(private val root: File) {
     }
 
     /** Reads and validates one identity; corrupted data is an error, never an absent operation. */
-    fun load(uid: String, capsuleId: String): FrozenOperationRecord? = synchronized(access) {
+    fun load(uid: String, capsuleId: String): FrozenOperationRecord? = read(uid, capsuleId, null)
+
+    private fun read(uid: String, capsuleId: String, migrationSession: StorageSession?): FrozenOperationRecord? = synchronized(access) {
         val source = target(uid, capsuleId)
         if (!source.exists()) return@synchronized null
         try {
             val fields = Properties().apply { source.inputStream().use { load(it) } }
-            require(fields.required("version") == "1") { "Unsupported operation format." }
+            val version = fields.required("version")
             require(fields.required("senderUid") == uid)
             require(fields.required("capsuleId") == capsuleId)
+            val isOpaque = fields.getProperty("isOpaque", "false").toBooleanStrict()
+            require(version == "1" || (isOpaque && version == "2")) { "Unsupported operation format." }
+            if (isOpaque) {
+                val operation = FrozenCapsuleOperation.opaque(uid, capsuleId, fields.required("snapshotDigest"))
+                operation.verify()
+                val hadPhotoProp = fields.getProperty("hadPhoto")
+                val hadPhoto = hadPhotoProp?.toBooleanStrictOrNull() ?: true
+                val record = FrozenOperationRecord(
+                    operation = operation,
+                    phase = PublicationPhase.valueOf(fields.required("phase")),
+                    photoAcknowledged = fields.getProperty("photoAcknowledged", "false").toBooleanStrict(),
+                    hasUnresolvedWrite = fields.getProperty("hasUnresolvedWrite", "false").toBooleanStrict(),
+                    terminalRejectionConfirmed = fields.getProperty("terminalRejectionConfirmed", "false").toBooleanStrict(),
+                    hadPhoto = hadPhoto
+                )
+                if (version == "1" && migrationSession != null) {
+                    migrationSession.requireOwner(uid)
+                    saveOpaqueCompaction(record)
+                }
+                return@synchronized record
+            }
+            val recipientUid = fields.required("recipientUid")
+            val text = fields.required("text")
             val photo = fields.getProperty("photoFile")?.let { name ->
                 RetainedOriginalPhoto(uid, capsuleId, name,
                     OriginalPhotoFormat.valueOf(fields.required("photoFormat")),
@@ -85,10 +123,11 @@ class FrozenOperationJournal(private val root: File) {
                     fields.required("radius").toDouble())
             }
             val operation = FrozenCapsuleOperation(
-                capsuleId, uid, fields.required("recipientUid"), fields.getProperty("title"),
-                fields.required("text"), CapsuleLock(LockMode.valueOf(fields.required("lockMode")),
+                capsuleId, uid, recipientUid, fields.getProperty("title"),
+                text, CapsuleLock(LockMode.valueOf(fields.required("lockMode")),
                     fields.getProperty("unlockAt")?.let(Instant::parse), location),
-                fields.required("creationZone"), photo, fields.required("snapshotDigest")
+                fields.required("creationZone"), photo, fields.required("snapshotDigest"),
+                isOpaque = false
             )
             operation.verify()
             FrozenOperationRecord(operation, PublicationPhase.valueOf(fields.required("phase")),
@@ -96,7 +135,8 @@ class FrozenOperationJournal(private val root: File) {
                 fields.getProperty("hasUnresolvedWrite", "false").toBooleanStrict(),
                 fields.getProperty("terminalRejectionConfirmed", "false").toBooleanStrict(),
                 fields.getProperty("replacementDraftId"),
-                fields.getProperty("replacementPrepared", "false").toBooleanStrict())
+                fields.getProperty("replacementPrepared", "false").toBooleanStrict(),
+                hadPhoto = photo != null)
         } catch (error: RuntimeException) {
             throw IOException("Saved capsule operation is invalid; do not start a new send.", error)
         }
@@ -104,6 +144,7 @@ class FrozenOperationJournal(private val root: File) {
 
     /** Atomically reads and updates progress without allowing a timeout to overwrite a later ACK. */
     fun update(
+        session: StorageSession,
         uid: String,
         capsuleId: String,
         change: (FrozenOperationRecord) -> FrozenOperationRecord
@@ -111,25 +152,82 @@ class FrozenOperationJournal(private val root: File) {
         val current = load(uid, capsuleId) ?: throw IOException("Saved operation is missing.")
         val updated = change(current)
         require(updated.operation.senderUid == uid && updated.operation.capsuleId == capsuleId)
-        save(updated)
+        save(session, updated)
         updated
     }
 
     /** Lists only the current UID's durable operations for foreground recovery. */
-    fun list(uid: String): List<FrozenOperationRecord> = synchronized(access) {
+    fun list(uid: String, migrationSession: StorageSession? = null): List<FrozenOperationRecord> = synchronized(access) {
         val directory = accountDirectory(uid)
         if (!directory.exists()) return@synchronized emptyList()
         val files = directory.listFiles() ?: throw IOException("Cannot read operation storage.")
         files.filter { it.isFile && it.extension == "properties" }.sortedBy { it.name }.map {
-            load(uid, it.nameWithoutExtension)
+            read(uid, it.nameWithoutExtension, migrationSession)
                 ?: throw IOException("Operation disappeared during recovery.")
+        }
+    }
+
+    /**
+     * Compacts unresolved operations for [uid] into opaque recovery records by scrubbing
+     * sensitive content payload fields (text, title, photo reference).
+     * Deletes resolved (SENT) or ABANDONED records from local disk.
+     */
+    fun compactAccountDataToOpaque(uid: String): List<String> = synchronized(access) {
+        if (uid.isBlank()) return@synchronized emptyList()
+        val directory = accountDirectory(uid)
+        if (directory.isDirectory) {
+            val partials = directory.listFiles { file -> file.extension == "partial" }
+                ?: throw IOException("Cannot inspect operation storage.")
+            partials.forEach { Files.deleteIfExists(it.toPath()) }
+        }
+        val records = list(uid)
+        val opaqueIds = mutableListOf<String>()
+        for (record in records) {
+            val operation = record.operation
+            val destination = target(uid, operation.capsuleId)
+            if (record.phase == PublicationPhase.SENT || record.phase == PublicationPhase.ABANDONED) {
+                if (destination.exists() && !destination.delete()) {
+                    throw IOException("Cannot delete resolved operation file: $destination")
+                }
+            } else {
+                val hadPhoto = record.hadPhoto || operation.photo != null
+                val opaqueOperation = FrozenCapsuleOperation.opaque(uid, operation.capsuleId, operation.snapshotDigest)
+                val opaqueRecord = record.copy(operation = opaqueOperation, hadPhoto = hadPhoto,
+                    replacementDraftId = null, replacementPrepared = false)
+                saveOpaqueCompaction(opaqueRecord)
+                opaqueIds.add(operation.capsuleId)
+            }
+        }
+        opaqueIds
+    }
+
+    /** Deletes all operation records for [uid] during full account erasure. */
+    fun clearAccountData(uid: String): Unit = synchronized(access) {
+        if (uid.isBlank()) return@synchronized
+        val dir = accountDirectory(uid)
+        if (dir.exists()) {
+            if (!dir.deleteRecursively() || dir.exists()) {
+                throw IOException("Failed to delete operation journal directory for $uid")
+            }
         }
     }
 
     /** Encodes explicit versioned fields; provider URIs and server-generated timestamps are excluded. */
     private fun encode(record: FrozenOperationRecord): Properties = Properties().apply {
         val operation = record.operation
-        setProperty("version", "1")
+        setProperty("version", if (operation.isOpaque) "2" else "1")
+        if (operation.isOpaque) {
+            setProperty("isOpaque", "true")
+            setProperty("capsuleId", operation.capsuleId)
+            setProperty("senderUid", operation.senderUid)
+            setProperty("snapshotDigest", operation.snapshotDigest)
+            setProperty("phase", record.phase.name)
+            setProperty("hadPhoto", (record.hadPhoto || operation.photo != null).toString())
+            setProperty("photoAcknowledged", record.photoAcknowledged.toString())
+            setProperty("hasUnresolvedWrite", record.hasUnresolvedWrite.toString())
+            setProperty("terminalRejectionConfirmed", record.terminalRejectionConfirmed.toString())
+            return@apply
+        }
         setProperty("capsuleId", operation.capsuleId)
         setProperty("senderUid", operation.senderUid)
         setProperty("recipientUid", operation.recipientUid)

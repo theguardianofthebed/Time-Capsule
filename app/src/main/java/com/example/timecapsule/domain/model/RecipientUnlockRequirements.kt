@@ -19,5 +19,6 @@ data class RecipientUnlockRequirements(
     val unlocked: Boolean,
     val lockMode: LockMode,
     val unlockAt: Instant? = null,
-    val locationTarget: LocationTarget? = null
+    val locationTarget: LocationTarget? = null,
+    val unlockedAt: Instant? = null
 )

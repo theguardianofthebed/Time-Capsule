@@ -1,5 +1,6 @@
 package com.example.timecapsule.data.publication
 
+import com.example.timecapsule.data.session.fixtureSession
 import com.example.timecapsule.domain.model.CapsuleDraft
 import com.example.timecapsule.domain.model.CapsuleLock
 import com.example.timecapsule.domain.model.FrozenCapsuleOperation
@@ -91,7 +92,7 @@ class FrozenOperationJournalTest {
         val operation = freeze(draft().copy(lock = CapsuleLock(LockMode.TIME_AND_LOCATION,
             now.plusSeconds(7200), LocationTarget(37.631, 127.079))))
         val record = FrozenOperationRecord(operation, PublicationPhase.OUTCOME_UNKNOWN)
-        FrozenOperationJournal(root).save(record)
+        FrozenOperationJournal(root).save(fixtureSession("sender"), record)
         assertEquals(record, FrozenOperationJournal(root).load("sender", operation.capsuleId))
     }
 
@@ -109,10 +110,10 @@ class FrozenOperationJournalTest {
     @Test fun changedContentCannotOverwriteExistingOperation() {
         val journal = FrozenOperationJournal(temporary.newFolder())
         val original = freeze()
-        journal.save(FrozenOperationRecord(original))
+        journal.save(fixtureSession("sender"), FrozenOperationRecord(original))
         val changed = freeze(draft().copy(text = "Changed"))
         assertThrows(IllegalArgumentException::class.java) {
-            journal.save(FrozenOperationRecord(changed))
+            journal.save(fixtureSession("sender"), FrozenOperationRecord(changed))
         }
         assertEquals(original, journal.load("sender", original.capsuleId)?.operation)
     }
@@ -121,8 +122,8 @@ class FrozenOperationJournalTest {
     @Test fun progressUpdateDoesNotChangeSnapshot() {
         val root = temporary.newFolder()
         val operation = freeze()
-        FrozenOperationJournal(root).save(FrozenOperationRecord(operation))
-        FrozenOperationJournal(root).save(FrozenOperationRecord(operation, PublicationPhase.PUBLISHING))
+        FrozenOperationJournal(root).save(fixtureSession("sender"), FrozenOperationRecord(operation))
+        FrozenOperationJournal(root).save(fixtureSession("sender"), FrozenOperationRecord(operation, PublicationPhase.PUBLISHING))
         assertEquals(FrozenOperationRecord(operation, PublicationPhase.PUBLISHING),
             FrozenOperationJournal(root).load("sender", operation.capsuleId))
     }
@@ -130,7 +131,7 @@ class FrozenOperationJournalTest {
     /** Another account cannot load or list this account's retained operation. */
     @Test fun journalIsAccountScoped() {
         val journal = FrozenOperationJournal(temporary.newFolder())
-        journal.save(FrozenOperationRecord(freeze()))
+        journal.save(fixtureSession("sender"), FrozenOperationRecord(freeze()))
         assertNull(journal.load("other", "capsule-one"))
         assertTrue(journal.list("other").isEmpty())
         assertEquals(1, journal.list("sender").size)
@@ -140,7 +141,7 @@ class FrozenOperationJournalTest {
     @Test fun corruptRecordCannotBecomeAbsentOperation() {
         val root = temporary.newFolder()
         val journal = FrozenOperationJournal(root)
-        journal.save(FrozenOperationRecord(freeze()))
+        journal.save(fixtureSession("sender"), FrozenOperationRecord(freeze()))
         root.walkTopDown().first { it.extension == "properties" }.writeText("version=1\n")
         assertThrows(IOException::class.java) { journal.load("sender", "capsule-one") }
     }
@@ -149,7 +150,7 @@ class FrozenOperationJournalTest {
     @Test fun staleDigestIsRejected() {
         val journal = FrozenOperationJournal(temporary.newFolder())
         assertThrows(IllegalArgumentException::class.java) {
-            journal.save(FrozenOperationRecord(freeze().copy(text = "Changed")))
+            journal.save(fixtureSession("sender"), FrozenOperationRecord(freeze().copy(text = "Changed")))
         }
     }
 
@@ -164,7 +165,7 @@ class FrozenOperationJournalTest {
         assertEquals(original.snapshotDigest, copy.snapshotDigest)
         assertEquals("capsuleMedia/sender/capsule-one/original", original.photoObjectPath)
         val root = temporary.newFolder()
-        FrozenOperationJournal(root).save(FrozenOperationRecord(original))
+        FrozenOperationJournal(root).save(fixtureSession("sender"), FrozenOperationRecord(original))
         assertEquals(original, FrozenOperationJournal(root).load("sender", "capsule-one")?.operation)
     }
 

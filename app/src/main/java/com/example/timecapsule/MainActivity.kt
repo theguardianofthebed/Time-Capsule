@@ -55,12 +55,6 @@ class MainActivity : AppCompatActivity() {
 
         container = appContainer
 
-        // Unconditionally restore session into SessionTracker on every Activity/container creation
-        val activeUid = container.accountSessionManager.restoreSessionIfAuthenticated()
-        if (!activeUid.isNullOrBlank()) {
-            container.recoveryCoordinator?.triggerForegroundRecovery()
-        }
-
         // Register Fragment attach listener to re-wire navigation callbacks on Activity recreation/rotation
         supportFragmentManager.addFragmentOnAttachListener { _, fragment ->
             attachFragmentListeners(fragment)
@@ -71,17 +65,24 @@ class MainActivity : AppCompatActivity() {
             attachFragmentListeners(fragment)
         }
 
-        if (savedInstanceState == null) {
-            if (activeUid.isNullOrBlank()) {
-                navigateToSignIn()
-            } else {
-                navigateToContentDraft()
-            }
-        } else {
+        if (savedInstanceState != null) {
             lastProcessedNotificationIntentKey = savedInstanceState.getString("KEY_PROCESSED_NOTIFICATION_INTENT")
         }
 
-        handleNotificationIntent(intent)
+        lifecycleScope.launch {
+            val activeUid = container.accountSessionManager.restoreSessionIfAuthenticated()
+            if (!activeUid.isNullOrBlank()) {
+                container.recoveryCoordinator?.triggerForegroundRecovery()
+            }
+            if (savedInstanceState == null) {
+                if (activeUid.isNullOrBlank()) {
+                    navigateToSignIn()
+                } else {
+                    navigateToContentDraft()
+                }
+            }
+            handleNotificationIntent(intent)
+        }
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -138,9 +139,11 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         if (::container.isInitialized) {
-            val activeUid = container.accountSessionManager.restoreSessionIfAuthenticated()
-            if (!activeUid.isNullOrBlank()) {
-                container.recoveryCoordinator?.triggerForegroundRecovery()
+            lifecycleScope.launch {
+                val activeUid = container.accountSessionManager.restoreSessionIfAuthenticated()
+                if (!activeUid.isNullOrBlank()) {
+                    container.recoveryCoordinator?.triggerForegroundRecovery()
+                }
             }
         }
     }
@@ -150,18 +153,22 @@ class MainActivity : AppCompatActivity() {
             is S01SignInFragment -> {
                 fragment.onGoToRegisterListener = { navigateToRegister() }
                 fragment.onSignInSuccessListener = {
-                    val uid = container.accountSessionManager.restoreSessionIfAuthenticated()
-                    if (!uid.isNullOrBlank()) {
-                        container.recoveryCoordinator?.triggerForegroundRecovery()
+                    lifecycleScope.launch {
+                        val uid = container.accountSessionManager.restoreSessionIfAuthenticated()
+                        if (!uid.isNullOrBlank()) {
+                            container.recoveryCoordinator?.triggerForegroundRecovery()
+                        }
                     }
                     navigateToContentDraft()
                 }
             }
             is S02RegisterFragment -> {
                 fragment.onRegisterSuccessListener = {
-                    val uid = container.accountSessionManager.restoreSessionIfAuthenticated()
-                    if (!uid.isNullOrBlank()) {
-                        container.recoveryCoordinator?.triggerForegroundRecovery()
+                    lifecycleScope.launch {
+                        val uid = container.accountSessionManager.restoreSessionIfAuthenticated()
+                        if (!uid.isNullOrBlank()) {
+                            container.recoveryCoordinator?.triggerForegroundRecovery()
+                        }
                     }
                     navigateToContentDraft()
                 }
@@ -191,15 +198,17 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun handleMomentsClick() {
-        val activeUid = container.accountSessionManager.restoreSessionIfAuthenticated()
-        if (activeUid.isNullOrBlank()) {
-            navigateToSignIn()
-        } else {
-            Toast.makeText(
-                this,
-                "Your capsule list isn't available yet.",
-                Toast.LENGTH_SHORT
-            ).show()
+        lifecycleScope.launch {
+            val activeUid = container.accountSessionManager.restoreSessionIfAuthenticated()
+            if (activeUid.isNullOrBlank()) {
+                navigateToSignIn()
+            } else {
+                Toast.makeText(
+                    this@MainActivity,
+                    "Your capsule list isn't available yet.",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
         }
     }
 

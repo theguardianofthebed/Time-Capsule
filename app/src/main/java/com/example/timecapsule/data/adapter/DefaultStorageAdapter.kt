@@ -3,6 +3,7 @@ package com.example.timecapsule.data.adapter
 import com.example.timecapsule.data.media.PhotoUploadBackend
 import com.example.timecapsule.domain.model.FrozenPhotoUpload
 import com.example.timecapsule.domain.model.PhotoUploadAcknowledgment
+import com.example.timecapsule.domain.result.OperationResult
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Source
@@ -24,6 +25,17 @@ class DefaultStorageAdapter(
 ) : StorageAdapter, PhotoUploadBackend {
     /** Reports an authenticated SDK environment, not server reachability or successful upload. */
     override fun isAvailable(): Boolean = auth.currentUser != null
+
+    override suspend fun downloadPhotoBytes(
+        objectPath: String,
+        maxBytes: Long
+    ): OperationResult<ByteArray> = try {
+        val bytes = storage.reference.child(objectPath).getBytes(maxBytes).await()
+        OperationResult.Success(bytes)
+    } catch (e: Exception) {
+        if (e is CancellationException) throw e
+        OperationResult.Unavailable("Photo download failed: ${e.message}")
+    }
 
     /** Requires the matching sender and compares server size/MD5 with the exact uploaded bytes. */
     override suspend fun upload(file: File, frozen: FrozenPhotoUpload): PhotoUploadAcknowledgment {

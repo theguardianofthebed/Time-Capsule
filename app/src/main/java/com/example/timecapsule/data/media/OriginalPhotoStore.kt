@@ -1,8 +1,10 @@
 package com.example.timecapsule.data.media
 
+import com.example.timecapsule.data.session.StorageSession
 import com.example.timecapsule.domain.model.OriginalPhotoFormat
 import com.example.timecapsule.domain.model.OriginalPhotoLimits
 import com.example.timecapsule.domain.model.RetainedOriginalPhoto
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
@@ -36,6 +38,7 @@ class OriginalPhotoStore(
      * Invalid images are rejected; permission, storage and cancellation failures are propagated.
      */
     suspend fun retain(
+        session: StorageSession,
         ownerUid: String,
         capsuleId: String,
         declaredMimeType: String?,
@@ -50,37 +53,44 @@ class OriginalPhotoStore(
             // Always close the provider stream, including unsupported-format and disk failures.
             val result = input.use { source ->
                 if (format == null) throw InvalidOriginalPhotoException("Choose a JPEG or PNG photo.")
-                if (!directory.isDirectory && !directory.mkdirs()) {
-                    throw IOException("Cannot create private photo storage.")
-                }
-                val file = File(directory, "${UUID.randomUUID()}.original")
-                candidate = file
+                synchronized(StorageSession.lock) { session.requireOwner(ownerUid) }
                 val digest = MessageDigest.getInstance("SHA-256")
+                val bytes = ByteArrayOutputStream()
+                val buffer = ByteArray(8192)
                 var count = 0L
-                file.outputStream().use { output ->
-                    val buffer = ByteArray(8192)
-                    while (true) {
-                        coroutineContext.ensureActive()
-                        val read = source.read(buffer)
-                        if (read == -1) break
-                        if (read == 0) continue
-                        count += read
-                        if (count > OriginalPhotoLimits.MAX_BYTES) {
-                            throw InvalidOriginalPhotoException("Photo must be at most 5 MiB.")
-                        }
-                        output.write(buffer, 0, read)
-                        digest.update(buffer, 0, read)
+                while (true) {
+                    coroutineContext.ensureActive()
+                    val read = source.read(buffer)
+                    if (read == -1) break
+                    count += read
+                    if (count > OriginalPhotoLimits.MAX_BYTES) {
+                        throw InvalidOriginalPhotoException("Photo must be at most 5 MiB.")
                     }
-                    output.fd.sync()
+                    bytes.write(buffer, 0, read)
+                    digest.update(buffer, 0, read)
                 }
-                coroutineContext.ensureActive()
                 if (!OriginalPhotoLimits.acceptsSize(count)) {
                     throw InvalidOriginalPhotoException("The selected photo is empty.")
+                }
+                coroutineContext.ensureActive()
+                val file = File(directory, "${UUID.randomUUID()}.original")
+                // Provider reads may stall. Only the bounded private-file commit holds the session lock.
+                synchronized(StorageSession.lock) {
+                    session.requireOwner(ownerUid)
+                    if (!directory.isDirectory && !directory.mkdirs()) {
+                        throw IOException("Cannot create private photo storage.")
+                    }
+                    candidate = file
+                    file.outputStream().use { output ->
+                        bytes.writeTo(output)
+                        output.fd.sync()
+                    }
                 }
                 if (probe.inspect(file) != format) {
                     throw InvalidOriginalPhotoException("Photo is unreadable or its format does not match.")
                 }
                 coroutineContext.ensureActive()
+                synchronized(StorageSession.lock) { session.requireOwner(ownerUid) }
                 RetainedOriginalPhoto(
                     ownerUid, capsuleId, file.name, format, count, hex(digest.digest())
                 )
@@ -126,6 +136,17 @@ class OriginalPhotoStore(
     /** Hashes identity components so provider/account text cannot escape private directories. */
     private fun digestName(value: String): String =
         hex(MessageDigest.getInstance("SHA-256").digest(value.toByteArray(Charsets.UTF_8)))
+
+    /** Clears all stored private photos for [ownerUid] during account cleanup. */
+    fun clearAccountData(ownerUid: String) {
+        require(ownerUid.isNotBlank())
+        val dir = File(root, digestName(ownerUid))
+        if (dir.exists()) {
+            if (!dir.deleteRecursively() || dir.exists()) {
+                throw IOException("Failed to delete original photo directory for $ownerUid")
+            }
+        }
+    }
 
     /** Encodes a digest as its stable lowercase hexadecimal fingerprint. */
     private fun hex(bytes: ByteArray): String = bytes.joinToString("") { "%02x".format(it) }

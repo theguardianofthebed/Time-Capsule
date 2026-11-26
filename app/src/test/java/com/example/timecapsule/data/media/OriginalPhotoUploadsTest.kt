@@ -1,5 +1,6 @@
 package com.example.timecapsule.data.media
 
+import com.example.timecapsule.data.session.fixtureSession
 import com.example.timecapsule.data.AccountSessionManager
 import com.example.timecapsule.data.adapter.AuthAdapter
 import com.example.timecapsule.data.adapter.FirestoreAdapter
@@ -44,7 +45,18 @@ class OriginalPhotoUploadsTest {
 
     /** Copies a small fixture; image decoding itself belongs to Android device checks. */
     private suspend fun selected(): RetainedOriginalPhoto =
-        store.retain("sender", "capsule-1", "image/png", byteArrayOf(1, 2, 3).inputStream())
+        store.retain(fixtureSession("sender"), "sender", "capsule-1", "image/png", byteArrayOf(1, 2, 3).inputStream())
+
+    /** A queued freeze cannot publish a frozen record under a later login for the same sender. */
+    @Test fun queuedFreezeRejectsSameUidReauthentication() = runBlocking {
+        val first = session
+        val photo = selected()
+        session = SessionSnapshot(null, 2)
+        store.clearAccountData("sender")
+        session = SessionSnapshot("sender", 3)
+        assertTrue(service.freeze(photo, first) is OperationResult.Denied)
+        assertFalse(journals.walk().any { it.isFile })
+    }
 
     /** Unwraps the successful freeze and fails immediately if preparation did not succeed. */
     private suspend fun freeze(): FrozenPhotoUpload =
@@ -103,7 +115,7 @@ class OriginalPhotoUploadsTest {
     /** A new photo cannot replace a frozen image for the same operation ID. */
     @Test fun frozenIdentityCannotBeReplaced() = runBlocking {
         freeze()
-        val replacement = store.retain("sender", "capsule-1", "image/png", byteArrayOf(4).inputStream())
+        val replacement = store.retain(fixtureSession("sender"), "sender", "capsule-1", "image/png", byteArrayOf(4).inputStream())
         assertTrue(service.freeze(replacement) is OperationResult.Invalid)
     }
 
@@ -210,7 +222,7 @@ class OriginalPhotoUploadsTest {
         File(invalidJournals, "capsule-fail").createNewFile()
 
         val failingService = OriginalPhotoUploads(store, invalidJournals, backend) { session }
-        val original = store.retain("sender", "capsule-fail", "image/png", byteArrayOf(10, 20).inputStream())
+        val original = store.retain(fixtureSession("sender"), "sender", "capsule-fail", "image/png", byteArrayOf(10, 20).inputStream())
 
         val freezeRes = failingService.freeze(original)
         assertTrue("Freeze must return failure when journal save fails", freezeRes is OperationResult.Unavailable)
@@ -236,7 +248,7 @@ class OriginalPhotoUploadsTest {
         val initialContent = targetFile.readText()
 
         val failingService = OriginalPhotoUploads(store, corruptedJournals, backend) { session }
-        val original = store.retain("sender", "capsule-corrupt", "image/png", byteArrayOf(5, 6).inputStream())
+        val original = store.retain(fixtureSession("sender"), "sender", "capsule-corrupt", "image/png", byteArrayOf(5, 6).inputStream())
 
         val res = failingService.freeze(original)
         assertTrue("Freeze must fail closed on malformed journal", res is OperationResult.Unavailable)

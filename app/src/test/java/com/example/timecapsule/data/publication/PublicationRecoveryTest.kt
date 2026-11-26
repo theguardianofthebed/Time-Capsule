@@ -1,5 +1,6 @@
 package com.example.timecapsule.data.publication
 
+import com.example.timecapsule.data.session.StorageSession
 import com.example.timecapsule.domain.model.CapsuleDraft
 import com.example.timecapsule.domain.model.CapsuleLock
 import com.example.timecapsule.domain.model.FrozenCapsuleOperation
@@ -56,7 +57,7 @@ class PublicationRecoveryTest {
 
     /** Persists an unresolved prior write, as would remain after process termination. */
     private fun saveUnknown(operation: FrozenCapsuleOperation = operation(), photoAck: Boolean = false) {
-        journal.save(FrozenOperationRecord(operation, PublicationPhase.OUTCOME_UNKNOWN,
+        journal.save(StorageSession(session) { session }, FrozenOperationRecord(operation, PublicationPhase.OUTCOME_UNKNOWN,
             photoAcknowledged = photoAck, hasUnresolvedWrite = true))
     }
 
@@ -214,7 +215,7 @@ class PublicationRecoveryTest {
     /** Failure evidence is recoverable after process recreation, without losing its earlier-write flag. */
     @Test fun rejectionEvidenceSurvivesReload() = runBlocking {
         val original = operation()
-        journal.save(FrozenOperationRecord(original, PublicationPhase.OUTCOME_UNKNOWN,
+        journal.save(StorageSession(session) { session }, FrozenOperationRecord(original, PublicationPhase.OUTCOME_UNKNOWN,
             terminalRejectionConfirmed = true))
         val result = service().reconcile("one") as OperationResult.Success
         assertEquals(SendStatus.FAILED, result.data)
@@ -259,7 +260,7 @@ class PublicationRecoveryTest {
     @Test fun completedSendDoesNotRefreezeExpiredLock() = runBlocking {
         val draft = draft().copy(lock = CapsuleLock(LockMode.TIME, now.plusSeconds(60)))
         val original = FrozenCapsuleOperation.freeze(draft, "sender", "Asia/Seoul", now)
-        journal.save(FrozenOperationRecord(original, PublicationPhase.SENT))
+        journal.save(StorageSession(session) { session }, FrozenOperationRecord(original, PublicationPhase.SENT))
         val later = CapsulePublicationCoordinator(journal, backend, null, { session },
             { now.plusSeconds(120) }, { "America/New_York" })
         assertTrue(later.publish(draft) is OperationResult.Success)

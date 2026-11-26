@@ -1,5 +1,6 @@
 package com.example.timecapsule.data.media
 
+import com.example.timecapsule.data.session.fixtureSession
 import com.example.timecapsule.domain.model.OriginalPhotoFormat
 import com.example.timecapsule.domain.model.RetainedOriginalPhoto
 import org.junit.Assert.assertEquals
@@ -17,14 +18,14 @@ class PhotoDraftJournalTest {
         val root = temporary.newFolder()
         val photo = RetainedOriginalPhoto("a", "capsule", "photo.original", OriginalPhotoFormat.PNG, 3, "hash")
         val record = PhotoDraftRecord("capsule", "Title", "한글\nmessage", photo)
-        PhotoDraftJournal(root).save("a", record)
+        PhotoDraftJournal(root).save(fixtureSession("a"), "a", record)
         assertEquals(record, PhotoDraftJournal(root).load("a"))
     }
 
     /** Account B cannot obtain A's draft, even when IDs contain path separators. */
     @Test fun accountJournalsAreIsolated() {
         val journal = PhotoDraftJournal(temporary.newFolder())
-        journal.save("../a", PhotoDraftRecord("capsule", "", "private", null))
+        journal.save(fixtureSession("../a"), "../a", PhotoDraftRecord("capsule", "", "private", null))
         assertNull(journal.load("b"))
         assertEquals("private", journal.load("../a")?.text)
     }
@@ -33,9 +34,18 @@ class PhotoDraftJournalTest {
     @Test fun removalIsDurable() {
         val journal = PhotoDraftJournal(temporary.newFolder())
         val photo = RetainedOriginalPhoto("a", "capsule", "photo.original", OriginalPhotoFormat.PNG, 3, "hash")
-        journal.save("a", PhotoDraftRecord("capsule", "", "", photo))
-        journal.save("a", PhotoDraftRecord("capsule", "", "message", null))
+        journal.save(fixtureSession("a"), "a", PhotoDraftRecord("capsule", "", "", photo))
+        journal.save(fixtureSession("a"), "a", PhotoDraftRecord("capsule", "", "message", null))
         assertNull(journal.load("a")?.photo)
         assertEquals("message", journal.load("a")?.text)
+    }
+
+    /** Clearing account data erases the saved draft record. */
+    @Test fun clearAccountDataErasesRecord() {
+        val journal = PhotoDraftJournal(temporary.newFolder())
+        journal.save(fixtureSession("user-1"), "user-1", PhotoDraftRecord("capsule-1", "Title", "Text", null))
+        assertEquals("Text", journal.load("user-1")?.text)
+        journal.clearAccountData("user-1")
+        assertNull(journal.load("user-1"))
     }
 }

@@ -1,5 +1,6 @@
 package com.example.timecapsule.ui.draft
 
+import com.example.timecapsule.data.session.StorageSession
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.timecapsule.R
@@ -8,6 +9,9 @@ import com.example.timecapsule.data.media.PhotoDraftStorage
 import com.example.timecapsule.data.media.PhotoDraftRecord
 import com.example.timecapsule.domain.model.RetainedOriginalPhoto
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.IOException
@@ -78,12 +82,13 @@ data class CapsuleDraftUiState(
     val publicationBusy: Boolean = false,
     val recoveryBusy: Boolean = false,
     val recoveryBlocked: Boolean = false,
+    val statusOnly: Boolean = false,
     val canAbandon: Boolean = false,
     val publicationMessage: Int? = null
 ) {
     /** Frozen, completed and unresolved submissions never become editable through Back navigation. */
     val editable: Boolean
-        get() = publicationPhase == null && !publicationBusy && !recoveryBusy && !recoveryBlocked
+        get() = !statusOnly && publicationPhase == null && !publicationBusy && !recoveryBusy && !recoveryBlocked
 }
 
 /**
@@ -120,7 +125,7 @@ class CapsuleDraftViewModel(
         val state = _uiState.value
         return token == photoToken &&
             state.activeSessionUid == uid &&
-            accountSessionManager.restoreSessionIfAuthenticated() == uid &&
+            accountSessionManager.currentSession().uid == uid &&
             accountSessionManager.currentSession() == observedSession &&
             state.capsuleId == capsuleId
     }
@@ -169,18 +174,19 @@ class CapsuleDraftViewModel(
         val input = photoInput ?: return
         val state = _uiState.value
         val uid = state.activeSessionUid ?: return
+        val storageSession = StorageSession(observedSession, accountSessionManager::currentSession)
         val capsuleId = state.capsuleId
         val record = PhotoDraftRecord(capsuleId, state.title, state.text, state.originalPhoto, state.locationTarget, state.locationName)
         viewModelScope.launch {
             try {
                 photoSaveMutex.withLock {
                     if (_uiState.value.activeSessionUid != uid ||
-                        accountSessionManager.restoreSessionIfAuthenticated() != uid ||
+                        accountSessionManager.currentSession().uid != uid ||
                         accountSessionManager.currentSession() != observedSession ||
                         _uiState.value.capsuleId != capsuleId) {
                         return@withLock
                     }
-                    input.save(uid, record)
+                    input.save(storageSession, uid, record)
                     if (released != null && released != record.photo) {
                         try {
                             input.remove(released)
@@ -204,13 +210,14 @@ class CapsuleDraftViewModel(
         if (!_uiState.value.editable) return
         val state = _uiState.value
         val uid = state.activeSessionUid ?: return
+        val storageSession = StorageSession(observedSession, accountSessionManager::currentSession)
         val capsuleId = state.capsuleId
         val token = ++photoToken
         _uiState.update { it.copy(photoBusy = true, photoError = null) }
         viewModelScope.launch {
             var retainedPhoto: RetainedOriginalPhoto? = null
             try {
-                val photo = input.retain(uid, capsuleId, uri)
+                val photo = input.retain(storageSession, uid, capsuleId, uri)
                 retainedPhoto = photo
                 if (!isCurrentPhotoOp(token, uid, capsuleId)) {
                     input.remove(photo)
@@ -227,7 +234,7 @@ class CapsuleDraftViewModel(
                     previousPhoto = latestState.originalPhoto
                     val record = PhotoDraftRecord(capsuleId, latestState.title, latestState.text, photo, latestState.locationTarget, latestState.locationName)
                     try {
-                        input.save(uid, record)
+                        input.save(storageSession, uid, record)
                     } catch (cancelled: CancellationException) {
                         throw cancelled
                     } catch (_: Exception) {
@@ -242,7 +249,7 @@ class CapsuleDraftViewModel(
                         try {
                             val currentInJournal = input.restore(uid)
                             if (currentInJournal?.capsuleId == capsuleId && currentInJournal.photo == photo) {
-                                input.save(uid, PhotoDraftRecord(capsuleId, latestState.title, latestState.text, previousPhoto, latestState.locationTarget, latestState.locationName))
+                                input.save(storageSession, uid, PhotoDraftRecord(capsuleId, latestState.title, latestState.text, previousPhoto, latestState.locationTarget, latestState.locationName))
                             }
                         } catch (cancelled: CancellationException) {
                             throw cancelled
@@ -343,7 +350,7 @@ class CapsuleDraftViewModel(
     }
 
     init {
-        val currentUid = accountSessionManager.restoreSessionIfAuthenticated()
+        val currentUid = accountSessionManager.currentSession().uid
         observedSession = accountSessionManager.currentSession()
         _uiState.update { it.copy(activeSessionUid = currentUid) }
         if (!currentUid.isNullOrBlank()) {
@@ -362,8 +369,8 @@ class CapsuleDraftViewModel(
         if (latestRepository != null) this.repository = latestRepository
         if (latestRecoveryCoordinator != null) this.recoveryCoordinator = latestRecoveryCoordinator
 
-        val activeUid = accountSessionManager.restoreSessionIfAuthenticated()
         val currentSession = accountSessionManager.currentSession()
+        val activeUid = currentSession.uid
         if (activeUid != _uiState.value.activeSessionUid || currentSession != observedSession) {
             observedSession = currentSession
             photoToken++
@@ -376,6 +383,22 @@ class CapsuleDraftViewModel(
             }
         } else if (!_uiState.value.publicationBusy && !_uiState.value.recoveryBusy) {
             recoverPublicationState()
+        }
+
+        viewModelScope.launch {
+            val restoredUid = accountSessionManager.restoreSessionIfAuthenticated()
+            if (restoredUid != _uiState.value.activeSessionUid) {
+                val newSession = accountSessionManager.currentSession()
+                observedSession = newSession
+                photoToken++
+                publicationToken++
+                activeLookupToken++
+                _uiState.value = CapsuleDraftUiState(activeSessionUid = restoredUid)
+                if (!restoredUid.isNullOrBlank()) {
+                    selectFutureMe(restoredUid)
+                    recoverPublicationState(restoreEditable = true)
+                }
+            }
         }
     }
 
@@ -422,7 +445,7 @@ class CapsuleDraftViewModel(
             )
         }
         if (mode == RecipientMode.FUTURE_ME) {
-            val currentUid = accountSessionManager.restoreSessionIfAuthenticated() ?: _uiState.value.activeSessionUid ?: ""
+            val currentUid = accountSessionManager.currentSession().uid ?: _uiState.value.activeSessionUid ?: ""
             selectFutureMe(currentUid)
         } else {
             _uiState.update {
@@ -716,16 +739,16 @@ class CapsuleDraftViewModel(
                     val recovered = pending ?: completed
                     if (recovered != null) applyRecovered(recovered)
                     else _uiState.update { it.copy(recoveryBusy = false, recoveryBlocked = false) }
-                    if (recovered == null && restoreEditable) restorePhotoDraft()
+                    if (recovered == null && restoreEditable && _uiState.value.editable) restorePhotoDraft()
                 } else {
-                    _uiState.update { it.copy(recoveryBusy = false, recoveryBlocked = true,
+                    _uiState.update { it.copy(recoveryBusy = false, recoveryBlocked = !it.statusOnly,
                         publicationMessage = R.string.publication_recovery_failure) }
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
                 if (isCurrentPublication(uid, token, capturedSession)) _uiState.update {
-                    it.copy(recoveryBusy = false, recoveryBlocked = true,
+                    it.copy(recoveryBusy = false, recoveryBlocked = !it.statusOnly,
                         publicationMessage = R.string.publication_recovery_failure)
                 }
             }
@@ -734,31 +757,61 @@ class CapsuleDraftViewModel(
 
     /** Renders a frozen operation without revalidating an elapsed unlock time or restoring SENT text. */
     private fun applyRecovered(recovered: RecoveredPublication) {
-        require(recovered.phase == PublicationPhase.SENT || recovered.snapshot != null) {
-            "An unfinished send requires its frozen snapshot."
-        }
         val operation = recovered.snapshot
         photoToken++
         activeLookupToken++
         _uiState.update { state ->
-            if (operation == null) state.copy(capsuleId = recovered.capsuleId,
-                text = "", localPhotoUri = null, originalPhoto = null, photoName = null,
-                photoSizeBytes = null, photoBusy = false, publicationPhase = recovered.phase,
-                publicationBusy = false, recoveryBusy = false, recoveryBlocked = false,
-                canAbandon = false, publicationMessage = R.string.publication_sent)
-            else state.copy(capsuleId = operation.capsuleId, title = operation.title ?: "",
-                text = operation.text, originalPhoto = operation.photo,
-                localPhotoUri = operation.photo?.let { photoInput?.file(it)?.toURI()?.toString() },
-                photoName = operation.photo?.let { "Photo" }, photoSizeBytes = operation.photo?.sizeBytes,
-                photoBusy = false, recipientUidInput = operation.recipientUid,
-                resolvedProfile = RecipientProfile(operation.recipientUid, operation.recipientUid),
-                isRecipientConfirmed = true, lockMode = operation.lock.mode,
-                unlockAt = operation.lock.unlockAt, creationZone = operation.creationZone,
-                locationTarget = operation.lock.location,
-                publicationPhase = recovered.phase, canAbandon = recovered.canAbandon,
-                publicationBusy = false, recoveryBusy = false, recoveryBlocked = false,
-                publicationMessage = if (recovered.canAbandon) R.string.publication_failed
-                    else R.string.publication_unknown)
+            if (operation == null || operation.recipientUid == state.activeSessionUid || recovered.phase == PublicationPhase.SENT) {
+                val messageRes = when (recovered.phase) {
+                    PublicationPhase.SENT -> R.string.publication_sent
+                    PublicationPhase.FAILED -> if (recovered.canAbandon) R.string.publication_failed else R.string.publication_unknown
+                    else -> R.string.publication_unknown
+                }
+                state.copy(
+                    statusOnly = true,
+                    capsuleId = recovered.capsuleId,
+                    text = "",
+                    title = "",
+                    localPhotoUri = null,
+                    originalPhoto = null,
+                    photoName = null,
+                    photoSizeBytes = null,
+                    photoBusy = false,
+                    publicationPhase = recovered.phase,
+                    canAbandon = recovered.canAbandon,
+                    publicationBusy = false,
+                    recoveryBusy = false,
+                    recoveryBlocked = false,
+                    publicationMessage = messageRes
+                )
+            } else {
+                state.copy(
+                    statusOnly = false,
+                    capsuleId = operation.capsuleId,
+                    title = operation.title ?: "",
+                    text = operation.text,
+                    originalPhoto = operation.photo,
+                    localPhotoUri = operation.photo?.let { photoInput?.file(it)?.toURI()?.toString() },
+                    photoName = operation.photo?.let { "Photo" },
+                    photoSizeBytes = operation.photo?.sizeBytes,
+                    photoBusy = false,
+                    recipientUidInput = operation.recipientUid,
+                    resolvedProfile = if (operation.recipientUid.isNotBlank()) RecipientProfile(operation.recipientUid, operation.recipientUid) else state.resolvedProfile,
+                    isRecipientConfirmed = operation.recipientUid.isNotBlank(),
+                    lockMode = operation.lock.mode,
+                    unlockAt = operation.lock.unlockAt,
+                    creationZone = operation.creationZone,
+                    locationTarget = operation.lock.location,
+                    publicationPhase = recovered.phase,
+                    canAbandon = recovered.canAbandon,
+                    publicationBusy = false,
+                    recoveryBusy = false,
+                    recoveryBlocked = false,
+                    publicationMessage = if (recovered.phase == PublicationPhase.SENT) R.string.publication_sent
+                        else if (recovered.canAbandon) R.string.publication_failed
+                        else R.string.publication_unknown
+                )
+            }
         }
     }
 
@@ -798,17 +851,28 @@ class CapsuleDraftViewModel(
         publicationSession = capturedSession
         photoToken++
         activeLookupToken++
-        _uiState.update { it.copy(publicationBusy = true, publicationPhase = PublicationPhase.PREPARED,
-            canAbandon = false, publicationMessage = R.string.publication_sending) }
+        val before = _uiState.value
+        val hideContent = before.statusOnly || (before.resolvedProfile?.uid ?: before.recipientUidInput.trim()) == uid
+        _uiState.update { state ->
+            val review = if (hideContent) state.copy(statusOnly = true, title = "", text = "",
+                originalPhoto = null, localPhotoUri = null, photoName = null, photoSizeBytes = null) else state
+            review.copy(publicationBusy = true, publicationPhase = PublicationPhase.PREPARED,
+                canAbandon = false, publicationMessage = R.string.publication_sending)
+        }
         viewModelScope.launch {
             try {
                 photoSaveMutex.withLock { /* Drain earlier compose saves before final cleanup. */ }
                 if (!isCurrentPublication(uid, token, capturedSession)) return@launch
-                val result = action(capturedSession)
+                val result = try {
+                    action(capturedSession)
+                } catch (timeout: TimeoutCancellationException) {
+                    currentCoroutineContext().ensureActive()
+                    OperationResult.OutcomeUnknown(before.capsuleId, "Publication acknowledgment timed out.")
+                }
                 if (!isCurrentPublication(uid, token, capturedSession)) return@launch
                 if (result is OperationResult.Success) {
                     _uiState.update { it.copy(
-                        publicationPhase = PublicationPhase.SENT, text = "", originalPhoto = null,
+                        publicationPhase = PublicationPhase.SENT, statusOnly = true, title = "", text = "", originalPhoto = null,
                         localPhotoUri = null, photoName = null, photoSizeBytes = null,
                         publicationMessage = R.string.publication_sent) }
                 } else {
@@ -823,8 +887,8 @@ class CapsuleDraftViewModel(
                 if (recovered is OperationResult.Success) {
                     val record = recovered.data.firstOrNull { it.capsuleId == _uiState.value.capsuleId }
                     if (record != null) applyRecovered(record)
-                    else if (result !is OperationResult.Success) _uiState.update {
-                        it.copy(publicationBusy = false, publicationPhase = null,
+                    else if (result is OperationResult.Invalid && before.editable) _uiState.update {
+                        before.copy(publicationBusy = false, publicationPhase = null,
                             publicationMessage = R.string.publication_invalid)
                     }
                 }
@@ -904,7 +968,7 @@ class CapsuleDraftViewModel(
         capturedSession: SessionSnapshot
     ): Boolean =
         token == publicationToken && _uiState.value.activeSessionUid == uid &&
-            accountSessionManager.restoreSessionIfAuthenticated() == uid &&
+            accountSessionManager.currentSession().uid == uid &&
             accountSessionManager.isSessionValid(capturedSession)
 
     /** Bounds read-only recovery waiting without canceling the independently owned send task. */
@@ -913,7 +977,12 @@ class CapsuleDraftViewModel(
         capturedSession: SessionSnapshot
     ) =
         withTimeoutOrNull(15_000L) {
-            recoveryCoordinator?.recoverPublications(capturedSession) ?: backend.recoverPublications(capturedSession)
+            try {
+                recoveryCoordinator?.recoverPublications(capturedSession) ?: backend.recoverPublications(capturedSession)
+            } catch (timeout: TimeoutCancellationException) {
+                currentCoroutineContext().ensureActive()
+                OperationResult.Unavailable("Saved send recovery timed out.")
+            }
         } ?: OperationResult.Unavailable("Saved send recovery timed out.")
 
     /** Resets draft state with a new unique capsule ID. */
@@ -921,7 +990,7 @@ class CapsuleDraftViewModel(
         if (!_uiState.value.editable) return
         val previous = _uiState.value.originalPhoto
         photoToken++
-        val activeUid = accountSessionManager.restoreSessionIfAuthenticated()
+        val activeUid = accountSessionManager.currentSession().uid
         _uiState.value = CapsuleDraftUiState(activeSessionUid = activeUid)
         if (!activeUid.isNullOrBlank()) {
             selectFutureMe(activeUid)
