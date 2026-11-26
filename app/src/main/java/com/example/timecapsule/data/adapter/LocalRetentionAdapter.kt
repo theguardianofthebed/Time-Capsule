@@ -74,6 +74,15 @@ interface LocalRetentionAdapter {
         capsuleId: String
     ): OperationResult<RetainedContent>
 
+    /**
+     * Lists all verified retained content entries for [targetSession] if markers and content files are complete.
+     */
+    suspend fun listVerifiedRecipientEntries(
+        targetSession: SessionSnapshot
+    ): OperationResult<List<RetainedContent>> {
+        return OperationResult.Unavailable("List verified recipient entries is not implemented in this adapter.")
+    }
+
     /** Clears account-scoped retained content for [uid]. */
     suspend fun clearAccountData(uid: String)
 

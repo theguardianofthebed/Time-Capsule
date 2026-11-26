@@ -1,0 +1,161 @@
+{
+  "issue": 21,
+  "checked_at": "2026-11-26T12:04:45Z",
+  "selected_base": "b157f447f4340b6dba99edee2bef797956b0554b",
+  "owner": "User J",
+  "owner_confirmation": "Confirmed User J as acting student owner for Issue #21 implementation",
+  "branch": "feature/21-capsule-lists-detail",
+  "period": "26-27 November 2026",
+  "scope": "MVP",
+  "reviewer": "User G",
+  "components": [
+    "app/src/main/java/com/example/timecapsule/domain/model/Capsule.kt",
+    "app/src/main/java/com/example/timecapsule/domain/model/CapsuleListsSnapshot.kt",
+    "app/src/main/java/com/example/timecapsule/data/CapsuleRepository.kt",
+    "app/src/main/java/com/example/timecapsule/data/DefaultCapsuleRepository.kt",
+    "app/src/main/java/com/example/timecapsule/data/adapter/FirestoreAdapter.kt",
+    "app/src/main/java/com/example/timecapsule/data/adapter/DefaultFirestoreAdapter.kt",
+    "app/src/main/java/com/example/timecapsule/data/adapter/LocalRetentionAdapter.kt",
+    "app/src/main/java/com/example/timecapsule/data/adapter/DefaultLocalRetentionAdapter.kt",
+    "app/src/main/java/com/example/timecapsule/ui/ViewModelFactory.kt",
+    "app/src/main/java/com/example/timecapsule/ui/s03/S03CapsuleListFragment.kt",
+    "app/src/main/java/com/example/timecapsule/ui/s03/S03CapsuleListViewModel.kt",
+    "app/src/main/java/com/example/timecapsule/ui/s03/CapsuleListUiState.kt",
+    "app/src/main/java/com/example/timecapsule/ui/s07/S07CapsuleDetailFragment.kt",
+    "app/src/main/java/com/example/timecapsule/ui/s07/S07CapsuleDetailViewModel.kt",
+    "app/src/main/java/com/example/timecapsule/ui/s07/CapsuleDetailUiState.kt",
+    "app/src/main/java/com/example/timecapsule/MainActivity.kt",
+    "app/src/main/res/layout/fragment_s03_capsule_list.xml",
+    "app/src/main/res/layout/fragment_s07_capsule_detail.xml",
+    "app/src/main/res/layout/item_capsule_summary.xml"
+  ],
+  "deliverable": "Account-scoped lists, locked details, permanent re-view, and notification routing",
+  "contract_approval": "DD-06, DD-28, FR-08, FR-11, FR-12, NFR-05, AC-03, AC-09, AC-11, T-07, T-08, T-27, T-28, T-29, T-30, T-35",
+  "blocking_failures": [],
+  "inventory": {
+    "issues": "Issue #21 Add account-scoped lists, locked details and permanent re-view",
+    "branches": "feature/21-capsule-lists-detail based on main at b157f447f4340b6dba99edee2bef797956b0554b",
+    "prs": "PR #46 merged for Issue 20",
+    "handoffs": "issue-20-account-retention-cleanup-20261126.md",
+    "compatible": true,
+    "compatibility_evidence": "No active competing claims or overlapping file modifications for capsule lists and detail views",
+    "active_claims": [
+      {
+        "issue": 21,
+        "owner": "User J",
+        "branch": "feature/21-capsule-lists-detail",
+        "overlaps": false,
+        "agreement": "Explicit prompt allocating Issue #21 implementation to User J"
+      }
+    ]
+  },
+  "dependencies": [
+    {
+      "issue": 10,
+      "pr": "https://github.com/theguardianofthebed/Time-Capsule/pull/33",
+      "merged": true,
+      "merge_commit": "74aa763076801944a33897b2f67c36d3afb27aa9",
+      "implementation_inspection": "PR #33 merged into main, contains account session manager, sign in, sign up, profile repair, and lookup interface",
+      "paths": [
+        "app/src/main/java/com/example/timecapsule/data/AccountSessionManager.kt"
+      ],
+      "checks": [
+        {
+          "result": "PASS",
+          "procedure": "JVM unit tests and instrumentation tests",
+          "expected_actual": "47 JVM unit tests and 9 Android instrumentation tests reported passing",
+          "commit": "74aa763076801944a33897b2f67c36d3afb27aa9",
+          "environment": "Android Studio Agent Mode",
+          "evidence": "PR #33 verification record"
+        }
+      ],
+      "blocking_failures": []
+    },
+    {
+      "issue": 11,
+      "pr": "https://github.com/theguardianofthebed/Time-Capsule/pull/35",
+      "merged": true,
+      "merge_commit": "2228a07f65d8918d59ead727e33fa9fe5c56ab97",
+      "implementation_inspection": "PR #35 merged into main, contains Firestore capsule schema, Firestore rules, and Storage rules",
+      "paths": [
+        "app/src/main/java/com/example/timecapsule/data/adapter/FirestoreAdapter.kt"
+      ],
+      "checks": [
+        {
+          "result": "PASS",
+          "procedure": "Firebase emulator rules tests and JVM unit tests",
+          "expected_actual": "Rules and unit tests passed in PR #35",
+          "commit": "2228a07f65d8918d59ead727e33fa9fe5c56ab97",
+          "environment": "Android Studio Agent Mode",
+          "evidence": "PR #35 verification record"
+        }
+      ],
+      "blocking_failures": []
+    },
+    {
+      "issue": 14,
+      "pr": "https://github.com/theguardianofthebed/Time-Capsule/pull/40",
+      "merged": true,
+      "merge_commit": "15cf5bfdc39e6827c1a5407198cd65f6e6a7c232",
+      "implementation_inspection": "PR #40 merged into main, contains frozen operation journal, capsule publication coordinator, and publication reconciliation",
+      "paths": [
+        "app/src/main/java/com/example/timecapsule/data/publication/CapsulePublicationCoordinator.kt",
+        "app/src/main/java/com/example/timecapsule/data/publication/FrozenOperationJournal.kt"
+      ],
+      "checks": [
+        {
+          "result": "PASS",
+          "procedure": "JVM unit tests and publication reconciliation verification",
+          "expected_actual": "Publication unit tests passed in PR #40",
+          "commit": "15cf5bfdc39e6827c1a5407198cd65f6e6a7c232",
+          "environment": "Android Studio Agent Mode",
+          "evidence": "PR #40 verification record"
+        }
+      ],
+      "blocking_failures": []
+    },
+    {
+      "issue": 15,
+      "pr": "https://github.com/theguardianofthebed/Time-Capsule/pull/41",
+      "merged": true,
+      "merge_commit": "6ccd2ffb02dde02278f8c9b30a4ae1355ea180ff",
+      "implementation_inspection": "PR #41 merged into main, contains UTC schedules and online one-way unlock",
+      "paths": [
+        "app/src/main/java/com/example/timecapsule/data/DefaultCapsuleRepository.kt"
+      ],
+      "checks": [
+        {
+          "result": "PASS",
+          "procedure": "JVM unit tests and unlock verification",
+          "expected_actual": "214 JVM unit tests reported passing",
+          "commit": "6ccd2ffb02dde02278f8c9b30a4ae1355ea180ff",
+          "environment": "Android Studio Agent Mode",
+          "evidence": "PR #41 verification record"
+        }
+      ],
+      "blocking_failures": []
+    },
+    {
+      "issue": 20,
+      "pr": "https://github.com/theguardianofthebed/Time-Capsule/pull/46",
+      "merged": true,
+      "merge_commit": "b157f447f4340b6dba99edee2bef797956b0554b",
+      "implementation_inspection": "PR #46 merged into main, contains account-safe retention and cleanup orchestrator",
+      "paths": [
+        "app/src/main/java/com/example/timecapsule/data/cleanup/AccountCleanupOrchestrator.kt",
+        "app/src/main/java/com/example/timecapsule/data/adapter/DefaultLocalRetentionAdapter.kt"
+      ],
+      "checks": [
+        {
+          "result": "PASS",
+          "procedure": "JVM unit tests, debug build, lint",
+          "expected_actual": "355 JVM unit tests reported passing",
+          "commit": "b157f447f4340b6dba99edee2bef797956b0554b",
+          "environment": "Android Studio Agent Mode",
+          "evidence": "PR #46 verification record"
+        }
+      ],
+      "blocking_failures": []
+    }
+  ]
+}

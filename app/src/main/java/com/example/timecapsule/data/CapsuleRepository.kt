@@ -3,6 +3,7 @@ package com.example.timecapsule.data
 import com.example.timecapsule.domain.model.Availability
 import com.example.timecapsule.domain.model.CapsuleDraft
 import com.example.timecapsule.domain.model.CapsuleListsSnapshot
+import com.example.timecapsule.domain.model.CapsuleSummary
 import com.example.timecapsule.domain.model.ProtectedCapsuleContent
 import com.example.timecapsule.domain.model.RecipientProfile
 import com.example.timecapsule.domain.model.RecoveredPublication
@@ -69,6 +70,26 @@ interface CapsuleRepository {
 
     /** Retrieves participant-scoped Sent and Received capsule lists for active user [uid]. */
     suspend fun lists(uid: String): OperationResult<CapsuleListsSnapshot>
+
+    /** Retrieves participant-scoped Sent and Received capsule lists for active user [uid] bound to [targetSession]. */
+    suspend fun lists(
+        uid: String,
+        targetSession: SessionSnapshot
+    ): OperationResult<CapsuleListsSnapshot> =
+        if (session() != targetSession) OperationResult.Denied("Account session changed.")
+        else lists(uid)
+
+    /** Retrieves capsule summary metadata for [capsuleId]. */
+    suspend fun getSummary(capsuleId: String): OperationResult<CapsuleSummary> =
+        getSummary(capsuleId, session())
+
+    /** Retrieves capsule summary metadata for [capsuleId] bound to [targetSession]. */
+    suspend fun getSummary(
+        capsuleId: String,
+        targetSession: SessionSnapshot
+    ): OperationResult<CapsuleSummary> =
+        if (session() != targetSession) OperationResult.Denied("Account session changed.")
+        else OperationResult.Unavailable("Get summary is not implemented in this repository.")
 
     /**
      * Performs a read-only recipient unlock authorization check for [capsuleId].

@@ -14,9 +14,11 @@ import com.example.timecapsule.data.notification.NotificationEntryValidator
 import com.example.timecapsule.databinding.ActivityMainBinding
 import com.example.timecapsule.ui.s01.S01SignInFragment
 import com.example.timecapsule.ui.s02.S02RegisterFragment
+import com.example.timecapsule.ui.s03.S03CapsuleListFragment
 import com.example.timecapsule.ui.s04.S04ContentDraftFragment
 import com.example.timecapsule.ui.s05.S05RecipientLockFragment
 import com.example.timecapsule.ui.s06.S06ConfirmSendFragment
+import com.example.timecapsule.ui.s07.S07CapsuleDetailFragment
 import com.example.timecapsule.ui.s08.S08AccountSettingsFragment
 import kotlinx.coroutines.launch
 
@@ -78,7 +80,7 @@ class MainActivity : AppCompatActivity() {
                 if (activeUid.isNullOrBlank()) {
                     navigateToSignIn()
                 } else {
-                    navigateToContentDraft()
+                    navigateToCapsuleList()
                 }
             }
             handleNotificationIntent(intent)
@@ -121,11 +123,7 @@ class MainActivity : AppCompatActivity() {
                 is NotificationEntryResult.Valid -> {
                     if (container.sessionTracker.isSessionValid(currentSession) &&
                         container.sessionTracker.currentSession() == currentSession) {
-                        Toast.makeText(
-                            this@MainActivity,
-                            getString(R.string.s07_title_capsule_ready),
-                            Toast.LENGTH_LONG
-                        ).show()
+                        navigateToCapsuleDetail(result.capsuleId)
                     }
                 }
                 is NotificationEntryResult.Invalid -> {
@@ -159,7 +157,7 @@ class MainActivity : AppCompatActivity() {
                             container.recoveryCoordinator?.triggerForegroundRecovery()
                         }
                     }
-                    navigateToContentDraft()
+                    navigateToCapsuleList()
                 }
             }
             is S02RegisterFragment -> {
@@ -170,25 +168,36 @@ class MainActivity : AppCompatActivity() {
                             container.recoveryCoordinator?.triggerForegroundRecovery()
                         }
                     }
-                    navigateToContentDraft()
+                    navigateToCapsuleList()
                 }
                 fragment.onGoToSignInListener = { navigateToSignIn() }
             }
+            is S03CapsuleListFragment -> {
+                fragment.onOpenCapsuleDetailListener = { capsuleId -> navigateToCapsuleDetail(capsuleId) }
+                fragment.onCreateCapsuleListener = { navigateToContentDraft() }
+                fragment.onAccountSettingsListener = { navigateToAccountSettings() }
+            }
             is S04ContentDraftFragment -> {
                 fragment.onNextToRecipientLockListener = { navigateToRecipientLock() }
-                fragment.onNavigateToMomentsListener = { handleMomentsClick() }
+                fragment.onNavigateToMomentsListener = { navigateToCapsuleList() }
                 fragment.onNavigateToAccountListener = { navigateToAccountSettings() }
             }
             is S05RecipientLockFragment -> {
                 fragment.onBackToContentDraftListener = { navigateToContentDraft() }
                 fragment.onNextToConfirmSendListener = { navigateToConfirmSend() }
-                fragment.onNavigateToMomentsListener = { handleMomentsClick() }
+                fragment.onNavigateToMomentsListener = { navigateToCapsuleList() }
                 fragment.onNavigateToAccountListener = { navigateToAccountSettings() }
             }
             is S06ConfirmSendFragment -> {
                 fragment.onBackToRecipientLockListener = { navigateToRecipientLock() }
-                fragment.onNavigateToMomentsListener = { handleMomentsClick() }
+                fragment.onNavigateToMomentsListener = { navigateToCapsuleList() }
                 fragment.onNavigateToAccountListener = { navigateToAccountSettings() }
+            }
+            is S07CapsuleDetailFragment -> {
+                fragment.onBackListener = { navigateToCapsuleList() }
+                fragment.onNavigateToMomentsListener = { navigateToCapsuleList() }
+                fragment.onCreateCapsuleListener = { navigateToContentDraft() }
+                fragment.onAccountSettingsListener = { navigateToAccountSettings() }
             }
             is S08AccountSettingsFragment -> {
                 fragment.onSignOutSuccessListener = { navigateToSignIn() }
@@ -198,25 +207,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun handleMomentsClick() {
-        lifecycleScope.launch {
-            val activeUid = container.accountSessionManager.restoreSessionIfAuthenticated()
-            if (activeUid.isNullOrBlank()) {
-                navigateToSignIn()
-            } else {
-                Toast.makeText(
-                    this@MainActivity,
-                    "Your capsule list isn't available yet.",
-                    Toast.LENGTH_SHORT
-                ).show()
-            }
-        }
+        navigateToCapsuleList()
     }
 
     /** Navigates to S-01 Sign in screen. */
     fun navigateToSignIn() {
         val fragment = S01SignInFragment().apply {
             onGoToRegisterListener = { navigateToRegister() }
-            onSignInSuccessListener = { navigateToContentDraft() }
+            onSignInSuccessListener = { navigateToCapsuleList() }
         }
         replaceFragment(fragment)
     }
@@ -224,8 +222,39 @@ class MainActivity : AppCompatActivity() {
     /** Navigates to S-02 Register / Profile Repair screen. */
     fun navigateToRegister() {
         val fragment = S02RegisterFragment().apply {
-            onRegisterSuccessListener = { navigateToContentDraft() }
+            onRegisterSuccessListener = { navigateToCapsuleList() }
             onGoToSignInListener = { navigateToSignIn() }
+        }
+        replaceFragment(fragment)
+    }
+
+    /** Navigates to S-03 Capsule List screen. */
+    fun navigateToCapsuleList() {
+        val activeUid = container.sessionTracker.currentSession().uid
+        if (activeUid.isNullOrBlank()) {
+            navigateToSignIn()
+            return
+        }
+        val fragment = S03CapsuleListFragment().apply {
+            onOpenCapsuleDetailListener = { capsuleId -> navigateToCapsuleDetail(capsuleId) }
+            onCreateCapsuleListener = { navigateToContentDraft() }
+            onAccountSettingsListener = { navigateToAccountSettings() }
+        }
+        replaceFragment(fragment)
+    }
+
+    /** Navigates to S-07 Capsule Detail screen. */
+    fun navigateToCapsuleDetail(capsuleId: String) {
+        val activeUid = container.sessionTracker.currentSession().uid
+        if (activeUid.isNullOrBlank()) {
+            navigateToSignIn()
+            return
+        }
+        val fragment = S07CapsuleDetailFragment.newInstance(capsuleId).apply {
+            onBackListener = { navigateToCapsuleList() }
+            onNavigateToMomentsListener = { navigateToCapsuleList() }
+            onCreateCapsuleListener = { navigateToContentDraft() }
+            onAccountSettingsListener = { navigateToAccountSettings() }
         }
         replaceFragment(fragment)
     }
@@ -242,7 +271,7 @@ class MainActivity : AppCompatActivity() {
     fun navigateToContentDraft() {
         val fragment = S04ContentDraftFragment().apply {
             onNextToRecipientLockListener = { navigateToRecipientLock() }
-            onNavigateToMomentsListener = { navigateToSignIn() }
+            onNavigateToMomentsListener = { navigateToCapsuleList() }
             onNavigateToAccountListener = { navigateToAccountSettings() }
         }
         replaceFragment(fragment)
@@ -253,7 +282,7 @@ class MainActivity : AppCompatActivity() {
         val fragment = S05RecipientLockFragment().apply {
             onBackToContentDraftListener = { navigateToContentDraft() }
             onNextToConfirmSendListener = { navigateToConfirmSend() }
-            onNavigateToMomentsListener = { navigateToSignIn() }
+            onNavigateToMomentsListener = { navigateToCapsuleList() }
             onNavigateToAccountListener = { navigateToAccountSettings() }
         }
         replaceFragment(fragment)
@@ -263,7 +292,7 @@ class MainActivity : AppCompatActivity() {
     fun navigateToConfirmSend() {
         val fragment = S06ConfirmSendFragment().apply {
             onBackToRecipientLockListener = { navigateToRecipientLock() }
-            onNavigateToMomentsListener = { navigateToSignIn() }
+            onNavigateToMomentsListener = { navigateToCapsuleList() }
             onNavigateToAccountListener = { navigateToAccountSettings() }
         }
         replaceFragment(fragment)

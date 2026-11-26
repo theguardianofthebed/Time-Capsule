@@ -11,6 +11,8 @@ import com.example.timecapsule.domain.condition.ConditionEvaluator
 import com.example.timecapsule.domain.model.Availability
 import com.example.timecapsule.domain.model.CapsuleDraft
 import com.example.timecapsule.domain.model.CapsuleListsSnapshot
+import com.example.timecapsule.domain.model.CapsuleLock
+import com.example.timecapsule.domain.model.CapsuleSummary
 import com.example.timecapsule.domain.model.ForegroundLocationSample
 import com.example.timecapsule.domain.model.LocationSampleStatus
 import com.example.timecapsule.domain.model.LockMode
@@ -109,7 +111,130 @@ class DefaultCapsuleRepository(
             ?: OperationResult.Unavailable("Publication replacement is unavailable.")
 
     override suspend fun lists(uid: String): OperationResult<CapsuleListsSnapshot> {
-        return OperationResult.Unavailable("Capsule lists query requires Issue #21 implementation.")
+        return lists(uid, sessionTracker.currentSession())
+    }
+
+    override suspend fun lists(
+        uid: String,
+        targetSession: SessionSnapshot
+    ): OperationResult<CapsuleListsSnapshot> {
+        val cleanUid = uid.trim()
+        if (cleanUid.isBlank()) {
+            return OperationResult.Invalid("UID must not be blank for capsule lists.")
+        }
+        if (!sessionTracker.isSessionValid(targetSession) || !targetSession.isAuthenticated || targetSession.uid != cleanUid) {
+            return OperationResult.Denied("Account session changed or authentication required.")
+        }
+
+        val sentRes = firestoreAdapter.getSentCapsuleSummaries(cleanUid)
+        val receivedRes = firestoreAdapter.getReceivedCapsuleSummaries(cleanUid)
+
+        if (!sessionTracker.isSessionValid(targetSession)) {
+            return OperationResult.Denied("Account session changed during lists query.")
+        }
+
+        if (sentRes is OperationResult.Success && receivedRes is OperationResult.Success) {
+            return OperationResult.Success(
+                CapsuleListsSnapshot(
+                    sent = sentRes.data,
+                    received = receivedRes.data
+                )
+            )
+        }
+
+        // Offline fallback: if network/server is unavailable, check local retention
+        val retention = retentionAdapter
+        if (retention != null) {
+            val offlineEntries = retention.listVerifiedRecipientEntries(targetSession)
+            if (!sessionTracker.isSessionValid(targetSession)) {
+                return OperationResult.Denied("Account session changed during offline lists fallback.")
+            }
+            if (offlineEntries is OperationResult.Success && offlineEntries.data.isNotEmpty()) {
+                val offlineSummaries = offlineEntries.data.map { retained ->
+                    val hasPhoto = retained.photoBytes != null
+                    CapsuleSummary(
+                        capsuleId = retained.capsuleId,
+                        senderUid = "",
+                        recipientUid = cleanUid,
+                        lock = CapsuleLock(mode = LockMode.TIME),
+                        sendStatus = SendStatus.SENT,
+                        availability = Availability.AVAILABLE,
+                        title = "Previously unlocked capsule",
+                        unlockedAt = retained.verifiedUnlockedAt,
+                        hasPhoto = hasPhoto
+                    )
+                }
+                val sentList = if (sentRes is OperationResult.Success) sentRes.data else emptyList()
+                return OperationResult.Success(
+                    CapsuleListsSnapshot(
+                        sent = sentList,
+                        received = offlineSummaries
+                    )
+                )
+            }
+        }
+
+        return when {
+            sentRes is OperationResult.Denied -> sentRes
+            receivedRes is OperationResult.Denied -> receivedRes
+            sentRes is OperationResult.Invalid -> sentRes
+            receivedRes is OperationResult.Invalid -> receivedRes
+            else -> OperationResult.Unavailable("Network unavailable and no retained capsules exist offline.")
+        }
+    }
+
+    override suspend fun getSummary(capsuleId: String): OperationResult<CapsuleSummary> {
+        return getSummary(capsuleId, sessionTracker.currentSession())
+    }
+
+    override suspend fun getSummary(
+        capsuleId: String,
+        targetSession: SessionSnapshot
+    ): OperationResult<CapsuleSummary> {
+        val cleanCapsuleId = capsuleId.trim()
+        if (cleanCapsuleId.isBlank()) {
+            return OperationResult.Invalid("Capsule ID must not be blank.")
+        }
+        if (!sessionTracker.isSessionValid(targetSession) || !targetSession.isAuthenticated || targetSession.uid.isNullOrBlank()) {
+            return OperationResult.Denied("Authentication required to get capsule summary.")
+        }
+        val activeUid = targetSession.uid!!
+
+        val summaryRes = firestoreAdapter.getCapsuleSummary(cleanCapsuleId, activeUid)
+        if (!sessionTracker.isSessionValid(targetSession)) {
+            return OperationResult.Denied("Account session changed during getSummary.")
+        }
+
+        if (summaryRes is OperationResult.Success) {
+            return summaryRes
+        }
+
+        // Offline fallback for recipient: check local retention
+        val retention = retentionAdapter
+        if (retention != null) {
+            val offlineRes = retention.readRetainedContent(targetSession, cleanCapsuleId)
+            if (!sessionTracker.isSessionValid(targetSession)) {
+                return OperationResult.Denied("Account session changed during offline summary read.")
+            }
+            if (offlineRes is OperationResult.Success) {
+                val retained = offlineRes.data
+                return OperationResult.Success(
+                    CapsuleSummary(
+                        capsuleId = cleanCapsuleId,
+                        senderUid = "",
+                        recipientUid = activeUid,
+                        lock = CapsuleLock(mode = LockMode.TIME),
+                        sendStatus = SendStatus.SENT,
+                        availability = Availability.AVAILABLE,
+                        title = "Unlocked capsule",
+                        unlockedAt = retained.verifiedUnlockedAt,
+                        hasPhoto = retained.photoBytes != null
+                    )
+                )
+            }
+        }
+
+        return summaryRes
     }
 
     override suspend fun checkUnlockStatus(
@@ -311,7 +436,34 @@ class DefaultCapsuleRepository(
             }
         }
 
-        // 2. Authoritative server check for unlock requirements & unlock timestamp
+        // 2. Authoritative server metadata lookup to determine role & authorization
+        val summaryRes = firestoreAdapter.getCapsuleSummary(cleanId, activeUid)
+        if (!sessionTracker.isSessionValid(targetSession)) {
+            return OperationResult.Denied("Account session changed during content read.")
+        }
+
+        if (summaryRes is OperationResult.Success) {
+            val summary = summaryRes.data
+            val isAuthorCopy = (activeUid == summary.senderUid && summary.senderUid != summary.recipientUid)
+
+            if (isAuthorCopy) {
+                // Author Copy branch: direct protected read, NO unlock verification, NO recipient marker, NO retention save
+                val contentRes = firestoreAdapter.readProtectedContent(cleanId, activeUid)
+                if (!sessionTracker.isSessionValid(targetSession)) {
+                    return OperationResult.Denied("Account session changed during content read.")
+                }
+                if (contentRes is OperationResult.Success) {
+                    val content = contentRes.data
+                    if (!content.photoObjectPath.isNullOrBlank() && content.photoBytes == null) {
+                        return OperationResult.Unavailable("Photo download failed for author copy.")
+                    }
+                    return OperationResult.Success(content.copy(availableOffline = false))
+                }
+                return if (contentRes is OperationResult.Unavailable) contentRes else OperationResult.Denied("Protected content unreadable for author copy.")
+            }
+        }
+
+        // Recipient branch
         val reqResult = firestoreAdapter.readRecipientUnlockRequirements(cleanId, activeUid)
         if (!sessionTracker.isSessionValid(targetSession)) {
             return OperationResult.Denied("Account session changed during content read.")

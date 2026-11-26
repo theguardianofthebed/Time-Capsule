@@ -189,4 +189,32 @@
     <string name="photo_access_denied">Photo access was denied. Choose the photo again.</string>
     <string name="photo_invalid">Choose a readable JPEG or PNG between 1 byte and 5 MiB.</string>
     <string name="photo_io_failure">Cannot read or save the photo. Check available storage and try again.</string>
+
+    <!-- S-03 Stitch UI Strings -->
+    <string name="s03_eyebrow">YOUR LITTLE COLLECTION</string>
+    <string name="s03_headline">Moments in waiting.</string>
+    <string name="s03_subtitle">Some for now. Some for a little later.</string>
+    <string name="s03_tab_received">Received</string>
+    <string name="s03_tab_sent">Sent</string>
+    <string name="s03_filter_all">All moments</string>
+    <string name="s03_filter_sealed">Still sealed</string>
+    <string name="s03_filter_opened">Opened</string>
+    <string name="s03_status_sealed">Sealed</string>
+    <string name="s03_status_opened">Opened</string>
+    <string name="s03_status_pending">Sending…</string>
+    <string name="s03_status_failed">Action needed</string>
+    <string name="s03_empty_received">No received capsules yet.</string>
+    <string name="s03_empty_sent">No sent capsules yet.</string>
+    <string name="s03_stale_banner">Showing offline saved moments. Connect to update.</string>
+
+    <!-- S-07 Stitch UI Strings -->
+    <string name="s07_nav_title">A little moment</string>
+    <string name="s07_badge_opened">A moment, opened</string>
+    <string name="s07_badge_sealed">A moment, sealed</string>
+    <string name="s07_badge_author">Sender copy</string>
+    <string name="s07_meant_to_open">MEANT TO OPEN</string>
+    <string name="s07_opened_banner">Opened %1$s. This moment stays open, wherever you go.</string>
+    <string name="s07_unlocked_toast">A little moment, finally yours. Capsule unlocked.</string>
+    <string name="s07_btn_retry">Connect and retry</string>
+    <string name="s07_asset_unavailable">Capsule unlocked — content unavailable. Connect and retry.</string>
 </resources>

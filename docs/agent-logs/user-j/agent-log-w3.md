@@ -597,3 +597,74 @@ On `0c18e07adc0786cdd1055a9f2985f870414fc230`, Gradle 9.6.0, AGP 9.3.0, JDK 25 a
 The Firestore and Storage emulator suite passed all 42 tests on `540a1586de7cae8e45d6d71bad871b62c12a1b66` with local emulator traffic excluded from the proxy. That checkout differed only in the Gradle declaration of the same test dependency. The Android instrumentation APK was built, but no device was attached and no device test result is claimed. User G's review and the previously scheduled device scenarios T-02, T-29 and T-44 remain pending.
 
 [Implementation](https://github.com/theguardianofthebed/Time-Capsule/commit/0c18e07adc0786cdd1055a9f2985f870414fc230) · [Handoff](../../agent-tools/handoffs/issue-20-account-retention-cleanup-20261126.md)
+
+
+## Feature or task: Issue #21 Add account-scoped lists, locked details and permanent re-view
+
+- **Task and purpose:** Implementation of Issue #21 (Add account-scoped lists, locked details and permanent re-view), delivering S-03 Capsule Lists, S-07 Capsule Detail, participant-scoped Firestore queries, role-aware protected content reads (Author Copy vs Recipient), offline retention listing and relaunch re-view (T-29, T-30), and MainActivity navigation with notification tap entry, with User J as acting implementation owner and User G as reviewer.
+- **Session date(s):** November 26, 2026.
+- **Issue and PR:** [Issue #21](https://github.com/theguardianofthebed/Time-Capsule/issues/21), task branch `feature/21-capsule-lists-detail`.
+- **Requirement/design references:** DD-06, DD-28; FR-08, FR-11, FR-12; NFR-05; AC-03, AC-09, AC-11; T-07, T-08, T-27, T-28, T-29, T-30, T-35.
+- **Agent environment:** Android Studio Agent Mode.
+- **Model used:** Gemini 3.8 Flash.
+
+### Goal
+
+Implement complete bounded scope for Issue #21: S-03 Capsule Lists (Received and Sent tabs, stale/offline indicator, unresolved send recovery routing), S-07 Capsule Detail (locked details, unlocked letter content, photo rendering, Author Copy sender view, retry action), server-authoritative participant metadata queries (`getSentCapsuleSummaries`, `getReceivedCapsuleSummaries`, `getCapsuleSummary`), role-aware protected reads in `DefaultCapsuleRepository`, offline retention entry enumeration (`listVerifiedRecipientEntries`) supporting process relaunch re-view (T-29, T-30), and MainActivity navigation wiring with notification tap intent routing.
+
+### Requests and prompts
+
+| # | Request summary | Actual prompt (key part) | Why it worked (or didn't) |
+|---|-----------------|--------------------------|---------------------------|
+| 1 | Execute Issue #21 implementation instruction & update w3 log | "Read the attached TimeCapsule_Issue21_Gemini_Implementation_Prompt.md in full and execute it as the implementation instruction for Issue #21... User J, update agent w3 log... check Stitch project TimeCapsule Android UI Design" | Comprehensive prompt with exact preflight, wireframe inspection requirements, repository boundaries, and regression testing constraints. |
+
+### What the agent changed and verified
+
+- **Data Models (`Capsule.kt`, `CapsuleListsSnapshot.kt`):**
+  - Extended `CapsuleSummary` with safe metadata fields (`title`, `createdAt`, `creationZone`, `hasPhoto`, `unlockedAt`, `senderDisplayName`, `recipientDisplayName`) while keeping existing positional/named constructors backwards compatible. Protected text and photo bytes remain strictly excluded from summary models.
+- **Participant Query & Firestore Adapter Layer (`FirestoreAdapter.kt`, `DefaultFirestoreAdapter.kt`):**
+  - Implemented `getSentCapsuleSummaries(senderUid)` and `getReceivedCapsuleSummaries(recipientUid)` executing equality queries on `capsules` via `Source.SERVER`.
+  - Implemented `getCapsuleSummary(capsuleId, uid)` performing exact-ID metadata reads with participant verification (`uid == senderId || uid == recipientId`).
+  - Enforced `!doc.metadata.hasPendingWrites()` and `!doc.metadata.isFromCache` on all document queries, rejecting unconfirmed local overlays and cached records.
+- **Offline Retention Listing & Re-view (`LocalRetentionAdapter.kt`, `DefaultLocalRetentionAdapter.kt`):**
+  - Extended `LocalRetentionAdapter` with `listVerifiedRecipientEntries(targetSession)` to enumerate verified account-scoped retained content directories (`noBackupFilesDir/retained-content/<hashed-uid>/<capsule-id>/`).
+  - Validates `verified-marker.properties` (v1/v2), matching UID, capsule ID, valid timestamp, and required text/photo file completeness before returning retained entries, enabling offline re-view after process relaunch while signed in (T-29, T-30).
+- **Repository Role & Authorization Gate (`CapsuleRepository.kt`, `DefaultCapsuleRepository.kt`):**
+  - Implemented `lists(uid, targetSession)` fetching participant lists from server and falling back to verified local retention when offline.
+  - Implemented `getSummary(capsuleId, targetSession)` with participant check and offline fallback.
+  - Refactored `readContent(capsuleId, targetSession)` to evaluate participant roles:
+    - **Author Copy (`senderUid == activeUid && senderUid != recipientUid`):** Directly reads protected content via `firestoreAdapter.readProtectedContent`. Never executes an unlock transaction, never writes recipient retention markers, and never mutates recipient unlock state.
+    - **Recipient (`recipientUid == activeUid`):** Checks existing server/local unlock state. If locked, evaluates unlock conditions or triggers `ForegroundRecoveryCoordinator.verifyUnlock`. Saves verified content to local retention upon successful read.
+    - **Unrelated User / Unauthenticated:** Rejects access with `OperationResult.Denied`.
+- **ViewModels & Presentation State (`S03CapsuleListViewModel.kt`, `S07CapsuleDetailViewModel.kt`, `ViewModelFactory.kt`):**
+  - Implemented `S03CapsuleListViewModel` managing tab selection (Received/Sent), session-scoped list loading, publication recovery, and foreground unlock checks via `ForegroundRecoveryCoordinator`.
+  - Implemented `S07CapsuleDetailViewModel` managing role-aware detail fetching, unlock condition evaluation, and protected content display state.
+  - Extended `ViewModelFactory` to instantiate both ViewModels cleanly with required dependencies.
+- **Native Views & Navigation (`S03CapsuleListFragment.kt`, `S07CapsuleDetailFragment.kt`, `MainActivity.kt`):**
+  - Created native XML layouts (`fragment_s03_capsule_list.xml`, `item_capsule_summary.xml`, `fragment_s07_capsule_detail.xml`) adhering strictly to Stitch UI wireframes and design tokens.
+  - Created `S03CapsuleListFragment` and `S07CapsuleDetailFragment` using ViewBinding and lifecycle-aware state collection (`repeatOnLifecycle(STARTED)`).
+  - Updated `MainActivity` navigation callbacks, centralizing fragment attachment, bottom navigation ("Moments" -> `navigateToCapsuleList()`), and notification tap intent routing (`NotificationEntryResult.Valid` -> `navigateToCapsuleDetail(capsuleId)`).
+- **Automated Verification Suite:**
+  - Written `CapsuleListsAndDetailRepositoryTest.kt` (6 unit tests passed covering sent/received list queries, non-matching UID denial, participant summary lookup, Author Copy read without unlock transaction, recipient lock enforcement, and offline retention fallback).
+  - Written `S03CapsuleListViewModelTest.kt` (2 unit tests passed covering list loading and tab selection).
+  - Written `S07CapsuleDetailViewModelTest.kt` (2 unit tests passed covering Author Copy direct read and recipient locked reason formatting).
+  - Total **365 JVM unit tests passed** (`./gradlew :app:testDebugUnitTest`).
+  - Clean debug APK build passed (`./gradlew :app:assembleDebug`).
+  - Clean AndroidTest APK build passed (`./gradlew :app:assembleDebugAndroidTest`).
+  - Clean Android lint passed (`./gradlew :app:clean :app:lintDebug`).
+  - Preflight readiness check passed (`py tools/check_readiness.py --issue 21 --evidence docs/agent-tools/readiness-evidence-issue21.json` -> `PREFLIGHT_RECORD_VALID`).
+
+### Checks and results
+
+- `./gradlew :app:testDebugUnitTest`: PASS (365 JVM unit tests passed across project, 0 failed)
+- `./gradlew :app:assembleDebug :app:assembleDebugAndroidTest`: PASS (`BUILD SUCCESSFUL`)
+- `./gradlew :app:clean :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors)
+- `py tools/check_readiness.py --issue 21 --evidence docs/agent-tools/readiness-evidence-issue21.json`: PASS (`PREFLIGHT_RECORD_VALID`)
+- `git status`: PASS (clean on `feature/21-capsule-lists-detail`)
+
+### My review and understanding
+
+- **What I reviewed:** Pending student review and personal confirmation by User J.
+- **What I can explain:** How `DefaultCapsuleRepository` uses `getCapsuleSummary` to differentiate Author Copy from Recipient roles, how `DefaultLocalRetentionAdapter.listVerifiedRecipientEntries` enables process relaunch re-view when offline (T-29, T-30), and how `S03CapsuleListViewModel` and `S07CapsuleDetailViewModel` isolate session state using `requestToken` checks across coroutine suspension points.
+- **Feedback and next step:** Teammate PR review by User G and manual testing on device/emulator before human merge into `main`.
+
