@@ -3,6 +3,7 @@ package com.example.timecapsule.data.media
 import com.example.timecapsule.domain.model.OriginalPhotoFormat
 import com.example.timecapsule.domain.model.OriginalPhotoLimits
 import com.example.timecapsule.domain.model.RetainedOriginalPhoto
+import com.example.timecapsule.domain.session.SessionSnapshot
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
@@ -28,8 +29,10 @@ class InvalidOriginalPhotoException(message: String) : IOException(message)
  */
 class OriginalPhotoStore(
     private val root: File,
-    private val probe: OriginalImageProbe
+    private val probe: OriginalImageProbe,
+    private val session: (() -> SessionSnapshot)?
 ) {
+    constructor(root: File, probe: OriginalImageProbe) : this(root, probe, null)
     /**
      * Consumes and closes [input], enforces the byte cap while streaming and preserves exact bytes.
      * The caller owns [input] if argument validation fails before this method starts consuming it.
@@ -41,6 +44,10 @@ class OriginalPhotoStore(
         declaredMimeType: String?,
         input: InputStream
     ): RetainedOriginalPhoto {
+        val activeSession = session?.invoke()
+        if (activeSession != null && (!activeSession.isAuthenticated || activeSession.uid != ownerUid)) {
+            throw IOException("Stale or unauthenticated session: cannot retain photo.")
+        }
         require(ownerUid.isNotBlank() && capsuleId.isNotBlank())
         val format = OriginalPhotoFormat.entries.firstOrNull { it.mimeType == declaredMimeType }
         val directory = File(File(root, digestName(ownerUid)), digestName(capsuleId))

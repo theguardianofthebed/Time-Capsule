@@ -244,18 +244,33 @@ class AccountSessionManager(
         return confirmation.copy(isConfirmed = confirm)
     }
 
-    /** Signs out the current user and executes account cleanup BEFORE signing out of Auth or clearing session. */
+    /**
+     * Signs out current user following strict account transition lifecycle:
+     * 1. Capture former account identity.
+     * 2. Invalidate former session generation FIRST to block protected access immediately.
+     * 3. Execute store cleanups and Auth sign-out.
+     * 4. Confirm successful cleanup before removing pending obligation.
+     */
     suspend fun signOut(): OperationResult<Unit> = authMutex.withLock {
-        val oldUid = sessionTracker.currentSession().uid
-        val targetUid = if (!oldUid.isNullOrBlank()) oldUid else ""
+        val capturedSession = sessionTracker.currentSession()
+        val oldUid = capturedSession.uid ?: ""
+
+        // 1. Invalidate former session generation FIRST to block protected access immediately
+        sessionTracker.clearSession()
+
+        val targetUid = if (oldUid.isNotBlank()) oldUid else ""
+
+        // 2. Execute cleanup for former account UID (or retry pending cleanup if oldUid is blank)
         if (targetUid.isNotBlank() || isCleanupPending()) {
             val cleanupRes = onAccountCleared?.invoke(targetUid)
             if (cleanupRes is OperationResult.Unavailable || isCleanupPending()) {
-                return@withLock OperationResult.Unavailable("Account cleanup failed or pending. Cannot complete sign-out.")
+                authAdapter.signOut()
+                return@withLock OperationResult.Unavailable("Account cleanup failed or pending. Session remains invalidated.")
             }
         }
+
+        // 3. Complete Auth sign-out and return Success
         authAdapter.signOut()
-        sessionTracker.clearSession()
         OperationResult.Success(Unit)
     }
 

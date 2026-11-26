@@ -119,9 +119,19 @@ class TimeCapsuleApplication : Application() {
             root = File(noBackupDir, "retained-content"),
             session = sessionTracker::currentSession
         )
-        val operationJournal = FrozenOperationJournal(File(noBackupDir, "capsule-operations"))
-        val originalPhotoStore = OriginalPhotoStore(File(noBackupDir, "original-photos"), AndroidOriginalImageProbe())
-        val photoDraftJournal = PhotoDraftJournal(File(noBackupDir, "photo-drafts"))
+        val operationJournal = FrozenOperationJournal(
+            root = File(noBackupDir, "capsule-operations"),
+            session = sessionTracker::currentSession
+        )
+        val originalPhotoStore = OriginalPhotoStore(
+            root = File(noBackupDir, "original-photos"),
+            probe = AndroidOriginalImageProbe(),
+            session = sessionTracker::currentSession
+        )
+        val photoDraftJournal = PhotoDraftJournal(
+            root = File(noBackupDir, "photo-drafts"),
+            session = sessionTracker::currentSession
+        )
 
         val accountCleanupOrchestrator = AccountCleanupOrchestrator(
             retentionAdapter = retentionAdapter,

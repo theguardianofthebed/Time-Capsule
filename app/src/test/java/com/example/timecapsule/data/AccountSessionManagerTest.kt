@@ -316,8 +316,7 @@ class AccountSessionManagerTest {
         // First sign-out attempt fails
         val firstSignOut = manager.signOut()
         assertTrue(firstSignOut is OperationResult.Unavailable)
-        assertEquals("user-failing-signout", fakeAuthAdapter.activeUid())
-        assertTrue(sessionTracker.currentSession().isAuthenticated)
+        assertFalse("SessionTracker must be unauthenticated after sign-out start", sessionTracker.currentSession().isAuthenticated)
         assertEquals(1, cleanupAttempts)
 
         // Fix the store failure and attempt second sign-out
