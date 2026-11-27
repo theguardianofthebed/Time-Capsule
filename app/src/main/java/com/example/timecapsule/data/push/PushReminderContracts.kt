@@ -30,6 +30,7 @@ enum class PushPostResult { ATTEMPTED, NOT_ATTEMPTED, ATTEMPT_FAILED }
 /**
  * Reminder display boundary, deliberately distinct from #19's confirmed-unlock notification API.
  * Implementations use a generic reminder, account-safe entry and #20-compatible cancellation.
+ * Calls must stay short and must not wait for a UI-thread dispatch or perform network requests.
  */
 interface PushReminderRenderer {
     /** Checks runtime permission, app settings and notification channel availability without posting. */
