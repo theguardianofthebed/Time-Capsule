@@ -1,4 +1,4 @@
-# Agent Log – Week 3 (11/22/2026 – 11/24/2026)
+# Agent Log – Week 3 (11/22/2026 – 11/27/2026)
 
 - Name / Student ID: Junwon (User J)
 - Model(s) used: Android Studio Agent Mode (Gemini Flash 3.6)
