@@ -180,7 +180,7 @@ No manual code fixes were needed. All changes were applied through Android Studi
 - **Issue and PR:** [Issue #16](https://github.com/theguardianofthebed/Time-Capsule/issues/16), task branch `feature/16-map-foreground-location`.
 - **Requirement/design references:** FR-06, NFR-02; ARC-07; DD-12, DD-22; AC-05; T-16, T-17, T-18, T-42 (partial).
 - **Agent environment:** Android Studio Agent Mode.
-- **Model used:** Gemini 3.8 Flash.
+- **Model used:** Gemini 3.6 Flash.
 
 ### Goal
 
@@ -283,7 +283,7 @@ No manual code fix was required. The agent corrected a missing permission linter
 - **Issue and PR:** [Issue #17](https://github.com/theguardianofthebed/Time-Capsule/issues/17), task branch `feature/17-current-conditions` (pushed to `origin/feature/17-current-conditions`).
 - **Requirement/design references:** FR-06, FR-07, NFR-04; ARC-05; DD-05; AC-06; T-19, T-20, T-42.
 - **Agent environment:** Android Studio Agent Mode.
-- **Model used:** Gemini 3.8 Flash.
+- **Model used:** Gemini 3.6 Flash.
 
 ### Goal
 
@@ -351,7 +351,7 @@ No manual code fix was required. The agent corrected a missing constructor param
 - **Issue and PR:** [Issue #18](https://github.com/theguardianofthebed/Time-Capsule/issues/18), task branch `feature/18-foreground-recovery`.
 - **Requirement/design references:** FR-09, NFR-05; ARC-05, ARC-07; DD-08; AC-07; T-24, T-25, T-32.
 - **Agent environment:** Android Studio Agent Mode.
-- **Model used:** Gemini 3.8 Flash.
+- **Model used:** Gemini 3.6 Flash.
 
 ### Goal
 
@@ -517,7 +517,7 @@ Implement account-safe local notifications for confirmed first unlocks without t
 - **Issue and PR:** [Issue #20](https://github.com/theguardianofthebed/Time-Capsule/issues/20), task branch `feature/20-account-retention-cleanup`.
 - **Requirement/design references:** FR-01, FR-12, NFR-01; ARC-06; DD-18; AC-01, AC-13; T-02, T-29, T-44.
 - **Agent environment:** Android Studio Agent Mode.
-- **Model used:** Gemini 3.8 Flash.
+- **Model used:** Gemini 3.6 Flash.
 
 ### Goal
 
@@ -606,7 +606,7 @@ The Firestore and Storage emulator suite passed all 42 tests on `540a1586de7cae8
 - **Issue and PR:** [Issue #21](https://github.com/theguardianofthebed/Time-Capsule/issues/21), task branch `feature/21-capsule-lists-detail`.
 - **Requirement/design references:** DD-06, DD-28; FR-08, FR-11, FR-12; NFR-05; AC-03, AC-09, AC-11; T-07, T-08, T-27, T-28, T-29, T-30, T-35.
 - **Agent environment:** Android Studio Agent Mode.
-- **Model used:** Gemini 3.8 Flash.
+- **Model used:** Gemini 3.6 Flash.
 
 ### Goal
 
