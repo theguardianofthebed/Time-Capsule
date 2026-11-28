@@ -112,6 +112,11 @@ class S08AccountSettingsFragment : Fragment() {
 
         // Profile check observer: updates header and populates field if user is not actively editing
         viewModel.profileCheckState.observe(viewLifecycleOwner) { result ->
+            val screenOrigin = getOriginatingSession()
+            val currentSession = appContainer.accountSessionManager.currentSession()
+            if (screenOrigin == null || screenOrigin != currentSession || !appContainer.accountSessionManager.isSessionValid(screenOrigin)) {
+                return@observe
+            }
             when (result) {
                 is OperationResult.Success -> {
                     val name = result.data.displayName

@@ -268,15 +268,17 @@ class S07CapsuleDetailViewModel(
                 (msg.contains("location", ignoreCase = true) && msg.contains("permission", ignoreCase = true))) {
                 return DetailStatus.LOCKED_PERMISSION_REQUIRED
             }
-            if (msg.contains("location service", ignoreCase = true) ||
-                msg.contains("location provider", ignoreCase = true) ||
-                msg.contains("disabled", ignoreCase = true) ||
-                msg.contains("gps", ignoreCase = true)) {
+            if ((msg.contains("location", ignoreCase = true) && msg.contains("disabled", ignoreCase = true) && !msg.contains("account", ignoreCase = true)) ||
+                msg.contains("location service", ignoreCase = true) ||
+                msg.contains("location provider disabled", ignoreCase = true) ||
+                msg.contains("gps disabled", ignoreCase = true)) {
                 return DetailStatus.LOCKED_LOCATION_DISABLED
             }
-            if (msg.contains("radius", ignoreCase = true) ||
+            if (msg.contains("null fix", ignoreCase = true) ||
                 msg.contains("accuracy", ignoreCase = true) ||
-                msg.contains("stale", ignoreCase = true)) {
+                msg.contains("stale", ignoreCase = true) ||
+                msg.contains("outside target radius", ignoreCase = true) ||
+                msg.contains("sample is missing", ignoreCase = true)) {
                 return DetailStatus.LOCKED_WAITING_LOCATION
             }
         }

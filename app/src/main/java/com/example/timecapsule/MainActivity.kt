@@ -413,7 +413,11 @@ class MainActivity : AppCompatActivity() {
                     pending = null
                     val currentOwner = container.sessionTracker.currentSession()
                     val canReadNow = readOnlySession == currentOwner && (fragment is S03CapsuleListFragment || fragment is S07CapsuleDetailFragment)
-                    if (isProtected(fragment) && (!currentOwner.isAuthenticated || (verifiedProfile != currentOwner && !canReadNow))) {
+                    val belongs = belongsToCurrentSession(fragment)
+                    val checking = accountCheck?.isActive == true
+
+                    if (checking || (requiresSession(fragment) && !belongs) ||
+                        (isProtected(fragment) && (!currentOwner.isAuthenticated || (verifiedProfile != currentOwner && !canReadNow)))) {
                         binding.fragmentContainer.visibility = View.INVISIBLE
                         resolveAccountScreen()
                     } else {

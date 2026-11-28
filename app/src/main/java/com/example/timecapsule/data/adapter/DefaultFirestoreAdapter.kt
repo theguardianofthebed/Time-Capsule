@@ -49,7 +49,8 @@ private sealed interface TransactionUnlockResult {
  */
 class DefaultFirestoreAdapter(
     private val contextSupplier: () -> Context? = { null },
-    private val storageAdapter: StorageAdapter? = null
+    private val storageAdapter: StorageAdapter? = null,
+    private val firestoreSupplier: (() -> FirebaseFirestore?)? = null
 ) : FirestoreAdapter {
 
     override fun isAvailable(): Boolean {
@@ -58,7 +59,7 @@ class DefaultFirestoreAdapter(
     }
 
     override fun firestoreInstance(): FirebaseFirestore? {
-        return FirebaseConfig.getMemoryOnlyFirestore(contextSupplier())
+        return firestoreSupplier?.invoke() ?: FirebaseConfig.getMemoryOnlyFirestore(contextSupplier())
     }
 
     override suspend fun getRecipientProfile(uid: String): OperationResult<RecipientProfile> {

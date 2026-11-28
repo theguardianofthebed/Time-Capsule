@@ -30,6 +30,7 @@ private class FakeAuthAdapterForS08 : AuthAdapter {
     var uid: String? = "test-uid-123"
     var name: String? = "Initial Name"
     var updateCount = 0
+    var signOutCount = 0
 
     override fun activeUid(): String? = uid
     override fun activeEmail(): String? = uid?.let { "$it@example.com" }
@@ -53,6 +54,7 @@ private class FakeAuthAdapterForS08 : AuthAdapter {
     }
 
     override fun signOut() {
+        signOutCount++
         uid = null
         name = null
     }
@@ -256,6 +258,7 @@ class S08AccountSettingsViewModelTest {
         testDispatcher.scheduler.advanceUntilIdle()
 
         assertNull(authAdapter.activeUid())
+        assertEquals(1, authAdapter.signOutCount)
     }
 
     private fun runBlockingTest(block: suspend () -> Unit) = runBlocking { block() }

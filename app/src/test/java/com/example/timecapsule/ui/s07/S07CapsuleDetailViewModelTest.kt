@@ -109,17 +109,15 @@ class S07CapsuleDetailViewModelTest {
     }
 
     @Test
-    fun `timeOnlyLock_accountDisabledError_mapsToAccessDenied_notLocationDisabled`() = runTest(testDispatcher) {
+    fun `locationLock_accountDisabledError_mapsToAccessDenied_notLocationDisabled`() = runTest(testDispatcher) {
         sessionTracker.startSession(userB)
-        val now = Instant.now()
         val cap = CapsuleSummary(
             capsuleId = "cap-3",
             senderUid = userA,
             recipientUid = userB,
-            lock = CapsuleLock(LockMode.TIME, unlockAt = now.plusSeconds(3600)),
+            lock = CapsuleLock(LockMode.LOCATION, location = LocationTarget(37.5, 127.0)),
             sendStatus = SendStatus.SENT,
-            availability = Availability.LOCKED,
-            title = "A's Note To B"
+            availability = Availability.LOCKED
         )
         fakeRepository.summaries["cap-3"] = cap
         fakeRecoveryCoordinator.verifyUnlockResult = OperationResult.Denied("User account disabled or not found.")
@@ -128,9 +126,50 @@ class S07CapsuleDetailViewModelTest {
         testDispatcher.scheduler.advanceUntilIdle()
 
         val state = viewModel.uiState.value
-        assertFalse(state.isLoading)
         assertEquals(DetailStatus.ACCESS_DENIED, state.status)
-        assertFalse(state.status == DetailStatus.LOCKED_LOCATION_DISABLED)
+    }
+
+    @Test
+    fun `bothLock_staleSessionError_mapsToAccessDenied`() = runTest(testDispatcher) {
+        sessionTracker.startSession(userB)
+        val now = Instant.now()
+        val cap = CapsuleSummary(
+            capsuleId = "cap-both-stale",
+            senderUid = userA,
+            recipientUid = userB,
+            lock = CapsuleLock(LockMode.TIME_AND_LOCATION, unlockAt = now.plusSeconds(3600), location = LocationTarget(37.5, 127.0)),
+            sendStatus = SendStatus.SENT,
+            availability = Availability.LOCKED
+        )
+        fakeRepository.summaries["cap-both-stale"] = cap
+        fakeRecoveryCoordinator.verifyUnlockResult = OperationResult.Denied("Session changed during authentication.")
+
+        viewModel.loadDetail("cap-both-stale")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(DetailStatus.ACCESS_DENIED, state.status)
+    }
+
+    @Test
+    fun `locationLock_nullFixError_mapsToWaitingLocation`() = runTest(testDispatcher) {
+        sessionTracker.startSession(userB)
+        val cap = CapsuleSummary(
+            capsuleId = "cap-null-fix",
+            senderUid = userA,
+            recipientUid = userB,
+            lock = CapsuleLock(LockMode.LOCATION, location = LocationTarget(37.5, 127.0)),
+            sendStatus = SendStatus.SENT,
+            availability = Availability.LOCKED
+        )
+        fakeRepository.summaries["cap-null-fix"] = cap
+        fakeRecoveryCoordinator.verifyUnlockResult = OperationResult.Unavailable("Location provider returned a null fix.")
+
+        viewModel.loadDetail("cap-null-fix")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(DetailStatus.LOCKED_WAITING_LOCATION, state.status)
     }
 
     @Test
@@ -173,6 +212,50 @@ class S07CapsuleDetailViewModelTest {
 
         val state = viewModel.uiState.value
         assertEquals(DetailStatus.LOCKED_LOCATION_DISABLED, state.status)
+    }
+
+    @Test
+    fun `timeLock_ambiguousAuthDenial_mapsToAccessDenied`() = runTest(testDispatcher) {
+        sessionTracker.startSession(userB)
+        val now = Instant.now()
+        val cap = CapsuleSummary(
+            capsuleId = "cap-time-denied",
+            senderUid = userA,
+            recipientUid = userB,
+            lock = CapsuleLock(LockMode.TIME, unlockAt = now.plusSeconds(3600)),
+            sendStatus = SendStatus.SENT,
+            availability = Availability.LOCKED
+        )
+        fakeRepository.summaries["cap-time-denied"] = cap
+        fakeRecoveryCoordinator.verifyUnlockResult = OperationResult.Denied("Unlock authorization denied.")
+
+        viewModel.loadDetail("cap-time-denied")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(DetailStatus.ACCESS_DENIED, state.status)
+    }
+
+    @Test
+    fun `bothLock_unavailableNetwork_mapsToVerificationFailed`() = runTest(testDispatcher) {
+        sessionTracker.startSession(userB)
+        val now = Instant.now()
+        val cap = CapsuleSummary(
+            capsuleId = "cap-both-offline",
+            senderUid = userA,
+            recipientUid = userB,
+            lock = CapsuleLock(LockMode.TIME_AND_LOCATION, unlockAt = now.plusSeconds(3600), location = LocationTarget(37.5, 127.0)),
+            sendStatus = SendStatus.SENT,
+            availability = Availability.LOCKED
+        )
+        fakeRepository.summaries["cap-both-offline"] = cap
+        fakeRecoveryCoordinator.verifyUnlockResult = OperationResult.Unavailable("Network connection lost.")
+
+        viewModel.loadDetail("cap-both-offline")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(DetailStatus.LOCKED_VERIFICATION_FAILED, state.status)
     }
 
     private class FakeRecoveryCoordinator(

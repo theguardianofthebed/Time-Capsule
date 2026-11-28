@@ -1082,4 +1082,39 @@ User J confirmed task ownership and implementation review. Personal reflections,
 User J confirmed task ownership and implementation review. Personal reflections, teammate PR review by User G, manual device testing, and human merge into `main` remain for the students to complete.
 
 
+## 2026-11-29-issue22-fifth-review — Issue #22 Fifth Review Outstanding Corrections
+
+- **Owner:** User J, explicitly confirmed as implementation owner for Issue #22. Reviewer: User G.
+- **Environment/model:** Android Studio Agent Mode (Gemini 3.8 Flash).
+- **Status:** Implemented, verified with 448 passing JVM unit tests, clean debug build, clean AndroidTest APK build, clean lint (0 errors), branch `feature/22-native-ui-recovery` updated. Target PR: [Draft PR #51](https://github.com/theguardianofthebed/Time-Capsule/pull/51).
+- **Requested outcome:** Complete fifth review outstanding items: commit previously pending changes to `MainActivity.kt` and `S07CapsuleDetailViewModel.kt`, complete unlock failure classification, strengthen navigation transaction completion with `belongsToCurrentSession(fragment)` and `accountCheck?.isActive`, strengthen location label restoration in `CapsuleDraftViewModel.kt`, and add production adapter validation tests.
+- **References:** [Issue #22](https://github.com/theguardianofthebed/Time-Capsule/issues/22); [PR #51](https://github.com/theguardianofthebed/Time-Capsule/pull/51); FR-01–FR-12; ARC-01, ARC-04, ARC-05, ARC-07; DD-01, DD-02, DD-03, DD-04, DD-05, DD-06, DD-07, DD-08, DD-09, DD-12, DD-13, DD-14, DD-15, DD-18, DD-19, DD-26, DD-27, DD-28; AC-10; T-38, T-45.
+
+### Work performed
+
+- **Committed Outstanding File Changes (`MainActivity.kt`, `S07CapsuleDetailViewModel.kt`):**
+  - Included modified `MainActivity.kt` and `S07CapsuleDetailViewModel.kt` in git staging and commit.
+- **Complete Unlock Failure Classification (`S07CapsuleDetailViewModel.kt`):**
+  - Refined `mapUnlockFailureStatus()` to distinguish participant denial (`ACCESS_DENIED`), permission denial (`LOCKED_PERMISSION_REQUIRED`), disabled location services (`LOCKED_LOCATION_DISABLED`), missing/null location fix (`LOCKED_WAITING_LOCATION`), and time pending (`LOCKED_WAITING_TIME` / `LOCKED_WAITING_BOTH`).
+- **Complete Navigation Transaction Protection (`MainActivity.kt`):**
+  - Updated `replaceFragment().runOnCommit` to check `belongsToCurrentSession(fragment)` and `accountCheck?.isActive == true`, preventing obsolete fragments or premature container reveals during active profile checks.
+- **Recovered Location Label Restoration (`CapsuleDraftViewModel.kt`):**
+  - Updated `applyRecovered()` to require matching capsule ID AND matching location coordinates before preserving a custom location name.
+- **Production Adapter Validation Tests (`AuthAndRecipientTest.kt`):**
+  - Added unit tests directly exercising `DefaultAuthAdapter` and `DefaultFirestoreAdapter` production validation.
+
+### Checks and verification
+
+- `./gradlew :app:testDebugUnitTest`: PASS (448 JVM unit tests passed across project, 0 failed)
+- `./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors)
+- `py tools/check_readiness.py --validate-manifest`: PASS (`MANIFEST_VALID`)
+- `py tools/check_readiness.py --issue 22 --evidence docs/agent-tools/readiness-evidence-issue22.json`: PASS (`PREFLIGHT_RECORD_VALID`)
+- `git diff --check`: PASS (clean)
+
+### Human input and remaining work
+
+User J confirmed task ownership and implementation review. Personal reflections, teammate PR review by User G, manual device testing, and human merge into `main` remain for the students to complete.
+
+
+
 

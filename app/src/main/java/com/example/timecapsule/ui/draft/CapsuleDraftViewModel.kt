@@ -839,7 +839,9 @@ class CapsuleDraftViewModel(
                     publicationMessage = messageRes
                 )
             } else {
-                val restoredLocationName = if (state.capsuleId == operation.capsuleId) {
+                val restoredLocationName = if (state.capsuleId == operation.capsuleId &&
+                    state.locationTarget?.latitude == operation.lock.location?.latitude &&
+                    state.locationTarget?.longitude == operation.lock.location?.longitude) {
                     state.locationName
                 } else {
                     operation.lock.location?.let { "${"%.4f".format(it.latitude)}, ${"%.4f".format(it.longitude)}" }

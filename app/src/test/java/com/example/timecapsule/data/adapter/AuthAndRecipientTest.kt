@@ -176,4 +176,24 @@ class AuthAndRecipientTest {
         firestoreAdapter.simulatePermissionDenied = true
         assertTrue(firestoreAdapter.getRecipientProfile(validUid) is OperationResult.Denied)
     }
+
+    @Test
+    fun testDefaultAuthAdapterValidation() = runBlocking {
+        val adapter = DefaultAuthAdapter()
+        val blankEmailRes = adapter.signUp("", "pass123", "Name")
+        assertTrue(blankEmailRes is OperationResult.Invalid)
+
+        val blankPassRes = adapter.signUp("user@example.com", "", "Name")
+        assertTrue(blankPassRes is OperationResult.Invalid)
+    }
+
+    @Test
+    fun testDefaultFirestoreAdapterValidation() = runBlocking {
+        val adapter = DefaultFirestoreAdapter()
+        val blankUidRes = adapter.getRecipientProfile("")
+        assertTrue(blankUidRes is OperationResult.Invalid)
+
+        val unavailRes = adapter.getRecipientProfile("some-uid")
+        assertTrue(unavailRes is OperationResult.Unavailable)
+    }
 }

@@ -40,3 +40,14 @@ Published for independent review in [Draft PR #51](https://github.com/theguardia
 - Enforced complete profile verification in `DefaultFirestoreAdapter.getRecipientProfile()` (checks `hasPendingWrites()`/`isFromCache` before document existence, requires matching UID and nonblank display name).
 - Added in-flight submission guard `isSignOutInFlight` in `S08AccountSettingsViewModel` and session validation in S-08 LiveData observers.
 - Automated verification: 442 JVM unit tests passed (`./gradlew :app:testDebugUnitTest`), debug/test APKs assembled, lint clean (0 errors), readiness preflight valid (`py tools/check_readiness.py --issue 22 --evidence docs/agent-tools/readiness-evidence-issue22.json` -> `PREFLIGHT_RECORD_VALID`).
+
+## Issue #22 · Fifth Review: Outstanding Corrections (29 November 2026)
+
+- Work period: 29 November 2026 (KST). Scope: MVP. Human reviewer: User G.
+- Target PR: [PR #51](https://github.com/theguardianofthebed/Time-Capsule/pull/51). Branch: `feature/22-native-ui-recovery`.
+- Committed previously pending changes to `MainActivity.kt` and `S07CapsuleDetailViewModel.kt`.
+- Strengthened `MainActivity.replaceFragment().runOnCommit` with `belongsToCurrentSession(fragment)` check and `accountCheck?.isActive` guard.
+- Refined `S07CapsuleDetailViewModel.mapUnlockFailureStatus()` so specific location failures (`"location service"`, `"permission"`, `"null fix"`) produce correct location guidance while account/denial errors map to `ACCESS_DENIED`.
+- Strengthened `CapsuleDraftViewModel.applyRecovered()` location-label logic to require matching coordinates before preserving a custom location label.
+- Added tests exercising real `DefaultAuthAdapter` and `DefaultFirestoreAdapter` production adapter validation in `AuthAndRecipientTest.kt`.
+- Automated verification: 448 JVM unit tests passed (`./gradlew :app:testDebugUnitTest`), debug/test APKs assembled, lint clean (0 errors), readiness preflight valid (`py tools/check_readiness.py --issue 22 --evidence docs/agent-tools/readiness-evidence-issue22.json` -> `PREFLIGHT_RECORD_VALID`).
