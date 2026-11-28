@@ -109,6 +109,7 @@
     <!-- Stale / Offline Banner -->
     <TextView
         android:id="@+id/tvStaleBanner"
+        android:accessibilityLiveRegion="polite"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@color/capsule_banner_bg"
@@ -122,6 +123,7 @@
     <!-- Error Banner -->
     <TextView
         android:id="@+id/tvErrorMessage"
+        android:accessibilityLiveRegion="polite"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@color/capsule_error_bg"

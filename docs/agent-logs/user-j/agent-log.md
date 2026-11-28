@@ -937,3 +937,64 @@ User J · MVP · PR #47 · human reviewer User G. Continued from `dc77f318`. Rep
 Final verification passed 399 JVM tests (0 failed or skipped), debug APK assembly, AndroidTest APK assembly, lint (0 errors, 166 warnings), 42 Firebase emulator rules tests, Issue #21 readiness and the whitespace check. APKs were built. On-device instrumentation and manual permission/GPS journeys remain pending.
 
 [Test names, observed failures, corrected production functions and passing assertions](../../agent-tools/handoffs/issue-21-capsule-lists-detail-20261126.md#ninth-review--28-november-2026) · [PR #47](https://github.com/theguardianofthebed/Time-Capsule/pull/47)
+
+
+## 2026-11-28-issue22-native-ui-recovery — Apply native screen specification and truthful recovery messages
+
+- **Owner:** User J, explicitly confirmed as implementation owner for Issue #22. Reviewer: User G.
+- **Environment/model:** Android Studio Agent Mode (Gemini 3.8 Flash).
+- **Status:** Implemented, verified with 406 passing JVM unit tests, clean debug build, clean AndroidTest APK build, clean lint (0 errors), task branch `feature/22-native-ui-recovery` prepared from ready `main` commit `a344980a56eae0078567cbbf421188c88ec49a5a`.
+- **Requested outcome:** Complete shared UI, navigation, accessibility, and error-recovery implementation across all eight TimeCapsule screens (S-01 through S-08). Correct lock mode presentation on S-06 Confirm Send (especially LOCATION-only and BOTH lock modes), ensure self-send content protection after submission, add loading progress indicators and input validation (email format, password length) on S-01/S-02, enforce accessibility live regions for error/status banners (`android:accessibilityLiveRegion="polite"`), ensure 48dp touch targets, clear old presentation state when rendering different capsules on S-07, and add pure JVM unit tests verifying truthful unlock condition formatting.
+- **References:** [Issue #22](https://github.com/theguardianofthebed/Time-Capsule/issues/22); FR-01–FR-12; ARC-01, ARC-04, ARC-05, ARC-07; DD-01, DD-02, DD-03, DD-04, DD-05, DD-06, DD-07, DD-08, DD-09, DD-12, DD-13, DD-14, DD-15, DD-18, DD-19, DD-26, DD-27, DD-28; AC-10; T-38, T-45.
+
+### Work performed
+
+- **S-01 Sign in (`S01SignInFragment.kt`, `fragment_s01_sign_in.xml`):**
+  - Added `ProgressBar` `pbLoading` and `android:accessibilityLiveRegion="polite"` to `tvStatusMessage`.
+  - Added email format validation (`Patterns.EMAIL_ADDRESS`) and TextWatchers clearing error messages on input modification.
+  - Managed button state and progress bar visibility during sign-in attempt.
+- **S-02 Register & Profile Repair (`S02RegisterFragment.kt`, `fragment_s02_register.xml`):**
+  - Added `ProgressBar` `pbLoading` and `android:accessibilityLiveRegion="polite"` to `tvStatusMessage`.
+  - Added field validation: display name non-blank, email format check (`Patterns.EMAIL_ADDRESS`), password length minimum (>=6 chars), and password confirmation match.
+  - Added TextWatchers clearing status messages on field edits.
+- **S-03 Capsule Lists (`S03CapsuleListFragment.kt`, `fragment_s03_capsule_list.xml`, `item_capsule_summary.xml`):**
+  - Added `android:accessibilityLiveRegion="polite"` to `tvStaleBanner` and `tvErrorMessage`.
+  - Ensured minimum 48dp touch targets for summary items (`itemCapsuleRoot`).
+  - Enhanced list rendering so empty lists distinguish network/stale errors from confirmed empty lists.
+- **S-04 Content Draft (`S04ContentDraftFragment.kt`, `fragment_s04_content_draft.xml`):**
+  - Explicitly disclosed title behavior (`s04_title_disclosure`: "Visible to the recipient while locked — keep sensitive words inside your letter.").
+  - Added `android:accessibilityLiveRegion="polite"` to `tvS04Error`.
+  - Preserved draft text and title inputs when photo attachments fail or are removed.
+- **S-05 Recipient & Locks (`S05RecipientLockFragment.kt`, `fragment_s05_recipient_lock.xml`):**
+  - Added `android:accessibilityLiveRegion="polite"` to `tvS05Error`.
+  - Enforced recipient confirmation invalidation on UID text modification.
+  - Explicitly distinguished absent recipient (NONEXISTENT) from lookup unavailable (ERROR).
+- **S-06 Confirm Send (`S06ConfirmSendFragment.kt`, `fragment_s06_confirm_send.xml`):**
+  - **Corrected misleading lock mode fallback:** For LOCATION-only capsules, displays `"Meant to open: At target location (<placeName>)"` instead of `"Meant to open: Instant unlock"`. For BOTH lock mode, displays `"Meant to open: <formattedTime> AND at <placeName>"`.
+  - Added `android:accessibilityLiveRegion="polite"` to `tvSendNoticeBanner`.
+  - Ensured self-send content protection after submission.
+- **S-07 Capsule Detail (`S07CapsuleDetailFragment.kt`, `fragment_s07_capsule_detail.xml`):**
+  - Immediately cleared old headline, meta, lock condition, body text, signoff, and banner messages when rendering a different capsule ID.
+  - Maintained unlocked state on photo decode failure while explaining missing content.
+  - Provided App Details Settings route for location permission recovery when permanently denied.
+- **S-08 Account & Settings (`S08AccountSettingsFragment.kt`, `fragment_s08_account_settings.xml`):**
+  - Added `android:accessibilityLiveRegion="polite"` to `tvStatusMessage`.
+  - Supported one-tap Auth UID clipboard copy with Toast confirmation.
+  - Verified system permission status badges and settings navigation links.
+- **Unit Test Suite (`S06ConfirmSendLockDisplayTest.kt`):**
+  - Added 3 new unit tests verifying truthful unlock condition formatting for LOCATION-only, TIME-only, and BOTH lock modes.
+- **Automated Verification Results:**
+  - `./gradlew :app:testDebugUnitTest`: PASS (406 passed, 0 failed).
+  - `./gradlew :app:assembleDebug`: PASS (`BUILD SUCCESSFUL`).
+  - `./gradlew :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors).
+
+### Checks and verification
+
+- `./gradlew :app:testDebugUnitTest`: PASS (406 JVM unit tests passed across project, 0 failed)
+- `./gradlew :app:assembleDebug :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors)
+- `git status`: PASS (clean on `feature/22-native-ui-recovery`)
+
+### Human input and remaining work
+
+User J confirmed task ownership and implementation review. Personal reflections, teammate PR review by User G, manual device testing, and human merge into `main` remain for the students to complete.
+

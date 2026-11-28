@@ -278,6 +278,7 @@
             <!-- Error / Status Notice -->
             <TextView
                 android:id="@+id/tvS04Error"
+                android:accessibilityLiveRegion="polite"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"

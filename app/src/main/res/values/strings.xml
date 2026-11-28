@@ -43,6 +43,8 @@
     <string name="err_adapter_unavailable">Required service adapters unavailable.</string>
     <string name="err_session_unavailable">Session unauthenticated or service unavailable.</string>
     <string name="err_password_mismatch">Passwords do not match.</string>
+    <string name="err_password_too_short">Password must be at least 6 characters.</string>
+    <string name="err_invalid_email">Please enter a valid email address.</string>
     <string name="err_email_password_required">Please enter both email address and password.</string>
     <string name="err_required_field">Please fill in all required fields.</string>
     <string name="err_name_required">Please enter a valid display name.</string>

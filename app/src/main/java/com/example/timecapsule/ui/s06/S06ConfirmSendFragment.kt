@@ -202,23 +202,41 @@ class S06ConfirmSendFragment : Fragment() {
                         binding.tvReviewPhotoInfo.visibility = View.GONE
                     }
 
-                    // Unlock Time
-                    if (state.unlockAt != null) {
+                    // Unlock Condition Presentation
+                    val timeFormatted = if (state.unlockAt != null) {
                         val zoneId = try { ZoneId.of(state.creationZone) } catch (_: Exception) { ZoneId.systemDefault() }
-                        val formattedTime = TimeConversionHelper.formatZonedDateTime(state.unlockAt, zoneId)
-                        binding.tvReviewUnlockAt.text = "Meant to open: $formattedTime"
-                    } else {
-                        binding.tvReviewUnlockAt.text = "Meant to open: Instant unlock"
-                    }
+                        TimeConversionHelper.formatZonedDateTime(state.unlockAt, zoneId)
+                    } else null
 
-                    // Location Condition
-                    if (state.lockMode == LockMode.LOCATION || state.lockMode == LockMode.TIME_AND_LOCATION) {
+                    val placeFormatted = if (state.lockMode == LockMode.LOCATION || state.lockMode == LockMode.TIME_AND_LOCATION) {
                         val placeName = state.locationName ?: "Selected location"
                         val radius = state.locationTarget?.radiusMeters?.toInt() ?: 150
-                        binding.tvReviewLocation.text = "Location: $placeName · $radius m radius"
-                        binding.tvReviewLocation.visibility = View.VISIBLE
-                    } else {
-                        binding.tvReviewLocation.visibility = View.GONE
+                        "$placeName ($radius m radius)"
+                    } else null
+
+                    when (state.lockMode) {
+                        LockMode.TIME -> {
+                            binding.tvReviewUnlockAt.text = if (timeFormatted != null) {
+                                "Meant to open: $timeFormatted"
+                            } else {
+                                "Meant to open: Specified future time"
+                            }
+                            binding.tvReviewLocation.visibility = View.GONE
+                        }
+                        LockMode.LOCATION -> {
+                            binding.tvReviewUnlockAt.text = if (placeFormatted != null) {
+                                "Meant to open: At $placeFormatted"
+                            } else {
+                                "Meant to open: At target location"
+                            }
+                            binding.tvReviewLocation.visibility = View.GONE
+                        }
+                        LockMode.TIME_AND_LOCATION -> {
+                            val timeText = timeFormatted ?: "Specified future time"
+                            val placeText = placeFormatted ?: "Target location"
+                            binding.tvReviewUnlockAt.text = "Meant to open: $timeText AND at $placeText"
+                            binding.tvReviewLocation.visibility = View.GONE
+                        }
                     }
 
                     val notice = if (state.recoveryBusy) R.string.publication_recovering

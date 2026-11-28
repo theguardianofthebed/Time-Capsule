@@ -1,8 +1,11 @@
 package com.example.timecapsule.ui.s01
 
 import android.os.Bundle
+import android.text.Editable
+import android.text.TextWatcher
 import android.text.method.HideReturnsTransformationMethod
 import android.text.method.PasswordTransformationMethod
+import android.util.Patterns
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -63,9 +66,21 @@ class S01SignInFragment : Fragment() {
             binding.etPassword.setSelection(binding.etPassword.text?.length ?: 0)
         }
 
+        // Clear status message when user modifies credentials
+        val textWatcher = object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                binding.tvStatusMessage.text = ""
+            }
+            override fun afterTextChanged(s: Editable?) {}
+        }
+        binding.etEmail.addTextChangedListener(textWatcher)
+        binding.etPassword.addTextChangedListener(textWatcher)
+
         // Observe ViewModel sign-in state mutations
         viewModel.signInState.observe(viewLifecycleOwner) { result ->
             binding.btnSignIn.isEnabled = true
+            binding.pbLoading.visibility = View.GONE
             when (result) {
                 is OperationResult.Success -> {
                     binding.tvStatusMessage.text = getString(R.string.msg_sign_in_success)
@@ -90,7 +105,13 @@ class S01SignInFragment : Fragment() {
                 return@setOnClickListener
             }
 
+            if (!Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+                binding.tvStatusMessage.text = getString(R.string.err_invalid_email)
+                return@setOnClickListener
+            }
+
             binding.btnSignIn.isEnabled = false
+            binding.pbLoading.visibility = View.VISIBLE
             binding.tvStatusMessage.text = getString(R.string.msg_signing_in)
             viewModel.signIn(email, password)
         }

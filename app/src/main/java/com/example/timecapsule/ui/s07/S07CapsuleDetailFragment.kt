@@ -146,12 +146,18 @@ class S07CapsuleDetailFragment : Fragment() {
     private fun renderUiState(state: CapsuleDetailUiState) {
         binding.pbS07Loading.visibility = if (state.isLoading) View.VISIBLE else View.GONE
 
-        // Cancel previous image render if capsule ID or session generation changed
+        // Cancel previous image render and clear previous text state if capsule ID changed
         imageRenderToken++
         if (state.capsuleId != activeRenderCapsuleId) {
             imageRenderJob?.cancel()
             binding.ivS07Photo.setImageDrawable(null)
             binding.ivS07Photo.visibility = View.GONE
+            binding.tvS07Headline.text = ""
+            binding.tvS07Meta.text = ""
+            binding.tvS07LockCondition.text = ""
+            binding.tvS07BodyText.text = ""
+            binding.tvS07SignOff.text = ""
+            binding.tvS07Banner.text = ""
             activeRenderCapsuleId = state.capsuleId
         }
 

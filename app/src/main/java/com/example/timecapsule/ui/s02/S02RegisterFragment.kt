@@ -1,8 +1,11 @@
 package com.example.timecapsule.ui.s02
 
 import android.os.Bundle
+import android.text.Editable
+import android.text.TextWatcher
 import android.text.method.HideReturnsTransformationMethod
 import android.text.method.PasswordTransformationMethod
+import android.util.Patterns
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -87,9 +90,23 @@ class S02RegisterFragment : Fragment() {
             binding.etPassword.setSelection(binding.etPassword.text?.length ?: 0)
         }
 
+        // Clear status message when user modifies any input field
+        val textWatcher = object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                binding.tvStatusMessage.text = ""
+            }
+            override fun afterTextChanged(s: Editable?) {}
+        }
+        binding.etDisplayName.addTextChangedListener(textWatcher)
+        binding.etEmail.addTextChangedListener(textWatcher)
+        binding.etPassword.addTextChangedListener(textWatcher)
+        binding.etConfirmPassword.addTextChangedListener(textWatcher)
+
         // Observe registration and profile repair ViewModel state
         viewModel.registerState.observe(viewLifecycleOwner) { result ->
             binding.btnRegister.isEnabled = true
+            binding.pbLoading.visibility = View.GONE
             when (result) {
                 is OperationResult.Success -> {
                     binding.tvStatusMessage.text = getString(R.string.msg_account_created)
@@ -114,6 +131,7 @@ class S02RegisterFragment : Fragment() {
                     return@setOnClickListener
                 }
                 binding.btnRegister.isEnabled = false
+                binding.pbLoading.visibility = View.VISIBLE
                 binding.tvStatusMessage.text = getString(R.string.msg_creating_account)
                 viewModel.repairProfile(displayName)
             } else {
@@ -126,12 +144,23 @@ class S02RegisterFragment : Fragment() {
                     return@setOnClickListener
                 }
 
+                if (!Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+                    binding.tvStatusMessage.text = getString(R.string.err_invalid_email)
+                    return@setOnClickListener
+                }
+
+                if (password.length < 6) {
+                    binding.tvStatusMessage.text = getString(R.string.err_password_too_short)
+                    return@setOnClickListener
+                }
+
                 if (password != confirmPassword) {
                     binding.tvStatusMessage.text = getString(R.string.err_password_mismatch)
                     return@setOnClickListener
                 }
 
                 binding.btnRegister.isEnabled = false
+                binding.pbLoading.visibility = View.VISIBLE
                 binding.tvStatusMessage.text = getString(R.string.msg_creating_account)
                 viewModel.registerAndCreateProfile(email, password, displayName)
             }
