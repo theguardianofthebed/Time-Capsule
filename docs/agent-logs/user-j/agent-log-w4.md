@@ -16,3 +16,5 @@ Several failures were reproduced through the Android activity. A duplicate sign-
 User J’s personal review, explanations, manual fixes, and course submission remain pending student input. User G’s independent review is pending.
 
 See the [dated correction to the ongoing log](issue-22-correction.md).
+
+Published for independent review in [Draft PR #51](https://github.com/theguardianofthebed/Time-Capsule/pull/51).

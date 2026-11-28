@@ -60,3 +60,5 @@ User G's independent review is pending. The device walkthrough still needs to ch
 No remaining functional blocker was identified by the source review and automated checks. Full AC-10 device acceptance and independent review remain open.
 
 [User J’s dated correction to the ongoing log](../../agent-logs/user-j/issue-22-correction.md)
+
+[Draft PR #51](https://github.com/theguardianofthebed/Time-Capsule/pull/51) contains the published implementation at `3bfa2b888f365b77990cd5a2293546f48b75227e`. The published app tree `c51d3715d087dce1ebb5c69d29621dce92139c2c` and test tree `18099503d04c55fcc58e1bb09d9873294b637f6e` match the verified local candidate. The publication follow-up links this PR from the coursework records.
