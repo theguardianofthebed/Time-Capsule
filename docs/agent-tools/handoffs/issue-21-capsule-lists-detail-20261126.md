@@ -243,11 +243,22 @@
    - In `Issue21FunctionalCorrectionsTest.kt`, updated `timeLockVerificationReturnsLockedWaitingTime` to inject exact production response `OperationResult.Denied("Unlock authorization denied or unlock time not reached.")` and verify locked retry status, subsequent successful verification, and genuine non-participant denial (`DetailStatus.ACCESS_DENIED`).
    - In `Issue21FunctionalCorrectionsTest.kt`, added `locationLockConditionDisplaysCoordinatesAndRadius` test verifying location target coordinates and radius rendering in S07.
 
+## 12. Twelfth Review Restored Regression Coverage (28 November 2026)
+
+1. **Restored 15 Regression Tests:**
+   - Restored all 15 previously deleted regression tests in `Issue21FunctionalCorrectionsTest.kt`: `detailMissingDocumentIsAnAssetFailure`, `retentionStoragePermissionFailureRemainsDenied`, `retentionLegacyMigrationValidatesOriginalRecord`, `retentionMalformedCommittedFlagCannotAdoptRemoteDefault`, `retentionOfflineDetailPreservesParticipantsZoneAndLock`, `retentionUnknownLegacyLockStaysUnknown`, `retentionUnavailableDownloadUsesCommittedBytes`, `retentionAuthoritativeContentErrorsRemainAuthoritative`, `detailScreenPermissionFailurePersists`, `detailScreenOpensLocationSettings`, `detailScreenDecodeFailureKeepsUnlockAndRetry`, `detailWaitForRestorationRetainsIdentity`, `detailDeniedContentDiffersFromMissingAsset`, `tabsImmediateRefreshClearsOldGeneration`, `tabsPendingSendDoesNotHideReceivedEmptyView`.
+
+2. **Added BOTH Lock & Retry Action Coverage:**
+   - Added `bothLockVerificationReturnsLockedWaitingBothAndRetryUnlocks` test verifying `DetailStatus.LOCKED_WAITING_BOTH` status and subsequent successful Retry unlock.
+
+3. **Extended Location Target Layout Inspection:**
+   - Extended `locationLockConditionDisplaysCoordinatesAndRadius` test to inspect S07 production layout's `tvS07LockCondition` TextView on `MainActivity` via Robolectric.
+
 ---
 
-## 12. Verification and Checks Summary
+## 13. Verification and Checks Summary
 
-- `./gradlew :app:testDebugUnitTest`: **PASS (387 passed, 0 failed)**
+- `./gradlew :app:testDebugUnitTest`: **PASS (403 passed, 0 failed)**
 - `./gradlew :app:assembleDebug :app:assembleDebugAndroidTest`: **PASS (`BUILD SUCCESSFUL`)**
 - `./gradlew :app:clean :app:lintDebug`: **PASS (`BUILD SUCCESSFUL`, 0 lint errors)**
 - `py tools/check_readiness.py --issue 21 --evidence docs/agent-tools/readiness-evidence-issue21.json`: **PASS (`PREFLIGHT_RECORD_VALID`)**
@@ -255,11 +266,12 @@
 
 ---
 
-## 13. Next Human Action
+## 14. Next Human Action
 
 1. User G code review of branch `feature/21-capsule-lists-detail`.
 2. Manual end-to-end verification on Android device/emulator (S-03 list tabs, S-07 detail unlock, Author copy view, notification tap, and offline process relaunch re-view).
 3. Merge PR #47 after teammate approval.
+
 
 
 

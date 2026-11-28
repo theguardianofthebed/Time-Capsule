@@ -876,4 +876,19 @@ Final verification passed 399 JVM tests (0 failed or skipped), debug APK assembl
   - Lint passed cleanly with 0 errors (`./gradlew :app:clean :app:lintDebug`).
   - Readiness check passed (`PREFLIGHT_RECORD_VALID`).
 
+### Twelfth Review Restored Regression Coverage Applied (28 November 2026)
+
+- **1. Restored 15 Regression Tests:**
+  - Restored all 15 previously deleted regression tests in `Issue21FunctionalCorrectionsTest.kt`: `detailMissingDocumentIsAnAssetFailure`, `retentionStoragePermissionFailureRemainsDenied`, `retentionLegacyMigrationValidatesOriginalRecord`, `retentionMalformedCommittedFlagCannotAdoptRemoteDefault`, `retentionOfflineDetailPreservesParticipantsZoneAndLock`, `retentionUnknownLegacyLockStaysUnknown`, `retentionUnavailableDownloadUsesCommittedBytes`, `retentionAuthoritativeContentErrorsRemainAuthoritative`, `detailScreenPermissionFailurePersists`, `detailScreenOpensLocationSettings`, `detailScreenDecodeFailureKeepsUnlockAndRetry`, `detailWaitForRestorationRetainsIdentity`, `detailDeniedContentDiffersFromMissingAsset`, `tabsImmediateRefreshClearsOldGeneration`, `tabsPendingSendDoesNotHideReceivedEmptyView`.
+- **2. Added BOTH Lock & Retry Action Coverage:**
+  - Added `bothLockVerificationReturnsLockedWaitingBothAndRetryUnlocks` test.
+- **3. Extended Location Target Layout Inspection:**
+  - Extended `locationLockConditionDisplaysCoordinatesAndRadius` to inspect `tvS07LockCondition` on `MainActivity` via Robolectric.
+- **4. Automated Verification Suite:**
+  - Total **403 JVM unit tests passed** (`./gradlew :app:testDebugUnitTest`).
+  - Debug and AndroidTest APKs built cleanly (`./gradlew :app:assembleDebug :app:assembleDebugAndroidTest`).
+  - Lint passed cleanly with 0 errors (`./gradlew :app:clean :app:lintDebug`).
+  - Readiness check passed (`PREFLIGHT_RECORD_VALID`).
+
+
 
