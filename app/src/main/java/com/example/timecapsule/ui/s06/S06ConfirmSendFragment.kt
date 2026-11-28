@@ -27,6 +27,18 @@ import kotlinx.coroutines.launch
  */
 class S06ConfirmSendFragment : Fragment() {
 
+    companion object {
+        private const val ARG_CAPSULE_ID = "arg_capsule_id"
+
+        fun newInstance(capsuleId: String? = null): S06ConfirmSendFragment {
+            return S06ConfirmSendFragment().apply {
+                arguments = Bundle().apply {
+                    capsuleId?.let { putString(ARG_CAPSULE_ID, it) }
+                }
+            }
+        }
+    }
+
     private var _binding: FragmentS06ConfirmSendBinding? = null
     private val binding get() = _binding!!
 
