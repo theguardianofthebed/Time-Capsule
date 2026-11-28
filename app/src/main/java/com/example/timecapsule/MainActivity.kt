@@ -42,7 +42,8 @@ class MainActivity : AppCompatActivity() {
     private var lastProcessedNotificationIntentKey: String? = null
     private var accountCheck: Job? = null
     private var readOnlySession: SessionSnapshot? = null
-    private var verifiedProfile: SessionSnapshot? = null
+    var verifiedProfile: SessionSnapshot? = null
+        internal set
     private var lastTab = CapsuleTab.RECEIVED
     private var tabOwner: SessionSnapshot? = null
     private var pending: Fragment? = null

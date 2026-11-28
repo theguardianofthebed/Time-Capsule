@@ -565,9 +565,11 @@ class CapsuleDraftViewModel(
                     }
                 }
                 is OperationResult.Invalid -> {
+                    val isAbsent = result.message.contains("No recipient found", ignoreCase = true) ||
+                            result.message.contains("not found", ignoreCase = true)
                     _uiState.update {
                         it.copy(
-                            lookupStatus = RecipientLookupStatus.NONEXISTENT,
+                            lookupStatus = if (isAbsent) RecipientLookupStatus.NONEXISTENT else RecipientLookupStatus.ERROR,
                             resolvedProfile = null,
                             isRecipientConfirmed = false,
                             lookupErrorMessage = result.message

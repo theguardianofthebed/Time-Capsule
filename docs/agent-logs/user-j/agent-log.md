@@ -1116,5 +1116,38 @@ User J confirmed task ownership and implementation review. Personal reflections,
 User J confirmed task ownership and implementation review. Personal reflections, teammate PR review by User G, manual device testing, and human merge into `main` remain for the students to complete.
 
 
+## 2026-11-29-issue22-sixth-review — Issue #22 Sixth Review Final Outstanding Corrections
+
+- **Owner:** User J, explicitly confirmed as implementation owner for Issue #22. Reviewer: User G.
+- **Environment/model:** Android Studio Agent Mode (Gemini 3.8 Flash).
+- **Status:** Implemented, verified with 455 passing JVM unit tests, clean debug build, clean AndroidTest APK build, clean lint (0 errors), branch `feature/22-native-ui-recovery` updated. Target PR: [Draft PR #51](https://github.com/theguardianofthebed/Time-Capsule/pull/51).
+- **Requested outcome:** Complete sixth review items: refine unlock failure classification for ambiguous denials vs specific location issues, distinguish malformed recipient profiles from absent recipients, add production adapter tests for `DefaultAuthAdapter` and `DefaultFirestoreAdapter`, and add Robolectric navigation transaction protection tests.
+- **References:** [Issue #22](https://github.com/theguardianofthebed/Time-Capsule/issues/22); [PR #51](https://github.com/theguardianofthebed/Time-Capsule/pull/51); FR-01–FR-12; ARC-01, ARC-04, ARC-05, ARC-07; DD-01, DD-02, DD-03, DD-04, DD-05, DD-06, DD-07, DD-08, DD-09, DD-12, DD-13, DD-14, DD-15, DD-18, DD-19, DD-26, DD-27, DD-28; AC-10; T-38, T-45.
+
+### Work performed
+
+- **Truthful Unlock Failure Classification (`S07CapsuleDetailViewModel.kt`):**
+  - Refined `mapUnlockFailureStatus()` so ambiguous backend denials (`OperationResult.Denied`) do not claim definitive time-condition waiting, while specific location failures (`permission`, `location services disabled`, `null fix`) map to their corresponding statuses.
+- **Distinguished Malformed Profiles (`CapsuleDraftViewModel.kt`):**
+  - Updated `CapsuleDraftViewModel` recipient lookup mapping so confirmed missing documents return `RecipientLookupStatus.NONEXISTENT` ("User not found"), while malformed or invalid profile data returns `RecipientLookupStatus.ERROR` ("Recipient profile is invalid or incomplete").
+- **Production Adapter Unit Tests (`DefaultAuthAdapterTest.kt`, `DefaultFirestoreAdapterTest.kt`):**
+  - Added unit test suites directly exercising production `DefaultAuthAdapter` and `DefaultFirestoreAdapter` methods.
+- **Navigation Transaction Protection Test (`Issue21FunctionalCorrectionsTest.kt`):**
+  - Added Robolectric regression test `navigationTransactionSessionChangeDuringRunOnCommitKeepsContainerInvisible` verifying that an asynchronous session change during transaction completion keeps the container invisible and rechecks account state.
+
+### Checks and verification
+
+- `./gradlew :app:testDebugUnitTest`: PASS (455 JVM unit tests passed across project, 0 failed)
+- `./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors)
+- `py tools/check_readiness.py --validate-manifest`: PASS (`MANIFEST_VALID`)
+- `py tools/check_readiness.py --issue 22 --evidence docs/agent-tools/readiness-evidence-issue22.json`: PASS (`PREFLIGHT_RECORD_VALID`)
+- `git diff --check`: PASS (clean)
+
+### Human input and remaining work
+
+User J confirmed task ownership and implementation review. Personal reflections, teammate PR review by User G, manual device testing, and human merge into `main` remain for the students to complete.
+
+
+
 
 

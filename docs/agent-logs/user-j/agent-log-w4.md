@@ -51,3 +51,13 @@ Published for independent review in [Draft PR #51](https://github.com/theguardia
 - Strengthened `CapsuleDraftViewModel.applyRecovered()` location-label logic to require matching coordinates before preserving a custom location label.
 - Added tests exercising real `DefaultAuthAdapter` and `DefaultFirestoreAdapter` production adapter validation in `AuthAndRecipientTest.kt`.
 - Automated verification: 448 JVM unit tests passed (`./gradlew :app:testDebugUnitTest`), debug/test APKs assembled, lint clean (0 errors), readiness preflight valid (`py tools/check_readiness.py --issue 22 --evidence docs/agent-tools/readiness-evidence-issue22.json` -> `PREFLIGHT_RECORD_VALID`).
+
+## Issue #22 · Sixth Review: Final Outstanding Corrections (29 November 2026)
+
+- Work period: 29 November 2026 (KST). Scope: MVP. Human reviewer: User G.
+- Target PR: [PR #51](https://github.com/theguardianofthebed/Time-Capsule/pull/51). Branch: `feature/22-native-ui-recovery`.
+- Refined `S07CapsuleDetailViewModel.mapUnlockFailureStatus()` so ambiguous backend denials and explicit location guidance are strictly distinguished.
+- Distinguished malformed recipient profiles from absent recipients in `CapsuleDraftViewModel.kt` (`RecipientLookupStatus.NONEXISTENT` vs `RecipientLookupStatus.ERROR`).
+- Added unit tests for production `DefaultAuthAdapter` and `DefaultFirestoreAdapter` in `DefaultAuthAdapterTest.kt` and `DefaultFirestoreAdapterTest.kt`.
+- Added Robolectric navigation transaction session-change test `navigationTransactionSessionChangeDuringRunOnCommitKeepsContainerInvisible` in `Issue21FunctionalCorrectionsTest.kt`.
+- Automated verification: 455 JVM unit tests passed (`./gradlew :app:testDebugUnitTest`), debug/test APKs assembled, lint clean (0 errors), readiness preflight valid (`py tools/check_readiness.py --issue 22 --evidence docs/agent-tools/readiness-evidence-issue22.json` -> `PREFLIGHT_RECORD_VALID`).

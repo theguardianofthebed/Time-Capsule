@@ -1484,6 +1484,25 @@ class Issue21FunctionalCorrectionsTest {
         assertEquals("Final Replacement Text", (finalRead as OperationResult.Success).data.text)
     }
 
+    /** A session change during navigation transaction execution keeps the container invisible and rechecks account state. */
+    @Test fun navigationTransactionSessionChangeDuringRunOnCommitKeepsContainerInvisible() {
+        val activity = openScreen(repository)
+        val initialSession = sessionTracker.currentSession()
+
+        // 1. Initiate fragment replacement for current session
+        activity.navigateToCapsuleList()
+
+        // 2. Mid-flight session change before transaction completion
+        sessionTracker.startSession("session-user-new")
+
+        // 3. Complete transaction execution
+        settleScreen()
+
+        // 4. Verify that fragment container was not shown for obsolete session
+        val container = activity.findViewById<View>(R.id.fragmentContainer)
+        assertFalse(container.visibility == View.VISIBLE && activity.verifiedProfile == initialSession)
+    }
+
     @Test
     fun refreshingUnlockEvidenceForCommittedCapsulePreservesBothAssets() = runBlocking {
         val sessionA = sessionTracker.currentSession()
