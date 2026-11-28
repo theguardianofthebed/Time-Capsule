@@ -443,13 +443,17 @@ class DefaultCapsuleRepository(
             return OperationResult.Denied("Account session changed during unlock verification.")
         }
         if (result is OperationResult.Success && result.data.availability == Availability.AVAILABLE) {
-            retentionAdapter?.saveVerifiedUnlockMarker(
-                targetSession = targetSession,
-                capsuleId = cleanId,
-                verifiedUnlockedAt = Instant.now(),
-                lockMode = mode,
-                recipientUid = activeUid
-            )
+            val rechecked = firestoreAdapter.readRecipientUnlockRequirements(cleanId, activeUid)
+            val serverUnlockedAt = if (rechecked is OperationResult.Success) rechecked.data.unlockedAt else null
+            if (serverUnlockedAt != null) {
+                retentionAdapter?.saveVerifiedUnlockMarker(
+                    targetSession = targetSession,
+                    capsuleId = cleanId,
+                    verifiedUnlockedAt = serverUnlockedAt,
+                    lockMode = mode,
+                    recipientUid = activeUid
+                )
+            }
         }
         return result
     }
@@ -488,32 +492,46 @@ class DefaultCapsuleRepository(
         }
         val activeUid = targetSession.uid!!
 
-        // 1. Try local retention first
         val retention = retentionAdapter
-        val retentionReadRes = retention?.readRetainedContent(targetSession, cleanId)
-        if (!sessionTracker.isSessionValid(targetSession)) {
-            return OperationResult.Denied("Account session changed during content read.")
+
+        // 1. If network is offline, attempt local retention read immediately
+        if (!firestoreAdapter.isAvailable()) {
+            val retentionReadRes = retention?.readRetainedContent(targetSession, cleanId)
+            if (!sessionTracker.isSessionValid(targetSession)) {
+                return OperationResult.Denied("Account session changed during content read.")
+            }
+            return when (retentionReadRes) {
+                is OperationResult.Success -> {
+                    val retained = retentionReadRes.data
+                    val photoPath = if (retained.photoBytes != null) "retainedMedia/${retained.uid}/$cleanId" else null
+                    OperationResult.Success(
+                        ProtectedCapsuleContent(
+                            capsuleId = cleanId,
+                            text = retained.text,
+                            photoObjectPath = photoPath,
+                            photoBytes = retained.photoBytes,
+                            photoFormat = retained.photoFormat,
+                            availableOffline = true
+                        )
+                    )
+                }
+                is OperationResult.Unavailable -> {
+                    OperationResult.Unavailable("Capsule unlocked — content unavailable. Connect and retry.")
+                }
+                else -> {
+                    OperationResult.Unavailable("Network unavailable and no retained content found.")
+                }
+            }
         }
 
-        if (retentionReadRes is OperationResult.Success) {
-            val retained = retentionReadRes.data
-            val photoPath = if (retained.photoBytes != null) "retainedMedia/${retained.uid}/$cleanId" else null
-            return OperationResult.Success(
-                ProtectedCapsuleContent(
-                    capsuleId = cleanId,
-                    text = retained.text,
-                    photoObjectPath = photoPath,
-                    photoBytes = retained.photoBytes,
-                    photoFormat = retained.photoFormat,
-                    availableOffline = true
-                )
-            )
-        }
-
-        // 2. Authoritative server metadata lookup to determine role & authorization
+        // 2. Network is online: Check remote server for summary & unlock requirements
         val summaryRes = firestoreAdapter.getCapsuleSummary(cleanId, activeUid)
         if (!sessionTracker.isSessionValid(targetSession)) {
             return OperationResult.Denied("Account session changed during content read.")
+        }
+
+        if (summaryRes is OperationResult.Denied) {
+            return summaryRes // Authoritative denial from server blocks local fallback!
         }
 
         var summaryTitle: String? = null
@@ -547,19 +565,35 @@ class DefaultCapsuleRepository(
                 }
                 return if (contentRes is OperationResult.Unavailable) contentRes else OperationResult.Denied("Protected content unreadable for author copy.")
             }
-        } else if (summaryRes is OperationResult.Denied) {
-            return summaryRes
         }
 
-        // Recipient branch
+        // Recipient online branch
         val reqResult = firestoreAdapter.readRecipientUnlockRequirements(cleanId, activeUid)
         if (!sessionTracker.isSessionValid(targetSession)) {
             return OperationResult.Denied("Account session changed during content read.")
         }
 
         if (reqResult !is OperationResult.Success) {
-            if (reqResult is OperationResult.Unavailable && retentionReadRes is OperationResult.Unavailable) {
-                return OperationResult.Unavailable("Capsule unlocked — content unavailable. Connect and retry.")
+            if (reqResult is OperationResult.Unavailable) {
+                val retentionReadRes = retention?.readRetainedContent(targetSession, cleanId)
+                if (retentionReadRes is OperationResult.Success) {
+                    val retained = retentionReadRes.data
+                    val photoPath = if (retained.photoBytes != null) "retainedMedia/${retained.uid}/$cleanId" else null
+                    return OperationResult.Success(
+                        ProtectedCapsuleContent(
+                            capsuleId = cleanId,
+                            text = retained.text,
+                            photoObjectPath = photoPath,
+                            photoBytes = retained.photoBytes,
+                            photoFormat = retained.photoFormat,
+                            availableOffline = true
+                        )
+                    )
+                }
+                if (retentionReadRes is OperationResult.Unavailable) {
+                    return OperationResult.Unavailable("Capsule unlocked — content unavailable. Connect and retry.")
+                }
+                return OperationResult.Unavailable("Network unavailable and no retained content found.")
             }
             return if (reqResult is OperationResult.Denied) reqResult else OperationResult.Denied("Unlock requirements unreadable.")
         }
@@ -587,6 +621,22 @@ class DefaultCapsuleRepository(
         val verifiedTime = serverUnlockedAt
             ?: return OperationResult.Denied("Server unlock timestamp is missing.")
 
+        // Persist unlock marker BEFORE downloading protected content!
+        retention?.saveVerifiedUnlockMarker(
+            targetSession = targetSession,
+            capsuleId = cleanId,
+            verifiedUnlockedAt = verifiedTime,
+            title = summaryTitle,
+            lockMode = summaryLockMode ?: requirements.lockMode,
+            senderUid = (summaryRes as? OperationResult.Success)?.data?.senderUid,
+            recipientUid = activeUid,
+            senderDisplayName = summarySenderName,
+            recipientDisplayName = summaryRecipientName,
+            createdAt = summaryCreatedAt,
+            unlockAt = requirements.unlockAt,
+            hasPhoto = (summaryRes as? OperationResult.Success)?.data?.hasPhoto ?: false
+        )
+
         val contentRes = firestoreAdapter.readProtectedContent(cleanId, activeUid)
         if (!sessionTracker.isSessionValid(targetSession)) {
             return OperationResult.Denied("Account session changed during content read.")
@@ -609,10 +659,11 @@ class DefaultCapsuleRepository(
                     photoBytes = content.photoBytes,
                     photoFormat = content.photoFormat,
                     title = summaryTitle,
-                    lockMode = summaryLockMode,
+                    lockMode = summaryLockMode ?: requirements.lockMode,
                     senderDisplayName = summarySenderName,
                     recipientDisplayName = summaryRecipientName,
-                    createdAt = summaryCreatedAt
+                    createdAt = summaryCreatedAt,
+                    unlockAt = requirements.unlockAt
                 )
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled

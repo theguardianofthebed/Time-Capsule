@@ -66,6 +66,7 @@ data class RetainedSummary(
     val senderDisplayName: String? = null,
     val recipientDisplayName: String? = null,
     val createdAt: Instant? = null,
+    val creationZone: String? = null,
     val hasText: Boolean = false,
     val hasPhoto: Boolean = false,
     val isContentAvailable: Boolean = true
@@ -89,6 +90,8 @@ interface LocalRetentionAdapter {
         senderDisplayName: String? = null,
         recipientDisplayName: String? = null,
         createdAt: Instant? = null,
+        unlockAt: Instant? = null,
+        creationZone: String? = null,
         hasText: Boolean = false,
         hasPhoto: Boolean = false
     ): OperationResult<Unit> = OperationResult.Unavailable("Save verified unlock marker is not implemented in this adapter.")
@@ -107,7 +110,9 @@ interface LocalRetentionAdapter {
         lockMode: LockMode? = null,
         senderDisplayName: String? = null,
         recipientDisplayName: String? = null,
-        createdAt: Instant? = null
+        createdAt: Instant? = null,
+        unlockAt: Instant? = null,
+        creationZone: String? = null
     ): OperationResult<Unit>
 
     /**

@@ -152,7 +152,9 @@ class FakeLocalRetentionAdapter : LocalRetentionAdapter {
         lockMode: LockMode?,
         senderDisplayName: String?,
         recipientDisplayName: String?,
-        createdAt: Instant?
+        createdAt: Instant?,
+        unlockAt: Instant?,
+        creationZone: String?
     ): OperationResult<Unit> {
         val uid = targetSession.uid ?: ""
         val key = "$uid:$capsuleId"

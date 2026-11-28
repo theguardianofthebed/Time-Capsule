@@ -34,11 +34,10 @@ class S07CapsuleDetailViewModel(
     init {
         viewModelScope.launch {
             sessionTracker.observeSession().collect { session ->
-                activeJob?.cancel()
-                requestToken++
-                if (!session.isAuthenticated) {
-                    _uiState.value = CapsuleDetailUiState(isLoading = false, sessionSnapshot = session)
-                } else {
+                val currentSnap = _uiState.value.sessionSnapshot
+                if (currentSnap != null && currentSnap != session) {
+                    activeJob?.cancel()
+                    requestToken++
                     val currentId = _uiState.value.capsuleId
                     _uiState.value = CapsuleDetailUiState(isLoading = false, sessionSnapshot = session)
                     if (currentId.isNotBlank()) {

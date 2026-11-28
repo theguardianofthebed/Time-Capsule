@@ -5,6 +5,8 @@ import com.example.timecapsule.data.adapter.DefaultLocalRetentionAdapter
 import com.example.timecapsule.data.adapter.FirestoreAdapter
 import com.example.timecapsule.data.session.DefaultSessionTracker
 import com.example.timecapsule.domain.model.Availability
+import com.example.timecapsule.domain.model.CapsuleDraft
+import com.example.timecapsule.domain.model.CapsuleListsSnapshot
 import com.example.timecapsule.domain.model.CapsuleLock
 import com.example.timecapsule.domain.model.CapsuleSummary
 import com.example.timecapsule.domain.model.LockMode
@@ -19,8 +21,15 @@ import com.example.timecapsule.ui.s03.S03CapsuleListViewModel
 import com.example.timecapsule.ui.s07.S07CapsuleDetailViewModel
 import com.google.firebase.firestore.FirebaseFirestore
 import java.io.File
+import java.security.MessageDigest
 import java.time.Instant
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.setMain
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -33,18 +42,11 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
-import java.security.MessageDigest
 
 /**
- * Mandatory regression test suite for Issue #21 functional corrections:
- * 1. Offline re-view for TIME, LOCATION, and BOTH lock modes without manufactured metadata.
- * 2. Unlocked evidence with missing photo/text files vs relocking.
- * 3. Corrupted photo integrity verification.
- * 4. Network failure fallback vs authoritative access denial blocking.
- * 5. Cross-account retention isolation and stale session rejection.
- * 6. Lightweight list enumeration without bulk loading photo bytes.
- * 7. Asset retry without changing confirmed unlock timestamp.
+ * Mandatory regression test suite for Issue #21 functional corrections.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [35])
@@ -53,6 +55,7 @@ class Issue21FunctionalCorrectionsTest {
     @get:Rule
     val tempFolder = TemporaryFolder()
 
+    private val testDispatcher = StandardTestDispatcher()
     private lateinit var rootDir: File
     private lateinit var sessionTracker: DefaultSessionTracker
     private lateinit var fakeAuthAdapter: FakeAuthAdapter
@@ -65,6 +68,7 @@ class Issue21FunctionalCorrectionsTest {
 
     @Before
     fun setUp() {
+        Dispatchers.setMain(testDispatcher)
         rootDir = tempFolder.newFolder("retained-content")
         sessionTracker = DefaultSessionTracker()
         sessionTracker.startSession(userA)
@@ -82,12 +86,16 @@ class Issue21FunctionalCorrectionsTest {
         )
     }
 
+    @After
+    fun tearDown() {
+        Dispatchers.resetMain()
+    }
+
     @Test
     fun offlineReviewForTimeLocationAndBothModesPreservesLockModeAndTitle() = runBlocking {
         val sessionA = sessionTracker.currentSession()
         val now = Instant.now()
 
-        // Retain 3 capsules with distinct lock modes and titles
         val save1 = retentionAdapter.saveRetainedContent(
             targetSession = sessionA,
             capsuleId = "cap-time",
@@ -130,7 +138,6 @@ class Issue21FunctionalCorrectionsTest {
         )
         assertTrue(save3 is OperationResult.Success)
 
-        // Turn network OFF
         fakeFirestoreAdapter.isNetworkDown = true
 
         val listsRes = repository.lists(userA, sessionA)
@@ -160,7 +167,6 @@ class Issue21FunctionalCorrectionsTest {
         val now = Instant.now()
         val validPng = imageFixture("png")
 
-        // 1. Save valid photo capsule to retention
         val saveRes = retentionAdapter.saveRetainedContent(
             targetSession = sessionA,
             capsuleId = "cap-photo-missing",
@@ -173,14 +179,12 @@ class Issue21FunctionalCorrectionsTest {
         )
         assertTrue(saveRes is OperationResult.Success)
 
-        // Delete photo file manually to simulate missing/deleted photo asset
         val accountHash = sha256(userA.toByteArray(Charsets.UTF_8))
         val photoFile = File(rootDir, "$accountHash/cap-photo-missing/content.photo")
         assertTrue(photoFile.exists())
         photoFile.delete()
         assertFalse(photoFile.exists())
 
-        // 2. Offline summary read must preserve unlocked availability
         fakeFirestoreAdapter.isNetworkDown = true
         val summaryRes = repository.getSummary("cap-photo-missing", sessionA)
         assertTrue(summaryRes is OperationResult.Success)
@@ -188,7 +192,6 @@ class Issue21FunctionalCorrectionsTest {
         assertEquals(Availability.AVAILABLE, summary.availability)
         assertEquals("Photo Capsule", summary.title)
 
-        // 3. Offline content read must return Unavailable (content unavailable) without relocking
         val contentRes = repository.readContent("cap-photo-missing", sessionA)
         assertTrue(contentRes is OperationResult.Unavailable)
         assertTrue((contentRes as OperationResult.Unavailable).message.contains("unavailable"))
@@ -210,7 +213,6 @@ class Issue21FunctionalCorrectionsTest {
         )
         assertTrue(saveRes is OperationResult.Success)
 
-        // Overwrite photo file with corrupt bytes
         val accountHash = sha256(userA.toByteArray(Charsets.UTF_8))
         val photoFile = File(rootDir, "$accountHash/cap-corrupt/content.photo")
         assertTrue(photoFile.exists())
@@ -236,13 +238,11 @@ class Issue21FunctionalCorrectionsTest {
         )
         assertTrue(saveRes is OperationResult.Success)
 
-        // Scenario A: Network failure -> Offline fallback succeeds
         fakeFirestoreAdapter.isNetworkDown = true
         val offlineSummary = repository.getSummary("cap-denied-test", sessionA)
         assertTrue(offlineSummary is OperationResult.Success)
         assertEquals("Retained Title", (offlineSummary as OperationResult.Success).data.title)
 
-        // Scenario B: Authoritative Denied response -> Returns Denied directly, NO offline fallback!
         fakeFirestoreAdapter.isNetworkDown = false
         fakeFirestoreAdapter.accessDeniedForSummary = true
         val deniedSummary = repository.getSummary("cap-denied-test", sessionA)
@@ -264,11 +264,9 @@ class Issue21FunctionalCorrectionsTest {
         )
         assertTrue(saveRes is OperationResult.Success)
 
-        // Switch to User B session
         sessionTracker.startSession(userB)
         val sessionB = sessionTracker.currentSession()
 
-        // User B attempts to read User A's retained content
         val crossRead = retentionAdapter.readRetainedContent(sessionB, "cap-private-a")
         assertTrue(crossRead is OperationResult.Denied)
 
@@ -283,7 +281,6 @@ class Issue21FunctionalCorrectionsTest {
         val now = Instant.now()
         val samplePhoto = imageFixture("png")
 
-        // Save 5 retained photo capsules
         for (i in 1..5) {
             val saveRes = retentionAdapter.saveRetainedContent(
                 targetSession = sessionA,
@@ -314,7 +311,6 @@ class Issue21FunctionalCorrectionsTest {
         val sessionA = sessionTracker.currentSession()
         val now = Instant.now().minusSeconds(500)
 
-        // Set up server unlocked capsule
         val capSummary = CapsuleSummary(
             capsuleId = "cap-retry",
             senderUid = userB,
@@ -344,7 +340,6 @@ class Issue21FunctionalCorrectionsTest {
         val content = (readRes as OperationResult.Success).data
         assertEquals("Restored message", content.text)
 
-        // Verify saved retained timestamp matches original server unlockedAt
         val retainedRes = retentionAdapter.readRetainedContent(sessionA, "cap-retry")
         assertTrue(retainedRes is OperationResult.Success)
         assertEquals(now, (retainedRes as OperationResult.Success).data.verifiedUnlockedAt)
@@ -352,43 +347,130 @@ class Issue21FunctionalCorrectionsTest {
 
     @Test
     fun initialPhotoDownloadFailureAfterConfirmedUnlockThenOfflineProcessRecreation() = runBlocking {
-        val sessionA = sessionTracker.currentSession()
-        val now = Instant.now()
+        val session = sessionTracker.currentSession()
+        val serverTime = Instant.parse("2026-10-15T08:00:00Z")
 
-        // 1. Persist verified unlock marker when online unlock is confirmed, even if photo download fails
-        val markerRes = retentionAdapter.saveVerifiedUnlockMarker(
-            targetSession = sessionA,
-            capsuleId = "cap-initial-fail",
-            verifiedUnlockedAt = now,
-            title = "Photo Pending Title",
-            lockMode = LockMode.TIME,
+        val capSummary = CapsuleSummary(
+            capsuleId = "cap-prod-fail",
             senderUid = userB,
             recipientUid = userA,
+            lock = CapsuleLock(LockMode.TIME),
+            sendStatus = SendStatus.SENT,
+            availability = Availability.AVAILABLE,
+            title = "Photo Production Fail",
+            unlockedAt = serverTime,
             hasPhoto = true
         )
-        assertTrue(markerRes is OperationResult.Success)
+        fakeFirestoreAdapter.summaries["cap-prod-fail"] = capSummary
+        fakeFirestoreAdapter.requirements["cap-prod-fail"] = RecipientUnlockRequirements(
+            capsuleId = "cap-prod-fail",
+            recipientUid = userA,
+            unlocked = true,
+            lockMode = LockMode.TIME,
+            unlockedAt = serverTime
+        )
+        fakeFirestoreAdapter.protectedContent["cap-prod-fail"] = ProtectedCapsuleContent(
+            capsuleId = "cap-prod-fail",
+            text = "Text caption",
+            photoObjectPath = "remote/photo.jpg",
+            photoBytes = null // photo download fails!
+        )
 
-        // 2. Simulate process restart / offline execution
+        // 1. Execute production repository readContent
+        val initialRead = repository.readContent("cap-prod-fail", session)
+        assertTrue(initialRead is OperationResult.Unavailable)
+
+        // 2. Assert that the persisted marker timestamp equals the authoritative server timestamp
+        val markerRes = retentionAdapter.listVerifiedRecipientEntries(session)
+        assertTrue(markerRes is OperationResult.Success)
+        val entries = (markerRes as OperationResult.Success).data
+        assertEquals(1, entries.size)
+        assertEquals(serverTime, entries[0].verifiedUnlockedAt)
+        assertEquals("Photo Production Fail", entries[0].title)
+
+        // 3. Recreate retention adapter & repository (simulating process recreation)
+        val currentSnap = sessionTracker.currentSession()
+        val newRetentionAdapter = DefaultLocalRetentionAdapter(
+            root = rootDir,
+            session = { sessionTracker.currentSession() }
+        )
+        val newRepository = DefaultCapsuleRepository(
+            sessionTracker = sessionTracker,
+            authAdapter = fakeAuthAdapter,
+            firestoreAdapter = fakeFirestoreAdapter,
+            retentionAdapter = newRetentionAdapter
+        )
+
+        // 4. Disconnect network
         fakeFirestoreAdapter.isNetworkDown = true
 
-        val summaryRes = repository.getSummary("cap-initial-fail", sessionA)
-        assertTrue(summaryRes is OperationResult.Success)
-        val summary = (summaryRes as OperationResult.Success).data
-        assertEquals("Photo Pending Title", summary.title)
-        assertEquals(Availability.AVAILABLE, summary.availability)
+        // 5. Offline: unlocked entry is discoverable, but content is unavailable
+        val offlineSummary = newRepository.getSummary("cap-prod-fail", currentSnap)
+        assertTrue(offlineSummary is OperationResult.Success)
+        assertEquals(Availability.AVAILABLE, (offlineSummary as OperationResult.Success).data.availability)
 
-        // Content is unavailable locally since photo wasn't downloaded yet
-        val contentRes = repository.readContent("cap-initial-fail", sessionA)
-        assertTrue(contentRes is OperationResult.Unavailable)
+        val offlineContent = newRepository.readContent("cap-prod-fail", currentSnap)
+        assertTrue(offlineContent is OperationResult.Unavailable)
+
+        // 6. Reconnect network & fix photo download
+        fakeFirestoreAdapter.isNetworkDown = false
+        val validPng = imageFixture("png")
+        fakeFirestoreAdapter.protectedContent["cap-prod-fail"] = ProtectedCapsuleContent(
+            capsuleId = "cap-prod-fail",
+            text = "Text caption",
+            photoObjectPath = "remote/photo.jpg",
+            photoBytes = validPng,
+            photoFormat = OriginalPhotoFormat.PNG
+        )
+
+        // 7. Successful subsequent download
+        val reconnectRead = newRepository.readContent("cap-prod-fail", currentSnap)
+        assertTrue(reconnectRead is OperationResult.Success)
+        val content = (reconnectRead as OperationResult.Success).data
+        assertEquals("Text caption", content.text)
+        assertNotNull(content.photoBytes)
     }
 
     @Test
     fun accountTransitionWhileViewModelsActiveClearsPreviousAccountStateImmediately() = runBlocking {
-        val listViewModel = S03CapsuleListViewModel(sessionTracker, repository)
-        val detailViewModel = S07CapsuleDetailViewModel(sessionTracker, repository)
+        val fakeRepo = object : CapsuleRepository {
+            override fun session() = sessionTracker.currentSession()
+            override suspend fun getRecipient(uid: String) = OperationResult.Invalid("")
+            override suspend fun publish(frozenOperation: CapsuleDraft) = OperationResult.Invalid("")
+            override suspend fun reconcile(capsuleId: String) = OperationResult.Invalid("")
+            override suspend fun lists(uid: String) = lists(uid, sessionTracker.currentSession())
+            override suspend fun lists(uid: String, targetSession: SessionSnapshot): OperationResult<CapsuleListsSnapshot> {
+                val list = if (uid == userA) listOf(CapsuleSummary("cap-recv-a", userB, userA, CapsuleLock(LockMode.TIME), SendStatus.SENT, title = "Recv A", availability = Availability.AVAILABLE)) else emptyList()
+                return OperationResult.Success(CapsuleListsSnapshot(sent = emptyList(), received = list))
+            }
+            override suspend fun getSummary(capsuleId: String) = getSummary(capsuleId, sessionTracker.currentSession())
+            override suspend fun getSummary(capsuleId: String, targetSession: SessionSnapshot): OperationResult<CapsuleSummary> {
+                if (targetSession.uid != userA) return OperationResult.Denied("Not user A")
+                return OperationResult.Success(CapsuleSummary("cap-recv-a", userB, userA, CapsuleLock(LockMode.TIME), SendStatus.SENT, title = "Recv A", availability = Availability.AVAILABLE))
+            }
+            override suspend fun readContent(capsuleId: String) = readContent(capsuleId, sessionTracker.currentSession())
+            override suspend fun readContent(capsuleId: String, targetSession: SessionSnapshot): OperationResult<ProtectedCapsuleContent> {
+                if (targetSession.uid != userA) return OperationResult.Denied("Not user A")
+                return OperationResult.Success(ProtectedCapsuleContent("cap-recv-a", "User A Secret", null))
+            }
+        }
+
+        val listViewModel = S03CapsuleListViewModel(sessionTracker, fakeRepo)
+        val detailViewModel = S07CapsuleDetailViewModel(sessionTracker, fakeRepo)
+
+        listViewModel.loadLists()
+        detailViewModel.loadDetail("cap-recv-a")
+
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Assert User A's data was loaded
+        assertEquals(1, listViewModel.uiState.value.receivedList.size)
+        assertEquals("User A Secret", detailViewModel.uiState.value.content?.text)
 
         // Transition to User B
         sessionTracker.startSession(userB)
+
+        testDispatcher.scheduler.advanceUntilIdle()
 
         val listState = listViewModel.uiState.value
         val detailState = detailViewModel.uiState.value
@@ -397,6 +479,44 @@ class Issue21FunctionalCorrectionsTest {
         assertEquals(userB, detailState.sessionSnapshot?.uid)
         assertTrue(listState.receivedList.isEmpty())
         assertTrue(detailState.content == null)
+    }
+
+    @Test
+    fun interruptedRetainedContentReplacementPreservesUnlockEvidenceWithoutAuthorizingIncompleteBytes() = runBlocking {
+        val sessionA = sessionTracker.currentSession()
+        val now = Instant.now()
+
+        val markerRes = retentionAdapter.saveVerifiedUnlockMarker(
+            targetSession = sessionA,
+            capsuleId = "cap-interrupt",
+            verifiedUnlockedAt = now,
+            title = "Interrupt Test",
+            lockMode = LockMode.TIME,
+            senderUid = userB,
+            recipientUid = userA,
+            hasPhoto = true
+        )
+        assertTrue(markerRes is OperationResult.Success)
+
+        val badSave = retentionAdapter.saveRetainedContent(
+            targetSession = sessionA,
+            capsuleId = "cap-interrupt",
+            verifiedUnlockedAt = now,
+            text = "Caption",
+            photoBytes = byteArrayOf(1, 2, 3), // invalid PNG
+            photoFormat = OriginalPhotoFormat.PNG
+        )
+        assertTrue(badSave is OperationResult.Invalid)
+
+        val summaryRes = retentionAdapter.listVerifiedRecipientEntries(sessionA)
+        assertTrue(summaryRes is OperationResult.Success)
+        val summaries = (summaryRes as OperationResult.Success).data
+        assertEquals(1, summaries.size)
+        assertEquals(now, summaries[0].verifiedUnlockedAt)
+        assertFalse(summaries[0].isContentAvailable)
+
+        val readRes = retentionAdapter.readRetainedContent(sessionA, "cap-interrupt")
+        assertTrue(readRes is OperationResult.Unavailable)
     }
 
     private fun sha256(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256")

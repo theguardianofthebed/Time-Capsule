@@ -751,6 +751,33 @@ Implement complete bounded scope for Issue #21: S-03 Capsule Lists (Received and
   - Lint passed cleanly with 0 errors (`./gradlew :app:clean :app:lintDebug`).
   - Readiness check passed (`PREFLIGHT_RECORD_VALID`).
 
+### Third Review Functional & Integration Corrections Applied (28 November 2026)
+
+- **1. Restored Atomic Retained-Content Protection:**
+  - `DefaultLocalRetentionAdapter.kt` invalidates complete-content authorization (`hasText = false, hasPhoto = false`) BEFORE modifying retained content files on disk.
+  - Complete-content authorization is published only AFTER all required text and photo bytes are written and validated. Interrupted replacements preserve unlock evidence without authorizing incomplete bytes.
+- **2. Authoritative Server Unlock Timestamps & Persistence Order:**
+  - Removed device clock time (`Instant.now()`) for `verifiedUnlockedAt` in `DefaultCapsuleRepository.kt`.
+  - Obtains and persists `serverUnlockedAt` from authoritative `RecipientUnlockRequirements.unlockedAt`.
+  - Persists `saveVerifiedUnlockMarker` BEFORE starting protected content download.
+- **3. Cancellable Session-Bound Image Decoding:**
+  - In `S07CapsuleDetailFragment.kt`, maintained cancellable `imageRenderJob`.
+  - Revalidates session snapshot, capsule ID, and fragment binding state BEFORE applying decoded bitmap to `ivS07Photo`.
+  - Immediately clears image drawables and cancels active decoding on view destruction or session generation reset.
+- **4. Complete Metadata Preservation & Access Contracts:**
+  - Preserved `unlockAt` and `creationZone` in `verified-marker.properties` and `RetainedSummary`.
+  - Authoritative server access denials (`OperationResult.Denied`) block local retention overrides when online.
+- **5. Foreground Recovery & Notification Fixes:**
+  - In `S03CapsuleListViewModel`, foreground unlock updates both `receivedList` and `sentList` item availability.
+  - In `MainActivity.kt`, notification intent deduplication key is recorded ONLY after `validateEntryIntent` succeeds.
+  - In `S03CapsuleListFragment`, unresolved publication cards route to `navigateToConfirmSend(pub.capsuleId)` with specific capsule ID.
+- **6. Automated Verification Suite:**
+  - Total **375 JVM unit tests passed** (`./gradlew :app:testDebugUnitTest`).
+  - Debug and AndroidTest APKs built cleanly (`./gradlew :app:assembleDebug :app:assembleDebugAndroidTest`).
+  - Lint passed cleanly with 0 errors (`./gradlew :app:clean :app:lintDebug`).
+  - Readiness check passed (`PREFLIGHT_RECORD_VALID`).
+
+
 
 
 

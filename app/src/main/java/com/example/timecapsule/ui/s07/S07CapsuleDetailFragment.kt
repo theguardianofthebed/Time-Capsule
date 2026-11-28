@@ -17,6 +17,7 @@ import com.example.timecapsule.R
 import com.example.timecapsule.databinding.FragmentS07CapsuleDetailBinding
 import com.example.timecapsule.ui.ViewModelFactory
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.ZoneId
@@ -42,6 +43,9 @@ class S07CapsuleDetailFragment : Fragment() {
 
     private var _binding: FragmentS07CapsuleDetailBinding? = null
     private val binding get() = _binding!!
+
+    private var imageRenderJob: Job? = null
+    private var activeRenderCapsuleId: String? = null
 
     private val viewModel: S07CapsuleDetailViewModel by viewModels {
         val activity = requireActivity() as MainActivity
@@ -97,6 +101,14 @@ class S07CapsuleDetailFragment : Fragment() {
     private fun renderUiState(state: CapsuleDetailUiState) {
         binding.pbS07Loading.visibility = if (state.isLoading) View.VISIBLE else View.GONE
 
+        // Cancel previous image render if capsule ID or session generation changed
+        if (state.capsuleId != activeRenderCapsuleId) {
+            imageRenderJob?.cancel()
+            binding.ivS07Photo.setImageDrawable(null)
+            binding.ivS07Photo.visibility = View.GONE
+            activeRenderCapsuleId = state.capsuleId
+        }
+
         if (state.summary != null) {
             val summary = state.summary
             val titleText = if (!summary.title.isNullOrBlank()) summary.title else "A little moment"
@@ -141,19 +153,31 @@ class S07CapsuleDetailFragment : Fragment() {
 
             val photoBytes = state.content.photoBytes
             if (photoBytes != null && photoBytes.isNotEmpty()) {
-                viewLifecycleOwner.lifecycleScope.launch {
+                imageRenderJob?.cancel()
+                val expectedCapsuleId = state.capsuleId
+                val expectedSession = state.sessionSnapshot
+
+                imageRenderJob = viewLifecycleOwner.lifecycleScope.launch {
                     val bitmap = decodeSampledBitmap(photoBytes, 1024)
-                    _binding?.let { b ->
+                    val currentState = viewModel.uiState.value
+
+                    // Revalidate session snapshot, capsule ID, and binding before rendering
+                    if (_binding != null &&
+                        currentState.capsuleId == expectedCapsuleId &&
+                        currentState.sessionSnapshot == expectedSession) {
                         if (bitmap != null) {
-                            b.ivS07Photo.setImageBitmap(bitmap)
-                            b.ivS07Photo.visibility = View.VISIBLE
+                            binding.ivS07Photo.setImageBitmap(bitmap)
+                            binding.ivS07Photo.visibility = View.VISIBLE
                         } else {
-                            b.ivS07Photo.setImageDrawable(null)
-                            b.ivS07Photo.visibility = View.GONE
+                            binding.ivS07Photo.setImageDrawable(null)
+                            binding.ivS07Photo.visibility = View.GONE
                         }
+                    } else {
+                        bitmap?.recycle()
                     }
                 }
             } else {
+                imageRenderJob?.cancel()
                 binding.ivS07Photo.setImageDrawable(null)
                 binding.ivS07Photo.visibility = View.GONE
             }
@@ -164,7 +188,9 @@ class S07CapsuleDetailFragment : Fragment() {
             binding.llS07ContentCard.visibility = View.GONE
             binding.tvS07BodyText.text = ""
             binding.tvS07SignOff.text = ""
+            imageRenderJob?.cancel()
             binding.ivS07Photo.setImageDrawable(null)
+            binding.ivS07Photo.visibility = View.GONE
         }
 
         // Banner and Error / Retry
@@ -204,6 +230,7 @@ class S07CapsuleDetailFragment : Fragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
+        imageRenderJob?.cancel()
         _binding?.ivS07Photo?.setImageDrawable(null)
         _binding = null
     }

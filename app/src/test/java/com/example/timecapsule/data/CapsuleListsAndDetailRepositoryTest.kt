@@ -261,7 +261,9 @@ class CapsuleListsAndDetailRepositoryTest {
             lockMode: LockMode?,
             senderDisplayName: String?,
             recipientDisplayName: String?,
-            createdAt: Instant?
+            createdAt: Instant?,
+            unlockAt: Instant?,
+            creationZone: String?
         ): OperationResult<Unit> {
             retainedEntries.add(
                 RetainedContent(

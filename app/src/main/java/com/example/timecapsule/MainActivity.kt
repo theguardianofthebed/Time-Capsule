@@ -113,7 +113,6 @@ class MainActivity : AppCompatActivity() {
         val intentKey = "$action:$uid:$capsuleId"
 
         if (lastProcessedNotificationIntentKey == intentKey) return
-        lastProcessedNotificationIntentKey = intentKey
 
         val currentSession = container.sessionTracker.currentSession()
         val validator = NotificationEntryValidator(container.repository, container.sessionTracker)
@@ -123,11 +122,12 @@ class MainActivity : AppCompatActivity() {
                 is NotificationEntryResult.Valid -> {
                     if (container.sessionTracker.isSessionValid(currentSession) &&
                         container.sessionTracker.currentSession() == currentSession) {
+                        lastProcessedNotificationIntentKey = intentKey
                         navigateToCapsuleDetail(result.capsuleId)
                     }
                 }
                 is NotificationEntryResult.Invalid -> {
-                    // Stale, malformed, or cross-account notification tap rejected safely without navigation
+                    // Stale, malformed, or cross-account notification tap rejected safely without recording key or navigating
                 }
             }
         }
@@ -289,7 +289,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     /** Navigates to S-06 Confirm Send Review screen. */
-    fun navigateToConfirmSend() {
+    fun navigateToConfirmSend(capsuleId: String? = null) {
         val fragment = S06ConfirmSendFragment().apply {
             onBackToRecipientLockListener = { navigateToRecipientLock() }
             onNavigateToMomentsListener = { navigateToCapsuleList() }

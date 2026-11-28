@@ -98,11 +98,40 @@
    - Decodes photo bytes off the UI thread (`Dispatchers.IO`) with bounded sample sizing (max 1024px).
    - Recycles/clears bitmap drawables on view destruction or session generation changes.
 
+## 4. Third Review Functional & Integration Corrections (28 November 2026)
+
+1. **Restored Atomic Retained-Content Protection:**
+   - In `DefaultLocalRetentionAdapter.kt`, `saveRetainedContent` invalidates complete-content authorization (`hasText = false, hasPhoto = false`) BEFORE writing new content files to disk.
+   - Complete-content authorization is published only AFTER all required text and photo bytes are successfully written and validated.
+   - Interrupted replacements leave verified unlock evidence intact without authorizing incomplete or unvalidated bytes.
+
+2. **Authoritative Server Unlock Timestamps & Persistence Order:**
+   - In `DefaultCapsuleRepository.kt`, removed device clock time (`Instant.now()`) for `verifiedUnlockedAt`.
+   - Obtains and persists `serverUnlockedAt` from authoritative `RecipientUnlockRequirements.unlockedAt`.
+   - Persists `saveVerifiedUnlockMarker` BEFORE starting protected content download when recipient unlocks an online capsule.
+
+3. **Cancellable Session-Bound Image Decoding:**
+   - In `S07CapsuleDetailFragment.kt`, maintained cancellable `imageRenderJob`.
+   - Revalidates session snapshot, capsule ID, and fragment binding state BEFORE applying decoded bitmap to `ivS07Photo`.
+   - Immediately clears image drawables and cancels active decoding on view destruction or session generation reset.
+
+4. **Complete Metadata Preservation & Offline Read Contracts:**
+   - Preserved `unlockAt` and `creationZone` in `verified-marker.properties` and `RetainedSummary`.
+   - Authoritative server access denials (`OperationResult.Denied`) block local retention overrides when online, while offline re-view remains supported when network is unavailable.
+
+5. **Foreground Recovery & Notification Fixes:**
+   - In `S03CapsuleListViewModel`, foreground unlock updates both `receivedList` and `sentList` item availability.
+   - In `MainActivity.kt`, notification intent deduplication key is recorded ONLY after `validateEntryIntent` succeeds.
+   - In `S03CapsuleListFragment`, unresolved publication cards route to `navigateToConfirmSend(pub.capsuleId)` with specific capsule ID.
+
+6. **Production-Path Regression Test Suite:**
+   - Expanded `Issue21FunctionalCorrectionsTest.kt` with 10 production-path tests (covering full unlock -> initial download failure -> process recreation -> offline summary -> online retry, ViewModel session state clearing, and interrupted content replacement).
+
 ---
 
-## 4. Verification and Checks Summary
+## 5. Verification and Checks Summary
 
-- `./gradlew :app:testDebugUnitTest`: **PASS (374 passed, 0 failed)**
+- `./gradlew :app:testDebugUnitTest`: **PASS (375 passed, 0 failed)**
 - `./gradlew :app:assembleDebug :app:assembleDebugAndroidTest`: **PASS (`BUILD SUCCESSFUL`)**
 - `./gradlew :app:clean :app:lintDebug`: **PASS (`BUILD SUCCESSFUL`, 0 lint errors)**
 - `py tools/check_readiness.py --issue 21 --evidence docs/agent-tools/readiness-evidence-issue21.json`: **PASS (`PREFLIGHT_RECORD_VALID`)**
@@ -110,10 +139,11 @@
 
 ---
 
-## 5. Next Human Action
+## 6. Next Human Action
 
 1. User G code review of branch `feature/21-capsule-lists-detail`.
 2. Manual end-to-end verification on Android device/emulator (S-03 list tabs, S-07 detail unlock, Author copy view, notification tap, and offline process relaunch re-view).
 3. Merge PR #47 after teammate approval.
+
 
 

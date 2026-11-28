@@ -19,18 +19,6 @@ import kotlinx.coroutines.withContext
 
 /**
  * Production implementation of [LocalRetentionAdapter] managing UID-scoped app-private retained content.
- *
- * Security & Data Isolation Architecture:
- * 1. Storage Location: Root directory MUST be under Android `noBackupFilesDir` to prevent cloud auto-backup.
- * 2. Hashed Account Isolation: Stores content under `root/retained-content/<hashed-uid>/<capsule-id>/`
- *    so filenames never contain plain text user UIDs or sensitive user identifiers.
- * 3. Server Timestamp Requirement: Retained markers store [RetainedContent.verifiedUnlockedAt] derived strictly from authoritative
- *    server unlock evidence. Local device clock changes cannot manufacture valid retention markers.
- * 4. Atomic Verification Gate: Offline reads require matching UID, valid marker, and complete, readable content files.
- *    Missing text or photo files cause the read to fail closed ([OperationResult.Unavailable]).
- *
- * @param root Base directory for retained content storage, typically `File(noBackupFilesDir, "retained-content")`.
- * @param session Live session supplier for active session validation.
  */
 class DefaultLocalRetentionAdapter(
     private val root: File,
@@ -56,6 +44,8 @@ class DefaultLocalRetentionAdapter(
         senderDisplayName: String?,
         recipientDisplayName: String?,
         createdAt: Instant?,
+        unlockAt: Instant?,
+        creationZone: String?,
         hasText: Boolean,
         hasPhoto: Boolean
     ): OperationResult<Unit> = withContext(Dispatchers.IO) {
@@ -107,6 +97,10 @@ class DefaultLocalRetentionAdapter(
                         ?: existingProperties.getProperty("recipientDisplayName")?.let { setProperty("recipientDisplayName", it) }
                     createdAt?.let { setProperty("createdAt", it.toString()) }
                         ?: existingProperties.getProperty("createdAt")?.let { setProperty("createdAt", it) }
+                    unlockAt?.let { setProperty("unlockAt", it.toString()) }
+                        ?: existingProperties.getProperty("unlockAt")?.let { setProperty("unlockAt", it) }
+                    creationZone?.takeIf { it.isNotBlank() }?.let { setProperty("creationZone", it) }
+                        ?: existingProperties.getProperty("creationZone")?.let { setProperty("creationZone", it) }
                 }
 
                 val tempMarker = File.createTempFile("marker-", ".partial", directory)
@@ -143,7 +137,9 @@ class DefaultLocalRetentionAdapter(
         lockMode: LockMode?,
         senderDisplayName: String?,
         recipientDisplayName: String?,
-        createdAt: Instant?
+        createdAt: Instant?,
+        unlockAt: Instant?,
+        creationZone: String?
     ): OperationResult<Unit> = withContext(Dispatchers.IO) {
         val cleanUid = (targetSession.uid ?: "").trim()
         val cleanCapsuleId = capsuleId.trim()
@@ -172,13 +168,39 @@ class DefaultLocalRetentionAdapter(
                     return@synchronized OperationResult.Unavailable("Cannot create retained content directory.")
                 }
 
-                // A failed replacement must never authorize a mixture of old and new files.
                 val markerFile = File(directory, MARKER_FILE_NAME)
                 val existingProperties = Properties()
                 if (markerFile.exists()) {
                     try { markerFile.inputStream().use { existingProperties.load(it) } } catch (_: Exception) {}
                 }
 
+                // 1. Invalidate complete-content authorization BEFORE writing new content files
+                val tempProperties = Properties().apply {
+                    putAll(existingProperties)
+                    setProperty("version", MARKER_VERSION)
+                    setProperty("uid", cleanUid)
+                    setProperty("capsuleId", cleanCapsuleId)
+                    setProperty("verifiedUnlockedAt", verifiedUnlockedAt.toString())
+                    setProperty("hasText", "false")
+                    setProperty("hasPhoto", "false")
+                }
+                val preMarker = File.createTempFile("marker-pre-", ".partial", directory)
+                try {
+                    preMarker.outputStream().use { output ->
+                        tempProperties.store(output, null)
+                        output.fd.sync()
+                    }
+                    Files.move(
+                        preMarker.toPath(),
+                        markerFile.toPath(),
+                        StandardCopyOption.ATOMIC_MOVE,
+                        StandardCopyOption.REPLACE_EXISTING
+                    )
+                } finally {
+                    preMarker.delete()
+                }
+
+                // 2. Write content files atomically
                 val textFile = File(directory, TEXT_FILE_NAME)
                 if (retainedText == null) Files.deleteIfExists(textFile.toPath())
                 else writeAtomic(textFile, retainedText.toByteArray(Charsets.UTF_8))
@@ -186,6 +208,7 @@ class DefaultLocalRetentionAdapter(
                 if (photoBytes == null) Files.deleteIfExists(photoFile.toPath())
                 else writeAtomic(photoFile, photoBytes)
 
+                // 3. Publish complete-content authorization only AFTER files are written
                 val properties = Properties().apply {
                     setProperty("version", MARKER_VERSION)
                     setProperty("uid", cleanUid)
@@ -205,6 +228,10 @@ class DefaultLocalRetentionAdapter(
                         ?: existingProperties.getProperty("recipientDisplayName")?.let { setProperty("recipientDisplayName", it) }
                     createdAt?.let { setProperty("createdAt", it.toString()) }
                         ?: existingProperties.getProperty("createdAt")?.let { setProperty("createdAt", it) }
+                    unlockAt?.let { setProperty("unlockAt", it.toString()) }
+                        ?: existingProperties.getProperty("unlockAt")?.let { setProperty("unlockAt", it) }
+                    creationZone?.takeIf { it.isNotBlank() }?.let { setProperty("creationZone", it) }
+                        ?: existingProperties.getProperty("creationZone")?.let { setProperty("creationZone", it) }
                 }
 
                 val tempMarker = File.createTempFile("marker-", ".partial", directory)
@@ -430,6 +457,9 @@ class DefaultLocalRetentionAdapter(
             val createdAt = properties.getProperty("createdAt")?.let {
                 try { Instant.parse(it) } catch (_: Exception) { null }
             }
+            val unlockAt = properties.getProperty("unlockAt")?.let {
+                try { Instant.parse(it) } catch (_: Exception) { null }
+            }
 
             // Check if text and photo files exist on disk WITHOUT reading bytes
             val textFile = File(directory, TEXT_FILE_NAME)
@@ -446,6 +476,7 @@ class DefaultLocalRetentionAdapter(
                     senderUid = senderUid,
                     recipientUid = recipientUid,
                     lockMode = lockMode,
+                    unlockAt = unlockAt,
                     title = title,
                     senderDisplayName = senderDisplayName,
                     recipientDisplayName = recipientDisplayName,
