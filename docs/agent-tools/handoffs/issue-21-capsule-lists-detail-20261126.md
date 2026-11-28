@@ -150,9 +150,28 @@
 5. **Fault-Injection Regression Test Suite:**
    - Updated `Issue21FunctionalCorrectionsTest.kt` with a deterministic fault-injection test (`interruptedRetainedContentReplacementPreservesUnlockEvidenceWithoutAuthorizingIncompleteBytes`) exercising initial complete save -> pre-marker invalidation -> forced I/O fault -> process recreation -> verified unlock evidence survival without incomplete byte authorization -> unlock marker refresh -> successful clean replacement.
 
+## 6. Fifth Review Functional Corrections (28 November 2026)
+
+1. **Independent Content Commitment Gate (`contentCommitted`):**
+   - Implemented explicit `contentCommitted` property in `DefaultLocalRetentionAdapter.kt`.
+   - `saveVerifiedUnlockMarker` writes unlock evidence without inheriting or creating `contentCommitted = true`.
+   - `saveRetainedContent` invalidates `contentCommitted = false` BEFORE modifying files and sets `contentCommitted = true` only AFTER all files are written and validated.
+   - `readRetainedContentInternal` and `readRetainedSummaryInternal` enforce `contentCommitted == true`.
+
+2. **Session Validation Boundaries:**
+   - Added `sessionTracker.isSessionValid(targetSession)` checks across all asynchronous boundaries in `DefaultCapsuleRepository.kt` (between sent/received queries, after post-unlock metadata reads, after unlock marker save, and before returning protected content).
+
+3. **Complete Image Render Identity Protection:**
+   - In `S07CapsuleDetailFragment.kt`, maintained an explicit `imageRenderToken` and captured session/capsule identity.
+   - Revalidates live session, token, capsule ID, and fragment binding before rendering bitmap on main thread.
+
+4. **Production-Path Fault Injection Test:**
+   - Implemented testable `faultInjector` seam on `DefaultLocalRetentionAdapter`.
+   - `interruptedRetainedContentReplacementPreservesUnlockEvidenceWithoutAuthorizingIncompleteBytes` in `Issue21FunctionalCorrectionsTest.kt` exercises initial complete save -> pre-marker invalidation -> forced I/O fault -> process recreation -> verified unlock evidence survival without incomplete byte authorization -> unlock marker refresh -> clean replacement.
+
 ---
 
-## 6. Verification and Checks Summary
+## 7. Verification and Checks Summary
 
 - `./gradlew :app:testDebugUnitTest`: **PASS (375 passed, 0 failed)**
 - `./gradlew :app:assembleDebug :app:assembleDebugAndroidTest`: **PASS (`BUILD SUCCESSFUL`)**
@@ -162,11 +181,12 @@
 
 ---
 
-## 7. Next Human Action
+## 8. Next Human Action
 
 1. User G code review of branch `feature/21-capsule-lists-detail`.
 2. Manual end-to-end verification on Android device/emulator (S-03 list tabs, S-07 detail unlock, Author copy view, notification tap, and offline process relaunch re-view).
 3. Merge PR #47 after teammate approval.
+
 
 
 

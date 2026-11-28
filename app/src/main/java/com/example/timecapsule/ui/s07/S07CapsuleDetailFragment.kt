@@ -45,6 +45,7 @@ class S07CapsuleDetailFragment : Fragment() {
     private val binding get() = _binding!!
 
     private var imageRenderJob: Job? = null
+    private var imageRenderToken: Long = 0L
     private var activeRenderCapsuleId: String? = null
 
     private val viewModel: S07CapsuleDetailViewModel by viewModels {
@@ -154,23 +155,29 @@ class S07CapsuleDetailFragment : Fragment() {
             val photoBytes = state.content.photoBytes
             if (photoBytes != null && photoBytes.isNotEmpty()) {
                 imageRenderJob?.cancel()
+                val token = ++imageRenderToken
                 val expectedCapsuleId = state.capsuleId
                 val expectedSession = state.sessionSnapshot
+                val sessionTracker = (requireActivity() as MainActivity).container.sessionTracker
 
                 imageRenderJob = viewLifecycleOwner.lifecycleScope.launch {
                     val bitmap = decodeSampledBitmap(photoBytes, 1024)
+                    val currentSession = sessionTracker.currentSession()
                     val currentState = viewModel.uiState.value
 
-                    // Revalidate session snapshot, capsule ID, and binding before rendering
+                    // Revalidate live session, render token, capsule ID, and binding before rendering
                     if (_binding != null &&
+                        token == imageRenderToken &&
+                        currentSession == expectedSession &&
                         currentState.capsuleId == expectedCapsuleId &&
-                        currentState.sessionSnapshot == expectedSession) {
+                        sessionTracker.isSessionValid(expectedSession ?: currentSession)) {
                         if (bitmap != null) {
                             binding.ivS07Photo.setImageBitmap(bitmap)
                             binding.ivS07Photo.visibility = View.VISIBLE
                         } else {
                             binding.ivS07Photo.setImageDrawable(null)
                             binding.ivS07Photo.visibility = View.GONE
+                            Toast.makeText(requireContext(), "Failed to decode image.", Toast.LENGTH_SHORT).show()
                         }
                     } else {
                         bitmap?.recycle()

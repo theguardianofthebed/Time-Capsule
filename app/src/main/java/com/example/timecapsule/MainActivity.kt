@@ -290,7 +290,7 @@ class MainActivity : AppCompatActivity() {
 
     /** Navigates to S-06 Confirm Send Review screen. */
     fun navigateToConfirmSend(capsuleId: String? = null) {
-        val fragment = S06ConfirmSendFragment().apply {
+        val fragment = S06ConfirmSendFragment.newInstance(capsuleId).apply {
             onBackToRecipientLockListener = { navigateToRecipientLock() }
             onNavigateToMomentsListener = { navigateToCapsuleList() }
             onNavigateToAccountListener = { navigateToAccountSettings() }

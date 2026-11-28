@@ -763,6 +763,25 @@ Implement complete bounded scope for Issue #21: S-03 Capsule Lists (Received and
   - Lint passed cleanly with 0 errors (`./gradlew :app:clean :app:lintDebug`).
   - Readiness check passed (`PREFLIGHT_RECORD_VALID`).
 
+### Fifth Review Functional Corrections Applied (28 November 2026)
+
+- **1. Independent Content Commitment Gate (`contentCommitted`):**
+  - Implemented explicit `contentCommitted` property in `DefaultLocalRetentionAdapter.kt`.
+  - `saveVerifiedUnlockMarker` writes unlock evidence without inheriting or creating `contentCommitted = true`.
+  - `saveRetainedContent` invalidates `contentCommitted = false` BEFORE modifying files and sets `contentCommitted = true` only AFTER all files are written and validated.
+- **2. Session Validation Boundaries:**
+  - Added `sessionTracker.isSessionValid(targetSession)` checks across all asynchronous boundaries in `DefaultCapsuleRepository.kt`.
+- **3. Complete Image Render Identity Protection:**
+  - In `S07CapsuleDetailFragment.kt`, maintained an explicit `imageRenderToken` and captured session/capsule identity. Revalidates live session, token, capsule ID, and fragment binding before rendering bitmap.
+- **4. Production-Path Fault Injection Test:**
+  - Implemented testable `faultInjector` seam on `DefaultLocalRetentionAdapter`.
+  - `interruptedRetainedContentReplacementPreservesUnlockEvidenceWithoutAuthorizingIncompleteBytes` in `Issue21FunctionalCorrectionsTest.kt` exercises initial complete save -> pre-marker invalidation -> forced I/O fault -> process recreation -> verified unlock evidence survival without incomplete byte authorization -> unlock marker refresh -> clean replacement.
+- **5. Automated Verification Suite:**
+  - Total **375 JVM unit tests passed** (`./gradlew :app:testDebugUnitTest`).
+  - Debug and AndroidTest APKs built cleanly (`./gradlew :app:assembleDebug :app:assembleDebugAndroidTest`).
+  - Lint passed cleanly with 0 errors (`./gradlew :app:clean :app:lintDebug`).
+  - Readiness check passed (`PREFLIGHT_RECORD_VALID`).
+
 
 
 

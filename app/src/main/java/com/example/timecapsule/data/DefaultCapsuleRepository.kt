@@ -128,10 +128,13 @@ class DefaultCapsuleRepository(
         }
 
         val sentRes = firestoreAdapter.getSentCapsuleSummaries(cleanUid)
-        val receivedRes = firestoreAdapter.getReceivedCapsuleSummaries(cleanUid)
-
         if (!sessionTracker.isSessionValid(targetSession)) {
-            return OperationResult.Denied("Account session changed during lists query.")
+            return OperationResult.Denied("Account session changed during sent lists query.")
+        }
+
+        val receivedRes = firestoreAdapter.getReceivedCapsuleSummaries(cleanUid)
+        if (!sessionTracker.isSessionValid(targetSession)) {
+            return OperationResult.Denied("Account session changed during received lists query.")
         }
 
         if (sentRes is OperationResult.Success && receivedRes is OperationResult.Success) {
@@ -173,6 +176,7 @@ class DefaultCapsuleRepository(
                         availability = Availability.AVAILABLE,
                         title = retained.title,
                         createdAt = retained.createdAt,
+                        creationZone = retained.creationZone,
                         hasPhoto = retained.hasPhoto,
                         unlockedAt = retained.verifiedUnlockedAt,
                         senderDisplayName = retained.senderDisplayName,
@@ -216,6 +220,7 @@ class DefaultCapsuleRepository(
                         availability = Availability.AVAILABLE,
                         title = retained.title,
                         createdAt = retained.createdAt,
+                        creationZone = retained.creationZone,
                         hasPhoto = retained.hasPhoto,
                         unlockedAt = retained.verifiedUnlockedAt,
                         senderDisplayName = retained.senderDisplayName,

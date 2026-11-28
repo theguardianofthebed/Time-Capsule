@@ -16,6 +16,7 @@ import java.time.Instant
 import java.util.Properties
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.jetbrains.annotations.TestOnly
 
 /**
  * Production implementation of [LocalRetentionAdapter] managing UID-scoped app-private retained content.
@@ -24,6 +25,9 @@ class DefaultLocalRetentionAdapter(
     private val root: File,
     private val session: () -> SessionSnapshot
 ) : LocalRetentionAdapter {
+
+    @set:TestOnly
+    var faultInjector: (() -> Unit)? = null
 
     companion object {
         private val lock = StorageSession.lock
@@ -79,6 +83,7 @@ class DefaultLocalRetentionAdapter(
                     setProperty("uid", cleanUid)
                     setProperty("capsuleId", cleanCapsuleId)
                     setProperty("verifiedUnlockedAt", verifiedUnlockedAt.toString())
+                    setProperty("contentCommitted", existingProperties.getProperty("contentCommitted") ?: "false")
                     setProperty("hasText", hasText.toString())
                     setProperty("hasPhoto", hasPhoto.toString())
                     existingProperties.getProperty("photoSha256")?.let { setProperty("photoSha256", it) }
@@ -181,6 +186,7 @@ class DefaultLocalRetentionAdapter(
                     setProperty("uid", cleanUid)
                     setProperty("capsuleId", cleanCapsuleId)
                     setProperty("verifiedUnlockedAt", verifiedUnlockedAt.toString())
+                    setProperty("contentCommitted", "false")
                     setProperty("hasText", "false")
                     setProperty("hasPhoto", "false")
                 }
@@ -200,6 +206,9 @@ class DefaultLocalRetentionAdapter(
                     preMarker.delete()
                 }
 
+                // Fault injection seam for testing interrupted replacements
+                faultInjector?.invoke()
+
                 // 2. Write content files atomically
                 val textFile = File(directory, TEXT_FILE_NAME)
                 if (retainedText == null) Files.deleteIfExists(textFile.toPath())
@@ -214,6 +223,7 @@ class DefaultLocalRetentionAdapter(
                     setProperty("uid", cleanUid)
                     setProperty("capsuleId", cleanCapsuleId)
                     setProperty("verifiedUnlockedAt", verifiedUnlockedAt.toString())
+                    setProperty("contentCommitted", "true")
                     setProperty("hasText", (retainedText != null).toString())
                     setProperty("hasPhoto", (photoBytes != null).toString())
                     photoBytes?.let { setProperty("photoSha256", sha256(it)) }
@@ -347,6 +357,12 @@ class DefaultLocalRetentionAdapter(
                 return OperationResult.Denied("Retained marker timestamp is corrupted.")
             }
 
+            val contentCommittedStr = properties.getProperty("contentCommitted")
+            val isCommitted = contentCommittedStr?.toBooleanStrictOrNull() ?: true
+            if (!isCommitted) {
+                return OperationResult.Denied("Retained content is uncommitted or unavailable locally.")
+            }
+
             val hasTextStr = properties.getProperty("hasText")
             val hasPhotoStr = properties.getProperty("hasPhoto")
             val hasText = hasTextStr?.toBooleanStrictOrNull()
@@ -442,6 +458,8 @@ class DefaultLocalRetentionAdapter(
 
             val hasText = properties.getProperty("hasText")?.toBooleanStrictOrNull() ?: false
             val hasPhoto = properties.getProperty("hasPhoto")?.toBooleanStrictOrNull() ?: false
+            val contentCommittedStr = properties.getProperty("contentCommitted")
+            val isCommitted = contentCommittedStr?.toBooleanStrictOrNull() ?: (hasText || hasPhoto)
 
             val senderUid = properties.getProperty("senderUid")?.takeIf { it.isNotBlank() }
             val recipientUid = properties.getProperty("recipientUid")?.takeIf { it.isNotBlank() }
@@ -485,7 +503,7 @@ class DefaultLocalRetentionAdapter(
                     creationZone = creationZone,
                     hasText = hasText,
                     hasPhoto = hasPhoto,
-                    isContentAvailable = (hasText || hasPhoto) && textOk && photoOk
+                    isContentAvailable = isCommitted && (hasText || hasPhoto) && textOk && photoOk
                 )
             )
         } catch (error: Exception) {
