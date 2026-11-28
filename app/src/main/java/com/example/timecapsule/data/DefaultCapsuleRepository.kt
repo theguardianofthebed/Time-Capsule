@@ -142,26 +142,34 @@ class DefaultCapsuleRepository(
             )
         }
 
-        // Offline fallback: if network/server is unavailable, check local retention
+        // Authoritative Denied / Invalid -> Return immediately without offline fallback
+        if (sentRes is OperationResult.Denied) return sentRes
+        if (receivedRes is OperationResult.Denied) return receivedRes
+        if (sentRes is OperationResult.Invalid) return sentRes
+        if (receivedRes is OperationResult.Invalid) return receivedRes
+
+        // Attempt offline fallback ONLY when network/service is Unavailable
         val retention = retentionAdapter
-        if (retention != null) {
+        if (retention != null && (sentRes is OperationResult.Unavailable || receivedRes is OperationResult.Unavailable)) {
             val offlineEntries = retention.listVerifiedRecipientEntries(targetSession)
             if (!sessionTracker.isSessionValid(targetSession)) {
                 return OperationResult.Denied("Account session changed during offline lists fallback.")
             }
             if (offlineEntries is OperationResult.Success && offlineEntries.data.isNotEmpty()) {
                 val offlineSummaries = offlineEntries.data.map { retained ->
-                    val hasPhoto = retained.photoBytes != null
                     CapsuleSummary(
                         capsuleId = retained.capsuleId,
                         senderUid = "",
                         recipientUid = cleanUid,
-                        lock = CapsuleLock(mode = LockMode.TIME),
+                        lock = CapsuleLock(mode = retained.lockMode ?: LockMode.TIME),
                         sendStatus = SendStatus.SENT,
                         availability = Availability.AVAILABLE,
-                        title = "Previously unlocked capsule",
+                        title = retained.title,
+                        createdAt = retained.createdAt,
+                        hasPhoto = retained.hasPhoto,
                         unlockedAt = retained.verifiedUnlockedAt,
-                        hasPhoto = hasPhoto
+                        senderDisplayName = retained.senderDisplayName,
+                        recipientDisplayName = retained.recipientDisplayName
                     )
                 }
                 val sentList = if (sentRes is OperationResult.Success) sentRes.data else emptyList()
@@ -174,12 +182,10 @@ class DefaultCapsuleRepository(
             }
         }
 
+        @Suppress("UNCHECKED_CAST")
         return when {
-            sentRes is OperationResult.Denied -> sentRes
-            receivedRes is OperationResult.Denied -> receivedRes
-            sentRes is OperationResult.Invalid -> sentRes
-            receivedRes is OperationResult.Invalid -> receivedRes
-            else -> OperationResult.Unavailable("Network unavailable and no retained capsules exist offline.")
+            sentRes !is OperationResult.Success -> sentRes as OperationResult<CapsuleListsSnapshot>
+            else -> receivedRes as OperationResult<CapsuleListsSnapshot>
         }
     }
 
@@ -209,28 +215,38 @@ class DefaultCapsuleRepository(
             return summaryRes
         }
 
-        // Offline fallback for recipient: check local retention
+        // Authoritative Denied / Invalid -> Return immediately without offline fallback
+        if (summaryRes is OperationResult.Denied || summaryRes is OperationResult.Invalid) {
+            return summaryRes
+        }
+
+        // Offline fallback for recipient ONLY when network is Unavailable
         val retention = retentionAdapter
-        if (retention != null) {
-            val offlineRes = retention.readRetainedContent(targetSession, cleanCapsuleId)
+        if (retention != null && summaryRes is OperationResult.Unavailable) {
+            val offlineEntries = retention.listVerifiedRecipientEntries(targetSession)
             if (!sessionTracker.isSessionValid(targetSession)) {
                 return OperationResult.Denied("Account session changed during offline summary read.")
             }
-            if (offlineRes is OperationResult.Success) {
-                val retained = offlineRes.data
-                return OperationResult.Success(
-                    CapsuleSummary(
-                        capsuleId = cleanCapsuleId,
-                        senderUid = "",
-                        recipientUid = activeUid,
-                        lock = CapsuleLock(mode = LockMode.TIME),
-                        sendStatus = SendStatus.SENT,
-                        availability = Availability.AVAILABLE,
-                        title = "Unlocked capsule",
-                        unlockedAt = retained.verifiedUnlockedAt,
-                        hasPhoto = retained.photoBytes != null
+            if (offlineEntries is OperationResult.Success) {
+                val matching = offlineEntries.data.firstOrNull { it.capsuleId == cleanCapsuleId }
+                if (matching != null) {
+                    return OperationResult.Success(
+                        CapsuleSummary(
+                            capsuleId = cleanCapsuleId,
+                            senderUid = "",
+                            recipientUid = activeUid,
+                            lock = CapsuleLock(mode = matching.lockMode ?: LockMode.TIME),
+                            sendStatus = SendStatus.SENT,
+                            availability = Availability.AVAILABLE,
+                            title = matching.title,
+                            createdAt = matching.createdAt,
+                            hasPhoto = matching.hasPhoto,
+                            unlockedAt = matching.verifiedUnlockedAt,
+                            senderDisplayName = matching.senderDisplayName,
+                            recipientDisplayName = matching.recipientDisplayName
+                        )
                     )
-                )
+                }
             }
         }
 
@@ -413,27 +429,26 @@ class DefaultCapsuleRepository(
         }
         val activeUid = targetSession.uid!!
 
-        // 1. Check local retention first if adapter is present
+        // 1. Try local retention first
         val retention = retentionAdapter
-        if (retention != null) {
-            val offlineRes = retention.readRetainedContent(targetSession, cleanId)
-            if (!sessionTracker.isSessionValid(targetSession)) {
-                return OperationResult.Denied("Account session changed during content read.")
-            }
-            if (offlineRes is OperationResult.Success) {
-                val retained = offlineRes.data
-                val photoPath = if (retained.photoBytes != null) "retainedMedia/${retained.uid}/$cleanId" else null
-                return OperationResult.Success(
-                    ProtectedCapsuleContent(
-                        capsuleId = cleanId,
-                        text = retained.text,
-                        photoObjectPath = photoPath,
-                        photoBytes = retained.photoBytes,
-                        photoFormat = retained.photoFormat,
-                        availableOffline = true
-                    )
+        val retentionReadRes = retention?.readRetainedContent(targetSession, cleanId)
+        if (!sessionTracker.isSessionValid(targetSession)) {
+            return OperationResult.Denied("Account session changed during content read.")
+        }
+
+        if (retentionReadRes is OperationResult.Success) {
+            val retained = retentionReadRes.data
+            val photoPath = if (retained.photoBytes != null) "retainedMedia/${retained.uid}/$cleanId" else null
+            return OperationResult.Success(
+                ProtectedCapsuleContent(
+                    capsuleId = cleanId,
+                    text = retained.text,
+                    photoObjectPath = photoPath,
+                    photoBytes = retained.photoBytes,
+                    photoFormat = retained.photoFormat,
+                    availableOffline = true
                 )
-            }
+            )
         }
 
         // 2. Authoritative server metadata lookup to determine role & authorization
@@ -442,8 +457,20 @@ class DefaultCapsuleRepository(
             return OperationResult.Denied("Account session changed during content read.")
         }
 
+        var summaryTitle: String? = null
+        var summaryLockMode: LockMode? = null
+        var summarySenderName: String? = null
+        var summaryRecipientName: String? = null
+        var summaryCreatedAt: Instant? = null
+
         if (summaryRes is OperationResult.Success) {
             val summary = summaryRes.data
+            summaryTitle = summary.title
+            summaryLockMode = summary.lock.mode
+            summarySenderName = summary.senderDisplayName
+            summaryRecipientName = summary.recipientDisplayName
+            summaryCreatedAt = summary.createdAt
+
             val isAuthorCopy = (activeUid == summary.senderUid && summary.senderUid != summary.recipientUid)
 
             if (isAuthorCopy) {
@@ -461,6 +488,8 @@ class DefaultCapsuleRepository(
                 }
                 return if (contentRes is OperationResult.Unavailable) contentRes else OperationResult.Denied("Protected content unreadable for author copy.")
             }
+        } else if (summaryRes is OperationResult.Denied) {
+            return summaryRes
         }
 
         // Recipient branch
@@ -468,12 +497,19 @@ class DefaultCapsuleRepository(
         if (!sessionTracker.isSessionValid(targetSession)) {
             return OperationResult.Denied("Account session changed during content read.")
         }
+
         if (reqResult !is OperationResult.Success) {
-            return OperationResult.Denied("Unlock requirements unreadable.")
+            if (reqResult is OperationResult.Unavailable && retentionReadRes is OperationResult.Unavailable) {
+                return OperationResult.Unavailable("Capsule unlocked — content unavailable. Connect and retry.")
+            }
+            return if (reqResult is OperationResult.Denied) reqResult else OperationResult.Denied("Unlock requirements unreadable.")
         }
 
         val requirements = reqResult.data
         var serverUnlockedAt = requirements.unlockedAt
+        if (summaryLockMode == null) {
+            summaryLockMode = requirements.lockMode
+        }
 
         if (!requirements.unlocked) {
             val unlockRes = verifyUnlockOutcome(cleanId, targetSession)
@@ -506,8 +542,19 @@ class DefaultCapsuleRepository(
                 return OperationResult.Unavailable("Capsule has no readable content.")
             }
             val saveResult = try {
-                retention?.saveRetainedContent(targetSession, cleanId, verifiedTime, content.text,
-                    content.photoBytes, content.photoFormat)
+                retention?.saveRetainedContent(
+                    targetSession = targetSession,
+                    capsuleId = cleanId,
+                    verifiedUnlockedAt = verifiedTime,
+                    text = content.text,
+                    photoBytes = content.photoBytes,
+                    photoFormat = content.photoFormat,
+                    title = summaryTitle,
+                    lockMode = summaryLockMode,
+                    senderDisplayName = summarySenderName,
+                    recipientDisplayName = summaryRecipientName,
+                    createdAt = summaryCreatedAt
+                )
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
             } catch (error: java.io.IOException) {

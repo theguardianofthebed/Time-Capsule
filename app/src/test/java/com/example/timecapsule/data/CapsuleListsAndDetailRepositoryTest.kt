@@ -4,6 +4,7 @@ import com.example.timecapsule.data.adapter.AuthAdapter
 import com.example.timecapsule.data.adapter.FirestoreAdapter
 import com.example.timecapsule.data.adapter.LocalRetentionAdapter
 import com.example.timecapsule.data.adapter.RetainedContent
+import com.example.timecapsule.data.adapter.RetainedSummary
 import com.example.timecapsule.data.session.DefaultSessionTracker
 import com.example.timecapsule.domain.model.Availability
 import com.example.timecapsule.domain.model.CapsuleLock
@@ -281,8 +282,17 @@ class CapsuleListsAndDetailRepositoryTest {
 
         override suspend fun listVerifiedRecipientEntries(
             targetSession: SessionSnapshot
-        ): OperationResult<List<RetainedContent>> {
-            val userEntries = retainedEntries.filter { it.uid == targetSession.uid }
+        ): OperationResult<List<RetainedSummary>> {
+            val userEntries = retainedEntries.filter { it.uid == targetSession.uid }.map {
+                RetainedSummary(
+                    uid = it.uid,
+                    capsuleId = it.capsuleId,
+                    verifiedUnlockedAt = it.verifiedUnlockedAt,
+                    hasText = !it.text.isNullOrBlank(),
+                    hasPhoto = it.photoBytes != null,
+                    isContentAvailable = true
+                )
+            }
             return OperationResult.Success(userEntries)
         }
 

@@ -1,5 +1,6 @@
 package com.example.timecapsule.data.adapter
 
+import com.example.timecapsule.domain.model.LockMode
 import com.example.timecapsule.domain.model.OriginalPhotoFormat
 import com.example.timecapsule.domain.result.OperationResult
 import com.example.timecapsule.domain.session.SessionSnapshot
@@ -51,6 +52,23 @@ data class RetainedContent(
 }
 
 /**
+ * Lightweight account-scoped retention summary metadata for list enumeration without bulk loading protected bytes.
+ */
+data class RetainedSummary(
+    val uid: String,
+    val capsuleId: String,
+    val verifiedUnlockedAt: Instant,
+    val lockMode: LockMode? = null,
+    val title: String? = null,
+    val senderDisplayName: String? = null,
+    val recipientDisplayName: String? = null,
+    val createdAt: Instant? = null,
+    val hasText: Boolean = false,
+    val hasPhoto: Boolean = false,
+    val isContentAvailable: Boolean = true
+)
+
+/**
  * Replaceable adapter boundary for UID-scoped local app-private storage and DataStore markers.
  */
 interface LocalRetentionAdapter {
@@ -67,6 +85,25 @@ interface LocalRetentionAdapter {
     ): OperationResult<Unit>
 
     /**
+     * Persists verified recipient unlocked content with server timestamp, metadata, and session snapshot.
+     */
+    suspend fun saveRetainedContent(
+        targetSession: SessionSnapshot,
+        capsuleId: String,
+        verifiedUnlockedAt: Instant,
+        text: String?,
+        photoBytes: ByteArray?,
+        photoFormat: OriginalPhotoFormat?,
+        title: String? = null,
+        lockMode: LockMode? = null,
+        senderDisplayName: String? = null,
+        recipientDisplayName: String? = null,
+        createdAt: Instant? = null
+    ): OperationResult<Unit> = saveRetainedContent(
+        targetSession, capsuleId, verifiedUnlockedAt, text, photoBytes, photoFormat
+    )
+
+    /**
      * Reads verified retained content for the active account if marker and content files are complete.
      */
     suspend fun readRetainedContent(
@@ -75,11 +112,11 @@ interface LocalRetentionAdapter {
     ): OperationResult<RetainedContent>
 
     /**
-     * Lists all verified retained content entries for [targetSession] if markers and content files are complete.
+     * Lists lightweight retention metadata for [targetSession] without bulk loading protected text or photo bytes.
      */
     suspend fun listVerifiedRecipientEntries(
         targetSession: SessionSnapshot
-    ): OperationResult<List<RetainedContent>> {
+    ): OperationResult<List<RetainedSummary>> {
         return OperationResult.Unavailable("List verified recipient entries is not implemented in this adapter.")
     }
 

@@ -703,5 +703,26 @@ Implement complete bounded scope for Issue #21: S-03 Capsule Lists (Received and
 - **What I can explain:** How `DefaultCapsuleRepository` uses `getCapsuleSummary` to differentiate Author Copy from Recipient roles, how `DefaultLocalRetentionAdapter.listVerifiedRecipientEntries` enables process relaunch re-view when offline (T-29, T-30), and how `S03CapsuleListViewModel` and `S07CapsuleDetailViewModel` isolate session state using `requestToken` checks across coroutine suspension points.
 - **Feedback and next step:** Teammate PR review by User G and manual testing on device/emulator before human merge into `main`.
 
+### First Review Functional Corrections Applied (28 November 2026)
+
+- **1. Separated Verified Unlock Evidence from Retained Asset Availability (AC-09, FR-12, DD-06, T-30):**
+  - Maintained distinct concepts for account-scoped unlock evidence (`verifiedUnlockedAt`), safe summary metadata (`RetainedSummary`), and actual protected file integrity (`readRetainedContent`).
+  - Missing or corrupted retained photo/text files no longer hide an unlocked capsule from list enumeration or relock the capsule; returns actionable `OperationResult.Unavailable("Capsule unlocked — content unavailable. Connect and retry.")` allowing online asset re-download.
+- **2. Eliminated Fabricated Offline Metadata:**
+  - Preserved `title`, `lockMode`, `senderDisplayName`, `recipientDisplayName`, and `createdAt` in `verified-marker.properties`.
+  - `listVerifiedRecipientEntries()` uses stored properties from `verified-marker.properties` rather than manufacturing generic titles or defaulting all lock modes to `TIME`. Full backward compatibility with legacy v1/v2 markers preserved.
+- **3. Corrected Fallback Eligibility in Repository:**
+  - `DefaultCapsuleRepository` list and summary queries check response types strictly: `OperationResult.Denied` and `OperationResult.Invalid` return directly without attempting offline retention fallback.
+  - Offline fallback is attempted ONLY when remote queries return `OperationResult.Unavailable` (network/service down).
+- **4. Lightweight List Enumeration Without Bulk Loading Protected Bytes:**
+  - `listVerifiedRecipientEntries` returns `List<RetainedSummary>` by inspecting `verified-marker.properties` and checking file existence on disk (`isContentAvailable`).
+  - Zero text or photo bytes are loaded or decoded during list enumeration, preventing memory pressure on S-03.
+- **5. Deduplicated Retention Validation:**
+  - Extracted shared internal helper methods (`readRetainedContentInternal`, `readRetainedSummaryInternal`) in `DefaultLocalRetentionAdapter`, eliminating duplicate marker parsing while preserving atomic locks, session checks, and SHA-256 integrity checks.
+- **6. Mandatory Regression Test Suite:**
+  - Added `Issue21FunctionalCorrectionsTest.kt` (7 Robolectric unit tests covering TIME, LOCATION, BOTH offline re-view, missing photo retry, corrupted photo integrity check, network failure vs access denial, cross-account isolation, and lightweight summary enumeration).
+  - Total **372 JVM unit tests passed** (`./gradlew :app:testDebugUnitTest`).
+
+
 
 [Implementation](https://github.com/theguardianofthebed/Time-Capsule/commit/0c18e07adc0786cdd1055a9f2985f870414fc230) · [Handoff](../../agent-tools/handoffs/issue-20-account-retention-cleanup-20261126.md)

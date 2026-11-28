@@ -2,6 +2,7 @@ package com.example.timecapsule.data.adapter
 
 import com.example.timecapsule.data.media.AndroidOriginalImageProbe
 import com.example.timecapsule.data.session.StorageSession
+import com.example.timecapsule.domain.model.LockMode
 import com.example.timecapsule.domain.model.OriginalPhotoFormat
 import com.example.timecapsule.domain.model.OriginalPhotoLimits
 import com.example.timecapsule.domain.result.OperationResult
@@ -51,6 +52,25 @@ class DefaultLocalRetentionAdapter(
         text: String?,
         photoBytes: ByteArray?,
         photoFormat: OriginalPhotoFormat?
+    ): OperationResult<Unit> {
+        return saveRetainedContent(
+            targetSession, capsuleId, verifiedUnlockedAt, text, photoBytes, photoFormat,
+            null, null, null, null, null
+        )
+    }
+
+    override suspend fun saveRetainedContent(
+        targetSession: SessionSnapshot,
+        capsuleId: String,
+        verifiedUnlockedAt: Instant,
+        text: String?,
+        photoBytes: ByteArray?,
+        photoFormat: OriginalPhotoFormat?,
+        title: String?,
+        lockMode: LockMode?,
+        senderDisplayName: String?,
+        recipientDisplayName: String?,
+        createdAt: Instant?
     ): OperationResult<Unit> = withContext(Dispatchers.IO) {
         val cleanUid = (targetSession.uid ?: "").trim()
         val cleanCapsuleId = capsuleId.trim()
@@ -98,6 +118,11 @@ class DefaultLocalRetentionAdapter(
                     setProperty("hasPhoto", (photoBytes != null).toString())
                     photoBytes?.let { setProperty("photoSha256", sha256(it)) }
                     photoFormat?.let { setProperty("photoFormat", it.name) }
+                    lockMode?.let { setProperty("lockMode", it.name) }
+                    title?.takeIf { it.isNotBlank() }?.let { setProperty("title", it) }
+                    senderDisplayName?.takeIf { it.isNotBlank() }?.let { setProperty("senderDisplayName", it) }
+                    recipientDisplayName?.takeIf { it.isNotBlank() }?.let { setProperty("recipientDisplayName", it) }
+                    createdAt?.let { setProperty("createdAt", it.toString()) }
                 }
 
                 val tempMarker = File.createTempFile("marker-", ".partial", directory)
@@ -137,96 +162,13 @@ class DefaultLocalRetentionAdapter(
             if (!targetSession.isAuthenticated || session() != targetSession) {
                 return@synchronized OperationResult.Denied("Retained content read denied for stale or unauthenticated session generation.")
             }
-            try {
-                val directory = targetCapsuleDirectory(cleanUid, cleanCapsuleId)
-                val markerFile = File(directory, MARKER_FILE_NAME)
-                if (!markerFile.exists()) {
-                    return@synchronized OperationResult.Denied("No verified retention marker exists for $cleanCapsuleId.")
-                }
-
-                val properties = Properties().apply {
-                    markerFile.inputStream().use { load(it) }
-                }
-
-                val version = properties.getProperty("version")
-                val markerUid = properties.getProperty("uid")
-                val markerCapsuleId = properties.getProperty("capsuleId")
-                val unlockTimeStr = properties.getProperty("verifiedUnlockedAt")
-
-                if ((version != MARKER_VERSION && version != "1") || markerUid != cleanUid || markerCapsuleId != cleanCapsuleId || unlockTimeStr == null) {
-                    return@synchronized OperationResult.Denied("Retained marker is invalid or belongs to another account.")
-                }
-
-                val verifiedUnlockedAt = try {
-                    Instant.parse(unlockTimeStr)
-                } catch (_: Exception) {
-                    return@synchronized OperationResult.Denied("Retained marker timestamp is corrupted.")
-                }
-
-                val hasTextStr = properties.getProperty("hasText")
-                val hasPhotoStr = properties.getProperty("hasPhoto")
-                val hasText = hasTextStr?.toBooleanStrictOrNull()
-                    ?: return@synchronized OperationResult.Denied("Retained marker hasText flag is missing or invalid.")
-                val hasPhoto = hasPhotoStr?.toBooleanStrictOrNull()
-                    ?: return@synchronized OperationResult.Denied("Retained marker hasPhoto flag is missing or invalid.")
-
-                if (!hasText && !hasPhoto) {
-                    return@synchronized OperationResult.Denied("Retained marker declares neither text nor photo content.")
-                }
-
-                val textContent = if (hasText) {
-                    val textFile = File(directory, TEXT_FILE_NAME)
-                    if (!textFile.exists()) {
-                        return@synchronized OperationResult.Unavailable("Retained text file is missing.")
-                    }
-                    val t = textFile.readText(Charsets.UTF_8)
-                    if (t.isBlank()) {
-                        return@synchronized OperationResult.Unavailable("Retained text content is empty.")
-                    }
-                    t
-                } else null
-
-                val photoFormat = if (hasPhoto) {
-                    val formatStr = properties.getProperty("photoFormat") ?: return@synchronized OperationResult.Unavailable("Retained photo format metadata missing.")
-                    try {
-                        OriginalPhotoFormat.valueOf(formatStr)
-                    } catch (_: Exception) {
-                        return@synchronized OperationResult.Unavailable("Invalid retained photo format.")
-                    }
-                } else null
-
-                val photoBytes = if (hasPhoto) {
-                    val photoFile = File(directory, PHOTO_FILE_NAME)
-                    if (!photoFile.isFile || !OriginalPhotoLimits.acceptsSize(photoFile.length())) {
-                        return@synchronized OperationResult.Unavailable("Retained photo file is missing.")
-                    }
-                    val bytes = photoFile.readBytes()
-                    if (properties.getProperty("photoSha256") != sha256(bytes) ||
-                        AndroidOriginalImageProbe.inspect(bytes) != photoFormat) {
-                        return@synchronized OperationResult.Unavailable("Retained photo integrity could not be verified.")
-                    }
-                    bytes
-                } else null
-
-                OperationResult.Success(
-                    RetainedContent(
-                        uid = cleanUid,
-                        capsuleId = cleanCapsuleId,
-                        text = textContent,
-                        photoBytes = photoBytes,
-                        photoFormat = photoFormat,
-                        verifiedUnlockedAt = verifiedUnlockedAt
-                    )
-                )
-            } catch (error: Exception) {
-                OperationResult.Unavailable("Failed to read retained content: ${error.message}")
-            }
+            readRetainedContentInternal(cleanUid, cleanCapsuleId)
         }
     }
 
     override suspend fun listVerifiedRecipientEntries(
         targetSession: SessionSnapshot
-    ): OperationResult<List<RetainedContent>> = withContext(Dispatchers.IO) {
+    ): OperationResult<List<RetainedSummary>> = withContext(Dispatchers.IO) {
         val cleanUid = (targetSession.uid ?: "").trim()
         if (cleanUid.isBlank()) {
             return@withContext OperationResult.Denied("Authenticated UID is required.")
@@ -243,23 +185,19 @@ class DefaultLocalRetentionAdapter(
                 }
 
                 val capsuleDirs = accountDir.listFiles { file -> file.isDirectory } ?: emptyArray()
-                val entries = mutableListOf<RetainedContent>()
+                val summaries = mutableListOf<RetainedSummary>()
 
                 for (capsuleDir in capsuleDirs) {
                     val capsuleId = capsuleDir.name
                     if (!capsuleId.matches(Regex("[A-Za-z0-9_-]+"))) continue
-                    val directory = targetCapsuleDirectory(cleanUid, capsuleId)
-                    val markerFile = File(directory, MARKER_FILE_NAME)
-                    if (!markerFile.exists()) continue
-
-                    val readRes = readRetainedContentDirect(cleanUid, capsuleId)
-                    if (readRes is OperationResult.Success) {
-                        entries.add(readRes.data)
+                    val summaryRes = readRetainedSummaryInternal(cleanUid, capsuleId)
+                    if (summaryRes is OperationResult.Success) {
+                        summaries.add(summaryRes.data)
                     }
                 }
 
-                val sorted = entries.sortedWith(
-                    compareByDescending<RetainedContent> { it.verifiedUnlockedAt }
+                val sorted = summaries.sortedWith(
+                    compareByDescending<RetainedSummary> { it.verifiedUnlockedAt }
                         .thenBy { it.capsuleId }
                 )
                 OperationResult.Success(sorted)
@@ -269,7 +207,8 @@ class DefaultLocalRetentionAdapter(
         }
     }
 
-    private fun readRetainedContentDirect(
+    /** Reads and fully validates retained content and bytes inside synchronized lock. */
+    private fun readRetainedContentInternal(
         cleanUid: String,
         cleanCapsuleId: String
     ): OperationResult<RetainedContent> {
@@ -356,6 +295,81 @@ class DefaultLocalRetentionAdapter(
             )
         } catch (error: Exception) {
             return OperationResult.Unavailable("Failed to read retained content: ${error.message}")
+        }
+    }
+
+    /**
+     * Reads lightweight retention marker metadata and checks file existence on disk WITHOUT loading or decoding bytes.
+     */
+    private fun readRetainedSummaryInternal(
+        cleanUid: String,
+        cleanCapsuleId: String
+    ): OperationResult<RetainedSummary> {
+        try {
+            val directory = targetCapsuleDirectory(cleanUid, cleanCapsuleId)
+            val markerFile = File(directory, MARKER_FILE_NAME)
+            if (!markerFile.exists()) {
+                return OperationResult.Denied("No verified retention marker exists for $cleanCapsuleId.")
+            }
+
+            val properties = Properties().apply {
+                markerFile.inputStream().use { load(it) }
+            }
+
+            val version = properties.getProperty("version")
+            val markerUid = properties.getProperty("uid")
+            val markerCapsuleId = properties.getProperty("capsuleId")
+            val unlockTimeStr = properties.getProperty("verifiedUnlockedAt")
+
+            if ((version != MARKER_VERSION && version != "1") || markerUid != cleanUid || markerCapsuleId != cleanCapsuleId || unlockTimeStr == null) {
+                return OperationResult.Denied("Retained marker is invalid or belongs to another account.")
+            }
+
+            val verifiedUnlockedAt = try {
+                Instant.parse(unlockTimeStr)
+            } catch (_: Exception) {
+                return OperationResult.Denied("Retained marker timestamp is corrupted.")
+            }
+
+            val hasText = properties.getProperty("hasText")?.toBooleanStrictOrNull() ?: false
+            val hasPhoto = properties.getProperty("hasPhoto")?.toBooleanStrictOrNull() ?: false
+
+            val lockModeStr = properties.getProperty("lockMode")
+            val lockMode = lockModeStr?.let {
+                try { LockMode.valueOf(it) } catch (_: Exception) { null }
+            }
+
+            val title = properties.getProperty("title")?.takeIf { it.isNotBlank() }
+            val senderDisplayName = properties.getProperty("senderDisplayName")?.takeIf { it.isNotBlank() }
+            val recipientDisplayName = properties.getProperty("recipientDisplayName")?.takeIf { it.isNotBlank() }
+            val createdAt = properties.getProperty("createdAt")?.let {
+                try { Instant.parse(it) } catch (_: Exception) { null }
+            }
+
+            // Check if text and photo files exist on disk WITHOUT reading bytes
+            val textFile = File(directory, TEXT_FILE_NAME)
+            val photoFile = File(directory, PHOTO_FILE_NAME)
+
+            val textOk = !hasText || (textFile.exists() && textFile.length() > 0)
+            val photoOk = !hasPhoto || (photoFile.isFile && OriginalPhotoLimits.acceptsSize(photoFile.length()))
+
+            return OperationResult.Success(
+                RetainedSummary(
+                    uid = cleanUid,
+                    capsuleId = cleanCapsuleId,
+                    verifiedUnlockedAt = verifiedUnlockedAt,
+                    lockMode = lockMode,
+                    title = title,
+                    senderDisplayName = senderDisplayName,
+                    recipientDisplayName = recipientDisplayName,
+                    createdAt = createdAt,
+                    hasText = hasText,
+                    hasPhoto = hasPhoto,
+                    isContentAvailable = textOk && photoOk
+                )
+            )
+        } catch (error: Exception) {
+            return OperationResult.Unavailable("Failed to read retained summary: ${error.message}")
         }
     }
 

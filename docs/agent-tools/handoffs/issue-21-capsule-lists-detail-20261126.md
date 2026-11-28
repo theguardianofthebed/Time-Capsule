@@ -45,18 +45,43 @@
    - Created `S03CapsuleListFragment` and `S07CapsuleDetailFragment` using ViewBinding and lifecycle-aware state collection (`repeatOnLifecycle(STARTED)`).
    - Updated `MainActivity` navigation callbacks, centralizing fragment attachment, bottom navigation ("Moments" -> `navigateToCapsuleList()`), and notification tap intent routing (`NotificationEntryResult.Valid` -> `navigateToCapsuleDetail(capsuleId)`).
 
+## 2. First Review Functional Corrections (28 November 2026)
+
+1. **Separated Verified Unlock Evidence from Retained Asset Availability (AC-09, FR-12, DD-06, T-30):**
+   - Distinct concepts maintained for account-scoped unlock evidence (`verifiedUnlockedAt`), safe summary metadata (`RetainedSummary`), and actual protected file integrity (`readRetainedContent`).
+   - Missing or corrupted retained photo/text files no longer hide an unlocked capsule from list enumeration or relock the capsule; returns actionable `OperationResult.Unavailable("Capsule unlocked — content unavailable. Connect and retry.")` allowing online asset re-download.
+
+2. **Eliminated Fabricated Offline Metadata:**
+   - Preserved `title`, `lockMode`, `senderDisplayName`, `recipientDisplayName`, and `createdAt` in `verified-marker.properties`.
+   - `listVerifiedRecipientEntries()` uses stored properties from `verified-marker.properties` rather than manufacturing generic titles or defaulting all lock modes to `TIME`. Full backward compatibility with legacy v1/v2 markers preserved.
+
+3. **Corrected Fallback Eligibility in Repository:**
+   - `DefaultCapsuleRepository` list and summary queries check response types strictly: `OperationResult.Denied` and `OperationResult.Invalid` return directly without attempting offline retention fallback.
+   - Offline fallback is attempted ONLY when remote queries return `OperationResult.Unavailable` (network/service down).
+
+4. **Lightweight List Enumeration Without Bulk Loading Protected Bytes:**
+   - `listVerifiedRecipientEntries` returns `List<RetainedSummary>` by inspecting `verified-marker.properties` and checking file existence on disk (`isContentAvailable`).
+   - Zero text or photo bytes are loaded or decoded during list enumeration, preventing memory pressure on S-03.
+
+5. **Deduplicated Retention Validation:**
+   - Extracted shared internal helper methods (`readRetainedContentInternal`, `readRetainedSummaryInternal`) in `DefaultLocalRetentionAdapter`, eliminating duplicate marker parsing while preserving atomic locks, session checks, and SHA-256 integrity checks.
+
+6. **Mandatory Regression Test Suite:**
+   - Added `Issue21FunctionalCorrectionsTest.kt` (7 Robolectric unit tests covering TIME, LOCATION, BOTH offline re-view, missing photo retry, corrupted photo integrity check, network failure vs access denial, cross-account isolation, and lightweight summary enumeration).
+   - Total **372 JVM unit tests passed** (`./gradlew :app:testDebugUnitTest`).
+
 ---
 
-## 2. Verification and Checks Summary
+## 3. Verification and Checks Summary
 
-- `./gradlew :app:testDebugUnitTest`: **PASS (365 passed, 0 failed)**
+- `./gradlew :app:testDebugUnitTest`: **PASS (372 passed, 0 failed)**
 - `./gradlew :app:assembleDebug :app:assembleDebugAndroidTest`: **PASS (`BUILD SUCCESSFUL`)**
 - `./gradlew :app:clean :app:lintDebug`: **PASS (`BUILD SUCCESSFUL`, 0 lint errors)**
 - `py tools/check_readiness.py --issue 21 --evidence docs/agent-tools/readiness-evidence-issue21.json`: **PASS (`PREFLIGHT_RECORD_VALID`)**
 
 ---
 
-## 3. Key Files Created/Modified
+## 4. Key Files Created/Modified
 
 - `app/src/main/java/com/example/timecapsule/domain/model/Capsule.kt`
 - `app/src/main/java/com/example/timecapsule/data/adapter/FirestoreAdapter.kt`
@@ -79,13 +104,15 @@
 - `app/src/main/res/layout/fragment_s07_capsule_detail.xml`
 - `app/src/main/res/values/strings.xml`
 - `app/src/test/java/com/example/timecapsule/data/CapsuleListsAndDetailRepositoryTest.kt`
+- `app/src/test/java/com/example/timecapsule/data/Issue21FunctionalCorrectionsTest.kt`
 - `app/src/test/java/com/example/timecapsule/ui/s03/S03CapsuleListViewModelTest.kt`
 - `app/src/test/java/com/example/timecapsule/ui/s07/S07CapsuleDetailViewModelTest.kt`
 
 ---
 
-## 4. Next Human Action
+## 5. Next Human Action
 
 1. User G code review of branch `feature/21-capsule-lists-detail`.
 2. Manual end-to-end verification on Android device/emulator (S-03 list tabs, S-07 detail unlock, Author copy view, notification tap, and offline process relaunch re-view).
-3. Open pull request for Issue #21 and merge after teammate approval.
+3. Merge PR #47 after teammate approval.
+
