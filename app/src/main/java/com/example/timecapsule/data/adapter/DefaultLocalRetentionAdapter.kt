@@ -79,8 +79,8 @@ class DefaultLocalRetentionAdapter(
                     setProperty("uid", cleanUid)
                     setProperty("capsuleId", cleanCapsuleId)
                     setProperty("verifiedUnlockedAt", verifiedUnlockedAt.toString())
-                    setProperty("hasText", (hasText || existingProperties.getProperty("hasText") == "true").toString())
-                    setProperty("hasPhoto", (hasPhoto || existingProperties.getProperty("hasPhoto") == "true").toString())
+                    setProperty("hasText", hasText.toString())
+                    setProperty("hasPhoto", hasPhoto.toString())
                     existingProperties.getProperty("photoSha256")?.let { setProperty("photoSha256", it) }
                     existingProperties.getProperty("photoFormat")?.let { setProperty("photoFormat", it) }
                     lockMode?.let { setProperty("lockMode", it.name) }
@@ -460,6 +460,7 @@ class DefaultLocalRetentionAdapter(
             val unlockAt = properties.getProperty("unlockAt")?.let {
                 try { Instant.parse(it) } catch (_: Exception) { null }
             }
+            val creationZone = properties.getProperty("creationZone")?.takeIf { it.isNotBlank() }
 
             // Check if text and photo files exist on disk WITHOUT reading bytes
             val textFile = File(directory, TEXT_FILE_NAME)
@@ -481,9 +482,10 @@ class DefaultLocalRetentionAdapter(
                     senderDisplayName = senderDisplayName,
                     recipientDisplayName = recipientDisplayName,
                     createdAt = createdAt,
+                    creationZone = creationZone,
                     hasText = hasText,
                     hasPhoto = hasPhoto,
-                    isContentAvailable = textOk && photoOk
+                    isContentAvailable = (hasText || hasPhoto) && textOk && photoOk
                 )
             )
         } catch (error: Exception) {

@@ -129,7 +129,30 @@
 
 ---
 
-## 5. Verification and Checks Summary
+## 5. Fourth Review Functional Corrections (28 November 2026)
+
+1. **Retention Commitment Invalidation Gate:**
+   - In `DefaultLocalRetentionAdapter.kt`, `saveRetainedContent` writes `hasText = "false"` and `hasPhoto = "false"` BEFORE modifying content files on disk.
+   - `saveVerifiedUnlockMarker` writes unlock evidence without inheriting or copying stale `hasText`/`hasPhoto` flags from previous runs unless explicitly provided as true.
+   - For lightweight enumeration, a verification-only marker evaluates `isContentAvailable = (hasText || hasPhoto) && textOk && photoOk`, returning `false` for uncommitted or incomplete content files.
+
+2. **Asynchronous Session Validation Gaps Closed:**
+   - In `DefaultCapsuleRepository.kt`, added `sessionTracker.isSessionValid(targetSession)` checks before and after every suspension point (after unlock marker save, after protected content reads, and between remote queries).
+   - Authoritative `OperationResult.Denied` and `OperationResult.Invalid` return immediately without local retention overrides.
+
+3. **Complete Metadata Preservation & Offline Re-view:**
+   - Restored and serialized `unlockAt` and `creationZone` into `verified-marker.properties` and `RetainedSummary`.
+   - Reconstructed `CapsuleSummary` from offline entries with authoritative `unlockAt` and `creationZone`.
+
+4. **S03 Sent & Received Foreground Synchronization:**
+   - In `S03CapsuleListViewModel.kt`, foreground recovery updates matching availability in both `receivedList` AND `sentList`.
+
+5. **Fault-Injection Regression Test Suite:**
+   - Updated `Issue21FunctionalCorrectionsTest.kt` with a deterministic fault-injection test (`interruptedRetainedContentReplacementPreservesUnlockEvidenceWithoutAuthorizingIncompleteBytes`) exercising initial complete save -> pre-marker invalidation -> forced I/O fault -> process recreation -> verified unlock evidence survival without incomplete byte authorization -> unlock marker refresh -> successful clean replacement.
+
+---
+
+## 6. Verification and Checks Summary
 
 - `./gradlew :app:testDebugUnitTest`: **PASS (375 passed, 0 failed)**
 - `./gradlew :app:assembleDebug :app:assembleDebugAndroidTest`: **PASS (`BUILD SUCCESSFUL`)**
@@ -139,11 +162,12 @@
 
 ---
 
-## 6. Next Human Action
+## 7. Next Human Action
 
 1. User G code review of branch `feature/21-capsule-lists-detail`.
 2. Manual end-to-end verification on Android device/emulator (S-03 list tabs, S-07 detail unlock, Author copy view, notification tap, and offline process relaunch re-view).
 3. Merge PR #47 after teammate approval.
+
 
 
 

@@ -777,6 +777,28 @@ Implement complete bounded scope for Issue #21: S-03 Capsule Lists (Received and
   - Lint passed cleanly with 0 errors (`./gradlew :app:clean :app:lintDebug`).
   - Readiness check passed (`PREFLIGHT_RECORD_VALID`).
 
+### Fourth Review Functional Corrections Applied (28 November 2026)
+
+- **1. Retention Commitment Invalidation Gate:**
+  - `DefaultLocalRetentionAdapter.kt` invalidates complete-content authorization (`hasText = false, hasPhoto = false`) BEFORE writing new content files on disk.
+  - `saveVerifiedUnlockMarker` writes unlock evidence without copying stale `hasText`/`hasPhoto` flags from previous runs unless explicitly provided as true.
+  - `isContentAvailable = (hasText || hasPhoto) && textOk && photoOk` evaluates to `false` for uncommitted or incomplete content files.
+- **2. Asynchronous Session Validation Gaps Closed:**
+  - `DefaultCapsuleRepository.kt` verifies `sessionTracker.isSessionValid(targetSession)` before and after every suspension point.
+  - Authoritative `OperationResult.Denied` and `OperationResult.Invalid` return immediately without local retention overrides.
+- **3. Complete Metadata Preservation & Offline Re-view:**
+  - Serialized `unlockAt` and `creationZone` into `verified-marker.properties` and restored them into `RetainedSummary` and `CapsuleSummary`.
+- **4. S03 Sent & Received Foreground Synchronization:**
+  - `S03CapsuleListViewModel.kt` updates matching availability in both `receivedList` AND `sentList` upon foreground unlock confirmation.
+- **5. Fault-Injection Regression Test Suite:**
+  - `Issue21FunctionalCorrectionsTest.kt` exercises initial complete save -> pre-marker invalidation -> forced I/O fault -> process recreation -> verified unlock evidence survival without incomplete byte authorization -> unlock marker refresh -> successful clean replacement.
+- **6. Automated Verification Suite:**
+  - Total **375 JVM unit tests passed** (`./gradlew :app:testDebugUnitTest`).
+  - Debug and AndroidTest APKs built cleanly (`./gradlew :app:assembleDebug :app:assembleDebugAndroidTest`).
+  - Lint passed cleanly with 0 errors (`./gradlew :app:clean :app:lintDebug`).
+  - Readiness check passed (`PREFLIGHT_RECORD_VALID`).
+
+
 
 
 

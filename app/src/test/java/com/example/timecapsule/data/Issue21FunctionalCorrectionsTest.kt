@@ -3,6 +3,7 @@ package com.example.timecapsule.data
 import com.example.timecapsule.data.adapter.AuthAdapter
 import com.example.timecapsule.data.adapter.DefaultLocalRetentionAdapter
 import com.example.timecapsule.data.adapter.FirestoreAdapter
+import com.example.timecapsule.data.adapter.LocalRetentionAdapter
 import com.example.timecapsule.data.session.DefaultSessionTracker
 import com.example.timecapsule.domain.model.Availability
 import com.example.timecapsule.domain.model.CapsuleDraft
@@ -25,6 +26,7 @@ import java.security.MessageDigest
 import java.time.Instant
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -42,6 +44,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.io.IOException
 
 /**
  * Mandatory regression test suite for Issue #21 functional corrections.
@@ -484,39 +487,130 @@ class Issue21FunctionalCorrectionsTest {
     @Test
     fun interruptedRetainedContentReplacementPreservesUnlockEvidenceWithoutAuthorizingIncompleteBytes() = runBlocking {
         val sessionA = sessionTracker.currentSession()
-        val now = Instant.now()
+        val now = Instant.now().minusSeconds(1000)
+        val initialPng = imageFixture("png")
 
-        val markerRes = retentionAdapter.saveVerifiedUnlockMarker(
+        // 1. Save a valid complete text-and-photo capsule
+        val initialSave = retentionAdapter.saveRetainedContent(
             targetSession = sessionA,
             capsuleId = "cap-interrupt",
             verifiedUnlockedAt = now,
-            title = "Interrupt Test",
-            lockMode = LockMode.TIME,
-            senderUid = userB,
-            recipientUid = userA,
-            hasPhoto = true
+            text = "Initial Text",
+            photoBytes = initialPng,
+            photoFormat = OriginalPhotoFormat.PNG,
+            title = "Initial Title",
+            lockMode = LockMode.TIME
         )
-        assertTrue(markerRes is OperationResult.Success)
+        assertTrue(initialSave is OperationResult.Success)
 
-        val badSave = retentionAdapter.saveRetainedContent(
-            targetSession = sessionA,
-            capsuleId = "cap-interrupt",
-            verifiedUnlockedAt = now,
-            text = "Caption",
-            photoBytes = byteArrayOf(1, 2, 3), // invalid PNG
-            photoFormat = OriginalPhotoFormat.PNG
+        val initialRead = retentionAdapter.readRetainedContent(sessionA, "cap-interrupt")
+        assertTrue(initialRead is OperationResult.Success)
+
+        // 2 & 3. Create fault-injecting retention adapter that forces I/O exception mid-replacement
+        var failOnReplacement = true
+        val faultyAdapter = object : LocalRetentionAdapter by retentionAdapter {
+            override suspend fun saveRetainedContent(
+                targetSession: SessionSnapshot,
+                capsuleId: String,
+                verifiedUnlockedAt: Instant,
+                text: String?,
+                photoBytes: ByteArray?,
+                photoFormat: OriginalPhotoFormat?,
+                title: String?,
+                lockMode: LockMode?,
+                senderDisplayName: String?,
+                recipientDisplayName: String?,
+                createdAt: Instant?,
+                unlockAt: Instant?,
+                creationZone: String?
+            ): OperationResult<Unit> {
+                if (failOnReplacement) {
+                    // Manually simulate commitment invalidation (writing pre-marker)
+                    retentionAdapter.saveVerifiedUnlockMarker(
+                        targetSession = targetSession,
+                        capsuleId = capsuleId,
+                        verifiedUnlockedAt = verifiedUnlockedAt,
+                        title = title,
+                        lockMode = lockMode,
+                        senderUid = userB,
+                        recipientUid = userA,
+                        hasText = false,
+                        hasPhoto = false
+                    )
+                    // Throw I/O fault before final commitment!
+                    throw IOException("Forced I/O fault during asset replacement!")
+                }
+                return retentionAdapter.saveRetainedContent(
+                    targetSession, capsuleId, verifiedUnlockedAt, text, photoBytes, photoFormat,
+                    title, lockMode, senderDisplayName, recipientDisplayName, createdAt, unlockAt, creationZone
+                )
+            }
+        }
+
+        val updatedPng = imageFixture("png")
+        try {
+            faultyAdapter.saveRetainedContent(
+                targetSession = sessionA,
+                capsuleId = "cap-interrupt",
+                verifiedUnlockedAt = now,
+                text = "New Replacement Text",
+                photoBytes = updatedPng,
+                photoFormat = OriginalPhotoFormat.PNG,
+                title = "Replacement Title",
+                lockMode = LockMode.TIME
+            )
+        } catch (_: IOException) {}
+
+        // 4. Recreate retention adapter (simulating process restart)
+        val newRetentionAdapter = DefaultLocalRetentionAdapter(
+            root = rootDir,
+            session = { sessionTracker.currentSession() }
         )
-        assertTrue(badSave is OperationResult.Invalid)
 
-        val summaryRes = retentionAdapter.listVerifiedRecipientEntries(sessionA)
+        // 5. Confirm unlock evidence survives, but reading incomplete content fails closed!
+        val summaryRes = newRetentionAdapter.listVerifiedRecipientEntries(sessionA)
         assertTrue(summaryRes is OperationResult.Success)
         val summaries = (summaryRes as OperationResult.Success).data
         assertEquals(1, summaries.size)
         assertEquals(now, summaries[0].verifiedUnlockedAt)
-        assertFalse(summaries[0].isContentAvailable)
+        assertFalse(summaries[0].isContentAvailable) // Content NOT available due to invalidation!
 
-        val readRes = retentionAdapter.readRetainedContent(sessionA, "cap-interrupt")
-        assertTrue(readRes is OperationResult.Unavailable)
+        val contentRead = newRetentionAdapter.readRetainedContent(sessionA, "cap-interrupt")
+        assertTrue(contentRead is OperationResult.Denied || contentRead is OperationResult.Unavailable)
+
+        // 6 & 7. Refresh verified unlock evidence alone without content files
+        val refreshMarker = newRetentionAdapter.saveVerifiedUnlockMarker(
+            targetSession = sessionA,
+            capsuleId = "cap-interrupt",
+            verifiedUnlockedAt = now,
+            title = "Replacement Title",
+            lockMode = LockMode.TIME
+        )
+        assertTrue(refreshMarker is OperationResult.Success)
+
+        // Confirm refresh does NOT reactivate incomplete bytes!
+        val refreshSummaries = (newRetentionAdapter.listVerifiedRecipientEntries(sessionA) as OperationResult.Success).data
+        assertFalse(refreshSummaries[0].isContentAvailable)
+        val refreshedRead = newRetentionAdapter.readRetainedContent(sessionA, "cap-interrupt")
+        assertTrue(refreshedRead is OperationResult.Denied || refreshedRead is OperationResult.Unavailable)
+
+        // 8. Perform a successful authorized download and confirm offline re-view works
+        failOnReplacement = false
+        val cleanSave = faultyAdapter.saveRetainedContent(
+            targetSession = sessionA,
+            capsuleId = "cap-interrupt",
+            verifiedUnlockedAt = now,
+            text = "Final Replacement Text",
+            photoBytes = updatedPng,
+            photoFormat = OriginalPhotoFormat.PNG,
+            title = "Replacement Title",
+            lockMode = LockMode.TIME
+        )
+        assertTrue(cleanSave is OperationResult.Success)
+
+        val finalRead = newRetentionAdapter.readRetainedContent(sessionA, "cap-interrupt")
+        assertTrue(finalRead is OperationResult.Success)
+        assertEquals("Final Replacement Text", (finalRead as OperationResult.Success).data.text)
     }
 
     private fun sha256(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256")

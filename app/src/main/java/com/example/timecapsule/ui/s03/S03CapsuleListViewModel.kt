@@ -115,7 +115,15 @@ class S03CapsuleListViewModel(
                                     item
                                 }
                             }
-                            _uiState.value = _uiState.value.copy(receivedList = updatedReceived)
+                            val updatedSent = _uiState.value.sentList.map { item ->
+                                val unlockRes = foregroundSummary.unlockResults[item.capsuleId]
+                                if (unlockRes is OperationResult.Success && unlockRes.data == Availability.AVAILABLE) {
+                                    item.copy(availability = Availability.AVAILABLE)
+                                } else {
+                                    item
+                                }
+                            }
+                            _uiState.value = _uiState.value.copy(receivedList = updatedReceived, sentList = updatedSent)
                         }
                     }
                 }

@@ -634,8 +634,12 @@ class DefaultCapsuleRepository(
             recipientDisplayName = summaryRecipientName,
             createdAt = summaryCreatedAt,
             unlockAt = requirements.unlockAt,
+            creationZone = (summaryRes as? OperationResult.Success)?.data?.creationZone,
             hasPhoto = (summaryRes as? OperationResult.Success)?.data?.hasPhoto ?: false
         )
+        if (!sessionTracker.isSessionValid(targetSession)) {
+            return OperationResult.Denied("Account session changed after unlock marker save.")
+        }
 
         val contentRes = firestoreAdapter.readProtectedContent(cleanId, activeUid)
         if (!sessionTracker.isSessionValid(targetSession)) {
@@ -663,7 +667,8 @@ class DefaultCapsuleRepository(
                     senderDisplayName = summarySenderName,
                     recipientDisplayName = summaryRecipientName,
                     createdAt = summaryCreatedAt,
-                    unlockAt = requirements.unlockAt
+                    unlockAt = requirements.unlockAt,
+                    creationZone = (summaryRes as? OperationResult.Success)?.data?.creationZone
                 )
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
