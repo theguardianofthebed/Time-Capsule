@@ -1,19 +1,12 @@
 package com.example.timecapsule.domain.model
 
-/**
- * Indicates whether the capsule lists were completely server-confirmed, partially offline, or stale offline.
- */
-enum class ListFreshness {
-    SERVER_CONFIRMED,
-    PARTIAL_OFFLINE,
-    STALE_OFFLINE
-}
+/** Evidence available for one participant query. Retained rows can represent only part of a list. */
+enum class ListProvenance { SERVER_CONFIRMED, OFFLINE_RETAINED, UNAVAILABLE }
 
-/**
- * Container holding metadata lists for sent capsules [sent] and received capsules [received].
- */
+/** Each list carries the source of its own rows, including when a query confirmed zero matches. */
 data class CapsuleListsSnapshot(
     val sent: List<CapsuleSummary>,
     val received: List<CapsuleSummary>,
-    val freshness: ListFreshness = ListFreshness.SERVER_CONFIRMED
+    val sentProvenance: ListProvenance = ListProvenance.SERVER_CONFIRMED,
+    val receivedProvenance: ListProvenance = ListProvenance.SERVER_CONFIRMED
 )

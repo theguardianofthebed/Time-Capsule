@@ -1,6 +1,7 @@
 package com.example.timecapsule
 
 import android.content.Intent
+import com.example.timecapsule.domain.session.SessionSnapshot
 import android.os.Bundle
 import android.view.View
 import android.widget.Toast
@@ -294,8 +295,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     /** Navigates to S-06 Confirm Send Review screen. */
-    fun navigateToConfirmSend(capsuleId: String? = null) {
-        val fragment = S06ConfirmSendFragment.newInstance(capsuleId).apply {
+    fun navigateToConfirmSend(capsuleId: String? = null, origin: SessionSnapshot? = null) {
+        val fragment = S06ConfirmSendFragment.newInstance(capsuleId, origin).apply {
             onBackToRecipientLockListener = { navigateToRecipientLock() }
             onNavigateToMomentsListener = { navigateToCapsuleList() }
             onNavigateToAccountListener = { navigateToAccountSettings() }

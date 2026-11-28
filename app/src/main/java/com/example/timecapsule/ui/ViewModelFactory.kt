@@ -21,7 +21,8 @@ class ViewModelFactory(
     private val accountSessionManager: AccountSessionManager,
     private val context: Context? = null,
     private val repository: CapsuleRepository? = null,
-    private val recoveryCoordinator: ForegroundRecoveryCoordinator? = null
+    private val recoveryCoordinator: ForegroundRecoveryCoordinator? = null,
+    private val restorePhotoDraft: Boolean = true
 ) : ViewModelProvider.Factory {
 
     @Suppress("UNCHECKED_CAST")
@@ -39,7 +40,7 @@ class ViewModelFactory(
             }
             modelClass.isAssignableFrom(CapsuleDraftViewModel::class.java) -> {
                 CapsuleDraftViewModel(accountSessionManager, repository, recoveryCoordinator).also { model ->
-                    context?.let { model.configurePhotos(AndroidPhotoInput(it)) }
+                    context?.let { model.configurePhotos(AndroidPhotoInput(it), restore = restorePhotoDraft) }
                 } as T
             }
             modelClass.isAssignableFrom(S03CapsuleListViewModel::class.java) -> {

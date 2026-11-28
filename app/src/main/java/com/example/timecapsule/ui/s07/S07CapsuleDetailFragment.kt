@@ -6,7 +6,13 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Toast
+import android.Manifest
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
+import android.content.pm.PackageManager
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
@@ -53,6 +59,22 @@ class S07CapsuleDetailFragment : Fragment() {
         }
     }
 
+    private var permissionRequested = false
+    private val locationPermission = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        refreshScreen()
+    }
+
+    /** Android may suppress repeated prompts. Keep a path to the app permission settings. */
+    private fun needsAppSettings(): Boolean = permissionRequested &&
+        ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION) !=
+            PackageManager.PERMISSION_GRANTED && !shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_FINE_LOCATION)
+
+    /** Remember whether Android has already been asked for precise location. */
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putBoolean("locationPermissionRequested", permissionRequested)
+    }
+
     private var imageRenderJob: Job? = null
     private var imageRenderToken: Long = 0L
     private var activeRenderCapsuleId: String? = null
@@ -80,9 +102,11 @@ class S07CapsuleDetailFragment : Fragment() {
         return binding.root
     }
 
+    /** Route retries and system settings actions using the currently rendered verification status. */
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        permissionRequested = savedInstanceState?.getBoolean("locationPermissionRequested") == true
         binding.btnS07Back.setOnClickListener { onBackListener?.invoke() }
         binding.btnS07NavMoments.setOnClickListener { onNavigateToMomentsListener?.invoke() }
         binding.btnS07NavCreate.setOnClickListener { onCreateCapsuleListener?.invoke() }
@@ -94,8 +118,17 @@ class S07CapsuleDetailFragment : Fragment() {
         }
 
         binding.btnS07Retry.setOnClickListener {
-            if (capsuleId.isNotBlank()) {
-                viewModel.loadDetail(capsuleId)
+            when (viewModel.uiState.value.status) {
+                DetailStatus.LOCKED_PERMISSION_REQUIRED -> if (needsAppSettings()) {
+                    startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        Uri.fromParts("package", requireContext().packageName, null)))
+                } else {
+                    permissionRequested = true
+                    locationPermission.launch(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION,
+                        Manifest.permission.ACCESS_FINE_LOCATION))
+                }
+                DetailStatus.LOCKED_LOCATION_DISABLED -> startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+                else -> refreshScreen()
             }
         }
 
@@ -108,10 +141,12 @@ class S07CapsuleDetailFragment : Fragment() {
         }
     }
 
+    /** Render verified content, persistent explanations and the appropriate recovery action. */
     private fun renderUiState(state: CapsuleDetailUiState) {
         binding.pbS07Loading.visibility = if (state.isLoading) View.VISIBLE else View.GONE
 
         // Cancel previous image render if capsule ID or session generation changed
+        imageRenderToken++
         if (state.capsuleId != activeRenderCapsuleId) {
             imageRenderJob?.cancel()
             binding.ivS07Photo.setImageDrawable(null)
@@ -125,18 +160,20 @@ class S07CapsuleDetailFragment : Fragment() {
             binding.tvS07Headline.text = titleText
 
             val formatter = DateTimeFormatter.ofPattern("MMM d, yyyy, h:mm a z").withZone(ZoneId.systemDefault())
-            val dateStr = summary.createdAt?.let { formatter.format(it) } ?: "Recently"
+            val dateStr = summary.createdAt?.let { formatter.format(it) } ?: "at an unknown date"
             val senderName = summary.senderDisplayName?.takeIf { it.isNotBlank() } ?: summary.senderUid
             binding.tvS07Meta.text = "Sent $dateStr by $senderName"
 
-            val unlockAtStr = summary.lock.unlockAt?.let { formatter.format(it) } ?: "Not specified"
-            binding.tvS07LockCondition.text = "Unlock time: $unlockAtStr\nLock mode: ${summary.lock.mode.name}"
+            val unlockAtStr = summary.lock?.unlockAt?.let { formatter.format(it) } ?: "Not specified"
+            binding.tvS07LockCondition.text = "Unlock time: $unlockAtStr\nLock mode: ${summary.lock?.mode?.name ?: "Unknown"}"
         } else {
             binding.tvS07Headline.text = ""
             binding.tvS07Meta.text = ""
             binding.tvS07LockCondition.text = ""
         }
 
+        binding.tvS07StatusBadge.visibility = if (state.role != ParticipantRole.NONE ||
+            state.status == DetailStatus.ACCESS_DENIED) View.VISIBLE else View.GONE
         when (state.role) {
             ParticipantRole.AUTHOR_COPY -> {
                 binding.tvS07StatusBadge.text = getString(R.string.s07_badge_author)
@@ -162,7 +199,7 @@ class S07CapsuleDetailFragment : Fragment() {
             binding.tvS07BodyText.text = state.content.text ?: ""
 
             val photoBytes = state.content.photoBytes
-            if (photoBytes != null && photoBytes.isNotEmpty()) {
+            if (photoBytes != null) {
                 imageRenderJob?.cancel()
                 val token = ++imageRenderToken
                 val expectedCapsuleId = state.capsuleId
@@ -177,7 +214,7 @@ class S07CapsuleDetailFragment : Fragment() {
                     // Revalidate live session, render token, capsule ID, and binding before rendering
                     if (_binding != null &&
                         token == imageRenderToken &&
-                        currentSession == expectedSession &&
+                        currentSession == expectedSession && currentState.content === state.content &&
                         currentState.capsuleId == expectedCapsuleId &&
                         sessionTracker.isSessionValid(expectedSession ?: currentSession)) {
                         if (bitmap != null) {
@@ -186,7 +223,7 @@ class S07CapsuleDetailFragment : Fragment() {
                         } else {
                             binding.ivS07Photo.setImageDrawable(null)
                             binding.ivS07Photo.visibility = View.GONE
-                            Toast.makeText(requireContext(), "Failed to decode image.", Toast.LENGTH_SHORT).show()
+                            viewModel.photoDecodeFailed(expectedCapsuleId, currentSession)
                         }
                     } else {
                         bitmap?.recycle()
@@ -209,19 +246,19 @@ class S07CapsuleDetailFragment : Fragment() {
             binding.ivS07Photo.visibility = View.GONE
         }
 
-        // Banner and Error / Retry
-        if (state.isUnlocked && state.content != null) {
-            binding.tvS07Banner.text = "This moment stays open, wherever you go."
-            binding.tvS07Banner.visibility = View.VISIBLE
-        } else {
-            binding.tvS07Banner.visibility = View.GONE
+        val message = state.errorMessage ?: state.unlockReason
+        binding.tvS07Banner.text = message
+        binding.tvS07Banner.visibility = if (message.isNullOrBlank()) View.GONE else View.VISIBLE
+        val action = when (state.status) {
+            DetailStatus.LOCKED_PERMISSION_REQUIRED -> if (needsAppSettings()) R.string.s07_app_settings
+                else R.string.s07_precise_permission
+            DetailStatus.LOCKED_LOCATION_DISABLED -> R.string.s07_location_settings
+            DetailStatus.LOADING, DetailStatus.ACCESS_DENIED, DetailStatus.AUTHOR_COPY_READY,
+            DetailStatus.UNLOCKED_CONTENT_READY -> null
+            else -> R.string.s07_btn_retry
         }
-
-        if (!state.errorMessage.isNullOrBlank()) {
-            Toast.makeText(requireContext(), state.errorMessage, Toast.LENGTH_SHORT).show()
-        }
-
-        binding.btnS07Retry.visibility = if (state.isAssetUnavailable || !state.isUnlocked) View.VISIBLE else View.GONE
+        binding.btnS07Retry.visibility = if (action == null) View.GONE else View.VISIBLE
+        action?.let { binding.btnS07Retry.setText(it) }
     }
 
     private suspend fun decodeSampledBitmap(photoBytes: ByteArray, maxDim: Int = 1024): Bitmap? = withContext(Dispatchers.IO) {

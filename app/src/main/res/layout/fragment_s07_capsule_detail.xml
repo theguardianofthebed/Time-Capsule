@@ -153,9 +153,10 @@
                     android:textStyle="italic" />
             </LinearLayout>
 
-            <!-- Confirmation Banner -->
+            <!-- Persistent verification, access and media status. -->
             <TextView
                 android:id="@+id/tvS07Banner"
+                android:accessibilityLiveRegion="polite"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"

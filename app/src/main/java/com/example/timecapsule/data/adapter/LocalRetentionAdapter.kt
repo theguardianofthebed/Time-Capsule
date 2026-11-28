@@ -5,6 +5,7 @@ import com.example.timecapsule.domain.model.OriginalPhotoFormat
 import com.example.timecapsule.domain.result.OperationResult
 import com.example.timecapsule.domain.session.SessionSnapshot
 import java.time.Instant
+import com.example.timecapsule.domain.model.LocationTarget
 
 /**
  * Verified retained content record holding text, photo bytes, and server unlock evidence.
@@ -69,7 +70,8 @@ data class RetainedSummary(
     val creationZone: String? = null,
     val hasText: Boolean = false,
     val hasPhoto: Boolean = false,
-    val isContentAvailable: Boolean = true
+    val isContentAvailable: Boolean = true,
+    val location: LocationTarget? = null
 )
 
 /**
@@ -93,7 +95,8 @@ interface LocalRetentionAdapter {
         unlockAt: Instant? = null,
         creationZone: String? = null,
         hasText: Boolean = false,
-        hasPhoto: Boolean = false
+        hasPhoto: Boolean = false,
+        location: LocationTarget? = null
     ): OperationResult<Unit> = OperationResult.Unavailable("Save verified unlock marker is not implemented in this adapter.")
 
     /**

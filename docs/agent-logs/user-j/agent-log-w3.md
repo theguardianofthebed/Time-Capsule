@@ -839,10 +839,10 @@ Implement complete bounded scope for Issue #21: S-03 Capsule Lists (Received and
   - Lint passed cleanly with 0 errors (`./gradlew :app:clean :app:lintDebug`).
   - Readiness check passed (`PREFLIGHT_RECORD_VALID`).
 
+## 28 November 2026 · Issue #21 ninth review
 
+User J · MVP · PR #47 · human reviewer User G. Continued from `dc77f318`. Reproduced each defect before changing production code. The 23 added regressions cover selected-publication identity across sessions, independent list query results, persistent S07 recovery actions and verified offline content. SDK-level cases distinguish a denied photo download from an authorized read of a missing protected document.
 
+Final verification passed 399 JVM tests (0 failed or skipped), debug APK assembly, AndroidTest APK assembly, lint (0 errors, 166 warnings), 42 Firebase emulator rules tests, Issue #21 readiness and the whitespace check. APKs were built. On-device instrumentation and manual permission/GPS journeys remain pending.
 
-
-
-
-
+[Test names, observed failures, corrected production functions and passing assertions](../../agent-tools/handoffs/issue-21-capsule-lists-detail-20261126.md#ninth-review--28-november-2026) · [PR #47](https://github.com/theguardianofthebed/Time-Capsule/pull/47)

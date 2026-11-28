@@ -9,6 +9,7 @@ import com.example.timecapsule.domain.model.Availability
 import com.example.timecapsule.domain.model.CapsuleSummary
 import com.example.timecapsule.domain.model.LockMode
 import com.example.timecapsule.domain.result.OperationResult
+import com.example.timecapsule.domain.session.SessionSnapshot
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -48,7 +49,10 @@ class S07CapsuleDetailViewModel(
         }
     }
 
+    /** Keep the requested identity while waiting for auth, then load under the current generation. */
     fun loadDetail(capsuleId: String) {
+        val token = ++requestToken
+        activeJob?.cancel()
         val cleanId = capsuleId.trim()
         if (cleanId.isBlank()) {
             _uiState.value = CapsuleDetailUiState(
@@ -64,14 +68,13 @@ class S07CapsuleDetailViewModel(
         if (!capturedSession.isAuthenticated || activeUid.isNullOrBlank()) {
             _uiState.value = CapsuleDetailUiState(
                 isLoading = false,
-                status = DetailStatus.ACCESS_DENIED,
-                errorMessage = "Authentication required."
+                capsuleId = cleanId, sessionSnapshot = capturedSession,
+                status = DetailStatus.LOADING,
+                errorMessage = "Waiting for account restoration."
             )
             return
         }
 
-        val token = ++requestToken
-        activeJob?.cancel()
         _uiState.value = CapsuleDetailUiState(
             isLoading = true,
             capsuleId = cleanId,
@@ -89,7 +92,7 @@ class S07CapsuleDetailViewModel(
                 _uiState.value = CapsuleDetailUiState(
                     isLoading = false,
                     capsuleId = cleanId,
-                    status = DetailStatus.ERROR,
+                    status = if (summaryRes is OperationResult.Denied) DetailStatus.ACCESS_DENIED else DetailStatus.ERROR,
                     errorMessage = msg,
                     sessionSnapshot = capturedSession
                 )
@@ -121,6 +124,11 @@ class S07CapsuleDetailViewModel(
                 val contentRes = repository.readContent(cleanId, capturedSession)
                 if (!sessionTracker.isSessionValid(capturedSession) || token != requestToken) return@launch
 
+                if (contentRes is OperationResult.Denied) {
+                    _uiState.value = CapsuleDetailUiState(capsuleId = cleanId, sessionSnapshot = capturedSession,
+                        status = DetailStatus.ACCESS_DENIED, errorMessage = contentRes.message)
+                    return@launch
+                }
                 when (contentRes) {
                     is OperationResult.Success -> {
                         _uiState.value = CapsuleDetailUiState(
@@ -163,12 +171,13 @@ class S07CapsuleDetailViewModel(
                     isUnlocked = true
                 } else if (verifyRes !is OperationResult.Success) {
                     failureReason = resultErrorMessage(verifyRes)
-                    failureStatus = mapUnlockFailureStatus(verifyRes, summary.lock.mode)
+                    failureStatus = mapUnlockFailureStatus(verifyRes, summary.lock?.mode)
                 }
             }
 
             if (!isUnlocked) {
-                val lockedStatus = failureStatus ?: when (summary.lock.mode) {
+                val lockedStatus = failureStatus ?: when (summary.lock?.mode) {
+                    null -> DetailStatus.LOCKED_VERIFICATION_FAILED
                     LockMode.TIME -> DetailStatus.LOCKED_WAITING_TIME
                     LockMode.LOCATION -> DetailStatus.LOCKED_WAITING_LOCATION
                     LockMode.TIME_AND_LOCATION -> DetailStatus.LOCKED_WAITING_BOTH
@@ -191,6 +200,11 @@ class S07CapsuleDetailViewModel(
             val contentRes = repository.readContent(cleanId, capturedSession)
             if (!sessionTracker.isSessionValid(capturedSession) || token != requestToken) return@launch
 
+            if (contentRes is OperationResult.Denied) {
+                _uiState.value = CapsuleDetailUiState(capsuleId = cleanId, sessionSnapshot = capturedSession,
+                    status = DetailStatus.ACCESS_DENIED, errorMessage = contentRes.message)
+                return@launch
+            }
             when (contentRes) {
                 is OperationResult.Success -> {
                     _uiState.value = CapsuleDetailUiState(
@@ -222,14 +236,27 @@ class S07CapsuleDetailViewModel(
         }
     }
 
-    private fun mapUnlockFailureStatus(res: OperationResult<*>, lockMode: LockMode): DetailStatus {
+    /** Keep the verified detail and any readable text when the current photo cannot be displayed. */
+    fun photoDecodeFailed(id: String, session: SessionSnapshot) {
+        val state = _uiState.value
+        val content = state.content ?: return
+        if (state.capsuleId != id || state.sessionSnapshot != session || !sessionTracker.isSessionValid(session)) return
+        _uiState.value = state.copy(content = content.copy(photoBytes = null), isAssetUnavailable = true,
+            status = if (state.role == ParticipantRole.AUTHOR_COPY) DetailStatus.AUTHOR_COPY_ASSET_UNAVAILABLE
+                else DetailStatus.UNLOCKED_ASSET_UNAVAILABLE,
+            errorMessage = "Could not display the photo. Retry to load it again.")
+    }
+
+    /** Distinguish device location guidance from an authoritative participant denial. */
+    private fun mapUnlockFailureStatus(res: OperationResult<*>, lockMode: LockMode?): DetailStatus {
         val msg = resultErrorMessage(res)
         return when {
-            msg.contains("permission", ignoreCase = true) -> DetailStatus.LOCKED_PERMISSION_REQUIRED
+            (msg.contains("location", true) && msg.contains("permission", true)) -> DetailStatus.LOCKED_PERMISSION_REQUIRED
             msg.contains("disabled", ignoreCase = true) -> DetailStatus.LOCKED_LOCATION_DISABLED
             msg.contains("radius", ignoreCase = true) || msg.contains("accuracy", ignoreCase = true) || msg.contains("stale", ignoreCase = true) -> DetailStatus.LOCKED_WAITING_LOCATION
-            msg.contains("denied", ignoreCase = true) -> DetailStatus.ACCESS_DENIED
+            res is OperationResult.Denied -> DetailStatus.ACCESS_DENIED
             else -> when (lockMode) {
+                null -> DetailStatus.LOCKED_VERIFICATION_FAILED
                 LockMode.TIME -> DetailStatus.LOCKED_WAITING_TIME
                 LockMode.LOCATION -> DetailStatus.LOCKED_WAITING_LOCATION
                 LockMode.TIME_AND_LOCATION -> DetailStatus.LOCKED_WAITING_BOTH
@@ -245,8 +272,10 @@ class S07CapsuleDetailViewModel(
         is OperationResult.Success -> ""
     }
 
+    /** Describe only the lock metadata available for this capsule. */
     private fun formatLockReason(summary: CapsuleSummary): String {
-        return when (summary.lock.mode) {
+        return when (summary.lock?.mode) {
+            null -> "Lock details unavailable"
             LockMode.TIME -> "Locked by time"
             LockMode.LOCATION -> "Locked by location"
             LockMode.TIME_AND_LOCATION -> "Locked by time + location"

@@ -239,10 +239,74 @@
 2. Manual end-to-end verification on Android device/emulator (S-03 list tabs, S-07 detail unlock, Author copy view, notification tap, and offline process relaunch re-view).
 3. Merge PR #47 after teammate approval.
 
+## Ninth review · 28 November 2026
 
+User J continued PR #47 from `dc77f31825fd3ed816ef7a310e6f786198bf974d`. User G owns human review. Scope remains FR-08/11/12, NFR-05, DD-06/28, AC-03/09/11 and T-07/08/27–30/35. Each regression below failed on the production behavior before its correction and passed when rerun afterward.
 
+### Targeted publication recovery
 
+`CapsuleDraftViewModelTest` exercises the activity-scoped production ViewModel. The repository fixture records actual retry, replacement and publish calls.
 
+| Regression | Observed before correction | Passing assertion after correction |
+|---|---|---|
+| `targetedRecoveryClearsPreviousAccountBeforeQuery` | Account B's initial state still contained A's “Frozen message”. | The state is cleared and blocked before B's query. A missing target stays blocked. |
+| `targetedRetryRejectsChangedGeneration` | Retry reached the repository after same-UID reauthentication. | The repository receives zero retries. |
+| `targetedFailureCannotRetryPreviousOperation` | After Y was denied, Retry called the repository for X. | No retry or publish occurs. Y remains selected and blocked. |
+| `targetedFailureCannotReplacePreviousOperation` | After Y was denied, Replace called the repository for X. | No abandonment or publish occurs. Y remains selected and blocked. |
+| `targetedSelectionSupersedesPendingRecovery` | X's delayed response replaced the selection of Y. | Y remains selected. Retry sends exactly Y's ID. |
+| `targetedRecheckKeepsOriginalGeneration` | A repeated check could silently validate the same selection in a newer generation. | Recheck remains blocked until a new selection originates from the new session. |
 
+Production changes cover `CapsuleDraftViewModel` initialization, `configurePhotos`, `resetSession`, `syncSessionState`, `recoverPublicationState`, `matchesSelection`, `sendCapsule`, `retryPublication`, `startPublicationAction`, `replaceFailedPublication` and `startNewAfterSent`. S03 passes the originating snapshot through `renderUiState`, `renderUnresolvedOperations` and `MainActivity.navigateToConfirmSend`. S06 carries it across recreation in `newInstance`, `onViewCreated`, `onResume`, `checkPublication`, `setupClickListeners` and `observeViewModelState`. `ViewModelFactory.create` configures photo storage without starting generic draft recovery when entering through a targeted selection.
 
+### Sent and Received query evidence
 
+| Regression in `Issue21FunctionalCorrectionsTest` | Observed before correction | Passing assertion after correction |
+|---|---|---|
+| `tabsEmptySentAndUnavailableReceived` | A successful empty Sent query was labeled unavailable. | Sent is confirmed empty and Received is unavailable. |
+| `tabsEmptyReceivedAndUnavailableSent` | A successful empty Received query was labeled unavailable. | Received is confirmed empty and Sent is unavailable. |
+| `tabsImmediateRefreshClearsOldGeneration` | Refresh exposed old rows immediately after a same-UID generation change. | Both lists, pending operations and errors are clear before the new query completes. |
+| `tabsPendingSendDoesNotHideReceivedEmptyView` | The actual Received empty label was detached when Sent had a pending operation. | The Received label is attached, visible and displays the confirmed-empty text. |
+
+`DefaultCapsuleRepository.lists` records each query's provenance in `CapsuleListsSnapshot` and uses `RetainedSummary.toSummary` for local rows. `S03CapsuleListViewModel.loadLists` compares complete sessions before exposing loading state. `CapsuleListUiState` derives the selected tab's freshness from its provenance. `S03CapsuleListFragment.renderUiState` places the empty or unavailable message in the selected tab independently of the other tab's content.
+
+### S07 presentation and restoration
+
+| Regression in `Issue21FunctionalCorrectionsTest` | Observed before correction | Passing assertion after correction |
+|---|---|---|
+| `detailScreenPermissionFailurePersists` | The verification explanation was missing from the visible banner. | The real layout displays the precise-location message and permission action. |
+| `detailScreenOpensLocationSettings` | Tapping Retry after a disabled-provider result launched no settings intent. | The action launches Android location-source settings. |
+| `detailScreenDecodeFailureKeepsUnlockAndRetry` | Image decoding failed without a persistent photo-retry state. | Caption and opened badge stay visible with a photo error and Retry. |
+| `detailWaitForRestorationRetainsIdentity` | The unauthenticated state lost the requested capsule ID. | The ID and waiting snapshot survive, then the restored session loads the correct detail. |
+| `detailMissingDocumentIsAnAssetFailure` | A successful Firestore read reporting an absent document was converted to an access denial. | The adapter returns Invalid for a confirmed missing asset. The repository preserves it and S07 offers retry. |
+| `detailDeniedContentDiffersFromMissingAsset` | Revoked content access appeared as an unavailable unlocked asset. | Access denial clears protected content and the asset-unavailable flag. |
+
+`S07CapsuleDetailViewModel.loadDetail`, `mapUnlockFailureStatus`, `formatLockReason` and `photoDecodeFailed` distinguish these states. `S07CapsuleDetailFragment.onViewCreated`, `onSaveInstanceState`, `needsAppSettings` and `renderUiState` use the persistent XML banner, Android runtime permission request, app permission settings and location-source settings. Robolectric exercised the production activity, lifecycle, Fragment and XML at API 35.
+
+### Retention and download failures
+
+| Regression in `Issue21FunctionalCorrectionsTest` | Observed before correction | Passing assertion after correction |
+|---|---|---|
+| `retentionLegacyMigrationValidatesOriginalRecord` | Refresh promoted a legacy marker belonging to another UID. | For v1 and v2, a complete record survives. Wrong UID, capsule ID, timestamp, flags or missing required bytes prevent commitment. |
+| `retentionMalformedCommittedFlagCannotAdoptRemoteDefault` | A malformed v3 text flag acquired the remote default and remained committed. | Refresh leaves the record uncommitted and unreadable. |
+| `retentionOfflineDetailPreservesParticipantsZoneAndLock` | Successful persistence lost the sender UID. | Offline list and detail preserve both participants, creation zone, lock mode, time and location. |
+| `retentionUnknownLegacyLockStaysUnknown` | A record without lock metadata acquired a time lock. | Its summary exposes an unknown lock. |
+| `retentionUnavailableDownloadUsesCommittedBytes` | Interrupted download made a previously retained capsule unreadable. | The authorized recipient receives the session-checked committed content. |
+| `retentionAuthoritativeContentErrorsRemainAuthoritative` | The repository replaced the remote error with a generic denial. | Denied and Invalid are returned intact, even with a cached copy. |
+| `retentionStoragePermissionFailureRemainsDenied` | The production Storage adapter translated the SDK's HTTP 403 into Unavailable. | The same SDK error returns Denied and cannot authorize offline fallback. |
+
+`DefaultLocalRetentionAdapter.saveVerifiedUnlockMarker`, `previousMarker`, `saveRetainedContent`, `readLocation` and `readRetainedSummaryInternal` preserve the v3 manifest and atomic replacement protocol. Legacy promotion reuses `readRetainedContentInternal` to validate the original assets. `LocalRetentionAdapter.saveVerifiedUnlockMarker` and `RetainedSummary` carry known coordinates. `DefaultCapsuleRepository.toSummary`, `getSummary`, `readContent` and `readRetained` share the offline mapping and session checks. `CapsuleSummary.lock` permits unknown legacy metadata. S03 `bindCapsuleItem` and S07's lock presentation handle this case. `DefaultStorageAdapter.downloadPhotoBytes` and `DefaultFirestoreAdapter.readProtectedContent` propagate authorization failures through the download path.
+
+### Final gate
+
+Linux, Temurin JDK 25, Gradle 9.6.0, Android SDK 37.0. Debug builds used the repository's credential-free emulator configuration.
+
+| Check | Observed result |
+|---|---|
+| `:app:testDebugUnitTest` | 399 passed across 43 suites, 0 failed, 0 errors, 0 skipped. Includes 23 new red-to-green regressions. |
+| `:app:assembleDebug :app:assembleDebugAndroidTest` | Both tasks passed. Verified both APKs were produced. |
+| `:app:lintDebug` | Passed with 0 errors and 166 warnings. |
+| Firebase Auth, Firestore and Storage emulators, demo-timecapsule, `npm test` | 42 rules tests passed at their default timeout. |
+| `python tools/check_readiness.py --issue 21 --evidence docs/agent-tools/readiness-evidence-issue21.json` | PREFLIGHT_RECORD_VALID, 0 blockers. |
+| `git diff --check HEAD` | Passed. |
+
+The first combined Android run lost its Gradle daemon. The final JVM, APK and lint runs used one worker and ran sequentially. Proxying emulator traffic first caused 16 timeouts and then three failures with extended timeouts. With loopback traffic direct, the unchanged rules suite passed twice at the default timeout. The S07 UI tests used Robolectric. Physical-device permission dialogs, GPS and on-device instrumentation remain for User G's review and device testing.

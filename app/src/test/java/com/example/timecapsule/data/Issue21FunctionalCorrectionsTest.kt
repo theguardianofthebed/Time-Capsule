@@ -21,6 +21,40 @@ import com.example.timecapsule.domain.session.SessionSnapshot
 import com.example.timecapsule.ui.s03.S03CapsuleListViewModel
 import com.example.timecapsule.ui.s07.S07CapsuleDetailViewModel
 import com.google.firebase.firestore.FirebaseFirestore
+import com.example.timecapsule.data.adapter.DefaultStorageAdapter
+import com.example.timecapsule.data.adapter.DefaultFirestoreAdapter
+import com.google.firebase.firestore.DocumentReference
+import com.google.firebase.firestore.DocumentSnapshot
+import com.google.firebase.firestore.Source
+import com.google.android.gms.tasks.Tasks
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.storage.FirebaseStorage
+import com.google.firebase.storage.StorageException
+import com.google.firebase.storage.StorageReference
+import org.robolectric.annotation.Implements
+import org.robolectric.annotation.Implementation
+import org.robolectric.shadow.api.Shadow
+import android.os.Looper
+import android.provider.Settings
+import android.widget.Button
+import com.example.timecapsule.ui.s07.DetailStatus
+import com.example.timecapsule.domain.model.UnlockVerificationOutcome
+import android.view.View
+import android.widget.TextView
+import com.example.timecapsule.MainActivity
+import com.example.timecapsule.R
+import com.example.timecapsule.TimeCapsuleApplication
+import com.example.timecapsule.data.adapter.DefaultLocationAdapter
+import com.example.timecapsule.data.adapter.StorageAdapter
+import com.example.timecapsule.data.di.AppDependencyContainer
+import com.example.timecapsule.data.recovery.ForegroundRecoveryCoordinator
+import com.example.timecapsule.domain.model.PublicationPhase
+import com.example.timecapsule.domain.model.RecoveredPublication
+import org.robolectric.Robolectric
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
+import com.example.timecapsule.domain.model.LocationTarget
+import java.util.Properties
 import java.io.File
 import java.io.IOException
 import java.security.MessageDigest
@@ -94,6 +128,321 @@ class Issue21FunctionalCorrectionsTest {
         Dispatchers.resetMain()
     }
 
+    /** A permitted server read can confirm the protected document is missing. */
+    @Test
+    @Config(shadows = [MissingDocumentReference::class, MissingDocument::class])
+    fun detailMissingDocumentIsAnAssetFailure() = runBlocking {
+        val adapter = DefaultFirestoreAdapter(contextSupplier = { RuntimeEnvironment.getApplication() })
+        val result = adapter.readProtectedContent("missing-document", userA)
+        assertTrue("Confirmed absence was returned as $result", result is OperationResult.Invalid)
+    }
+
+    /** Replace only the server read with a successful SDK task for a missing document. */
+    @Implements(value = DocumentReference::class, isInAndroidSdk = false)
+    class MissingDocumentReference {
+        @Implementation fun get(source: Source) =
+            Tasks.forResult(Shadow.newInstanceOf(DocumentSnapshot::class.java))
+    }
+
+    /** The server answered the read and reported no document at the requested path. */
+    @Implements(value = DocumentSnapshot::class, isInAndroidSdk = false)
+    class MissingDocument {
+        @Implementation fun exists() = false
+    }
+
+    /** Pass an SDK permission failure through the production Storage adapter. */
+    @Test
+    @Config(shadows = [DeniedStorage::class, DeniedReference::class])
+    fun retentionStoragePermissionFailureRemainsDenied() = runBlocking {
+        val adapter = DefaultStorageAdapter(Shadow.newInstanceOf(FirebaseStorage::class.java),
+            FirebaseFirestore.getInstance(), FirebaseAuth.getInstance())
+        DeniedReference.reads = 0
+        val result = adapter.downloadPhotoBytes("capsuleMedia/sender/id/original", 1024)
+        assertEquals(1, DeniedReference.reads)
+        assertTrue("Storage 403 was returned as $result", result is OperationResult.Denied)
+    }
+
+    /** Return a reference without opening an external Storage connection. */
+    @Implements(value = FirebaseStorage::class, isInAndroidSdk = false)
+    class DeniedStorage {
+        @Implementation fun getReference(): StorageReference = Shadow.newInstanceOf(StorageReference::class.java)
+    }
+
+    /** Supply the SDK's actual 403 exception when the adapter awaits getBytes. */
+    @Implements(value = StorageReference::class, isInAndroidSdk = false)
+    class DeniedReference {
+        companion object { var reads = 0 }
+        @Implementation fun child(path: String): StorageReference = Shadow.newInstanceOf(StorageReference::class.java)
+        @Implementation fun getBytes(maxDownloadSizeBytes: Long): com.google.android.gms.tasks.Task<ByteArray> {
+            reads++
+            return Tasks.forException(StorageException.fromExceptionAndHttpCode(IOException("Forbidden"), 403)!!)
+        }
+    }
+
+    /** Rewrite an actual private marker to reproduce on-disk legacy formats. */
+    private fun marker(id: String) = File(File(rootDir, sha256(userA.toByteArray())),
+        "$id/verified-marker.properties")
+
+    /** Load the exact manifest that will be consumed after a simulated restart. */
+    private fun properties(file: File) = Properties().apply { file.inputStream().use { load(it) } }
+
+    /** Test complete text alongside each broken identity, timestamp, flag and required file. */
+    @Test fun retentionLegacyMigrationValidatesOriginalRecord() = runBlocking {
+        val session = sessionTracker.currentSession()
+        val now = Instant.now()
+        for (version in listOf("1", "2")) {
+            for (variant in listOf("complete", "uid", "capsuleId", "verifiedUnlockedAt", "hasPhoto", "missing-text")) {
+                val id = "legacy-$version-$variant"
+                retentionAdapter.saveRetainedContent(session, id, now, "original", null, null)
+                val file = marker(id)
+                val old = properties(file).apply {
+                    setProperty("version", version)
+                    remove("contentCommitted")
+                    when (variant) {
+                        "complete" -> Unit
+                        "missing-text" -> File(file.parentFile, "content.text").delete()
+                        else -> setProperty(variant, "invalid")
+                    }
+                }
+                file.outputStream().use { old.store(it, null) }
+                retentionAdapter.saveVerifiedUnlockMarker(session, id, now)
+                val migrated = properties(file)
+                assertEquals("3", migrated.getProperty("version"))
+                assertEquals(id, (variant == "complete").toString(), migrated.getProperty("contentCommitted"))
+                val read = retentionAdapter.readRetainedContent(session, id)
+                assertEquals(id, variant == "complete", read is OperationResult.Success)
+            }
+        }
+    }
+
+    /** Remote metadata cannot repair a malformed committed local manifest. */
+    @Test fun retentionMalformedCommittedFlagCannotAdoptRemoteDefault() = runBlocking {
+        val session = sessionTracker.currentSession()
+        val id = "invalid-flag"
+        retentionAdapter.saveRetainedContent(session, id, Instant.now(), "old bytes", null, null)
+        val file = marker(id)
+        val broken = properties(file).apply { setProperty("hasText", "unknown") }
+        file.outputStream().use { broken.store(it, null) }
+        retentionAdapter.saveVerifiedUnlockMarker(session, id, Instant.now(), hasText = true)
+        assertEquals("false", properties(file).getProperty("contentCommitted"))
+        assertTrue(retentionAdapter.readRetainedContent(session, id) !is OperationResult.Success)
+    }
+
+    /** Set up a recipient with previously verified, server-authorized combined-lock metadata. */
+    private fun seedRecipient(id: String): CapsuleSummary {
+        val now = Instant.now()
+        val lock = CapsuleLock(LockMode.TIME_AND_LOCATION, now.minusSeconds(10), LocationTarget(37.4, 127.1))
+        val summary = CapsuleSummary(id, userB, userA, lock, SendStatus.SENT, Availability.AVAILABLE,
+            creationZone = "Asia/Seoul", unlockedAt = now)
+        fakeFirestoreAdapter.summaries[id] = summary
+        fakeFirestoreAdapter.requirements[id] = RecipientUnlockRequirements(id, userA, true, lock.mode,
+            lock.unlockAt, lock.location, now)
+        fakeFirestoreAdapter.protectedContent[id] = ProtectedCapsuleContent(id, "retained text", null)
+        return summary
+    }
+
+    /** Reopen through the list and detail repository after fully persisting remote content. */
+    @Test fun retentionOfflineDetailPreservesParticipantsZoneAndLock() = runBlocking {
+        val original = seedRecipient("complete-metadata")
+        assertTrue(repository.readContent(original.capsuleId) is OperationResult.Success)
+        fakeFirestoreAdapter.isNetworkDown = true
+        val detail = (repository.getSummary(original.capsuleId) as OperationResult.Success).data
+        val row = (repository.lists(userA) as OperationResult.Success).data.received.single()
+        for (item in listOf(detail, row)) {
+            assertEquals(original.senderUid, item.senderUid)
+            assertEquals(original.recipientUid, item.recipientUid)
+            assertEquals(original.creationZone, item.creationZone)
+            assertEquals(original.lock, item.lock)
+        }
+    }
+
+    /** A marker that predates lock metadata must not manufacture a time lock. */
+    @Test fun retentionUnknownLegacyLockStaysUnknown() = runBlocking {
+        val session = sessionTracker.currentSession()
+        retentionAdapter.saveRetainedContent(session, "unknown-lock", Instant.now(), "text", null, null)
+        fakeFirestoreAdapter.isNetworkDown = true
+        val detail = (repository.getSummary("unknown-lock") as OperationResult.Success).data
+        assertEquals(null, detail.lock)
+    }
+
+    /** Only download unavailability permits fallback to verified bytes for the current recipient. */
+    @Test fun retentionUnavailableDownloadUsesCommittedBytes() = runBlocking {
+        val id = seedRecipient("previously-saved").capsuleId
+        assertTrue(repository.readContent(id) is OperationResult.Success)
+        fakeFirestoreAdapter.contentFailure = OperationResult.Unavailable("Download interrupted")
+        val read = repository.readContent(id)
+        assertTrue(read is OperationResult.Success)
+        val content = (read as OperationResult.Success).data
+        assertTrue(content.availableOffline)
+        assertEquals("retained text", content.text)
+    }
+
+    /** An authoritative content error survives intact even when a local copy exists. */
+    @Test fun retentionAuthoritativeContentErrorsRemainAuthoritative() = runBlocking {
+        val id = seedRecipient("revoked").capsuleId
+        assertTrue(repository.readContent(id) is OperationResult.Success)
+        for (result in listOf(OperationResult.Denied("Revoked"), OperationResult.Invalid("Malformed"))) {
+            fakeFirestoreAdapter.contentFailure = result
+            assertEquals(result, repository.readContent(id))
+        }
+    }
+
+    /** Feed an actual S07 Fragment a deterministic verification or content result. */
+    private fun detailBackend(
+        available: Boolean = false,
+        verification: OperationResult<UnlockVerificationOutcome> = OperationResult.Unavailable("Location disabled"),
+        body: OperationResult<ProtectedCapsuleContent> = OperationResult.Unavailable("Missing asset")
+    ): CapsuleRepository = object : CapsuleRepository by repository {
+        override suspend fun getSummary(capsuleId: String, targetSession: SessionSnapshot) =
+            OperationResult.Success(CapsuleSummary(capsuleId, userB, userA, CapsuleLock(LockMode.LOCATION),
+                SendStatus.SENT, if (available) Availability.AVAILABLE else Availability.LOCKED))
+        override suspend fun verifyUnlockOutcome(capsuleId: String, targetSession: SessionSnapshot) = verification
+        override suspend fun readContent(capsuleId: String, targetSession: SessionSnapshot) = body
+    }
+
+    /** Show a capsule through the production activity navigation and fragment lifecycle. */
+    private fun openDetail(backend: CapsuleRepository): MainActivity = openScreen(backend).also {
+        it.navigateToCapsuleDetail("detail-id")
+        settleScreen()
+    }
+
+    /** Precise permission failures remain readable on the real screen with a permission action. */
+    @Test fun detailScreenPermissionFailurePersists() {
+        val message = "Precise location permission is required for location unlock."
+        val activity = openDetail(detailBackend(verification = OperationResult.Denied(message)))
+        val notice = activity.findViewById<TextView>(R.id.tvS07Banner)
+        assertEquals(View.VISIBLE, notice.visibility)
+        assertTrue(notice.text.contains(message))
+        val action = activity.findViewById<Button>(R.id.btnS07Retry)
+        assertTrue(action.text.contains("permission", ignoreCase = true))
+    }
+
+    /** A disabled provider offers a working Android location settings action. */
+    @Test fun detailScreenOpensLocationSettings() {
+        val activity = openDetail(detailBackend())
+        activity.findViewById<Button>(R.id.btnS07Retry).performClick()
+        assertEquals(Settings.ACTION_LOCATION_SOURCE_SETTINGS, shadowOf(activity).nextStartedActivity?.action)
+    }
+
+    /** A failed image decode keeps the verified recipient badge and an actionable message. */
+    @Test fun detailScreenDecodeFailureKeepsUnlockAndRetry() {
+        val bytes = byteArrayOf(1, 2, 3)
+        val activity = openDetail(detailBackend(true, body = OperationResult.Success(
+            ProtectedCapsuleContent("detail-id", "caption", "original", bytes))))
+        val notice = activity.findViewById<TextView>(R.id.tvS07Banner)
+        val deadline = System.nanoTime() + 2_000_000_000L
+        while (!notice.text.contains("photo", ignoreCase = true) && System.nanoTime() < deadline) {
+            settleScreen()
+            Thread.sleep(10)
+        }
+        assertTrue(notice.text.contains("photo", ignoreCase = true))
+        assertEquals(View.VISIBLE, activity.findViewById<Button>(R.id.btnS07Retry).visibility)
+        assertEquals(activity.getString(R.string.s07_badge_opened),
+            activity.findViewById<TextView>(R.id.tvS07StatusBadge).text)
+        assertEquals("caption", activity.findViewById<TextView>(R.id.tvS07BodyText).text.toString())
+    }
+
+    /** Authentication restoration retries the originally requested ID under the restored snapshot. */
+    @Test fun detailWaitForRestorationRetainsIdentity() {
+        sessionTracker.clearSession()
+        val model = S07CapsuleDetailViewModel(sessionTracker, detailBackend())
+        model.loadDetail("detail-id")
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals("detail-id", model.uiState.value.capsuleId)
+        assertEquals(sessionTracker.currentSession(), model.uiState.value.sessionSnapshot)
+        sessionTracker.startSession(userA)
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals("detail-id", model.uiState.value.summary?.capsuleId)
+        assertEquals(sessionTracker.currentSession(), model.uiState.value.sessionSnapshot)
+    }
+
+    /** Revoked access must not render the missing-file state for an opened capsule. */
+    @Test fun detailDeniedContentDiffersFromMissingAsset() {
+        val model = S07CapsuleDetailViewModel(sessionTracker,
+            detailBackend(true, body = OperationResult.Denied("Access revoked")))
+        model.loadDetail("detail-id")
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals(DetailStatus.ACCESS_DENIED, model.uiState.value.status)
+        assertFalse(model.uiState.value.isAssetUnavailable)
+        assertEquals(null, model.uiState.value.content)
+    }
+
+    /** A confirmed empty Sent query remains distinguishable from an unavailable Received query. */
+    @Test fun tabsEmptySentAndUnavailableReceived() {
+        fakeFirestoreAdapter.receivedUnavailable = true
+        val remoteOnly = DefaultCapsuleRepository(sessionTracker, fakeAuthAdapter, fakeFirestoreAdapter)
+        val model = S03CapsuleListViewModel(sessionTracker, remoteOnly)
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertFalse(model.uiState.value.isSentUnavailable)
+        assertTrue(model.uiState.value.isReceivedUnavailable)
+    }
+
+    /** A confirmed empty Received query remains distinguishable from an unavailable Sent query. */
+    @Test fun tabsEmptyReceivedAndUnavailableSent() {
+        fakeFirestoreAdapter.sentUnavailable = true
+        val model = S03CapsuleListViewModel(sessionTracker, repository)
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertFalse(model.uiState.value.isReceivedUnavailable)
+        assertTrue(model.uiState.value.isSentUnavailable)
+    }
+
+    /** Exercises the interval before the session flow collector processes reauthentication. */
+    @Test fun tabsImmediateRefreshClearsOldGeneration() {
+        val row = CapsuleSummary("old", userA, userA, CapsuleLock(LockMode.TIME), SendStatus.SENT,
+            availability = Availability.AVAILABLE)
+        fakeFirestoreAdapter.sentList[userA] = listOf(row)
+        fakeFirestoreAdapter.receivedList[userA] = listOf(row)
+        val backend = withPendingSend()
+        val model = S03CapsuleListViewModel(sessionTracker, backend,
+            ForegroundRecoveryCoordinator(backend, sessionTracker, ioDispatcher = testDispatcher))
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals(1, model.uiState.value.unresolvedOperations.size)
+        sessionTracker.startSession(userA)
+        model.loadLists(explicitRefresh = true)
+        val state = model.uiState.value
+        assertEquals(sessionTracker.currentSession(), state.sessionSnapshot)
+        assertTrue(state.sentList.isEmpty() && state.receivedList.isEmpty())
+        assertTrue(state.unresolvedOperations.isEmpty())
+        assertEquals(null, state.errorMessage)
+    }
+
+    /** Provide a pending Sent operation alongside the real production queries. */
+    private fun withPendingSend(): CapsuleRepository = object : CapsuleRepository by repository {
+        override suspend fun recoverPublications(targetSession: SessionSnapshot) =
+            OperationResult.Success(listOf(RecoveredPublication("pending", PublicationPhase.FAILED, null, true)))
+    }
+
+    /** The Received empty label remains visible when the Sent tab has a pending operation. */
+    @Test fun tabsPendingSendDoesNotHideReceivedEmptyView() {
+        val activity = openScreen(withPendingSend())
+        val label = activity.findViewById<TextView>(R.id.tvEmptyList)
+        assertNotNull("Received empty state is attached", label)
+        assertEquals(View.VISIBLE, label.visibility)
+        assertEquals(activity.getString(R.string.s03_empty_received), label.text.toString())
+    }
+
+    /** Start the real activity and inject only its external data boundaries. */
+    private fun openScreen(backend: CapsuleRepository): MainActivity {
+        val app = RuntimeEnvironment.getApplication() as TimeCapsuleApplication
+        val storage = object : StorageAdapter { override fun isAvailable() = false }
+        val manager = AccountSessionManager(fakeAuthAdapter, fakeFirestoreAdapter, sessionTracker,
+            storageDispatcher = testDispatcher)
+        app.setContainerForTesting(AppDependencyContainer(sessionTracker, fakeAuthAdapter, fakeFirestoreAdapter,
+            storage, DefaultLocationAdapter(app), retentionAdapter, backend, manager,
+            recoveryCoordinator = ForegroundRecoveryCoordinator(backend, sessionTracker, ioDispatcher = testDispatcher)))
+        val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+        settleScreen()
+        return activity
+    }
+
+    /** Drain both the ViewModel dispatcher and Android fragment transactions. */
+    private fun settleScreen() {
+        repeat(4) {
+            testDispatcher.scheduler.advanceUntilIdle()
+            shadowOf(Looper.getMainLooper()).idle()
+        }
+    }
+
     @Test
     fun offlineReviewForTimeLocationAndBothModesPreservesLockModeAndTitle() = runBlocking {
         val sessionA = sessionTracker.currentSession()
@@ -150,17 +499,17 @@ class Issue21FunctionalCorrectionsTest {
 
         val capTime = snapshot.received.first { it.capsuleId == "cap-time" }
         assertEquals("Time Capsule Title", capTime.title)
-        assertEquals(LockMode.TIME, capTime.lock.mode)
+        assertEquals(LockMode.TIME, capTime.lock?.mode)
         assertEquals("Sender Jamie", capTime.senderDisplayName)
 
         val capLoc = snapshot.received.first { it.capsuleId == "cap-loc" }
         assertEquals("Location Capsule Title", capLoc.title)
-        assertEquals(LockMode.LOCATION, capLoc.lock.mode)
+        assertEquals(LockMode.LOCATION, capLoc.lock?.mode)
         assertEquals("Sender Alex", capLoc.senderDisplayName)
 
         val capBoth = snapshot.received.first { it.capsuleId == "cap-both" }
         assertEquals("Both Capsule Title", capBoth.title)
-        assertEquals(LockMode.TIME_AND_LOCATION, capBoth.lock.mode)
+        assertEquals(LockMode.TIME_AND_LOCATION, capBoth.lock?.mode)
         assertEquals("Sender Sam", capBoth.senderDisplayName)
     }
 
@@ -645,7 +994,10 @@ class Issue21FunctionalCorrectionsTest {
 
     private class FakeFirestoreAdapter : FirestoreAdapter {
         var isNetworkDown = false
+        var sentUnavailable = false
+        var receivedUnavailable = false
         var accessDeniedForSummary = false
+        var contentFailure: OperationResult<Nothing>? = null
         val sentList = mutableMapOf<String, List<CapsuleSummary>>()
         val receivedList = mutableMapOf<String, List<CapsuleSummary>>()
         val summaries = mutableMapOf<String, CapsuleSummary>()
@@ -658,12 +1010,12 @@ class Issue21FunctionalCorrectionsTest {
         override suspend fun saveRecipientProfile(profile: RecipientProfile) = OperationResult.Success(Unit)
 
         override suspend fun getSentCapsuleSummaries(senderUid: String): OperationResult<List<CapsuleSummary>> {
-            if (isNetworkDown) return OperationResult.Unavailable("Network down")
+            if (isNetworkDown || sentUnavailable) return OperationResult.Unavailable("Network down")
             return OperationResult.Success(sentList[senderUid] ?: emptyList())
         }
 
         override suspend fun getReceivedCapsuleSummaries(recipientUid: String): OperationResult<List<CapsuleSummary>> {
-            if (isNetworkDown) return OperationResult.Unavailable("Network down")
+            if (isNetworkDown || receivedUnavailable) return OperationResult.Unavailable("Network down")
             return OperationResult.Success(receivedList[recipientUid] ?: emptyList())
         }
 
@@ -691,6 +1043,7 @@ class Issue21FunctionalCorrectionsTest {
             recipientUid: String
         ): OperationResult<ProtectedCapsuleContent> {
             if (isNetworkDown) return OperationResult.Unavailable("Network down")
+            contentFailure?.let { return it }
             val content = protectedContent[capsuleId] ?: return OperationResult.Invalid("Not found")
             return OperationResult.Success(content)
         }

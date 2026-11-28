@@ -1,5 +1,7 @@
 package com.example.timecapsule.ui.s03
 
+import com.example.timecapsule.domain.model.ListProvenance
+import com.example.timecapsule.domain.session.SessionSnapshot
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -85,6 +87,7 @@ class S03CapsuleListFragment : Fragment() {
         }
     }
 
+    /** Render the selected query independently from pending operations in Sent. */
     private fun renderUiState(state: CapsuleListUiState) {
         binding.pbLoading.visibility = if (state.isLoading) View.VISIBLE else View.GONE
 
@@ -98,7 +101,7 @@ class S03CapsuleListFragment : Fragment() {
         }
 
         // Stale & error banners
-        if (state.isStale) {
+        if (state.isStale && state.selectedProvenance == ListProvenance.OFFLINE_RETAINED) {
             binding.tvStaleBanner.visibility = View.VISIBLE
         } else {
             binding.tvStaleBanner.visibility = View.GONE
@@ -117,13 +120,13 @@ class S03CapsuleListFragment : Fragment() {
         container.removeAllViews()
 
         // Render unresolved operations if on SENT tab
-        if (state.selectedTab == CapsuleTab.SENT && state.unresolvedOperations.isNotEmpty()) {
-            renderUnresolvedOperations(container, state.unresolvedOperations)
+        val hasVisibleOperations = state.selectedTab == CapsuleTab.SENT && state.unresolvedOperations.isNotEmpty()
+        if (hasVisibleOperations) {
+            renderUnresolvedOperations(container, state.unresolvedOperations, state.sessionSnapshot)
         }
 
-        if (currentList.isEmpty() && state.unresolvedOperations.isEmpty() && !state.isLoading) {
-            val isCurrentTabUnavailable = if (state.selectedTab == CapsuleTab.RECEIVED) state.isReceivedUnavailable else state.isSentUnavailable
-            binding.tvEmptyList.text = if (isCurrentTabUnavailable) {
+        if (currentList.isEmpty() && !hasVisibleOperations && !state.isLoading) {
+            binding.tvEmptyList.text = if (state.isStale) {
                 state.errorMessage ?: "Unable to connect to network for this list. Tap refresh to try again."
             } else if (state.selectedTab == CapsuleTab.RECEIVED) {
                 getString(R.string.s03_empty_received)
@@ -143,9 +146,11 @@ class S03CapsuleListFragment : Fragment() {
         }
     }
 
+    /** Bind each recovery button to the same generation that supplied its row. */
     private fun renderUnresolvedOperations(
         container: LinearLayout,
-        unresolved: List<UnresolvedPublicationSummary>
+        unresolved: List<UnresolvedPublicationSummary>,
+        origin: SessionSnapshot?
     ) {
         val context = requireContext()
         val sectionHeader = TextView(context).apply {
@@ -194,7 +199,7 @@ class S03CapsuleListFragment : Fragment() {
             val btnAction = Button(context).apply {
                 text = if (pub.phase == PublicationPhase.OUTCOME_UNKNOWN) "Check / Retry" else "Open Confirm Send (S-06)"
                 setOnClickListener {
-                    (requireActivity() as MainActivity).navigateToConfirmSend(pub.capsuleId)
+                    (requireActivity() as MainActivity).navigateToConfirmSend(pub.capsuleId, origin)
                 }
             }
             card.addView(btnAction)
@@ -203,6 +208,7 @@ class S03CapsuleListFragment : Fragment() {
         }
     }
 
+    /** Present available summary metadata, including older records with unknown locks. */
     private fun bindCapsuleItem(
         itemBinding: ItemCapsuleSummaryBinding,
         summary: CapsuleSummary,
@@ -233,7 +239,8 @@ class S03CapsuleListFragment : Fragment() {
             if (isOpened) R.color.capsule_success_bg else R.color.capsule_badge_bg
         )
 
-        val lockConditionText = when (summary.lock.mode) {
+        val lockConditionText = when (summary.lock?.mode) {
+            null -> "Lock details unavailable"
             LockMode.TIME -> "Time lock"
             LockMode.LOCATION -> "Place lock"
             LockMode.TIME_AND_LOCATION -> "Time + place"

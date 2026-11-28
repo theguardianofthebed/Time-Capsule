@@ -30,7 +30,7 @@ data class CapsuleSummary(
     val capsuleId: String,
     val senderUid: String,
     val recipientUid: String,
-    val lock: CapsuleLock,
+    val lock: CapsuleLock?,
     val sendStatus: SendStatus,
     val availability: Availability = Availability.UNKNOWN,
     val title: String? = null,

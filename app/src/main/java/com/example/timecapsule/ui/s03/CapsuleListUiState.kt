@@ -1,7 +1,7 @@
 package com.example.timecapsule.ui.s03
 
 import com.example.timecapsule.domain.model.CapsuleSummary
-import com.example.timecapsule.domain.model.ListFreshness
+import com.example.timecapsule.domain.model.ListProvenance
 import com.example.timecapsule.domain.model.PublicationPhase
 import com.example.timecapsule.domain.session.SessionSnapshot
 
@@ -23,11 +23,12 @@ data class CapsuleListUiState(
     val sentList: List<CapsuleSummary> = emptyList(),
     val unresolvedOperations: List<UnresolvedPublicationSummary> = emptyList(),
     val errorMessage: String? = null,
-    val freshness: ListFreshness = ListFreshness.SERVER_CONFIRMED,
-    val isReceivedUnavailable: Boolean = false,
-    val isSentUnavailable: Boolean = false,
+    val receivedProvenance: ListProvenance = ListProvenance.UNAVAILABLE,
+    val sentProvenance: ListProvenance = ListProvenance.UNAVAILABLE,
     val sessionSnapshot: SessionSnapshot? = null
 ) {
-    val isStale: Boolean
-        get() = freshness != ListFreshness.SERVER_CONFIRMED
+    val selectedProvenance get() = if (selectedTab == CapsuleTab.RECEIVED) receivedProvenance else sentProvenance
+    val isReceivedUnavailable get() = receivedProvenance == ListProvenance.UNAVAILABLE
+    val isSentUnavailable get() = sentProvenance == ListProvenance.UNAVAILABLE
+    val isStale get() = !isLoading && selectedProvenance != ListProvenance.SERVER_CONFIRMED
 }

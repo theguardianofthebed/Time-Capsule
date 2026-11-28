@@ -361,7 +361,7 @@ class DefaultFirestoreAdapter(
                 .get(Source.SERVER).await()
 
             if (!doc.exists()) {
-                return@withContext OperationResult.Denied("Protected content document does not exist.")
+                return@withContext OperationResult.Invalid("Capsule content is missing on the server.")
             }
 
             if (doc.metadata.isFromCache || doc.metadata.hasPendingWrites()) {
@@ -380,14 +380,16 @@ class DefaultFirestoreAdapter(
                         photoObjectPath,
                         OriginalPhotoLimits.MAX_BYTES
                     )
-                    if (downloadRes is OperationResult.Success) {
-                        val downloaded = downloadRes.data
-                        photoFormat = AndroidOriginalImageProbe.inspect(downloaded)
-                            ?: return@withContext OperationResult.Unavailable("Downloaded photo cannot be decoded.")
-                        photoBytes = downloaded
-                    } else {
-                        return@withContext OperationResult.Unavailable("Photo download failed.")
+                    val downloaded = when (downloadRes) {
+                        is OperationResult.Success -> downloadRes.data
+                        is OperationResult.Denied -> return@withContext downloadRes
+                        is OperationResult.Invalid -> return@withContext downloadRes
+                        is OperationResult.Unavailable -> return@withContext downloadRes
+                        is OperationResult.OutcomeUnknown -> return@withContext downloadRes
                     }
+                    photoFormat = AndroidOriginalImageProbe.inspect(downloaded)
+                        ?: return@withContext OperationResult.Unavailable("Downloaded photo cannot be decoded.")
+                    photoBytes = downloaded
                 }
             }
 

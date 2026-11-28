@@ -13,6 +13,7 @@ import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import java.time.Instant
+import com.example.timecapsule.domain.model.LocationTarget
 import java.util.Properties
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -51,7 +52,8 @@ class DefaultLocalRetentionAdapter(
         unlockAt: Instant?,
         creationZone: String?,
         hasText: Boolean,
-        hasPhoto: Boolean
+        hasPhoto: Boolean,
+        location: LocationTarget?
     ): OperationResult<Unit> = withContext(Dispatchers.IO) {
         val cleanUid = (targetSession.uid ?: "").trim()
         val cleanCapsuleId = capsuleId.trim()
@@ -73,25 +75,18 @@ class DefaultLocalRetentionAdapter(
                 }
 
                 val markerFile = File(directory, MARKER_FILE_NAME)
-                val existingProperties = Properties()
-                if (markerFile.exists()) {
-                    try { markerFile.inputStream().use { existingProperties.load(it) } } catch (_: Exception) {}
-                }
-
-                val existingCommitted = existingProperties.getProperty("contentCommitted") == "true" ||
-                    (existingProperties.getProperty("contentCommitted") == null &&
-                        (existingProperties.getProperty("version") == "1" || existingProperties.getProperty("version") == "2") &&
-                        (existingProperties.getProperty("hasText") == "true" || existingProperties.getProperty("hasPhoto") == "true"))
-                val finalHasText = if (existingCommitted) {
-                    existingProperties.getProperty("hasText")?.toBooleanStrictOrNull() ?: hasText
-                } else {
-                    hasText
-                }
-                val finalHasPhoto = if (existingCommitted) {
-                    existingProperties.getProperty("hasPhoto")?.toBooleanStrictOrNull() ?: hasPhoto
-                } else {
-                    hasPhoto
-                }
+                val existingProperties = previousMarker(markerFile, cleanUid, cleanCapsuleId)
+                val version = existingProperties.getProperty("version")
+                val committed = existingProperties.getProperty("contentCommitted")
+                val legacy = version == "1" || version == "2"
+                val candidate = committed == "true" || (legacy && committed == null)
+                val oldText = existingProperties.getProperty("hasText")?.toBooleanStrictOrNull()
+                val oldPhoto = existingProperties.getProperty("hasPhoto")?.toBooleanStrictOrNull()
+                val validFlags = oldText != null && oldPhoto != null && (oldText || oldPhoto)
+                val existingCommitted = candidate && validFlags && (!legacy ||
+                    readRetainedContentInternal(cleanUid, cleanCapsuleId) is OperationResult.Success)
+                val finalHasText = if (candidate) oldText == true else hasText
+                val finalHasPhoto = if (candidate) oldPhoto == true else hasPhoto
 
                 val properties = Properties().apply {
                     setProperty("version", MARKER_VERSION)
@@ -103,6 +98,12 @@ class DefaultLocalRetentionAdapter(
                     setProperty("hasPhoto", finalHasPhoto.toString())
                     existingProperties.getProperty("photoSha256")?.let { setProperty("photoSha256", it) }
                     existingProperties.getProperty("photoFormat")?.let { setProperty("photoFormat", it) }
+                    val target = location ?: existingProperties.readLocation()
+                    if (target != null) {
+                        setProperty("latitude", target.latitude.toString())
+                        setProperty("longitude", target.longitude.toString())
+                        setProperty("radiusMeters", target.radiusMeters.toString())
+                    }
                     lockMode?.let { setProperty("lockMode", it.name) }
                         ?: existingProperties.getProperty("lockMode")?.let { setProperty("lockMode", it) }
                     title?.takeIf { it.isNotBlank() }?.let { setProperty("title", it) }
@@ -189,10 +190,7 @@ class DefaultLocalRetentionAdapter(
                 }
 
                 val markerFile = File(directory, MARKER_FILE_NAME)
-                val existingProperties = Properties()
-                if (markerFile.exists()) {
-                    try { markerFile.inputStream().use { existingProperties.load(it) } } catch (_: Exception) {}
-                }
+                val existingProperties = previousMarker(markerFile, cleanUid, cleanCapsuleId)
 
                 // 1. Invalidate complete-content authorization BEFORE writing new content files
                 val tempProperties = Properties().apply {
@@ -243,6 +241,9 @@ class DefaultLocalRetentionAdapter(
                     setProperty("hasPhoto", (photoBytes != null).toString())
                     photoBytes?.let { setProperty("photoSha256", sha256(it)) }
                     photoFormat?.let { setProperty("photoFormat", it.name) }
+                    for (key in listOf("senderUid", "recipientUid", "latitude", "longitude", "radiusMeters")) {
+                        existingProperties.getProperty(key)?.let { setProperty(key, it) }
+                    }
                     lockMode?.let { setProperty("lockMode", it.name) }
                         ?: existingProperties.getProperty("lockMode")?.let { setProperty("lockMode", it) }
                     title?.takeIf { it.isNotBlank() }?.let { setProperty("title", it) }
@@ -339,6 +340,34 @@ class DefaultLocalRetentionAdapter(
                 OperationResult.Unavailable("Failed to list retained content: ${error.message}")
             }
         }
+    }
+
+    /** Only metadata belonging to this record can survive a marker refresh or content replacement. */
+    private fun previousMarker(file: File, uid: String, id: String): Properties {
+        if (!file.isFile) return Properties()
+        val stored = Properties()
+        try {
+            file.inputStream().use { stored.load(it) }
+            if (stored.getProperty("version") in setOf("1", "2", MARKER_VERSION) &&
+                stored.getProperty("uid") == uid && stored.getProperty("capsuleId") == id) {
+                Instant.parse(stored.getProperty("verifiedUnlockedAt") ?: return Properties())
+                return stored
+            }
+        } catch (_: IllegalArgumentException) {
+            // Malformed properties cannot supply metadata for a replacement.
+        } catch (_: java.time.format.DateTimeParseException) {
+            // Unlock evidence must include the original authoritative timestamp.
+        }
+        return Properties()
+    }
+
+    /** Older markers may have no saved coordinates. Reject partial or out-of-range locations. */
+    private fun Properties.readLocation(): LocationTarget? {
+        val lat = getProperty("latitude")?.toDoubleOrNull() ?: return null
+        val lon = getProperty("longitude")?.toDoubleOrNull() ?: return null
+        val radius = getProperty("radiusMeters")?.toDoubleOrNull() ?: return null
+        return if (lat in -90.0..90.0 && lon in -180.0..180.0 && radius.isFinite() && radius > 0)
+            LocationTarget(lat, lon, radius) else null
     }
 
     /** Reads and fully validates retained content and bytes inside synchronized lock. */
@@ -524,6 +553,7 @@ class DefaultLocalRetentionAdapter(
                     creationZone = creationZone,
                     hasText = hasText,
                     hasPhoto = hasPhoto,
+                    location = properties.readLocation(),
                     isContentAvailable = isCommitted && (hasText || hasPhoto) && textOk && photoOk
                 )
             )

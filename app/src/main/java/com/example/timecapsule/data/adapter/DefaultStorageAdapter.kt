@@ -26,6 +26,7 @@ class DefaultStorageAdapter(
     /** Reports an authenticated SDK environment, not server reachability or successful upload. */
     override fun isAvailable(): Boolean = auth.currentUser != null
 
+    /** Preserve authorization failures so the caller cannot treat a revoked read as an offline download. */
     override suspend fun downloadPhotoBytes(
         objectPath: String,
         maxBytes: Long
@@ -34,7 +35,13 @@ class DefaultStorageAdapter(
         OperationResult.Success(bytes)
     } catch (e: Exception) {
         if (e is CancellationException) throw e
-        OperationResult.Unavailable("Photo download failed: ${e.message}")
+        when {
+            e is SecurityException || (e is StorageException && e.errorCode in setOf(
+                StorageException.ERROR_NOT_AUTHORIZED, StorageException.ERROR_NOT_AUTHENTICATED
+            )) -> OperationResult.Denied("Access to this photo was denied.")
+            e is IllegalArgumentException -> OperationResult.Invalid("Invalid photo download request.")
+            else -> OperationResult.Unavailable("Photo download failed: ${e.message}")
+        }
     }
 
     /** Requires the matching sender and compares server size/MD5 with the exact uploaded bytes. */

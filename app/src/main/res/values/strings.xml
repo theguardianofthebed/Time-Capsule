@@ -215,6 +215,9 @@
     <string name="s07_meant_to_open">MEANT TO OPEN</string>
     <string name="s07_opened_banner">Opened %1$s. This moment stays open, wherever you go.</string>
     <string name="s07_unlocked_toast">A little moment, finally yours. Capsule unlocked.</string>
-    <string name="s07_btn_retry">Connect and retry</string>
+    <string name="s07_btn_retry">Retry</string>
     <string name="s07_asset_unavailable">Capsule unlocked — content unavailable. Connect and retry.</string>
+    <string name="s07_precise_permission">Allow precise location permission</string>
+    <string name="s07_app_settings">Open app permission settings</string>
+    <string name="s07_location_settings">Open location settings</string>
 </resources>
