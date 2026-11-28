@@ -449,15 +449,23 @@ class DefaultCapsuleRepository(
         }
         if (result is OperationResult.Success && result.data.availability == Availability.AVAILABLE) {
             val rechecked = firestoreAdapter.readRecipientUnlockRequirements(cleanId, activeUid)
-            val serverUnlockedAt = if (rechecked is OperationResult.Success) rechecked.data.unlockedAt else null
-            if (serverUnlockedAt != null) {
-                retentionAdapter?.saveVerifiedUnlockMarker(
-                    targetSession = targetSession,
-                    capsuleId = cleanId,
-                    verifiedUnlockedAt = serverUnlockedAt,
-                    lockMode = mode,
-                    recipientUid = activeUid
-                )
+            if (!sessionTracker.isSessionValid(targetSession)) {
+                return OperationResult.Denied("Account session changed during post-unlock requirements recheck.")
+            }
+            if (rechecked is OperationResult.Success && rechecked.data.recipientUid == activeUid && rechecked.data.unlocked) {
+                val serverUnlockedAt = rechecked.data.unlockedAt
+                if (serverUnlockedAt != null) {
+                    retentionAdapter?.saveVerifiedUnlockMarker(
+                        targetSession = targetSession,
+                        capsuleId = cleanId,
+                        verifiedUnlockedAt = serverUnlockedAt,
+                        lockMode = mode,
+                        recipientUid = activeUid
+                    )
+                    if (!sessionTracker.isSessionValid(targetSession)) {
+                        return OperationResult.Denied("Account session changed after unlock marker save.")
+                    }
+                }
             }
         }
         return result
@@ -581,7 +589,13 @@ class DefaultCapsuleRepository(
         if (reqResult !is OperationResult.Success) {
             if (reqResult is OperationResult.Unavailable) {
                 val retentionReadRes = retention?.readRetainedContent(targetSession, cleanId)
+                if (!sessionTracker.isSessionValid(targetSession)) {
+                    return OperationResult.Denied("Account session changed after fallback content read.")
+                }
                 if (retentionReadRes is OperationResult.Success) {
+                    if (!sessionTracker.isSessionValid(targetSession)) {
+                        return OperationResult.Denied("Account session changed before returning retained content.")
+                    }
                     val retained = retentionReadRes.data
                     val photoPath = if (retained.photoBytes != null) "retainedMedia/${retained.uid}/$cleanId" else null
                     return OperationResult.Success(
@@ -618,6 +632,9 @@ class DefaultCapsuleRepository(
                 return OperationResult.Denied("Unlock authorization required before reading content.")
             }
             val rechecked = firestoreAdapter.readRecipientUnlockRequirements(cleanId, activeUid)
+            if (!sessionTracker.isSessionValid(targetSession)) {
+                return OperationResult.Denied("Account session changed after post-verification requirements read.")
+            }
             if (rechecked is OperationResult.Success) {
                 serverUnlockedAt = rechecked.data.unlockedAt
             }

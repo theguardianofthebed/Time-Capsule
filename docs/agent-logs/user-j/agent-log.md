@@ -796,6 +796,24 @@ Implement complete bounded scope for Issue #21: S-03 Capsule Lists (Received and
   - Lint passed cleanly with 0 errors (`./gradlew :app:clean :app:lintDebug`).
   - Readiness check passed (`PREFLIGHT_RECORD_VALID`).
 
+### Sixth Review Functional Corrections Applied (28 November 2026)
+
+- **1. Preserved Committed Asset Metadata:**
+  - `saveVerifiedUnlockMarker` in `DefaultLocalRetentionAdapter.kt` checks `existingCommitted = existingProperties.getProperty("contentCommitted") == "true"`.
+  - Preserves `contentCommitted = "true"`, `hasText`, and `hasPhoto` from `existingProperties` if an existing valid complete commitment exists, ensuring unlock evidence refreshes do not corrupt or clear committed assets.
+- **2. Session Validation Boundaries:**
+  - Verified and added explicit `sessionTracker.isSessionValid(targetSession)` checks at all 4 specified boundaries in `DefaultCapsuleRepository.kt`.
+- **3. Complete S03 -> S06 Targeted Recovery Route:**
+  - In `CapsuleDraftViewModel.kt`, `recoverPublicationState(targetCapsuleId: String?)` targets the specified capsule ID explicitly.
+  - `S06ConfirmSendFragment.newInstance(capsuleId)` passes `targetCapsuleId` to `viewModel.recoverPublicationState(targetCapsuleId)`.
+- **4. Automated Verification Suite:**
+  - Added `refreshingUnlockEvidenceForCommittedCapsulePreservesBothAssets` test to `Issue21FunctionalCorrectionsTest.kt`.
+  - Total **376 JVM unit tests passed** (`./gradlew :app:testDebugUnitTest`).
+  - Debug and AndroidTest APKs built cleanly (`./gradlew :app:assembleDebug :app:assembleDebugAndroidTest`).
+  - Lint passed cleanly with 0 errors (`./gradlew :app:clean :app:lintDebug`).
+  - Readiness check passed (`PREFLIGHT_RECORD_VALID`).
+
+
 ### Fourth Review Functional Corrections Applied (28 November 2026)
 
 - **1. Retention Commitment Invalidation Gate:**

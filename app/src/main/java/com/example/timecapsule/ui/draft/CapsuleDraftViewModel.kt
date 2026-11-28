@@ -712,7 +712,7 @@ class CapsuleDraftViewModel(
     }
 
     /** Reconciles saved sends before restoring raw compose data, particularly for locked self-sends. */
-    fun recoverPublicationState(restoreEditable: Boolean = false) {
+    fun recoverPublicationState(targetCapsuleId: String? = null, restoreEditable: Boolean = false) {
         val backend = repository
         if (backend == null) {
             if (restoreEditable) restorePhotoDraft()
@@ -732,11 +732,12 @@ class CapsuleDraftViewModel(
                 val result = recoverSaved(backend, capturedSession)
                 if (!isCurrentPublication(uid, token, capturedSession)) return@launch
                 if (result is OperationResult.Success) {
+                    val targeted = targetCapsuleId?.let { id -> result.data.firstOrNull { it.capsuleId == id } }
                     val pending = result.data.firstOrNull { it.phase != PublicationPhase.SENT }
                     val completed = result.data.firstOrNull {
                         it.capsuleId == _uiState.value.capsuleId || it.clearedEditableDraft
                     }
-                    val recovered = pending ?: completed
+                    val recovered = targeted ?: pending ?: completed
                     if (recovered != null) applyRecovered(recovered)
                     else _uiState.update { it.copy(recoveryBusy = false, recoveryBlocked = false) }
                     if (recovered == null && restoreEditable && _uiState.value.editable) restorePhotoDraft()

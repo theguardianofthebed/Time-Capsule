@@ -169,11 +169,27 @@
    - Implemented testable `faultInjector` seam on `DefaultLocalRetentionAdapter`.
    - `interruptedRetainedContentReplacementPreservesUnlockEvidenceWithoutAuthorizingIncompleteBytes` in `Issue21FunctionalCorrectionsTest.kt` exercises initial complete save -> pre-marker invalidation -> forced I/O fault -> process recreation -> verified unlock evidence survival without incomplete byte authorization -> unlock marker refresh -> clean replacement.
 
+## 7. Sixth Review Functional Corrections (28 November 2026)
+
+1. **Preserved Committed Asset Metadata:**
+   - In `DefaultLocalRetentionAdapter.kt`, `saveVerifiedUnlockMarker` checks `existingCommitted = existingProperties.getProperty("contentCommitted") == "true"`.
+   - If an existing valid complete commitment exists, `saveVerifiedUnlockMarker` preserves `contentCommitted = "true"`, `hasText`, and `hasPhoto` from `existingProperties`, preventing unlock marker refreshes from clearing or corrupting committed offline assets.
+
+2. **Session Validation Boundaries:**
+   - Added explicit `sessionTracker.isSessionValid(targetSession)` checks at all 4 specified boundaries in `DefaultCapsuleRepository.kt` (after `readRecipientUnlockRequirements` in `verifyUnlockOutcome`, after `saveVerifiedUnlockMarker` in `verifyUnlockOutcome`, after fallback `readRetainedContent` in `readContent`, and after `readRecipientUnlockRequirements` in `readContent`).
+
+3. **Complete S03 -> S06 Targeted Recovery Route:**
+   - In `CapsuleDraftViewModel.kt`, `recoverPublicationState(targetCapsuleId: String?)` targets the specified capsule ID explicitly (`result.data.firstOrNull { it.capsuleId == targetCapsuleId }`).
+   - `S06ConfirmSendFragment.newInstance(capsuleId)` passes `targetCapsuleId` to `viewModel.recoverPublicationState(targetCapsuleId)`.
+
+4. **Preserved Committed Assets Test:**
+   - Added `refreshingUnlockEvidenceForCommittedCapsulePreservesBothAssets` to `Issue21FunctionalCorrectionsTest.kt`, verifying that saving a complete text + photo capsule, refreshing unlock evidence, and switching to offline mode preserves full offline readability for both assets.
+
 ---
 
-## 7. Verification and Checks Summary
+## 8. Verification and Checks Summary
 
-- `./gradlew :app:testDebugUnitTest`: **PASS (375 passed, 0 failed)**
+- `./gradlew :app:testDebugUnitTest`: **PASS (376 passed, 0 failed)**
 - `./gradlew :app:assembleDebug :app:assembleDebugAndroidTest`: **PASS (`BUILD SUCCESSFUL`)**
 - `./gradlew :app:clean :app:lintDebug`: **PASS (`BUILD SUCCESSFUL`, 0 lint errors)**
 - `py tools/check_readiness.py --issue 21 --evidence docs/agent-tools/readiness-evidence-issue21.json`: **PASS (`PREFLIGHT_RECORD_VALID`)**
@@ -181,11 +197,12 @@
 
 ---
 
-## 8. Next Human Action
+## 9. Next Human Action
 
 1. User G code review of branch `feature/21-capsule-lists-detail`.
 2. Manual end-to-end verification on Android device/emulator (S-03 list tabs, S-07 detail unlock, Author copy view, notification tap, and offline process relaunch re-view).
 3. Merge PR #47 after teammate approval.
+
 
 
 

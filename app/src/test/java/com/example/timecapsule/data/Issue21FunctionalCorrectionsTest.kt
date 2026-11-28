@@ -536,14 +536,12 @@ class Issue21FunctionalCorrectionsTest {
         val summaries = (summaryRes as OperationResult.Success).data
         assertEquals(1, summaries.size)
         assertEquals(now, summaries[0].verifiedUnlockedAt)
-        if (summaries[0].isContentAvailable) {
-            throw RuntimeException("isContentAvailable was true! summary=${summaries[0]}")
-        }
+        assertFalse(summaries[0].isContentAvailable) // Content NOT available due to invalidation!
 
         val contentRead = newRetentionAdapter.readRetainedContent(sessionA, "cap-interrupt")
         assertTrue(contentRead is OperationResult.Denied || contentRead is OperationResult.Unavailable)
 
-        // 6 & 7. Refresh verified unlock evidence alone without content files (with hasPhoto = true)
+        // 6 & 7. Refresh verified unlock evidence alone without content files
         val refreshMarker = newRetentionAdapter.saveVerifiedUnlockMarker(
             targetSession = sessionA,
             capsuleId = "cap-interrupt",
@@ -577,6 +575,57 @@ class Issue21FunctionalCorrectionsTest {
         val finalRead = newRetentionAdapter.readRetainedContent(sessionA, "cap-interrupt")
         assertTrue(finalRead is OperationResult.Success)
         assertEquals("Final Replacement Text", (finalRead as OperationResult.Success).data.text)
+    }
+
+    @Test
+    fun refreshingUnlockEvidenceForCommittedCapsulePreservesBothAssets() = runBlocking {
+        val sessionA = sessionTracker.currentSession()
+        val now = Instant.now().minusSeconds(500)
+        val validPng = imageFixture("png")
+
+        // 1. Save valid text and photo capsule
+        val saveRes = retentionAdapter.saveRetainedContent(
+            targetSession = sessionA,
+            capsuleId = "cap-committed-refresh",
+            verifiedUnlockedAt = now,
+            text = "Committed Text",
+            photoBytes = validPng,
+            photoFormat = OriginalPhotoFormat.PNG,
+            title = "Committed Title",
+            lockMode = LockMode.TIME
+        )
+        assertTrue(saveRes is OperationResult.Success)
+
+        // 2. Refresh unlock evidence with default hasText = false, hasPhoto = false
+        val refreshRes = retentionAdapter.saveVerifiedUnlockMarker(
+            targetSession = sessionA,
+            capsuleId = "cap-committed-refresh",
+            verifiedUnlockedAt = now,
+            title = "Refreshed Title",
+            lockMode = LockMode.TIME
+        )
+        assertTrue(refreshRes is OperationResult.Success)
+
+        // 3. Disconnect network and recreate repository & retention adapter
+        val newRetentionAdapter = DefaultLocalRetentionAdapter(
+            root = rootDir,
+            session = { sessionTracker.currentSession() }
+        )
+        val newRepository = DefaultCapsuleRepository(
+            sessionTracker = sessionTracker,
+            authAdapter = fakeAuthAdapter,
+            firestoreAdapter = fakeFirestoreAdapter,
+            retentionAdapter = newRetentionAdapter
+        )
+        fakeFirestoreAdapter.isNetworkDown = true
+
+        // 4. Verify BOTH assets (text and photo) remain readable offline
+        val offlineRead = newRepository.readContent("cap-committed-refresh", sessionA)
+        assertTrue(offlineRead is OperationResult.Success)
+        val content = (offlineRead as OperationResult.Success).data
+        assertEquals("Committed Text", content.text)
+        assertNotNull(content.photoBytes)
+        assertEquals(OriginalPhotoFormat.PNG, content.photoFormat)
     }
 
     private fun sha256(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256")

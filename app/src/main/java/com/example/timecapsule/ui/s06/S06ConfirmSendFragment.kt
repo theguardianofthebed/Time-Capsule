@@ -70,7 +70,12 @@ class S06ConfirmSendFragment : Fragment() {
                 mainActivity.container.recoveryCoordinator)
         )[CapsuleDraftViewModel::class.java]
 
-        viewModel.syncSessionState(mainActivity.container.repository, mainActivity.container.recoveryCoordinator)
+        val targetCapsuleId = arguments?.getString(ARG_CAPSULE_ID)
+        if (!targetCapsuleId.isNullOrBlank()) {
+            viewModel.recoverPublicationState(targetCapsuleId = targetCapsuleId)
+        } else {
+            viewModel.syncSessionState(mainActivity.container.repository, mainActivity.container.recoveryCoordinator)
+        }
 
         setupClickListeners()
         observeViewModelState()

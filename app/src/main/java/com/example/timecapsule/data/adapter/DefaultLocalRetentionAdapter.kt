@@ -78,14 +78,26 @@ class DefaultLocalRetentionAdapter(
                     try { markerFile.inputStream().use { existingProperties.load(it) } } catch (_: Exception) {}
                 }
 
+                val existingCommitted = existingProperties.getProperty("contentCommitted") == "true"
+                val finalHasText = if (existingCommitted) {
+                    existingProperties.getProperty("hasText")?.toBooleanStrictOrNull() ?: hasText
+                } else {
+                    hasText
+                }
+                val finalHasPhoto = if (existingCommitted) {
+                    existingProperties.getProperty("hasPhoto")?.toBooleanStrictOrNull() ?: hasPhoto
+                } else {
+                    hasPhoto
+                }
+
                 val properties = Properties().apply {
                     setProperty("version", MARKER_VERSION)
                     setProperty("uid", cleanUid)
                     setProperty("capsuleId", cleanCapsuleId)
                     setProperty("verifiedUnlockedAt", verifiedUnlockedAt.toString())
-                    setProperty("contentCommitted", existingProperties.getProperty("contentCommitted") ?: "false")
-                    setProperty("hasText", hasText.toString())
-                    setProperty("hasPhoto", hasPhoto.toString())
+                    setProperty("contentCommitted", if (existingCommitted) "true" else "false")
+                    setProperty("hasText", finalHasText.toString())
+                    setProperty("hasPhoto", finalHasPhoto.toString())
                     existingProperties.getProperty("photoSha256")?.let { setProperty("photoSha256", it) }
                     existingProperties.getProperty("photoFormat")?.let { setProperty("photoFormat", it) }
                     lockMode?.let { setProperty("lockMode", it.name) }
@@ -358,7 +370,10 @@ class DefaultLocalRetentionAdapter(
             }
 
             val contentCommittedStr = properties.getProperty("contentCommitted")
-            val isCommitted = contentCommittedStr?.toBooleanStrictOrNull() ?: true
+            val isCommitted = when {
+                contentCommittedStr != null -> contentCommittedStr.toBooleanStrictOrNull() == true
+                else -> version == "1" || version == "2" // Legacy v1/v2 records
+            }
             if (!isCommitted) {
                 return OperationResult.Denied("Retained content is uncommitted or unavailable locally.")
             }
@@ -459,7 +474,10 @@ class DefaultLocalRetentionAdapter(
             val hasText = properties.getProperty("hasText")?.toBooleanStrictOrNull() ?: false
             val hasPhoto = properties.getProperty("hasPhoto")?.toBooleanStrictOrNull() ?: false
             val contentCommittedStr = properties.getProperty("contentCommitted")
-            val isCommitted = contentCommittedStr?.toBooleanStrictOrNull() ?: (hasText || hasPhoto)
+            val isCommitted = when {
+                contentCommittedStr != null -> contentCommittedStr.toBooleanStrictOrNull() == true
+                else -> version == "1" || (version == "2" && (hasText || hasPhoto))
+            }
 
             val senderUid = properties.getProperty("senderUid")?.takeIf { it.isNotBlank() }
             val recipientUid = properties.getProperty("recipientUid")?.takeIf { it.isNotBlank() }
