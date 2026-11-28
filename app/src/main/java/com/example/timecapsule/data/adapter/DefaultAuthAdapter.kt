@@ -8,6 +8,7 @@ import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import com.google.firebase.auth.FirebaseAuthWeakPasswordException
 import com.google.firebase.auth.UserProfileChangeRequest
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.tasks.await
 
 /**
@@ -58,10 +59,15 @@ class DefaultAuthAdapter(
             val user = result.user
             if (user != null) {
                 if (trimmedName.isNotBlank()) {
-                    val profileUpdates = UserProfileChangeRequest.Builder()
-                        .setDisplayName(trimmedName)
-                        .build()
-                    user.updateProfile(profileUpdates).await()
+                    try {
+                        val profileUpdates = UserProfileChangeRequest.Builder()
+                            .setDisplayName(trimmedName)
+                            .build()
+                        user.updateProfile(profileUpdates).await()
+                    } catch (e: Exception) {
+                        if (e is CancellationException) throw e
+                        // Account creation in Auth succeeded; profile display name update can be completed during profile repair
+                    }
                 }
                 OperationResult.Success(user.uid)
             } else {
@@ -102,7 +108,7 @@ class DefaultAuthAdapter(
 
     private fun <T> mapAuthException(e: Exception): OperationResult<T> {
         return when (e) {
-            is kotlinx.coroutines.CancellationException -> throw e
+            is CancellationException -> throw e
             is FirebaseNetworkException -> {
                 OperationResult.Unavailable("Network unavailable. Please check your connection.")
             }

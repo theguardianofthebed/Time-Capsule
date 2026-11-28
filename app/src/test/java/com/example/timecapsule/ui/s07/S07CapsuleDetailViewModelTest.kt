@@ -102,6 +102,30 @@ class S07CapsuleDetailViewModelTest {
         assertEquals("Locked by time", state.unlockReason)
     }
 
+    @Test
+    fun `timeOnlyLock_accountDisabledError_mapsToAccessDenied_notLocationDisabled`() = runTest(testDispatcher) {
+        sessionTracker.startSession(userB)
+        val now = Instant.now()
+        val cap = CapsuleSummary(
+            capsuleId = "cap-3",
+            senderUid = userA,
+            recipientUid = userB,
+            lock = CapsuleLock(LockMode.TIME, unlockAt = now.plusSeconds(3600)),
+            sendStatus = SendStatus.SENT,
+            availability = Availability.LOCKED,
+            title = "A's Note To B"
+        )
+        fakeRepository.summaries["cap-3"] = cap
+
+        viewModel.loadDetail("cap-3")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertFalse(state.isLoading)
+        assertEquals(DetailStatus.LOCKED_WAITING_TIME, state.status)
+        assertFalse(state.status == DetailStatus.LOCKED_LOCATION_DISABLED)
+    }
+
     private class FakeCapsuleRepository(
         private val sessionTracker: DefaultSessionTracker
     ) : CapsuleRepository {

@@ -5,6 +5,8 @@ import com.example.timecapsule.domain.model.LockMode
 import com.example.timecapsule.ui.draft.CapsuleDraftUiState
 import java.time.Instant
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** Assert the text passed to the actual review label, including incomplete recovered drafts. */
@@ -41,4 +43,22 @@ class S06ConfirmSendLockDisplayTest {
     @Test fun unknownZoneUsesExplicitUtc() =
         assertEquals("Meant to open: 2026-12-01 10:00 (UTC, UTC+00:00) · Creation timezone unavailable",
             reviewCondition(draft.copy(creationZone = "broken")))
+
+    /** Recovering an operation with a different location target does not leak the previous draft's location label. */
+    @Test fun recoveringDifferentOperationClearsStaleLocationLabel() {
+        val previousDraftState = draft.copy(locationName = "Eiffel Tower", locationTarget = LocationTarget(48.8584, 2.2945))
+        assertEquals("Meant to open: At Eiffel Tower (150 m radius)", reviewCondition(previousDraftState.copy(lockMode = LockMode.LOCATION)))
+
+        // Recovered operation with target coordinates (37.5665, 126.9780) and no location name
+        val recoveredLocationTarget = LocationTarget(37.5665, 126.9780)
+        val recoveredState = previousDraftState.copy(
+            locationTarget = recoveredLocationTarget,
+            locationName = "${"%.4f".format(recoveredLocationTarget.latitude)}, ${"%.4f".format(recoveredLocationTarget.longitude)}",
+            lockMode = LockMode.LOCATION
+        )
+
+        val text = reviewCondition(recoveredState)
+        assertTrue(text.contains("37.5665"))
+        assertFalse(text.contains("Eiffel Tower"))
+    }
 }

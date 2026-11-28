@@ -18,3 +18,16 @@ User J’s personal review, explanations, manual fixes, and course submission re
 See the [dated correction to the ongoing log](issue-22-correction.md).
 
 Published for independent review in [Draft PR #51](https://github.com/theguardianofthebed/Time-Capsule/pull/51).
+
+## Issue #22 · Third Implementation: Targeted Functional Corrections (28 November 2026)
+
+- Work period: 28 November 2026 (KST). Scope: MVP. Human reviewer: User G.
+- Target PR: [PR #51](https://github.com/theguardianofthebed/Time-Capsule/pull/51). Branch: `feature/22-native-ui-recovery`.
+- Corrected registration failure boundary in `DefaultAuthAdapter.signUp()` when Auth creation succeeds but profile update fails, keeping session active for same-account profile repair.
+- Applied originating session protection (`SessionSnapshot`) across `S08AccountSettingsFragment.kt` and `S08AccountSettingsViewModel.kt` (`repairProfile`, `signOut`, `checkProfile`, `btnCopyUid`).
+- Enforced authoritative server profile reads in `DefaultFirestoreAdapter.getRecipientProfile()` (`doc.metadata.hasPendingWrites() || doc.metadata.isFromCache` rejection, required UID and nonblank display name validation).
+- Updated `MainActivity.resolveAccountScreen()` with a 5s profile-check timeout and preserved offline viewing of previously authorized retained content.
+- Cleared stale location labels on recovered operations in `CapsuleDraftViewModel.applyRecovered()` and represented missing recovery records truthfully without false `PublicationPhase.FAILED` states.
+- Refined `S07CapsuleDetailViewModel.mapUnlockFailureStatus()` to ensure TIME-only verification failures never generate location-settings actions.
+- Re-evaluated session validity in `MainActivity.replaceFragment()`'s `runOnCommit` callback to prevent asynchronous session transition leakage.
+- Automated verification: 436 JVM unit tests passed (`./gradlew :app:testDebugUnitTest`), debug/test APKs assembled, lint clean (0 errors), readiness valid (`py tools/check_readiness.py --validate-manifest` -> `MANIFEST_VALID`).

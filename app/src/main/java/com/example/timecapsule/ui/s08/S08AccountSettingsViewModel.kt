@@ -7,11 +7,12 @@ import androidx.lifecycle.viewModelScope
 import com.example.timecapsule.data.AccountSessionManager
 import com.example.timecapsule.domain.model.RecipientProfile
 import com.example.timecapsule.domain.result.OperationResult
+import com.example.timecapsule.domain.session.SessionSnapshot
 import kotlinx.coroutines.launch
 
 /**
  * ViewModel for S-08 Account & Settings screen handling profile updates, profile repair, and sign out.
- * Prevents concurrent update submissions and uses token counters to invalidate delayed stale profile lookups.
+ * Enforces originating session validation to prevent obsolete screens from modifying or signing out newer sessions.
  */
 class S08AccountSettingsViewModel(
     private val accountSessionManager: AccountSessionManager
@@ -34,41 +35,65 @@ class S08AccountSettingsViewModel(
 
     /**
      * Verifies recipient profile existence for active [uid].
-     * Uses a version token to ignore delayed async responses if a newer update occurs in flight.
+     * Uses a version token and originating [origin] session check to ignore stale responses.
      */
-    fun checkProfile(uid: String) {
+    fun checkProfile(uid: String, origin: SessionSnapshot? = null) {
         val token = ++activeProfileCheckToken
         viewModelScope.launch {
+            if (origin != null && !accountSessionManager.isSessionValid(origin)) return@launch
             val result = accountSessionManager.checkProfile(uid)
-            if (token == activeProfileCheckToken) {
+            if (token == activeProfileCheckToken && (origin == null || accountSessionManager.isSessionValid(origin))) {
                 _profileCheckState.postValue(result)
             }
         }
     }
 
     /**
-     * Updates user display name through authenticated Profile Repair.
-     * Prevents duplicate concurrent submissions while an update operation is in flight,
-     * and invalidates any in-flight profile checks initiated before this update.
+     * Updates user display name through authenticated Profile Repair for originating [origin] session.
+     * Rejects updates if [origin] is no longer active or valid.
      */
-    fun repairProfile(displayName: String) {
+    fun repairProfile(displayName: String, origin: SessionSnapshot? = null) {
+        val targetSession = origin ?: accountSessionManager.currentSession()
         if (isUpdateInFlight) return
+        if (!accountSessionManager.isSessionValid(targetSession)) {
+            _updateState.postValue(OperationResult.Denied("Account changed or session expired."))
+            return
+        }
         isUpdateInFlight = true
         activeProfileCheckToken++
         _lastSubmittedName = displayName
         viewModelScope.launch {
-            val result = accountSessionManager.repairProfile(displayName)
+            if (!accountSessionManager.isSessionValid(targetSession)) {
+                isUpdateInFlight = false
+                _updateState.postValue(OperationResult.Denied("Account changed or session expired."))
+                return@launch
+            }
+            val result = accountSessionManager.repairProfile(displayName, targetSession)
             isUpdateInFlight = false
-            _updateState.postValue(result)
+            if (accountSessionManager.isSessionValid(targetSession)) {
+                _updateState.postValue(result)
+            } else {
+                _updateState.postValue(OperationResult.Denied("Account changed or session expired."))
+            }
         }
     }
 
     /**
-     * Signs out current user asynchronously in viewModelScope and terminates session.
+     * Signs out current user asynchronously for originating [origin] session.
+     * Rejects sign out if [origin] is no longer active or valid.
      */
-    fun signOut() {
+    fun signOut(origin: SessionSnapshot? = null) {
+        val targetSession = origin ?: accountSessionManager.currentSession()
+        if (!accountSessionManager.isSessionValid(targetSession)) {
+            _signOutState.postValue(OperationResult.Denied("Account changed or session expired."))
+            return
+        }
         viewModelScope.launch {
-            val result = accountSessionManager.signOut()
+            if (!accountSessionManager.isSessionValid(targetSession)) {
+                _signOutState.postValue(OperationResult.Denied("Account changed or session expired."))
+                return@launch
+            }
+            val result = accountSessionManager.signOut(targetSession)
             _signOutState.postValue(result)
         }
     }

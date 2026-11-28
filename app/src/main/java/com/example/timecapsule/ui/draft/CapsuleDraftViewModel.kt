@@ -782,7 +782,9 @@ class CapsuleDraftViewModel(
                             recoveryBusy = false,
                             recoveryBlocked = true,
                             statusOnly = true,
-                            publicationPhase = PublicationPhase.FAILED,
+                            publicationPhase = null,
+                            canAbandon = false,
+                            canRetryUnchanged = false,
                             publicationMessage = R.string.publication_recovery_failure
                         ) }
                     } else {
@@ -826,6 +828,7 @@ class CapsuleDraftViewModel(
                     photoName = null,
                     photoSizeBytes = null,
                     photoBusy = false,
+                    locationName = null,
                     publicationPhase = recovered.phase,
                     canAbandon = recovered.canAbandon,
                     canRetryUnchanged = recovered.canRetryUnchanged,
@@ -836,6 +839,11 @@ class CapsuleDraftViewModel(
                     publicationMessage = messageRes
                 )
             } else {
+                val restoredLocationName = if (state.capsuleId == operation.capsuleId) {
+                    state.locationName
+                } else {
+                    operation.lock.location?.let { "${"%.4f".format(it.latitude)}, ${"%.4f".format(it.longitude)}" }
+                }
                 state.copy(
                     statusOnly = false,
                     capsuleId = operation.capsuleId,
@@ -853,6 +861,7 @@ class CapsuleDraftViewModel(
                     unlockAt = operation.lock.unlockAt,
                     creationZone = operation.creationZone,
                     locationTarget = operation.lock.location,
+                    locationName = restoredLocationName,
                     publicationPhase = recovered.phase,
                     canAbandon = recovered.canAbandon,
                     canRetryUnchanged = recovered.canRetryUnchanged,

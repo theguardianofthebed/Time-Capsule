@@ -118,6 +118,7 @@ class AccountSessionManagerTest {
 
     private class FakeFirestoreAdapter : FirestoreAdapter {
         val directory = mutableMapOf<String, RecipientProfile>()
+        var failSaveProfile = false
 
         override fun isAvailable(): Boolean = true
         override fun firestoreInstance(): FirebaseFirestore? = null
@@ -132,6 +133,9 @@ class AccountSessionManagerTest {
         }
 
         override suspend fun saveRecipientProfile(profile: RecipientProfile): OperationResult<Unit> {
+            if (failSaveProfile) {
+                return OperationResult.Unavailable("Firestore write failed.")
+            }
             directory[profile.uid] = profile
             return OperationResult.Success(Unit)
         }
@@ -176,6 +180,24 @@ class AccountSessionManagerTest {
         val profileRes = fakeFirestoreAdapter.getRecipientProfile("user-123")
         assertTrue(profileRes is OperationResult.Success)
         assertEquals("New User", (profileRes as OperationResult.Success).data.displayName)
+    }
+
+    @Test
+    fun testSignUpAuthSuccessWithProfileWriteFailureActivatesSessionAndEnablesProfileRepair() = runBlocking {
+        fakeFirestoreAdapter.failSaveProfile = true
+        val result = accountSessionManager.signUpAndCreateProfile("new@example.com", "pass123", "New User")
+
+        assertTrue(result is OperationResult.Unavailable)
+
+        // Auth account created and session activated for user-123
+        assertTrue(sessionTracker.currentSession().isAuthenticated)
+        assertEquals("user-123", sessionTracker.currentSession().uid)
+
+        // Profile repair can now complete display name and Firestore profile for the same Auth account
+        fakeFirestoreAdapter.failSaveProfile = false
+        val repairRes = accountSessionManager.repairProfile("New User Repaired", sessionTracker.currentSession())
+        assertTrue(repairRes is OperationResult.Success)
+        assertEquals("New User Repaired", fakeAuthAdapter.activeDisplayName())
     }
 
     @Test

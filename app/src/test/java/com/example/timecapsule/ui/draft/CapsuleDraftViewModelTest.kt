@@ -534,6 +534,24 @@ class CapsuleDraftViewModelTest {
         assertFalse(model.uiState.value.editable)
     }
 
+    /** A missing recovery record represents unavailable recovery without claiming definite failure or allowing abandonment. */
+    @Test fun missingRecoveryRecord_doesNotSetPublicationPhaseFailedOrAllowAbandonment() {
+        val repository = PublicationRepository()
+        val model = publicationModel(repository)
+        repository.recovered = OperationResult.Success(emptyList())
+
+        model.recoverPublicationState("missing-capsule-id")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = model.uiState.value
+        assertEquals("missing-capsule-id", state.capsuleId)
+        assertTrue(state.recoveryBlocked)
+        assertTrue(state.statusOnly)
+        assertFalse(state.canAbandon)
+        assertFalse(state.canRetryUnchanged)
+        assertNull(state.publicationPhase)
+    }
+
     /** Reauthentication invalidates even a previously verified target under the same UID. */
     @Test fun targetedRetryRejectsChangedGeneration() {
         val repository = PublicationRepository()

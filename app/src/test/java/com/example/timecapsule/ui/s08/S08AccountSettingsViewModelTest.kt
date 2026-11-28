@@ -8,6 +8,7 @@ import com.example.timecapsule.data.adapter.FirestoreAdapter
 import com.example.timecapsule.data.session.DefaultSessionTracker
 import com.example.timecapsule.domain.model.RecipientProfile
 import com.example.timecapsule.domain.result.OperationResult
+import com.example.timecapsule.domain.session.SessionSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -196,6 +197,54 @@ class S08AccountSettingsViewModelTest {
         viewModel.signOut()
         testDispatcher.scheduler.advanceUntilIdle()
         assertNull(authAdapter.activeUid())
+    }
+
+    @Test
+    fun repairProfile_obsoleteSessionSameUidDifferentGeneration_isDenied() = runBlockingTest {
+        val obsoleteSession = SessionSnapshot("test-uid-123", 99L) // Current generation is 2L
+        viewModel.repairProfile("Obsolete Name", obsoleteSession)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val updateResult = viewModel.updateState.value
+        assertTrue(updateResult is OperationResult.Denied)
+        assertEquals("Initial Name", authAdapter.activeDisplayName())
+    }
+
+    @Test
+    fun repairProfile_differentUidSession_isDenied() = runBlockingTest {
+        val wrongUserSession = SessionSnapshot("other-user-456", 2L)
+        viewModel.repairProfile("Wrong User Name", wrongUserSession)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val updateResult = viewModel.updateState.value
+        assertTrue(updateResult is OperationResult.Denied)
+        assertEquals("Initial Name", authAdapter.activeDisplayName())
+    }
+
+    @Test
+    fun repairProfile_sessionChangeDuringAsyncOperation_isDenied() = runBlockingTest {
+        val currentSession = accountSessionManager.currentSession()
+
+        // Start repair profile with current session
+        viewModel.repairProfile("Name In Flight", currentSession)
+
+        // Mid-flight session generation change (e.g. relogin / session reset)
+        sessionTracker.startSession("test-uid-123") // Increments generation to 3L
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val updateResult = viewModel.updateState.value
+        assertTrue(updateResult is OperationResult.Denied)
+    }
+
+    @Test
+    fun signOut_obsoleteSession_isDenied() = runBlockingTest {
+        val obsoleteSession = SessionSnapshot("test-uid-123", 99L)
+        viewModel.signOut(obsoleteSession)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val signOutResult = viewModel.signOutState.value
+        assertTrue(signOutResult is OperationResult.Denied)
+        assertEquals("test-uid-123", authAdapter.activeUid())
     }
 
     private fun runBlockingTest(block: suspend () -> Unit) = runBlocking { block() }

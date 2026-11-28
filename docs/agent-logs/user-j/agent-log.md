@@ -998,3 +998,48 @@ Final verification passed 399 JVM tests (0 failed or skipped), debug APK assembl
 
 User J confirmed task ownership and implementation review. Personal reflections, teammate PR review by User G, manual device testing, and human merge into `main` remain for the students to complete.
 
+
+## 2026-11-28-issue22-third-implementation — Issue #22 Targeted Functional Corrections
+
+- **Owner:** User J, explicitly confirmed as implementation owner for Issue #22. Reviewer: User G.
+- **Environment/model:** Android Studio Agent Mode (Gemini 3.8 Flash).
+- **Status:** Implemented, verified with 436 passing JVM unit tests, clean debug build, clean AndroidTest APK build, clean lint (0 errors), branch `feature/22-native-ui-recovery` updated on HEAD `1b85e54bbef37e7ce008112cbcc03bff7cb18fc9`. PR: [Draft PR #51](https://github.com/theguardianofthebed/Time-Capsule/pull/51).
+- **Requested outcome:** Apply targeted functional corrections for Issue #22 covering registration failure after Auth creation, complete originating-session protection in S-08, authoritative profile verification boundaries, recovered publication presentation, S-07 failure classification, and navigation transaction completion.
+- **References:** [Issue #22](https://github.com/theguardianofthebed/Time-Capsule/issues/22); [PR #51](https://github.com/theguardianofthebed/Time-Capsule/pull/51); FR-01–FR-12; ARC-01, ARC-04, ARC-05, ARC-07; DD-01, DD-02, DD-03, DD-04, DD-05, DD-06, DD-07, DD-08, DD-09, DD-12, DD-13, DD-14, DD-15, DD-18, DD-19, DD-26, DD-27, DD-28; AC-10; T-38, T-45.
+
+### Work performed
+
+- **Registration Failure after Auth Creation (`DefaultAuthAdapter.kt`, `AccountSessionManager.kt`):**
+  - Updated `DefaultAuthAdapter.signUp()` to catch exceptions during optional `user.updateProfile()` after successful `createUserWithEmailAndPassword()`, returning `OperationResult.Success(user.uid)` so the created Auth user session is activated and can transition cleanly into Profile Repair mode without duplicate registration errors.
+  - Added regression test `testSignUpAuthSuccessWithProfileWriteFailureActivatesSessionAndEnablesProfileRepair` in `AccountSessionManagerTest.kt`.
+- **Originating-Session Protection in S-08 (`S08AccountSettingsFragment.kt`, `S08AccountSettingsViewModel.kt`):**
+  - Updated `S08AccountSettingsFragment` to extract originating `SessionSnapshot` from screen arguments (`screenUid`, `screenGeneration`) and pass `origin` to `viewModel.repairProfile(newName, origin)`, `viewModel.signOut(origin)`, and `viewModel.checkProfile(activeUid, origin)`.
+  - Updated `S08AccountSettingsViewModel` to validate `accountSessionManager.isSessionValid(origin)` before launching or completing coroutines and pass `origin` to `AccountSessionManager`.
+  - Updated `btnCopyUid` click handler to validate that the screen's originating `SessionSnapshot` matches the live session.
+  - Added 4 regression tests in `S08AccountSettingsViewModelTest.kt` covering obsolete session generation, different UID, session change between click and coroutine execution, and session change during an async profile operation.
+- **Authoritative Profile Verification (`DefaultFirestoreAdapter.kt`, `MainActivity.kt`):**
+  - Updated `DefaultFirestoreAdapter.getRecipientProfile()` to reject unconfirmed or cached document snapshots (`doc.metadata.hasPendingWrites() || doc.metadata.isFromCache`), validate document UID consistency (`docUid == cleanUid`), and enforce nonblank display name.
+  - Updated `MainActivity.resolveAccountScreen()` with a 5000ms timeout (`withTimeoutOrNull`) around `checkProfile(uid)`. If profile check returns `OperationResult.Unavailable` (network offline/timeout) and `verifiedProfile == snapshot`, preserved `verifiedProfile = snapshot` and kept the screen visible without kicking the user to profile repair.
+- **Recovered Publication Presentation (`CapsuleDraftViewModel.kt`):**
+  - Updated `CapsuleDraftViewModel.applyRecovered()` to restore `locationName = operation.locationName` (or formatted coordinates) on recovered operations, preventing stale location label leakage from previous drafts.
+  - Updated `CapsuleDraftViewModel.recoverPublicationState()` so a missing recovery record for a target capsule ID sets `recoveryBlocked = true` and `statusOnly = true` without setting `publicationPhase = PublicationPhase.FAILED` or allowing `canAbandon = true`.
+  - Added regression test `recoveringDifferentOperationClearsStaleLocationLabel` in `S06ConfirmSendLockDisplayTest.kt` and `missingRecoveryRecord_doesNotSetPublicationPhaseFailedOrAllowAbandonment` in `CapsuleDraftViewModelTest.kt`.
+- **S-07 Failure Classification (`S07CapsuleDetailViewModel.kt`):**
+  - Updated `S07CapsuleDetailViewModel.mapUnlockFailureStatus()` to check `lockMode` context first. If `lockMode == LockMode.TIME`, location-specific statuses (`LOCKED_PERMISSION_REQUIRED`, `LOCKED_LOCATION_DISABLED`) are never returned.
+  - Mapped `res is OperationResult.Denied` to `DetailStatus.ACCESS_DENIED`.
+  - Added regression test `timeOnlyLock_accountDisabledError_mapsToAccessDenied_notLocationDisabled` in `S07CapsuleDetailViewModelTest.kt`.
+- **Navigation Transaction Completion (`MainActivity.kt`):**
+  - Updated `MainActivity.replaceFragment()`'s `runOnCommit` callback to re-evaluate `currentOwner = container.sessionTracker.currentSession()`. If the session is no longer authenticated or verified for a protected destination, keeps container invisible and calls `resolveAccountScreen()`.
+
+### Checks and verification
+
+- `./gradlew :app:testDebugUnitTest`: PASS (436 JVM unit tests passed across project, 0 failed)
+- `./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors)
+- `py tools/check_readiness.py --validate-manifest`: PASS (`MANIFEST_VALID`)
+- `git diff --check`: PASS (clean)
+
+### Human input and remaining work
+
+User J confirmed task ownership and implementation review. Personal reflections, teammate PR review by User G, manual device testing, and human merge into `main` remain for the students to complete.
+
+

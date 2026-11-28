@@ -30,6 +30,7 @@ import com.example.timecapsule.ui.s06.S06ConfirmSendFragment
 import com.example.timecapsule.ui.s07.S07CapsuleDetailFragment
 import com.example.timecapsule.ui.s08.S08AccountSettingsFragment
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Main activity for the TimeCapsule application using native Views and ViewBinding.
@@ -209,7 +210,8 @@ class MainActivity : AppCompatActivity() {
                 showAccountCheck(false)
                 return@launch
             }
-            val profile = manager.checkProfile(uid)
+            val profile = withTimeoutOrNull(5_000L) { manager.checkProfile(uid) }
+                ?: OperationResult.Unavailable("Profile check timed out.")
             if (!manager.isSessionValid(snapshot) || supportFragmentManager.isStateSaved) return@launch
             if (profile is OperationResult.Success) {
                 readOnlySession = null
@@ -226,19 +228,19 @@ class MainActivity : AppCompatActivity() {
                 }
                 handleNotificationIntent(intent)
             } else {
-                verifiedProfile = null
                 val mode = when (profile) {
                     is OperationResult.Invalid -> "missing"
                     is OperationResult.Denied -> "denied"
                     else -> "unavailable"
                 }
                 val current = currentScreen()
-                if (mode == "unavailable" && readOnlySession == snapshot &&
+                if (mode == "unavailable" && (verifiedProfile == snapshot || readOnlySession == snapshot) &&
                     (current is S03CapsuleListFragment || current is S07CapsuleDetailFragment) &&
                     belongsToCurrentSession(current)) {
                     showAccountCheck(false)
                     return@launch
                 }
+                verifiedProfile = null
                 readOnlySession = null
                 if (current !is S02RegisterFragment || current.arguments?.getString("profileMode") != mode ||
                     !belongsToCurrentSession(current)) {
@@ -409,7 +411,14 @@ class MainActivity : AppCompatActivity() {
             .runOnCommit {
                 if (pending === fragment) {
                     pending = null
-                    showAccountCheck(false)
+                    val currentOwner = container.sessionTracker.currentSession()
+                    val canReadNow = readOnlySession == currentOwner && (fragment is S03CapsuleListFragment || fragment is S07CapsuleDetailFragment)
+                    if (isProtected(fragment) && (!currentOwner.isAuthenticated || (verifiedProfile != currentOwner && !canReadNow))) {
+                        binding.fragmentContainer.visibility = View.INVISIBLE
+                        resolveAccountScreen()
+                    } else {
+                        showAccountCheck(false)
+                    }
                 }
             }.commit()
     }

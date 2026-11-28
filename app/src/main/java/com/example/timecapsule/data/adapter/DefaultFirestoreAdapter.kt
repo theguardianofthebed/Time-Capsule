@@ -76,13 +76,27 @@ class DefaultFirestoreAdapter(
                 .get(Source.SERVER)
                 .await()
 
-            if (doc.exists()) {
-                val displayName = doc.getString("displayName") ?: ""
-                OperationResult.Success(RecipientProfile(uid = cleanUid, displayName = displayName))
-            } else {
-                OperationResult.Invalid("No recipient found with UID: $cleanUid")
+            if (!doc.exists()) {
+                return OperationResult.Invalid("No recipient found with UID: $cleanUid")
             }
+
+            if (doc.metadata.hasPendingWrites() || doc.metadata.isFromCache) {
+                return OperationResult.Unavailable("Profile snapshot is unconfirmed or cached.")
+            }
+
+            val docUid = doc.getString("uid")
+            if (docUid != null && docUid != cleanUid) {
+                return OperationResult.Invalid("Profile document UID mismatch.")
+            }
+
+            val displayName = doc.getString("displayName")
+            if (displayName.isNullOrBlank()) {
+                return OperationResult.Invalid("Profile display name is missing or blank.")
+            }
+
+            OperationResult.Success(RecipientProfile(uid = cleanUid, displayName = displayName))
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             mapFirestoreException(e)
         }
     }
