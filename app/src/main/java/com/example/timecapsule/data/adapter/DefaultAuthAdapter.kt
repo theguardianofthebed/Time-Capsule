@@ -7,6 +7,7 @@ import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
 import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import com.google.firebase.auth.FirebaseAuthWeakPasswordException
+import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.UserProfileChangeRequest
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.tasks.await
@@ -15,7 +16,8 @@ import kotlinx.coroutines.tasks.await
  * Production implementation of [AuthAdapter] using Firebase Authentication.
  */
 class DefaultAuthAdapter(
-    private val authSupplier: () -> FirebaseAuth = { FirebaseAuth.getInstance() }
+    private val authSupplier: () -> FirebaseAuth = { FirebaseAuth.getInstance() },
+    private val profileUpdater: (suspend (FirebaseUser, String) -> Unit)? = null
 ) : AuthAdapter {
 
     override fun activeUid(): String? = authSupplier().currentUser?.uid
@@ -60,10 +62,14 @@ class DefaultAuthAdapter(
             if (user != null) {
                 if (trimmedName.isNotBlank()) {
                     try {
-                        val profileUpdates = UserProfileChangeRequest.Builder()
-                            .setDisplayName(trimmedName)
-                            .build()
-                        user.updateProfile(profileUpdates).await()
+                        if (profileUpdater != null) {
+                            profileUpdater.invoke(user, trimmedName)
+                        } else {
+                            val profileUpdates = UserProfileChangeRequest.Builder()
+                                .setDisplayName(trimmedName)
+                                .build()
+                            user.updateProfile(profileUpdates).await()
+                        }
                     } catch (e: Exception) {
                         if (e is CancellationException) throw e
                         // Account creation in Auth succeeded; profile display name update can be completed during profile repair

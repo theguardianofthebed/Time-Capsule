@@ -105,6 +105,32 @@ class S07CapsuleDetailViewModelTest {
         assertFalse(state.isLoading)
         assertEquals(ParticipantRole.RECIPIENT, state.role)
         assertFalse(state.isUnlocked)
+        assertEquals(DetailStatus.ACCESS_DENIED, state.status)
+    }
+
+    @Test
+    fun `loadDetail for Recipient when time explicitly pending shows locked waiting time`() = runTest(testDispatcher) {
+        sessionTracker.startSession(userB)
+        val now = Instant.now()
+        val cap = CapsuleSummary(
+            capsuleId = "cap-time-pending",
+            senderUid = userA,
+            recipientUid = userB,
+            lock = CapsuleLock(LockMode.TIME, unlockAt = now.plusSeconds(3600)),
+            sendStatus = SendStatus.SENT,
+            availability = Availability.LOCKED,
+            title = "A's Note To B"
+        )
+        fakeRepository.summaries["cap-time-pending"] = cap
+        fakeRecoveryCoordinator.verifyUnlockResult = OperationResult.Denied("Unlock time not reached.")
+
+        viewModel.loadDetail("cap-time-pending")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertFalse(state.isLoading)
+        assertEquals(ParticipantRole.RECIPIENT, state.role)
+        assertFalse(state.isUnlocked)
         assertEquals(DetailStatus.LOCKED_WAITING_TIME, state.status)
     }
 

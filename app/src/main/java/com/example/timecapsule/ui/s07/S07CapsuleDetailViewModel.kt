@@ -266,15 +266,25 @@ class S07CapsuleDetailViewModel(
                 return DetailStatus.LOCKED_LOCATION_DISABLED
             }
             if (msg.contains("null fix", ignoreCase = true) ||
-                msg.contains("location accuracy", ignoreCase = true) ||
-                msg.contains("stale location", ignoreCase = true) ||
+                msg.contains("accuracy", ignoreCase = true) ||
+                msg.contains("stale", ignoreCase = true) ||
                 msg.contains("outside target radius", ignoreCase = true) ||
                 msg.contains("sample is missing", ignoreCase = true)) {
                 return DetailStatus.LOCKED_WAITING_LOCATION
             }
         }
 
-        // 2. Time condition pending
+        // 2. Participant or account denial takes precedence over ambiguous messages
+        if (res is OperationResult.Denied) {
+            val isExplicitTimePending = msg.equals("Unlock time not reached.", ignoreCase = true) ||
+                    msg.equals("Unlock time not reached", ignoreCase = true) ||
+                    msg.equals("Time condition pending", ignoreCase = true)
+            if (!isExplicitTimePending) {
+                return DetailStatus.ACCESS_DENIED
+            }
+        }
+
+        // 3. Explicit time condition pending
         val isTimeConditionPending = msg.contains("unlock time not reached", ignoreCase = true) ||
                 msg.contains("time not reached", ignoreCase = true) ||
                 msg.contains("time condition", ignoreCase = true)
@@ -286,12 +296,11 @@ class S07CapsuleDetailViewModel(
             }
         }
 
-        // 3. Verification service / network unavailable
+        // 4. Verification service / network unavailable
         if (res is OperationResult.Unavailable) {
             return DetailStatus.LOCKED_VERIFICATION_FAILED
         }
 
-        // 4. Access / session / participant denial
         if (res is OperationResult.Denied) {
             return DetailStatus.ACCESS_DENIED
         }

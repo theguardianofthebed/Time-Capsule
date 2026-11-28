@@ -50,7 +50,8 @@ private sealed interface TransactionUnlockResult {
 class DefaultFirestoreAdapter(
     private val contextSupplier: () -> Context? = { null },
     private val storageAdapter: StorageAdapter? = null,
-    private val firestoreSupplier: (() -> FirebaseFirestore?)? = null
+    private val firestoreSupplier: (() -> FirebaseFirestore?)? = null,
+    private val recipientFetcher: (suspend (String) -> OperationResult<RecipientProfile>)? = null
 ) : FirestoreAdapter {
 
     override fun isAvailable(): Boolean {
@@ -66,6 +67,10 @@ class DefaultFirestoreAdapter(
         val cleanUid = uid.trim()
         if (cleanUid.isBlank()) {
             return OperationResult.Invalid("UID must not be blank for recipient lookup.")
+        }
+
+        if (recipientFetcher != null) {
+            return recipientFetcher.invoke(cleanUid)
         }
 
         val instance = firestoreInstance()

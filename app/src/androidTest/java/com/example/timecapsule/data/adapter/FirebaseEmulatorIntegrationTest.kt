@@ -57,7 +57,7 @@ class FirebaseEmulatorIntegrationTest {
     fun setUp() {
         auth = FirebaseAuth.getInstance()
         firestore = FirebaseFirestore.getInstance()
-        authAdapter = DefaultAuthAdapter { auth }
+        authAdapter = DefaultAuthAdapter(authSupplier = { auth })
         firestoreAdapter = DefaultFirestoreAdapter(contextSupplier = { InstrumentationRegistry.getInstrumentation().targetContext })
     }
 

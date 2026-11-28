@@ -61,3 +61,11 @@ Published for independent review in [Draft PR #51](https://github.com/theguardia
 - Added unit tests for production `DefaultAuthAdapter` and `DefaultFirestoreAdapter` in `DefaultAuthAdapterTest.kt` and `DefaultFirestoreAdapterTest.kt`.
 - Added Robolectric navigation transaction session-change test `navigationTransactionSessionChangeDuringRunOnCommitKeepsContainerInvisible` in `Issue21FunctionalCorrectionsTest.kt`.
 - Automated verification: 455 JVM unit tests passed (`./gradlew :app:testDebugUnitTest`), debug/test APKs assembled, lint clean (0 errors), readiness preflight valid (`py tools/check_readiness.py --issue 22 --evidence docs/agent-tools/readiness-evidence-issue22.json` -> `PREFLIGHT_RECORD_VALID`).
+
+## Issue #22 · Seventh Review: Complete Remaining Functional and Verification Gaps (29 November 2026)
+
+- Work period: 29 November 2026 (KST). Scope: MVP. Human reviewer: User G.
+- Target PR: [PR #51](https://github.com/theguardianofthebed/Time-Capsule/pull/51). Branch: `feature/22-native-ui-recovery`.
+- Refined `S07CapsuleDetailViewModel.mapUnlockFailureStatus()` to ensure exact production unlock denial string `"Unlock authorization denied or unlock time not reached."` maps to `DetailStatus.ACCESS_DENIED`.
+- Verified production adapter exception-handling branches in `DefaultAuthAdapterTest.kt` and `DefaultFirestoreAdapterTest.kt`.
+- Automated verification: 463 JVM unit tests passed (`./gradlew :app:testDebugUnitTest`), debug/test APKs assembled, lint clean (0 errors), readiness preflight valid (`py tools/check_readiness.py --issue 22 --evidence docs/agent-tools/readiness-evidence-issue22.json` -> `PREFLIGHT_RECORD_VALID`).

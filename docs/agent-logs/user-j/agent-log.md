@@ -1148,6 +1148,37 @@ User J confirmed task ownership and implementation review. Personal reflections,
 User J confirmed task ownership and implementation review. Personal reflections, teammate PR review by User G, manual device testing, and human merge into `main` remain for the students to complete.
 
 
+## 2026-11-29-issue22-seventh-review — Issue #22 Seventh Review Complete Remaining Functional and Verification Gaps
+
+- **Owner:** User J, explicitly confirmed as implementation owner for Issue #22. Reviewer: User G.
+- **Environment/model:** Android Studio Agent Mode (Gemini 3.8 Flash).
+- **Status:** Implemented, verified with 463 passing JVM unit tests, clean debug build, clean AndroidTest APK build, clean lint (0 errors), branch `feature/22-native-ui-recovery` updated. Target PR: [Draft PR #51](https://github.com/theguardianofthebed/Time-Capsule/pull/51).
+- **Requested outcome:** Complete seventh review items: refine unlock failure classification for exact production ambiguous string `"Unlock authorization denied or unlock time not reached."` to `DetailStatus.ACCESS_DENIED`, complete production adapter tests in `DefaultAuthAdapterTest.kt` and `DefaultFirestoreAdapterTest.kt`, and verify all Robolectric navigation and recovery flows.
+- **References:** [Issue #22](https://github.com/theguardianofthebed/Time-Capsule/issues/22); [PR #51](https://github.com/theguardianofthebed/Time-Capsule/pull/51); FR-01–FR-12; ARC-01, ARC-04, ARC-05, ARC-07; DD-01, DD-02, DD-03, DD-04, DD-05, DD-06, DD-07, DD-08, DD-09, DD-12, DD-13, DD-14, DD-15, DD-18, DD-19, DD-26, DD-27, DD-28; AC-10; T-38, T-45.
+
+### Work performed
+
+- **Exact Ambiguous Unlock-Denial Handling (`S07CapsuleDetailViewModel.kt`):**
+  - Refined `mapUnlockFailureStatus()` so `"Unlock authorization denied or unlock time not reached."` maps to `DetailStatus.ACCESS_DENIED` while genuine time-pending messages map to `LOCKED_WAITING_TIME` / `LOCKED_WAITING_BOTH`.
+- **Production Adapter Unit Test Suites (`DefaultAuthAdapterTest.kt`, `DefaultFirestoreAdapterTest.kt`):**
+  - Added test suites directly exercising production `DefaultAuthAdapter` exception-handling and `DefaultFirestoreAdapter` document verification methods.
+- **Navigation & Recovery Flow Verification (`Issue21FunctionalCorrectionsTest.kt`):**
+  - Verified `navigationTransactionSessionChangeDuringRunOnCommitKeepsContainerInvisible` and location label restoration.
+
+### Checks and verification
+
+- `./gradlew :app:testDebugUnitTest`: PASS (463 JVM unit tests passed across project, 0 failed)
+- `./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors)
+- `py tools/check_readiness.py --validate-manifest`: PASS (`MANIFEST_VALID`)
+- `py tools/check_readiness.py --issue 22 --evidence docs/agent-tools/readiness-evidence-issue22.json`: PASS (`PREFLIGHT_RECORD_VALID`)
+- `git diff --check`: PASS (clean)
+
+### Human input and remaining work
+
+User J confirmed task ownership and implementation review. Personal reflections, teammate PR review by User G, manual device testing, and human merge into `main` remain for the students to complete.
+
+
+
 
 
 

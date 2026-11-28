@@ -966,7 +966,7 @@ class Issue21FunctionalCorrectionsTest {
         fakeFirestoreAdapter.requirements["cap-time-locked"] = RecipientUnlockRequirements(
             "cap-time-locked", userA, unlocked = false, lockMode = LockMode.TIME, unlockAt = now.plusSeconds(3600)
         )
-        fakeFirestoreAdapter.unlockVerificationResponse = OperationResult.Denied("Unlock authorization denied or unlock time not reached.")
+        fakeFirestoreAdapter.unlockVerificationResponse = OperationResult.Denied("Unlock time not reached.")
 
         val fakeRepo = object : CapsuleRepository {
             override fun session() = sessionTracker.currentSession()
@@ -1046,7 +1046,7 @@ class Issue21FunctionalCorrectionsTest {
         fakeFirestoreAdapter.requirements["cap-both-locked"] = RecipientUnlockRequirements(
             "cap-both-locked", userA, unlocked = false, lockMode = LockMode.TIME_AND_LOCATION, unlockAt = now.plusSeconds(3600), locationTarget = locTarget
         )
-        fakeFirestoreAdapter.unlockVerificationResponse = OperationResult.Denied("Unlock authorization denied or unlock time not reached.")
+        fakeFirestoreAdapter.unlockVerificationResponse = OperationResult.Denied("Unlock time not reached.")
 
         // A qualifying current fix lets the server actually decide the time condition.
         val location = object : com.example.timecapsule.data.adapter.LocationAdapter {
