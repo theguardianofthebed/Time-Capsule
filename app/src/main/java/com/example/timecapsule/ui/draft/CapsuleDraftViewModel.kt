@@ -718,19 +718,24 @@ class CapsuleDraftViewModel(
             if (restoreEditable) restorePhotoDraft()
             return
         }
+        val currentSession = accountSessionManager.currentSession()
+        val uid = currentSession.uid
+        if (!currentSession.isAuthenticated || uid.isNullOrBlank()) return
+
+        // Ensure activeSessionUid is synced to current session
+        _uiState.update { it.copy(activeSessionUid = uid) }
+
         val state = _uiState.value
-        val uid = state.activeSessionUid ?: return
         if (state.publicationBusy || state.recoveryBusy) return
         val token = ++publicationToken
-        val capturedSession = accountSessionManager.currentSession()
-        publicationSession = capturedSession
+        publicationSession = currentSession
         _uiState.update { it.copy(recoveryBusy = true) }
         viewModelScope.launch {
             try {
                 photoSaveMutex.withLock { /* Drain earlier compose saves before final cleanup. */ }
-                if (!isCurrentPublication(uid, token, capturedSession)) return@launch
-                val result = recoverSaved(backend, capturedSession)
-                if (!isCurrentPublication(uid, token, capturedSession)) return@launch
+                if (!isCurrentPublication(uid, token, currentSession)) return@launch
+                val result = recoverSaved(backend, currentSession)
+                if (!isCurrentPublication(uid, token, currentSession)) return@launch
                 if (result is OperationResult.Success) {
                     val recovered = if (!targetCapsuleId.isNullOrBlank()) {
                         result.data.firstOrNull { it.capsuleId == targetCapsuleId }
@@ -745,9 +750,11 @@ class CapsuleDraftViewModel(
                         applyRecovered(recovered)
                     } else if (!targetCapsuleId.isNullOrBlank()) {
                         _uiState.update { it.copy(
+                            capsuleId = targetCapsuleId,
                             recoveryBusy = false,
                             recoveryBlocked = true,
                             statusOnly = true,
+                            publicationPhase = PublicationPhase.FAILED,
                             publicationMessage = R.string.publication_recovery_failure
                         ) }
                     } else {
@@ -761,7 +768,7 @@ class CapsuleDraftViewModel(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                if (isCurrentPublication(uid, token, capturedSession)) _uiState.update {
+                if (isCurrentPublication(uid, token, currentSession)) _uiState.update {
                     it.copy(recoveryBusy = false, recoveryBlocked = !it.statusOnly,
                         publicationMessage = R.string.publication_recovery_failure)
                 }

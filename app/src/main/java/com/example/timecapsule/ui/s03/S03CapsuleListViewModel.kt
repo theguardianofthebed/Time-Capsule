@@ -66,8 +66,17 @@ class S03CapsuleListViewModel(
 
         val token = ++requestToken
         activeJob?.cancel()
+
+        // Clear previous account state if session UID changed
+        val currentSnap = _uiState.value.sessionSnapshot
+        val shouldClearLists = currentSnap != null && currentSnap.uid != capturedSession.uid
+        val initialReceived = if (shouldClearLists) emptyList() else _uiState.value.receivedList
+        val initialSent = if (shouldClearLists) emptyList() else _uiState.value.sentList
+
         _uiState.value = _uiState.value.copy(
             isLoading = true,
+            receivedList = initialReceived,
+            sentList = initialSent,
             errorMessage = null,
             sessionSnapshot = capturedSession
         )
@@ -83,6 +92,7 @@ class S03CapsuleListViewModel(
 
             val unresolved = if (recoveryRes is OperationResult.Success) {
                 recoveryRes.data.filter { it.phase != PublicationPhase.SENT }
+                    .map { UnresolvedPublicationSummary(it.capsuleId, it.phase) }
             } else {
                 emptyList()
             }
@@ -90,6 +100,9 @@ class S03CapsuleListViewModel(
             when (listsRes) {
                 is OperationResult.Success -> {
                     val snapshot = listsRes.data
+                    val isPartial = snapshot.freshness == ListFreshness.PARTIAL_OFFLINE
+                    val isStale = snapshot.freshness == ListFreshness.STALE_OFFLINE
+
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         receivedList = snapshot.received,
@@ -97,6 +110,8 @@ class S03CapsuleListViewModel(
                         unresolvedOperations = unresolved,
                         errorMessage = null,
                         freshness = snapshot.freshness,
+                        isReceivedUnavailable = isStale || (isPartial && snapshot.received.isEmpty()),
+                        isSentUnavailable = isStale || (isPartial && snapshot.sent.isEmpty()),
                         sessionSnapshot = capturedSession
                     )
 
@@ -134,6 +149,8 @@ class S03CapsuleListViewModel(
                         sentList = emptyList(),
                         unresolvedOperations = emptyList(),
                         errorMessage = listsRes.message,
+                        isReceivedUnavailable = true,
+                        isSentUnavailable = true,
                         sessionSnapshot = capturedSession
                     )
                 }
@@ -144,6 +161,8 @@ class S03CapsuleListViewModel(
                         sentList = emptyList(),
                         unresolvedOperations = emptyList(),
                         errorMessage = listsRes.message,
+                        isReceivedUnavailable = true,
+                        isSentUnavailable = true,
                         sessionSnapshot = capturedSession
                     )
                 }
@@ -155,6 +174,8 @@ class S03CapsuleListViewModel(
                         unresolvedOperations = emptyList(),
                         errorMessage = listsRes.message,
                         freshness = ListFreshness.STALE_OFFLINE,
+                        isReceivedUnavailable = true,
+                        isSentUnavailable = true,
                         sessionSnapshot = capturedSession
                     )
                 }
@@ -165,6 +186,8 @@ class S03CapsuleListViewModel(
                         sentList = emptyList(),
                         unresolvedOperations = emptyList(),
                         errorMessage = listsRes.message,
+                        isReceivedUnavailable = true,
+                        isSentUnavailable = true,
                         sessionSnapshot = capturedSession
                     )
                 }

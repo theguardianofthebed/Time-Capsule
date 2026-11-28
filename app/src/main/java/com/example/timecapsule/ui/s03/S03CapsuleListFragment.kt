@@ -122,8 +122,9 @@ class S03CapsuleListFragment : Fragment() {
         }
 
         if (currentList.isEmpty() && state.unresolvedOperations.isEmpty() && !state.isLoading) {
-            binding.tvEmptyList.text = if (state.isTabUnavailable) {
-                state.errorMessage ?: "Unable to connect to network. Tap refresh to try again."
+            val isCurrentTabUnavailable = if (state.selectedTab == CapsuleTab.RECEIVED) state.isReceivedUnavailable else state.isSentUnavailable
+            binding.tvEmptyList.text = if (isCurrentTabUnavailable) {
+                state.errorMessage ?: "Unable to connect to network for this list. Tap refresh to try again."
             } else if (state.selectedTab == CapsuleTab.RECEIVED) {
                 getString(R.string.s03_empty_received)
             } else {
@@ -144,7 +145,7 @@ class S03CapsuleListFragment : Fragment() {
 
     private fun renderUnresolvedOperations(
         container: LinearLayout,
-        unresolved: List<RecoveredPublication>
+        unresolved: List<UnresolvedPublicationSummary>
     ) {
         val context = requireContext()
         val sectionHeader = TextView(context).apply {

@@ -818,6 +818,28 @@ Implement complete bounded scope for Issue #21: S-03 Capsule Lists (Received and
   - Lint passed cleanly with 0 errors (`./gradlew :app:clean :app:lintDebug`).
   - Readiness check passed (`PREFLIGHT_RECORD_VALID`).
 
+### Eighth Review Functional Corrections Applied (28 November 2026)
+
+- **1. Task 1 — S03 Unavailable-State & Session Handling:**
+  - Implemented `isReceivedUnavailable` and `isSentUnavailable` in `CapsuleListUiState.kt`.
+  - Introduced status-only `UnresolvedPublicationSummary` in `CapsuleListUiState`.
+  - `S03CapsuleListFragment` renders distinct network unavailable text per tab when offline/unavailable instead of confirmed empty lists.
+- **2. Task 2 — Targeted S06 Recovery Safety:**
+  - `CapsuleDraftViewModel.recoverPublicationState(targetCapsuleId)` syncs `activeSessionUid` and blocks publication actions (`recoveryBlocked = true`) if requested target is missing.
+  - `S06ConfirmSendFragment` enforces `activeTargetCapsuleId` recovery across `onViewCreated`, `onResume`, and `btnCheckPublication`.
+- **3. Task 3 — Actual S07 Failure Presentation:**
+  - `S07CapsuleDetailViewModel` maps unlock verification failures to `mapUnlockFailureStatus` (`LOCKED_PERMISSION_REQUIRED`, `LOCKED_LOCATION_DISABLED`, `LOCKED_WAITING_LOCATION`, etc.).
+  - `S07CapsuleDetailFragment` renders persistent failure cards and provides actionable retry button; image decode failures show persistent error card.
+- **4. Task 4 — Retention Compatibility & Metadata:**
+  - `DefaultLocalRetentionAdapter.kt` recognizes legacy v1/v2 complete markers while enforcing `contentCommitted == "true"` for version 3.
+  - Preserves `contentCommitted = "true"`, `hasText`, and `hasPhoto` when refreshing unlock evidence for an already committed capsule.
+- **5. Automated Verification Suite:**
+  - Total **376 JVM unit tests passed** (`./gradlew :app:testDebugUnitTest`).
+  - Debug and AndroidTest APKs built cleanly (`./gradlew :app:assembleDebug :app:assembleDebugAndroidTest`).
+  - Lint passed cleanly with 0 errors (`./gradlew :app:clean :app:lintDebug`).
+  - Readiness check passed (`PREFLIGHT_RECORD_VALID`).
+
+
 
 
 

@@ -78,7 +78,10 @@ class DefaultLocalRetentionAdapter(
                     try { markerFile.inputStream().use { existingProperties.load(it) } } catch (_: Exception) {}
                 }
 
-                val existingCommitted = existingProperties.getProperty("contentCommitted") == "true"
+                val existingCommitted = existingProperties.getProperty("contentCommitted") == "true" ||
+                    (existingProperties.getProperty("contentCommitted") == null &&
+                        (existingProperties.getProperty("version") == "1" || existingProperties.getProperty("version") == "2") &&
+                        (existingProperties.getProperty("hasText") == "true" || existingProperties.getProperty("hasPhoto") == "true"))
                 val finalHasText = if (existingCommitted) {
                     existingProperties.getProperty("hasText")?.toBooleanStrictOrNull() ?: hasText
                 } else {

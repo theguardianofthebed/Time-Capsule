@@ -153,17 +153,22 @@ class S07CapsuleDetailViewModel(
 
             // Recipient branch:
             var isUnlocked = (summary.availability == Availability.AVAILABLE)
+            var failureReason: String? = null
+            var failureStatus: DetailStatus? = null
 
             if (!isUnlocked && recoveryCoordinator != null) {
                 val verifyRes = recoveryCoordinator.verifyUnlock(cleanId, capturedSession)
                 if (!sessionTracker.isSessionValid(capturedSession) || token != requestToken) return@launch
                 if (verifyRes is OperationResult.Success && verifyRes.data == Availability.AVAILABLE) {
                     isUnlocked = true
+                } else if (verifyRes !is OperationResult.Success) {
+                    failureReason = resultErrorMessage(verifyRes)
+                    failureStatus = mapUnlockFailureStatus(verifyRes, summary.lock.mode)
                 }
             }
 
             if (!isUnlocked) {
-                val lockedStatus = when (summary.lock.mode) {
+                val lockedStatus = failureStatus ?: when (summary.lock.mode) {
                     LockMode.TIME -> DetailStatus.LOCKED_WAITING_TIME
                     LockMode.LOCATION -> DetailStatus.LOCKED_WAITING_LOCATION
                     LockMode.TIME_AND_LOCATION -> DetailStatus.LOCKED_WAITING_BOTH
@@ -175,7 +180,8 @@ class S07CapsuleDetailViewModel(
                     role = ParticipantRole.RECIPIENT,
                     isUnlocked = false,
                     status = lockedStatus,
-                    unlockReason = formatLockReason(summary),
+                    unlockReason = failureReason ?: formatLockReason(summary),
+                    errorMessage = failureReason,
                     sessionSnapshot = capturedSession
                 )
                 return@launch
@@ -212,6 +218,21 @@ class S07CapsuleDetailViewModel(
                         sessionSnapshot = capturedSession
                     )
                 }
+            }
+        }
+    }
+
+    private fun mapUnlockFailureStatus(res: OperationResult<*>, lockMode: LockMode): DetailStatus {
+        val msg = resultErrorMessage(res)
+        return when {
+            msg.contains("permission", ignoreCase = true) -> DetailStatus.LOCKED_PERMISSION_REQUIRED
+            msg.contains("disabled", ignoreCase = true) -> DetailStatus.LOCKED_LOCATION_DISABLED
+            msg.contains("radius", ignoreCase = true) || msg.contains("accuracy", ignoreCase = true) || msg.contains("stale", ignoreCase = true) -> DetailStatus.LOCKED_WAITING_LOCATION
+            msg.contains("denied", ignoreCase = true) -> DetailStatus.ACCESS_DENIED
+            else -> when (lockMode) {
+                LockMode.TIME -> DetailStatus.LOCKED_WAITING_TIME
+                LockMode.LOCATION -> DetailStatus.LOCKED_WAITING_LOCATION
+                LockMode.TIME_AND_LOCATION -> DetailStatus.LOCKED_WAITING_BOTH
             }
         }
     }

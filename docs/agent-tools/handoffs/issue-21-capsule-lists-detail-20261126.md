@@ -202,9 +202,28 @@
    - Version 3 requires `contentCommitted == "true"`. Legacy v1/v2 records with valid files remain readable.
    - Preserves `contentCommitted = "true"`, `hasText`, and `hasPhoto` when refreshing unlock evidence for an already committed capsule.
 
+## 9. Eighth Review Functional Corrections (28 November 2026)
+
+1. **Task 1 — S03 Unavailable-State & Session Handling:**
+   - In `CapsuleListUiState.kt`, represented tab availability separately (`isReceivedUnavailable`, `isSentUnavailable`).
+   - Introduced `UnresolvedPublicationSummary` (status-only presentation summary without raw draft payloads).
+   - In `S03CapsuleListFragment.kt`, renders distinct network unavailable text per tab when offline/unavailable instead of confirmed empty lists.
+
+2. **Task 2 — Targeted S06 Recovery Safety:**
+   - In `CapsuleDraftViewModel.kt`, strict targeted recovery syncs `activeSessionUid` and blocks publication actions (`recoveryBlocked = true`) if requested target is missing, preventing operation X from ever operating on Y.
+   - In `S06ConfirmSendFragment.kt`, enforces `activeTargetCapsuleId` recovery across `onViewCreated`, `onResume`, and `btnCheckPublication`.
+
+3. **Task 3 — Actual S07 Failure Presentation:**
+   - In `S07CapsuleDetailViewModel.kt`, maps unlock verification failures to `mapUnlockFailureStatus` (`LOCKED_PERMISSION_REQUIRED`, `LOCKED_LOCATION_DISABLED`, `LOCKED_WAITING_LOCATION`, etc.).
+   - In `S07CapsuleDetailFragment.kt`, renders persistent failure cards and provides actionable retry button; image decode failures show persistent error card.
+
+4. **Task 4 — Retention Compatibility & Metadata:**
+   - In `DefaultLocalRetentionAdapter.kt`, recognizes legacy v1/v2 complete markers while enforcing `contentCommitted == "true"` for version 3.
+   - Preserves `contentCommitted = "true"`, `hasText`, and `hasPhoto` when refreshing unlock evidence for an already committed capsule.
+
 ---
 
-## 9. Verification and Checks Summary
+## 10. Verification and Checks Summary
 
 - `./gradlew :app:testDebugUnitTest`: **PASS (376 passed, 0 failed)**
 - `./gradlew :app:assembleDebug :app:assembleDebugAndroidTest`: **PASS (`BUILD SUCCESSFUL`)**
@@ -214,11 +233,12 @@
 
 ---
 
-## 10. Next Human Action
+## 11. Next Human Action
 
 1. User G code review of branch `feature/21-capsule-lists-detail`.
 2. Manual end-to-end verification on Android device/emulator (S-03 list tabs, S-07 detail unlock, Author copy view, notification tap, and offline process relaunch re-view).
 3. Merge PR #47 after teammate approval.
+
 
 
 
