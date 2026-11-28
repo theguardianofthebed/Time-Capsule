@@ -453,6 +453,7 @@ class CapsuleDraftViewModelTest {
         DefaultCapsuleRepository(sessionTracker, mockAuthAdapter, mockFirestoreAdapter) {
         var published = mutableListOf<CapsuleDraft>()
         var retried = mutableListOf<String>()
+        val abandoned = mutableListOf<String>()
         var recovered: OperationResult<List<RecoveredPublication>> = OperationResult.Success(emptyList())
         var onPublish: suspend (CapsuleDraft) -> OperationResult<String> = {
             OperationResult.OutcomeUnknown(it.capsuleId, "Uncertain")
@@ -489,6 +490,7 @@ class CapsuleDraftViewModelTest {
         /** Returns a coordinator-approved replacement fixture. */
         override suspend fun abandonPublication(capsuleId: String, targetSession: SessionSnapshot): OperationResult<CapsuleDraft> {
             if (!sessionTracker.isSessionValid(targetSession)) return OperationResult.Denied("Account session changed.")
+            abandoned.add(capsuleId)
             return replacement?.let { OperationResult.Success(it) } ?: OperationResult.Unavailable("No copy")
         }
         override suspend fun abandonPublication(capsuleId: String): OperationResult<CapsuleDraft> =
@@ -513,6 +515,104 @@ class CapsuleDraftViewModelTest {
             "sender-uid", "UTC", Instant.now())
         return RecoveredPublication(operation.capsuleId, phase,
             if (phase == PublicationPhase.SENT) null else operation, canAbandon)
+    }
+
+    /** A target selected after switching accounts cannot inherit the previous compose state. */
+    @Test fun targetedRecoveryClearsPreviousAccountBeforeQuery() {
+        val repository = PublicationRepository()
+        val model = publicationModel(repository)
+        mockAuthAdapter.setUid("recipient-b")
+        sessionTracker.startSession("recipient-b")
+        model.recoverPublicationState("requested")
+        val state = model.uiState.value
+        assertEquals("recipient-b", state.activeSessionUid)
+        assertEquals("", state.text)
+        assertNull(state.locationTarget)
+        assertTrue(state.recoveryBlocked)
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertTrue(model.uiState.value.recoveryBlocked)
+        assertFalse(model.uiState.value.editable)
+    }
+
+    /** Reauthentication invalidates even a previously verified target under the same UID. */
+    @Test fun targetedRetryRejectsChangedGeneration() {
+        val repository = PublicationRepository()
+        val model = publicationModel(repository)
+        val record = recovered(model, PublicationPhase.FAILED, true)
+        repository.recovered = OperationResult.Success(listOf(record))
+        model.recoverPublicationState(record.capsuleId)
+        testDispatcher.scheduler.advanceUntilIdle()
+        sessionTracker.clearSession()
+        sessionTracker.startSession("sender-uid")
+        model.retryPublication()
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertTrue(repository.retried.isEmpty())
+    }
+
+    /** Rechecking the same selection cannot rebind it to a later login generation. */
+    @Test fun targetedRecheckKeepsOriginalGeneration() {
+        val repository = PublicationRepository()
+        val model = publicationModel(repository)
+        val record = recovered(model, PublicationPhase.FAILED, true)
+        repository.recovered = OperationResult.Success(listOf(record))
+        model.recoverPublicationState(record.capsuleId)
+        testDispatcher.scheduler.advanceUntilIdle()
+        sessionTracker.startSession("sender-uid")
+        model.recoverPublicationState(record.capsuleId)
+        testDispatcher.scheduler.advanceUntilIdle()
+        model.retryPublication()
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertTrue(repository.retried.isEmpty())
+        assertTrue(model.uiState.value.recoveryBlocked)
+    }
+
+    /** A late answer for X cannot replace an already selected and verified Y. */
+    @Test fun targetedSelectionSupersedesPendingRecovery() {
+        val repository = PublicationRepository()
+        val model = publicationModel(repository)
+        val old = recovered(model, PublicationPhase.FAILED, true)
+        val requested = RecoveredPublication("requested-y", PublicationPhase.OUTCOME_UNKNOWN, null, false)
+        val delayed = CompletableDeferred<OperationResult<List<RecoveredPublication>>>()
+        repository.onRecover = { delayed.await() }
+        model.recoverPublicationState(old.capsuleId)
+        testDispatcher.scheduler.runCurrent()
+        repository.onRecover = { OperationResult.Success(listOf(requested)) }
+        model.recoverPublicationState(requested.capsuleId)
+        testDispatcher.scheduler.runCurrent()
+        delayed.complete(OperationResult.Success(listOf(old)))
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals(requested.capsuleId, model.uiState.value.capsuleId)
+        model.retryPublication()
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals(listOf(requested.capsuleId), repository.retried)
+    }
+
+    /** A failed selection cannot retry the self-send that previously occupied this screen. */
+    @Test fun targetedFailureCannotRetryPreviousOperation() = checkFailedTarget(false)
+
+    /** Replace must also use the requested, verified operation and its originating session. */
+    @Test fun targetedFailureCannotReplacePreviousOperation() = checkFailedTarget(true)
+
+    /** Exercises both publication controls after a status-only X is superseded by Y. */
+    private fun checkFailedTarget(replace: Boolean) {
+        val repository = PublicationRepository()
+        val model = publicationModel(repository)
+        val record = recovered(model, PublicationPhase.FAILED, true)
+        repository.recovered = OperationResult.Success(listOf(record))
+        model.recoverPublicationState(record.capsuleId)
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertTrue(model.uiState.value.canAbandon)
+        repository.recovered = OperationResult.Denied("Target unavailable")
+        model.recoverPublicationState("requested-y")
+        testDispatcher.scheduler.advanceUntilIdle()
+        if (replace) model.replaceFailedPublication() else model.retryPublication()
+        model.sendCapsule()
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertTrue(repository.retried.isEmpty())
+        assertTrue(repository.abandoned.isEmpty())
+        assertTrue(repository.published.isEmpty())
+        assertEquals("requested-y", model.uiState.value.capsuleId)
+        assertTrue(model.uiState.value.recoveryBlocked)
     }
 
     /** Double taps, discard and editing cannot mutate a submission while the backend is waiting. */

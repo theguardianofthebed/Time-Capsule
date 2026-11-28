@@ -2,6 +2,7 @@ package com.example.timecapsule.data.adapter
 
 import android.os.SystemClock
 import com.example.timecapsule.domain.model.Availability
+import com.example.timecapsule.domain.model.CapsuleSummary
 import com.example.timecapsule.domain.model.ForegroundLocationSample
 import com.example.timecapsule.domain.model.ProtectedCapsuleContent
 import com.example.timecapsule.domain.model.RecipientProfile
@@ -92,5 +93,20 @@ interface FirestoreAdapter {
         recipientUid: String
     ): OperationResult<ProtectedCapsuleContent> {
         return OperationResult.Unavailable("Protected content read is not implemented in this adapter.")
+    }
+
+    /** Reads participant-scoped sent capsule metadata summaries for [senderUid]. */
+    suspend fun getSentCapsuleSummaries(senderUid: String): OperationResult<List<CapsuleSummary>> {
+        return OperationResult.Unavailable("Sent capsule summaries query is not implemented in this adapter.")
+    }
+
+    /** Reads participant-scoped received capsule metadata summaries for [recipientUid]. */
+    suspend fun getReceivedCapsuleSummaries(recipientUid: String): OperationResult<List<CapsuleSummary>> {
+        return OperationResult.Unavailable("Received capsule summaries query is not implemented in this adapter.")
+    }
+
+    /** Reads exact capsule metadata summary for [capsuleId] if [uid] is a participant. */
+    suspend fun getCapsuleSummary(capsuleId: String, uid: String): OperationResult<CapsuleSummary> {
+        return OperationResult.Unavailable("Capsule summary query is not implemented in this adapter.")
     }
 }

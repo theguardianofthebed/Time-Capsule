@@ -25,7 +25,7 @@ import kotlinx.coroutines.sync.withLock
 class AccountSessionManager(
     private val authAdapter: AuthAdapter,
     private val firestoreAdapter: FirestoreAdapter,
-    private val sessionTracker: SessionTracker,
+    val sessionTracker: SessionTracker,
     private val sessionGuard: SessionGuard = SessionGuard(sessionTracker),
     private val onAccountCleared: (suspend (String) -> OperationResult<Unit>)? = null,
     private val isCleanupPending: () -> Boolean = { false },

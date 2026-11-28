@@ -14,6 +14,7 @@ import com.example.timecapsule.data.notification.UnlockNotificationCoordinator
 import com.example.timecapsule.data.publication.FrozenOperationJournal
 import com.example.timecapsule.data.session.DefaultSessionTracker
 import com.example.timecapsule.domain.model.Availability
+import com.example.timecapsule.domain.model.LocationTarget
 import com.example.timecapsule.domain.model.LockMode
 import com.example.timecapsule.domain.model.OriginalPhotoFormat
 import com.example.timecapsule.domain.model.ProtectedCapsuleContent
@@ -93,10 +94,23 @@ class StorageRaceRegressionTest {
                 verifiedUnlockedAt: Instant,
                 text: String?,
                 photoBytes: ByteArray?,
-                photoFormat: OriginalPhotoFormat?
+                photoFormat: OriginalPhotoFormat?,
+                title: String?,
+                lockMode: LockMode?,
+                senderUid: String?,
+                recipientUid: String?,
+                senderDisplayName: String?,
+                recipientDisplayName: String?,
+                createdAt: Instant?,
+                unlockAt: Instant?,
+                creationZone: String?,
+                location: LocationTarget?
             ): OperationResult<Unit> {
                 gate.await()
-                return retentionAdapter.saveRetainedContent(targetSession, capsuleId, verifiedUnlockedAt, text, photoBytes, photoFormat)
+                return retentionAdapter.saveRetainedContent(
+                    targetSession, capsuleId, verifiedUnlockedAt, text, photoBytes, photoFormat,
+                    title, lockMode, senderUid, recipientUid, senderDisplayName, recipientDisplayName, createdAt, unlockAt, creationZone, location
+                )
             }
         }
 

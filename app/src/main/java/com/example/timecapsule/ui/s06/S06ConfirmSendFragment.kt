@@ -1,5 +1,6 @@
 package com.example.timecapsule.ui.s06
 
+import com.example.timecapsule.domain.session.SessionSnapshot
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -27,6 +28,23 @@ import kotlinx.coroutines.launch
  */
 class S06ConfirmSendFragment : Fragment() {
 
+    companion object {
+        private const val ARG_CAPSULE_ID = "arg_capsule_id"
+
+        /** Keep the selected operation and its originating account together across recreation. */
+        fun newInstance(capsuleId: String? = null, origin: SessionSnapshot? = null): S06ConfirmSendFragment {
+            return S06ConfirmSendFragment().apply {
+                arguments = Bundle().apply {
+                    capsuleId?.let {
+                        putString(ARG_CAPSULE_ID, it)
+                        putString("originUid", origin?.uid)
+                        putLong("originGeneration", origin?.sessionGeneration ?: -1)
+                    }
+                }
+            }
+        }
+    }
+
     private var _binding: FragmentS06ConfirmSendBinding? = null
     private val binding get() = _binding!!
 
@@ -46,19 +64,26 @@ class S06ConfirmSendFragment : Fragment() {
         return binding.root
     }
 
+    private var activeTargetCapsuleId: String? = null
+
     /** Obtains the activity-scoped draft so rotations do not restart publication. */
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
         val mainActivity = requireActivity() as MainActivity
+        activeTargetCapsuleId = arguments?.getString(ARG_CAPSULE_ID)
         viewModel = ViewModelProvider(
             requireActivity(),
             ViewModelFactory(mainActivity.container.accountSessionManager,
                 requireContext().applicationContext, mainActivity.container.repository,
-                mainActivity.container.recoveryCoordinator)
+                mainActivity.container.recoveryCoordinator, restorePhotoDraft = activeTargetCapsuleId == null)
         )[CapsuleDraftViewModel::class.java]
 
-        viewModel.syncSessionState(mainActivity.container.repository, mainActivity.container.recoveryCoordinator)
+        if (activeTargetCapsuleId != null) {
+            checkPublication()
+        } else {
+            viewModel.syncSessionState(mainActivity.container.repository, mainActivity.container.recoveryCoordinator)
+        }
 
         setupClickListeners()
         observeViewModelState()
@@ -68,11 +93,21 @@ class S06ConfirmSendFragment : Fragment() {
     override fun onResume() {
         super.onResume()
         val mainActivity = activity as? MainActivity
-        if (mainActivity != null) {
+        if (activeTargetCapsuleId != null) {
+            checkPublication()
+        } else if (mainActivity != null) {
             viewModel.syncSessionState(mainActivity.container.repository, mainActivity.container.recoveryCoordinator)
         } else {
             viewModel.syncSessionState()
         }
+    }
+
+    /** Rotation and foreground checks keep the account identity of the original list selection. */
+    private fun checkPublication() {
+        val id = activeTargetCapsuleId
+        if (id == null) viewModel.recoverPublicationState()
+        else viewModel.recoverPublicationState(id, origin = SessionSnapshot(
+            arguments?.getString("originUid"), arguments?.getLong("originGeneration", -1L) ?: -1L))
     }
 
     /** Routes user actions through guarded ViewModel operations instead of Firebase calls. */
@@ -88,17 +123,17 @@ class S06ConfirmSendFragment : Fragment() {
         binding.btnSendCapsule.setOnClickListener {
             when (viewModel.uiState.value.publicationPhase) {
                 PublicationPhase.SENT -> {
-                    viewModel.startNewAfterSent()
+                    viewModel.startNewAfterSent(activeTargetCapsuleId)
                     if (viewModel.uiState.value.editable) {
                         (requireActivity() as MainActivity).navigateToContentDraft()
                     }
                 }
-                null -> viewModel.sendCapsule()
-                else -> viewModel.retryPublication()
+                null -> if (activeTargetCapsuleId == null) viewModel.sendCapsule() else Unit
+                else -> viewModel.retryPublication(activeTargetCapsuleId)
             }
         }
-        binding.btnCheckPublication.setOnClickListener { viewModel.recoverPublicationState() }
-        binding.btnReplacePublication.setOnClickListener { viewModel.replaceFailedPublication() }
+        binding.btnCheckPublication.setOnClickListener { checkPublication() }
+        binding.btnReplacePublication.setOnClickListener { viewModel.replaceFailedPublication(activeTargetCapsuleId) }
 
         binding.btnNavMoments.setOnClickListener {
             onNavigateToMomentsListener?.invoke()
@@ -114,6 +149,11 @@ class S06ConfirmSendFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.uiState.collect { state ->
+                    if (activeTargetCapsuleId != null && state.editable &&
+                        state.publicationMessage == R.string.publication_replacement_ready) {
+                        (requireActivity() as MainActivity).navigateToContentDraft()
+                        return@collect
+                    }
                     val busy = state.publicationBusy || state.recoveryBusy || state.photoBusy
                     val sent = state.publicationPhase == PublicationPhase.SENT
                     binding.layoutSummaryCard.visibility =

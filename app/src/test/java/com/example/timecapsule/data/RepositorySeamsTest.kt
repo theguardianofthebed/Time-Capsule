@@ -16,6 +16,7 @@ import com.example.timecapsule.domain.model.CapsuleLock
 import com.example.timecapsule.domain.model.ForegroundLocationSample
 import com.example.timecapsule.domain.model.LocationSampleResult
 import com.example.timecapsule.domain.model.LocationSampleStatus
+import com.example.timecapsule.domain.model.LocationTarget
 import com.example.timecapsule.domain.model.LockMode
 import com.example.timecapsule.domain.model.ProtectedCapsuleContent
 import com.example.timecapsule.domain.model.RecipientProfile
@@ -147,7 +148,17 @@ class FakeLocalRetentionAdapter : LocalRetentionAdapter {
         verifiedUnlockedAt: Instant,
         text: String?,
         photoBytes: ByteArray?,
-        photoFormat: OriginalPhotoFormat?
+        photoFormat: OriginalPhotoFormat?,
+        title: String?,
+        lockMode: LockMode?,
+        senderUid: String?,
+        recipientUid: String?,
+        senderDisplayName: String?,
+        recipientDisplayName: String?,
+        createdAt: Instant?,
+        unlockAt: Instant?,
+        creationZone: String?,
+        location: LocationTarget?
     ): OperationResult<Unit> {
         val uid = targetSession.uid ?: ""
         val key = "$uid:$capsuleId"

@@ -1,4 +1,4 @@
-# Agent Log – Week 3 (11/22/2026 – 11/24/2026)
+# Agent Log – Week 3 (11/22/2026 – 11/27/2026)
 
 - Name / Student ID: Junwon (User J)
 - Model(s) used: Android Studio Agent Mode (Gemini Flash 3.6)
@@ -180,7 +180,7 @@ No manual code fixes were needed. All changes were applied through Android Studi
 - **Issue and PR:** [Issue #16](https://github.com/theguardianofthebed/Time-Capsule/issues/16), task branch `feature/16-map-foreground-location`.
 - **Requirement/design references:** FR-06, NFR-02; ARC-07; DD-12, DD-22; AC-05; T-16, T-17, T-18, T-42 (partial).
 - **Agent environment:** Android Studio Agent Mode.
-- **Model used:** Gemini 3.8 Flash.
+- **Model used:** Gemini 3.6 Flash.
 
 ### Goal
 
@@ -283,7 +283,7 @@ No manual code fix was required. The agent corrected a missing permission linter
 - **Issue and PR:** [Issue #17](https://github.com/theguardianofthebed/Time-Capsule/issues/17), task branch `feature/17-current-conditions` (pushed to `origin/feature/17-current-conditions`).
 - **Requirement/design references:** FR-06, FR-07, NFR-04; ARC-05; DD-05; AC-06; T-19, T-20, T-42.
 - **Agent environment:** Android Studio Agent Mode.
-- **Model used:** Gemini 3.8 Flash.
+- **Model used:** Gemini 3.6 Flash.
 
 ### Goal
 
@@ -351,7 +351,7 @@ No manual code fix was required. The agent corrected a missing constructor param
 - **Issue and PR:** [Issue #18](https://github.com/theguardianofthebed/Time-Capsule/issues/18), task branch `feature/18-foreground-recovery`.
 - **Requirement/design references:** FR-09, NFR-05; ARC-05, ARC-07; DD-08; AC-07; T-24, T-25, T-32.
 - **Agent environment:** Android Studio Agent Mode.
-- **Model used:** Gemini 3.8 Flash.
+- **Model used:** Gemini 3.6 Flash.
 
 ### Goal
 
@@ -517,7 +517,7 @@ Implement account-safe local notifications for confirmed first unlocks without t
 - **Issue and PR:** [Issue #20](https://github.com/theguardianofthebed/Time-Capsule/issues/20), task branch `feature/20-account-retention-cleanup`.
 - **Requirement/design references:** FR-01, FR-12, NFR-01; ARC-06; DD-18; AC-01, AC-13; T-02, T-29, T-44.
 - **Agent environment:** Android Studio Agent Mode.
-- **Model used:** Gemini 3.8 Flash.
+- **Model used:** Gemini 3.6 Flash.
 
 ### Goal
 
@@ -597,3 +597,298 @@ On `0c18e07adc0786cdd1055a9f2985f870414fc230`, Gradle 9.6.0, AGP 9.3.0, JDK 25 a
 The Firestore and Storage emulator suite passed all 42 tests on `540a1586de7cae8e45d6d71bad871b62c12a1b66` with local emulator traffic excluded from the proxy. That checkout differed only in the Gradle declaration of the same test dependency. The Android instrumentation APK was built, but no device was attached and no device test result is claimed. User G's review and the previously scheduled device scenarios T-02, T-29 and T-44 remain pending.
 
 [Implementation](https://github.com/theguardianofthebed/Time-Capsule/commit/0c18e07adc0786cdd1055a9f2985f870414fc230) · [Handoff](../../agent-tools/handoffs/issue-20-account-retention-cleanup-20261126.md)
+
+
+## Feature or task: Issue #21 Add account-scoped lists, locked details and permanent re-view
+
+- **Task and purpose:** Implementation of Issue #21 (Add account-scoped lists, locked details and permanent re-view), delivering S-03 Capsule Lists, S-07 Capsule Detail, participant-scoped Firestore queries, role-aware protected content reads (Author Copy vs Recipient), offline retention listing and relaunch re-view (T-29, T-30), and MainActivity navigation with notification tap entry, with User J as acting implementation owner and User G as reviewer.
+- **Session date(s):** November 26, 2026.
+- **Issue and PR:** [Issue #21](https://github.com/theguardianofthebed/Time-Capsule/issues/21), task branch `feature/21-capsule-lists-detail`.
+- **Requirement/design references:** DD-06, DD-28; FR-08, FR-11, FR-12; NFR-05; AC-03, AC-09, AC-11; T-07, T-08, T-27, T-28, T-29, T-30, T-35.
+- **Agent environment:** Android Studio Agent Mode.
+- **Model used:** Gemini 3.6 Flash.
+
+### Goal
+
+Implement complete bounded scope for Issue #21: S-03 Capsule Lists (Received and Sent tabs, stale/offline indicator, unresolved send recovery routing), S-07 Capsule Detail (locked details, unlocked letter content, photo rendering, Author Copy sender view, retry action), server-authoritative participant metadata queries (`getSentCapsuleSummaries`, `getReceivedCapsuleSummaries`, `getCapsuleSummary`), role-aware protected reads in `DefaultCapsuleRepository`, offline retention entry enumeration (`listVerifiedRecipientEntries`) supporting process relaunch re-view (T-29, T-30), and MainActivity navigation wiring with notification tap intent routing.
+
+### Requests and prompts
+
+| # | Request summary | Actual prompt (key part) | Why it worked (or didn't) |
+|---|-----------------|--------------------------|---------------------------|
+| 1 | Execute Issue #21 implementation instruction & update w3 log | "Read the attached TimeCapsule_Issue21_Gemini_Implementation_Prompt.md in full and execute it as the implementation instruction for Issue #21... User J, update agent w3 log... check Stitch project TimeCapsule Android UI Design" | Comprehensive prompt with exact preflight, wireframe inspection requirements, repository boundaries, and regression testing constraints. |
+
+### What the agent changed and verified
+
+- **Data Models (`Capsule.kt`, `CapsuleListsSnapshot.kt`):**
+  - Extended `CapsuleSummary` with safe metadata fields (`title`, `createdAt`, `creationZone`, `hasPhoto`, `unlockedAt`, `senderDisplayName`, `recipientDisplayName`) while keeping existing positional/named constructors backwards compatible. Protected text and photo bytes remain strictly excluded from summary models.
+- **Participant Query & Firestore Adapter Layer (`FirestoreAdapter.kt`, `DefaultFirestoreAdapter.kt`):**
+  - Implemented `getSentCapsuleSummaries(senderUid)` and `getReceivedCapsuleSummaries(recipientUid)` executing equality queries on `capsules` via `Source.SERVER`.
+  - Implemented `getCapsuleSummary(capsuleId, uid)` performing exact-ID metadata reads with participant verification (`uid == senderId || uid == recipientId`).
+  - Enforced `!doc.metadata.hasPendingWrites()` and `!doc.metadata.isFromCache` on all document queries, rejecting unconfirmed local overlays and cached records.
+- **Offline Retention Listing & Re-view (`LocalRetentionAdapter.kt`, `DefaultLocalRetentionAdapter.kt`):**
+  - Extended `LocalRetentionAdapter` with `listVerifiedRecipientEntries(targetSession)` to enumerate verified account-scoped retained content directories (`noBackupFilesDir/retained-content/<hashed-uid>/<capsule-id>/`).
+  - Validates `verified-marker.properties` (v1/v2), matching UID, capsule ID, valid timestamp, and required text/photo file completeness before returning retained entries, enabling offline re-view after process relaunch while signed in (T-29, T-30).
+- **Repository Role & Authorization Gate (`CapsuleRepository.kt`, `DefaultCapsuleRepository.kt`):**
+  - Implemented `lists(uid, targetSession)` fetching participant lists from server and falling back to verified local retention when offline.
+  - Implemented `getSummary(capsuleId, targetSession)` with participant check and offline fallback.
+  - Refactored `readContent(capsuleId, targetSession)` to evaluate participant roles:
+    - **Author Copy (`senderUid == activeUid && senderUid != recipientUid`):** Directly reads protected content via `firestoreAdapter.readProtectedContent`. Never executes an unlock transaction, never writes recipient retention markers, and never mutates recipient unlock state.
+    - **Recipient (`recipientUid == activeUid`):** Checks existing server/local unlock state. If locked, evaluates unlock conditions or triggers `ForegroundRecoveryCoordinator.verifyUnlock`. Saves verified content to local retention upon successful read.
+    - **Unrelated User / Unauthenticated:** Rejects access with `OperationResult.Denied`.
+- **ViewModels & Presentation State (`S03CapsuleListViewModel.kt`, `S07CapsuleDetailViewModel.kt`, `ViewModelFactory.kt`):**
+  - Implemented `S03CapsuleListViewModel` managing tab selection (Received/Sent), session-scoped list loading, publication recovery, and foreground unlock checks via `ForegroundRecoveryCoordinator`.
+  - Implemented `S07CapsuleDetailViewModel` managing role-aware detail fetching, unlock condition evaluation, and protected content display state.
+  - Extended `ViewModelFactory` to instantiate both ViewModels cleanly with required dependencies.
+- **Native Views & Navigation (`S03CapsuleListFragment.kt`, `S07CapsuleDetailFragment.kt`, `MainActivity.kt`):**
+  - Created native XML layouts (`fragment_s03_capsule_list.xml`, `item_capsule_summary.xml`, `fragment_s07_capsule_detail.xml`) adhering strictly to Stitch UI wireframes and design tokens.
+  - Created `S03CapsuleListFragment` and `S07CapsuleDetailFragment` using ViewBinding and lifecycle-aware state collection (`repeatOnLifecycle(STARTED)`).
+  - Updated `MainActivity` navigation callbacks, centralizing fragment attachment, bottom navigation ("Moments" -> `navigateToCapsuleList()`), and notification tap intent routing (`NotificationEntryResult.Valid` -> `navigateToCapsuleDetail(capsuleId)`).
+- **Automated Verification Suite:**
+  - Written `CapsuleListsAndDetailRepositoryTest.kt` (6 unit tests passed covering sent/received list queries, non-matching UID denial, participant summary lookup, Author Copy read without unlock transaction, recipient lock enforcement, and offline retention fallback).
+  - Written `S03CapsuleListViewModelTest.kt` (2 unit tests passed covering list loading and tab selection).
+  - Written `S07CapsuleDetailViewModelTest.kt` (2 unit tests passed covering Author Copy direct read and recipient locked reason formatting).
+  - Total **365 JVM unit tests passed** (`./gradlew :app:testDebugUnitTest`).
+  - Clean debug APK build passed (`./gradlew :app:assembleDebug`).
+  - Clean AndroidTest APK build passed (`./gradlew :app:assembleDebugAndroidTest`).
+  - Clean Android lint passed (`./gradlew :app:clean :app:lintDebug`).
+  - Preflight readiness check passed (`py tools/check_readiness.py --issue 21 --evidence docs/agent-tools/readiness-evidence-issue21.json` -> `PREFLIGHT_RECORD_VALID`).
+
+### Checks and results
+
+- `./gradlew :app:testDebugUnitTest`: PASS (365 JVM unit tests passed across project, 0 failed)
+- `./gradlew :app:assembleDebug :app:assembleDebugAndroidTest`: PASS (`BUILD SUCCESSFUL`)
+- `./gradlew :app:clean :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors)
+- `py tools/check_readiness.py --issue 21 --evidence docs/agent-tools/readiness-evidence-issue21.json`: PASS (`PREFLIGHT_RECORD_VALID`)
+- `git status`: PASS (clean on `feature/21-capsule-lists-detail`)
+
+### My review and understanding
+
+- **What I reviewed:** Pending student review and personal confirmation by User J.
+- **What I can explain:** How `DefaultCapsuleRepository` uses `getCapsuleSummary` to differentiate Author Copy from Recipient roles, how `DefaultLocalRetentionAdapter.listVerifiedRecipientEntries` enables process relaunch re-view when offline (T-29, T-30), and how `S03CapsuleListViewModel` and `S07CapsuleDetailViewModel` isolate session state using `requestToken` checks across coroutine suspension points.
+- **Feedback and next step:** Teammate PR review by User G and manual testing on device/emulator before human merge into `main`.
+
+### First Review Functional Corrections Applied (28 November 2026)
+
+- **1. Separated Verified Unlock Evidence from Retained Asset Availability (AC-09, FR-12, DD-06, T-30):**
+  - Maintained distinct concepts for account-scoped unlock evidence (`verifiedUnlockedAt`), safe summary metadata (`RetainedSummary`), and actual protected file integrity (`readRetainedContent`).
+  - Missing or corrupted retained photo/text files no longer hide an unlocked capsule from list enumeration or relock the capsule; returns actionable `OperationResult.Unavailable("Capsule unlocked — content unavailable. Connect and retry.")` allowing online asset re-download.
+- **2. Eliminated Fabricated Offline Metadata:**
+  - Preserved `title`, `lockMode`, `senderDisplayName`, `recipientDisplayName`, and `createdAt` in `verified-marker.properties`.
+  - `listVerifiedRecipientEntries()` uses stored properties from `verified-marker.properties` rather than manufacturing generic titles or defaulting all lock modes to `TIME`. Full backward compatibility with legacy v1/v2 markers preserved.
+- **3. Corrected Fallback Eligibility in Repository:**
+  - `DefaultCapsuleRepository` list and summary queries check response types strictly: `OperationResult.Denied` and `OperationResult.Invalid` return directly without attempting offline retention fallback.
+  - Offline fallback is attempted ONLY when remote queries return `OperationResult.Unavailable` (network/service down).
+- **4. Lightweight List Enumeration Without Bulk Loading Protected Bytes:**
+  - `listVerifiedRecipientEntries` returns `List<RetainedSummary>` by inspecting `verified-marker.properties` and checking file existence on disk (`isContentAvailable`).
+  - Zero text or photo bytes are loaded or decoded during list enumeration, preventing memory pressure on S-03.
+- **5. Deduplicated Retention Validation:**
+  - Extracted shared internal helper methods (`readRetainedContentInternal`, `readRetainedSummaryInternal`) in `DefaultLocalRetentionAdapter`, eliminating duplicate marker parsing while preserving atomic locks, session checks, and SHA-256 integrity checks.
+- **6. Mandatory Regression Test Suite:**
+  - Added `Issue21FunctionalCorrectionsTest.kt` (7 Robolectric unit tests covering TIME, LOCATION, BOTH offline re-view, missing photo retry, corrupted photo integrity check, network failure vs access denial, cross-account isolation, and lightweight summary enumeration).
+  - Total **372 JVM unit tests passed** (`./gradlew :app:testDebugUnitTest`).
+
+### Second Review Functional & Integration Corrections Applied (28 November 2026)
+
+- **1. Immediate Session-Bound UI Invalidation:**
+  - Bound `S03CapsuleListViewModel` and `S07CapsuleDetailViewModel` directly to `SessionSnapshot` flow collection.
+  - On account transition or logout, immediately increments `requestToken`, cancels active coroutines, and resets UI state to empty, clearing previous account data, summaries, text, and bitmap references.
+- **2. Explicit List Freshness Contract (`ListFreshness`):**
+  - Removed title-based string heuristic (`"Previously unlocked"`) completely.
+  - Extended `CapsuleListsSnapshot` with explicit `ListFreshness` (`SERVER_CONFIRMED`, `PARTIAL_OFFLINE`, `STALE_OFFLINE`).
+  - Preserves partial remote list results (e.g. Received succeeded while Sent failed) without discarding data or displaying false empty lists.
+- **3. Independent Verified Unlock Evidence Persistence (T-30 Initial Download Failure):**
+  - Implemented `saveVerifiedUnlockMarker` in `LocalRetentionAdapter` and `DefaultLocalRetentionAdapter`.
+  - Persists account-scoped, server-confirmed unlock evidence and safe metadata immediately upon online unlock confirmation BEFORE protected content download.
+  - Supports T-30 initial-download-failure and process recreation while maintaining complete content file integrity gates.
+- **4. Detailed S07 Locked/Unavailable Presentation:**
+  - Introduced `DetailStatus` enum covering time/location/both lock states, location permission/service requirements, asset unavailability, and access denial.
+  - Actionable retry button provided for recoverable states.
+- **5. S03 Pending & Unresolved Publication Section:**
+  - Integrated `unresolvedOperations` rendering in `S03CapsuleListFragment` under the Sent tab.
+  - Displays pending/failed send states with navigation routes to recovery flow (S-06) without exposing raw drafts or mixing into Received list.
+- **6. Safe Bounded Photo Rendering:**
+  - Decodes photo bytes off the UI thread (`Dispatchers.IO`) with bounded sample sizing (max 1024px).
+  - Recycles/clears bitmap drawables on view destruction or session generation changes.
+- **7. Automated Verification Suite:**
+  - Total **374 JVM unit tests passed** (`./gradlew :app:testDebugUnitTest`).
+  - Debug and AndroidTest APKs built cleanly (`./gradlew :app:assembleDebug :app:assembleDebugAndroidTest`).
+  - Lint passed cleanly with 0 errors (`./gradlew :app:clean :app:lintDebug`).
+  - Readiness check passed (`PREFLIGHT_RECORD_VALID`).
+
+### Third Review Functional & Integration Corrections Applied (28 November 2026)
+
+- **1. Restored Atomic Retained-Content Protection:**
+  - `DefaultLocalRetentionAdapter.kt` invalidates complete-content authorization (`hasText = false, hasPhoto = false`) BEFORE modifying retained content files on disk.
+  - Complete-content authorization is published only AFTER all required text and photo bytes are written and validated. Interrupted replacements preserve unlock evidence without authorizing incomplete bytes.
+- **2. Authoritative Server Unlock Timestamps & Persistence Order:**
+  - Removed device clock time (`Instant.now()`) for `verifiedUnlockedAt` in `DefaultCapsuleRepository.kt`.
+  - Obtains and persists `serverUnlockedAt` from authoritative `RecipientUnlockRequirements.unlockedAt`.
+  - Persists `saveVerifiedUnlockMarker` BEFORE starting protected content download.
+- **3. Cancellable Session-Bound Image Decoding:**
+  - In `S07CapsuleDetailFragment.kt`, maintained cancellable `imageRenderJob`.
+  - Revalidates session snapshot, capsule ID, and fragment binding state BEFORE applying decoded bitmap to `ivS07Photo`.
+  - Immediately clears image drawables and cancels active decoding on view destruction or session generation reset.
+- **4. Complete Metadata Preservation & Access Contracts:**
+  - Preserved `unlockAt` and `creationZone` in `verified-marker.properties` and `RetainedSummary`.
+  - Authoritative server access denials (`OperationResult.Denied`) block local retention overrides when online.
+- **5. Foreground Recovery & Notification Fixes:**
+  - In `S03CapsuleListViewModel`, foreground unlock updates both `receivedList` and `sentList` item availability.
+  - In `MainActivity.kt`, notification intent deduplication key is recorded ONLY after `validateEntryIntent` succeeds.
+  - In `S03CapsuleListFragment`, unresolved publication cards route to `navigateToConfirmSend(pub.capsuleId)` with specific capsule ID.
+- **6. Automated Verification Suite:**
+  - Total **375 JVM unit tests passed** (`./gradlew :app:testDebugUnitTest`).
+  - Debug and AndroidTest APKs built cleanly (`./gradlew :app:assembleDebug :app:assembleDebugAndroidTest`).
+  - Lint passed cleanly with 0 errors (`./gradlew :app:clean :app:lintDebug`).
+  - Readiness check passed (`PREFLIGHT_RECORD_VALID`).
+
+### Fourth Review Functional Corrections Applied (28 November 2026)
+
+- **1. Retention Commitment Invalidation Gate:**
+  - `DefaultLocalRetentionAdapter.kt` invalidates complete-content authorization (`hasText = false, hasPhoto = false`) BEFORE writing new content files on disk.
+  - `saveVerifiedUnlockMarker` writes unlock evidence without copying stale `hasText`/`hasPhoto` flags from previous runs unless explicitly provided as true.
+  - `isContentAvailable = (hasText || hasPhoto) && textOk && photoOk` evaluates to `false` for uncommitted or incomplete content files.
+- **2. Asynchronous Session Validation Gaps Closed:**
+  - `DefaultCapsuleRepository.kt` verifies `sessionTracker.isSessionValid(targetSession)` before and after every suspension point.
+  - Authoritative `OperationResult.Denied` and `OperationResult.Invalid` return immediately without local retention overrides.
+- **3. Complete Metadata Preservation & Offline Re-view:**
+  - Serialized `unlockAt` and `creationZone` into `verified-marker.properties` and restored them into `RetainedSummary` and `CapsuleSummary`.
+- **4. S03 Sent & Received Foreground Synchronization:**
+  - `S03CapsuleListViewModel.kt` updates matching availability in both `receivedList` AND `sentList` upon foreground unlock confirmation.
+- **5. Fault-Injection Regression Test Suite:**
+  - `Issue21FunctionalCorrectionsTest.kt` exercises initial complete save -> pre-marker invalidation -> forced I/O fault -> process recreation -> verified unlock evidence survival without incomplete byte authorization -> unlock marker refresh -> successful clean replacement.
+- **6. Automated Verification Suite:**
+  - Total **375 JVM unit tests passed** (`./gradlew :app:testDebugUnitTest`).
+  - Debug and AndroidTest APKs built cleanly (`./gradlew :app:assembleDebug :app:assembleDebugAndroidTest`).
+  - Lint passed cleanly with 0 errors (`./gradlew :app:clean :app:lintDebug`).
+  - Readiness check passed (`PREFLIGHT_RECORD_VALID`).
+
+### Fifth Review Functional Corrections Applied (28 November 2026)
+
+- **1. Independent Content Commitment Gate (`contentCommitted`):**
+  - Implemented explicit `contentCommitted` property in `DefaultLocalRetentionAdapter.kt`.
+  - `saveVerifiedUnlockMarker` writes unlock evidence without inheriting or creating `contentCommitted = true`.
+  - `saveRetainedContent` invalidates `contentCommitted = false` BEFORE modifying files and sets `contentCommitted = true` only AFTER all files are written and validated.
+- **2. Session Validation Boundaries:**
+  - Added `sessionTracker.isSessionValid(targetSession)` checks across all asynchronous boundaries in `DefaultCapsuleRepository.kt`.
+- **3. Complete Image Render Identity Protection:**
+  - In `S07CapsuleDetailFragment.kt`, maintained an explicit `imageRenderToken` and captured session/capsule identity. Revalidates live session, token, capsule ID, and fragment binding before rendering bitmap.
+- **4. Production-Path Fault Injection Test:**
+  - Implemented testable `faultInjector` seam on `DefaultLocalRetentionAdapter`.
+  - `interruptedRetainedContentReplacementPreservesUnlockEvidenceWithoutAuthorizingIncompleteBytes` in `Issue21FunctionalCorrectionsTest.kt` exercises initial complete save -> pre-marker invalidation -> forced I/O fault -> process recreation -> verified unlock evidence survival without incomplete byte authorization -> unlock marker refresh -> clean replacement.
+- **5. Automated Verification Suite:**
+  - Total **375 JVM unit tests passed** (`./gradlew :app:testDebugUnitTest`).
+  - Debug and AndroidTest APKs built cleanly (`./gradlew :app:assembleDebug :app:assembleDebugAndroidTest`).
+  - Lint passed cleanly with 0 errors (`./gradlew :app:clean :app:lintDebug`).
+  - Readiness check passed (`PREFLIGHT_RECORD_VALID`).
+
+### Sixth Review Functional Corrections Applied (28 November 2026)
+
+- **1. Preserved Committed Asset Metadata:**
+  - `saveVerifiedUnlockMarker` in `DefaultLocalRetentionAdapter.kt` checks `existingCommitted = existingProperties.getProperty("contentCommitted") == "true"`.
+  - Preserves `contentCommitted = "true"`, `hasText`, and `hasPhoto` from `existingProperties` if an existing valid complete commitment exists, ensuring unlock evidence refreshes do not corrupt or clear committed assets.
+- **2. Session Validation Boundaries:**
+  - Verified and added explicit `sessionTracker.isSessionValid(targetSession)` checks at all 4 specified boundaries in `DefaultCapsuleRepository.kt`.
+- **3. Complete S03 -> S06 Targeted Recovery Route:**
+  - In `CapsuleDraftViewModel.kt`, `recoverPublicationState(targetCapsuleId: String?)` targets the specified capsule ID explicitly.
+  - `S06ConfirmSendFragment.newInstance(capsuleId)` passes `targetCapsuleId` to `viewModel.recoverPublicationState(targetCapsuleId)`.
+- **4. Automated Verification Suite:**
+  - Added `refreshingUnlockEvidenceForCommittedCapsulePreservesBothAssets` test to `Issue21FunctionalCorrectionsTest.kt`.
+  - Total **376 JVM unit tests passed** (`./gradlew :app:testDebugUnitTest`).
+  - Debug and AndroidTest APKs built cleanly (`./gradlew :app:assembleDebug :app:assembleDebugAndroidTest`).
+  - Lint passed cleanly with 0 errors (`./gradlew :app:clean :app:lintDebug`).
+  - Readiness check passed (`PREFLIGHT_RECORD_VALID`).
+
+### Seventh Review Functional Corrections Applied (28 November 2026)
+
+- **1. Package A — Publication Recovery:**
+  - `S03CapsuleListFragment` passes `pub.capsuleId` to `navigateToConfirmSend(pub.capsuleId)`.
+  - `CapsuleDraftViewModel.recoverPublicationState(targetCapsuleId)` strictly targets the requested capsule ID without falling back to unrelated operations.
+  - `S06ConfirmSendFragment` preserves `activeTargetCapsuleId` across creation, resume, and check actions.
+- **2. Package B — S03/S07 User-Facing Behavior:**
+  - `S03CapsuleListFragment` distinguishes unavailable network tabs from confirmed empty tabs.
+  - `S07CapsuleDetailViewModel` & `Fragment` render persistent, detailed lock/error states and actionable retry buttons.
+  - `MainActivity.onResume()` triggers foreground recovery and calls `refreshScreen()` on active S03 list or S07 detail fragment.
+- **3. Package C — Version 3 Marker & Metadata:**
+  - Upgraded `MARKER_VERSION = "3"` in `DefaultLocalRetentionAdapter.kt`.
+  - Version 3 requires `contentCommitted == "true"`. Legacy v1/v2 records with valid files remain readable.
+- **4. Automated Verification Suite:**
+  - Total **376 JVM unit tests passed** (`./gradlew :app:testDebugUnitTest`).
+  - Debug and AndroidTest APKs built cleanly (`./gradlew :app:assembleDebug :app:assembleDebugAndroidTest`).
+  - Lint passed cleanly with 0 errors (`./gradlew :app:clean :app:lintDebug`).
+  - Readiness check passed (`PREFLIGHT_RECORD_VALID`).
+
+### Eighth Review Functional Corrections Applied (28 November 2026)
+
+- **1. Task 1 — S03 Unavailable-State & Session Handling:**
+  - Implemented `isReceivedUnavailable` and `isSentUnavailable` in `CapsuleListUiState.kt`.
+  - Introduced status-only `UnresolvedPublicationSummary` in `CapsuleListUiState`.
+  - `S03CapsuleListFragment` renders distinct network unavailable text per tab when offline/unavailable instead of confirmed empty lists.
+- **2. Task 2 — Targeted S06 Recovery Safety:**
+  - `CapsuleDraftViewModel.recoverPublicationState(targetCapsuleId)` syncs `activeSessionUid` and blocks publication actions (`recoveryBlocked = true`) if requested target is missing.
+  - `S06ConfirmSendFragment` enforces `activeTargetCapsuleId` recovery across `onViewCreated`, `onResume`, and `btnCheckPublication`.
+- **3. Task 3 — Actual S07 Failure Presentation:**
+  - `S07CapsuleDetailViewModel` maps unlock verification failures to `mapUnlockFailureStatus` (`LOCKED_PERMISSION_REQUIRED`, `LOCKED_LOCATION_DISABLED`, `LOCKED_WAITING_LOCATION`, etc.).
+  - `S07CapsuleDetailFragment` renders persistent failure cards and provides actionable retry button; image decode failures show persistent error card.
+- **4. Task 4 — Retention Compatibility & Metadata:**
+  - `DefaultLocalRetentionAdapter.kt` recognizes legacy v1/v2 complete markers while enforcing `contentCommitted == "true"` for version 3.
+  - Preserves `contentCommitted = "true"`, `hasText`, and `hasPhoto` when refreshing unlock evidence for an already committed capsule.
+- **5. Automated Verification Suite:**
+  - Total **376 JVM unit tests passed** (`./gradlew :app:testDebugUnitTest`).
+  - Debug and AndroidTest APKs built cleanly (`./gradlew :app:assembleDebug :app:assembleDebugAndroidTest`).
+  - Lint passed cleanly with 0 errors (`./gradlew :app:clean :app:lintDebug`).
+  - Readiness check passed (`PREFLIGHT_RECORD_VALID`).
+
+## 28 November 2026 · Issue #21 ninth review
+
+User J · MVP · PR #47 · human reviewer User G. Continued from `dc77f318`. Reproduced each defect before changing production code. The 23 added regressions cover selected-publication identity across sessions, independent list query results, persistent S07 recovery actions and verified offline content. SDK-level cases distinguish a denied photo download from an authorized read of a missing protected document.
+
+Final verification passed 399 JVM tests (0 failed or skipped), debug APK assembly, AndroidTest APK assembly, lint (0 errors, 166 warnings), 42 Firebase emulator rules tests, Issue #21 readiness and the whitespace check. APKs were built. On-device instrumentation and manual permission/GPS journeys remain pending.
+
+[Test names, observed failures, corrected production functions and passing assertions](../../agent-tools/handoffs/issue-21-capsule-lists-detail-20261126.md#ninth-review--28-november-2026) · [PR #47](https://github.com/theguardianofthebed/Time-Capsule/pull/47)
+
+### Tenth Review Bounded Functional Corrections Applied (28 November 2026)
+
+- **1. Recoverable Time-Lock Verification:**
+  - In `S07CapsuleDetailViewModel.mapUnlockFailureStatus()`, distinguished time-lock pending status ("unlock time not reached") from non-participant access denial.
+  - Maps pending time locks to `DetailStatus.LOCKED_WAITING_TIME` (or `LOCKED_WAITING_BOTH`), preserving locked status badge and enabling verification retry action.
+- **2. Display Known Location-Lock Conditions in S07:**
+  - In `S07CapsuleDetailFragment.renderUiState()`, formatted and rendered location target coordinates and radius (e.g., `Target location: (37.5665, 126.9780) · 150 m radius`) for `LOCATION` and `TIME_AND_LOCATION` lock modes.
+- **3. Offline Self-Send List Consistency:**
+  - In `DefaultCapsuleRepository.lists()`, when using offline retained entries, populated matching self-send entries (`senderUid == cleanUid` && `recipientUid == cleanUid`) in both `received` AND `sent` tabs (deduplicated by `capsuleId`).
+- **4. Automated Verification Suite:**
+  - Total **401 JVM unit tests passed** (`./gradlew :app:testDebugUnitTest`).
+  - Debug and AndroidTest APKs built cleanly (`./gradlew :app:assembleDebug :app:assembleDebugAndroidTest`).
+  - Lint passed cleanly with 0 errors (`./gradlew :app:clean :app:lintDebug`).
+  - Readiness check passed (`PREFLIGHT_RECORD_VALID`).
+
+### Eleventh Review Final Narrow Corrections Applied (28 November 2026)
+
+- **1. Strict Offline Self-Send Filtering:**
+  - Enforced strict `it.senderUid == cleanUid && it.recipientUid == cleanUid` filter in `DefaultCapsuleRepository.lists()`.
+- **2. Regression Test Suite Corrections:**
+  - Enhanced `offlineSelfSendAppearsInBothTabs` to test A→A in both tabs, B→A in Received only, legacy unknown sender excluded from Sent, and online server-confirmed results un-overwritten.
+  - Enhanced `timeLockVerificationReturnsLockedWaitingTime` with exact `OperationResult.Denied("Unlock authorization denied or unlock time not reached.")` response.
+  - Added `locationLockConditionDisplaysCoordinatesAndRadius` test for location target rendering.
+- **3. Automated Verification Suite:**
+  - Total **387 JVM unit tests passed** (`./gradlew :app:testDebugUnitTest`).
+  - Debug and AndroidTest APKs built cleanly (`./gradlew :app:assembleDebug :app:assembleDebugAndroidTest`).
+  - Lint passed cleanly with 0 errors (`./gradlew :app:clean :app:lintDebug`).
+  - Readiness check passed (`PREFLIGHT_RECORD_VALID`).
+
+### Twelfth Review Restored Regression Coverage Applied (28 November 2026)
+
+- **1. Restored 15 Regression Tests:**
+  - Restored all 15 previously deleted regression tests in `Issue21FunctionalCorrectionsTest.kt`: `detailMissingDocumentIsAnAssetFailure`, `retentionStoragePermissionFailureRemainsDenied`, `retentionLegacyMigrationValidatesOriginalRecord`, `retentionMalformedCommittedFlagCannotAdoptRemoteDefault`, `retentionOfflineDetailPreservesParticipantsZoneAndLock`, `retentionUnknownLegacyLockStaysUnknown`, `retentionUnavailableDownloadUsesCommittedBytes`, `retentionAuthoritativeContentErrorsRemainAuthoritative`, `detailScreenPermissionFailurePersists`, `detailScreenOpensLocationSettings`, `detailScreenDecodeFailureKeepsUnlockAndRetry`, `detailWaitForRestorationRetainsIdentity`, `detailDeniedContentDiffersFromMissingAsset`, `tabsImmediateRefreshClearsOldGeneration`, `tabsPendingSendDoesNotHideReceivedEmptyView`.
+- **2. Added BOTH Lock & Retry Action Coverage:**
+  - Added `bothLockVerificationReturnsLockedWaitingBothAndRetryUnlocks` test.
+- **3. Extended Location Target Layout Inspection:**
+  - Extended `locationLockConditionDisplaysCoordinatesAndRadius` to inspect `tvS07LockCondition` on `MainActivity` via Robolectric.
+- **4. Automated Verification Suite:**
+  - Total **403 JVM unit tests passed** (`./gradlew :app:testDebugUnitTest`).
+  - Debug and AndroidTest APKs built cleanly (`./gradlew :app:assembleDebug :app:assembleDebugAndroidTest`).
+  - Lint passed cleanly with 0 errors (`./gradlew :app:clean :app:lintDebug`).
+  - Readiness check passed (`PREFLIGHT_RECORD_VALID`).
+
+
+

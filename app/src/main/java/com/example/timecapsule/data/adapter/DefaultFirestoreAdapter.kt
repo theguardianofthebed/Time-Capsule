@@ -4,6 +4,8 @@ import android.content.Context
 import com.example.timecapsule.config.FirebaseConfig
 import com.example.timecapsule.domain.location.LocationQualifier
 import com.example.timecapsule.domain.model.Availability
+import com.example.timecapsule.domain.model.CapsuleLock
+import com.example.timecapsule.domain.model.CapsuleSummary
 import com.example.timecapsule.domain.model.ForegroundLocationSample
 import com.example.timecapsule.domain.model.LocationTarget
 import com.example.timecapsule.domain.model.LockMode
@@ -14,10 +16,13 @@ import com.example.timecapsule.domain.model.ProtectedCapsuleContent
 import com.example.timecapsule.domain.model.QualificationFailureReason
 import com.example.timecapsule.domain.model.RecipientProfile
 import com.example.timecapsule.domain.model.RecipientUnlockRequirements
+import com.example.timecapsule.domain.model.SendStatus
 import com.example.timecapsule.domain.model.UnlockConfirmationKind
 import com.example.timecapsule.domain.model.UnlockVerificationOutcome
 import com.example.timecapsule.domain.result.OperationResult
+import java.time.Instant
 import com.google.firebase.FirebaseNetworkException
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
@@ -356,7 +361,7 @@ class DefaultFirestoreAdapter(
                 .get(Source.SERVER).await()
 
             if (!doc.exists()) {
-                return@withContext OperationResult.Denied("Protected content document does not exist.")
+                return@withContext OperationResult.Invalid("Capsule content is missing on the server.")
             }
 
             if (doc.metadata.isFromCache || doc.metadata.hasPendingWrites()) {
@@ -375,14 +380,16 @@ class DefaultFirestoreAdapter(
                         photoObjectPath,
                         OriginalPhotoLimits.MAX_BYTES
                     )
-                    if (downloadRes is OperationResult.Success) {
-                        val downloaded = downloadRes.data
-                        photoFormat = AndroidOriginalImageProbe.inspect(downloaded)
-                            ?: return@withContext OperationResult.Unavailable("Downloaded photo cannot be decoded.")
-                        photoBytes = downloaded
-                    } else {
-                        return@withContext OperationResult.Unavailable("Photo download failed.")
+                    val downloaded = when (downloadRes) {
+                        is OperationResult.Success -> downloadRes.data
+                        is OperationResult.Denied -> return@withContext downloadRes
+                        is OperationResult.Invalid -> return@withContext downloadRes
+                        is OperationResult.Unavailable -> return@withContext downloadRes
+                        is OperationResult.OutcomeUnknown -> return@withContext downloadRes
                     }
+                    photoFormat = AndroidOriginalImageProbe.inspect(downloaded)
+                        ?: return@withContext OperationResult.Unavailable("Downloaded photo cannot be decoded.")
+                    photoBytes = downloaded
                 }
             }
 
@@ -399,6 +406,179 @@ class DefaultFirestoreAdapter(
             if (e is CancellationException) throw e
             mapFirestoreException(e)
         }
+    }
+
+    override suspend fun getSentCapsuleSummaries(senderUid: String): OperationResult<List<CapsuleSummary>> {
+        val cleanUid = senderUid.trim()
+        if (cleanUid.isBlank()) {
+            return OperationResult.Invalid("Sender UID must not be blank.")
+        }
+        val instance = firestoreInstance()
+            ?: return OperationResult.Unavailable("Firestore service is unavailable.")
+
+        return try {
+            val querySnapshot = instance.collection("capsules")
+                .whereEqualTo("senderId", cleanUid)
+                .get(Source.SERVER)
+                .await()
+
+            val summaries = mutableListOf<CapsuleSummary>()
+            for (doc in querySnapshot.documents) {
+                if (doc.metadata.hasPendingWrites() || doc.metadata.isFromCache) {
+                    continue // Reject unconfirmed or cached documents
+                }
+                val summary = parseCapsuleSummaryFromDoc(doc) ?: continue
+                if (summary.senderUid == cleanUid) {
+                    summaries.add(summary)
+                }
+            }
+            val sorted = summaries.sortedWith(
+                compareByDescending<CapsuleSummary> { it.createdAt ?: Instant.EPOCH }
+                    .thenBy { it.capsuleId }
+            )
+            OperationResult.Success(sorted)
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            mapFirestoreException(e)
+        }
+    }
+
+    override suspend fun getReceivedCapsuleSummaries(recipientUid: String): OperationResult<List<CapsuleSummary>> {
+        val cleanUid = recipientUid.trim()
+        if (cleanUid.isBlank()) {
+            return OperationResult.Invalid("Recipient UID must not be blank.")
+        }
+        val instance = firestoreInstance()
+            ?: return OperationResult.Unavailable("Firestore service is unavailable.")
+
+        return try {
+            val querySnapshot = instance.collection("capsules")
+                .whereEqualTo("recipientId", cleanUid)
+                .get(Source.SERVER)
+                .await()
+
+            val summaries = mutableListOf<CapsuleSummary>()
+            for (doc in querySnapshot.documents) {
+                if (doc.metadata.hasPendingWrites() || doc.metadata.isFromCache) {
+                    continue // Reject unconfirmed or cached documents
+                }
+                val summary = parseCapsuleSummaryFromDoc(doc) ?: continue
+                if (summary.recipientUid == cleanUid) {
+                    summaries.add(summary)
+                }
+            }
+            val sorted = summaries.sortedWith(
+                compareByDescending<CapsuleSummary> { it.createdAt ?: Instant.EPOCH }
+                    .thenBy { it.capsuleId }
+            )
+            OperationResult.Success(sorted)
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            mapFirestoreException(e)
+        }
+    }
+
+    override suspend fun getCapsuleSummary(capsuleId: String, uid: String): OperationResult<CapsuleSummary> {
+        val cleanCapsuleId = capsuleId.trim()
+        val cleanUid = uid.trim()
+        if (cleanCapsuleId.isBlank() || cleanUid.isBlank()) {
+            return OperationResult.Invalid("Capsule ID and UID must not be blank.")
+        }
+        val instance = firestoreInstance()
+            ?: return OperationResult.Unavailable("Firestore service is unavailable.")
+
+        return try {
+            val doc = instance.collection("capsules")
+                .document(cleanCapsuleId)
+                .get(Source.SERVER)
+                .await()
+
+            if (!doc.exists()) {
+                return OperationResult.Invalid("Capsule not found with ID: $cleanCapsuleId")
+            }
+            if (doc.metadata.hasPendingWrites() || doc.metadata.isFromCache) {
+                return OperationResult.Unavailable("Capsule metadata is unconfirmed or cached.")
+            }
+
+            val summary = parseCapsuleSummaryFromDoc(doc)
+                ?: return OperationResult.Invalid("Capsule metadata is malformed.")
+
+            if (summary.senderUid != cleanUid && summary.recipientUid != cleanUid) {
+                return OperationResult.Denied("Access denied. User is not a participant of this capsule.")
+            }
+
+            OperationResult.Success(summary)
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            mapFirestoreException(e)
+        }
+    }
+
+    private fun parseCapsuleSummaryFromDoc(doc: DocumentSnapshot): CapsuleSummary? {
+        val capsuleId = doc.id.ifBlank { doc.getString("capsuleId") ?: "" }
+        if (capsuleId.isBlank()) return null
+
+        val senderId = doc.getString("senderId") ?: return null
+        val recipientId = doc.getString("recipientId") ?: return null
+        if (senderId.isBlank() || recipientId.isBlank()) return null
+
+        val lockModeStr = doc.getString("lockMode") ?: "TIME"
+        val lockMode = when (lockModeStr) {
+            "TIME" -> LockMode.TIME
+            "LOCATION" -> LockMode.LOCATION
+            "BOTH", "TIME_AND_LOCATION" -> LockMode.TIME_AND_LOCATION
+            else -> return null
+        }
+
+        val unlockAtInstant = doc.getTimestamp("unlockAt")?.toInstant()
+
+        val locMap = doc.get("location") as? Map<*, *>
+        val locationTarget = if (locMap != null) {
+            val lat = (locMap["latitude"] as? Number)?.toDouble()
+            val lng = (locMap["longitude"] as? Number)?.toDouble()
+            val radiusM = (locMap["radiusM"] as? Number)?.toDouble()
+            if (lat != null && lng != null && radiusM != null && lat.isFinite() && lng.isFinite() && radiusM == 150.0) {
+                LocationTarget(latitude = lat, longitude = lng, radiusMeters = radiusM)
+            } else {
+                if (lockMode == LockMode.LOCATION || lockMode == LockMode.TIME_AND_LOCATION) return null
+                null
+            }
+        } else {
+            if (lockMode == LockMode.LOCATION || lockMode == LockMode.TIME_AND_LOCATION) return null
+            null
+        }
+
+        val lock = CapsuleLock(mode = lockMode, unlockAt = unlockAtInstant, location = locationTarget)
+
+        val unlocked = doc.getBoolean("unlocked") ?: false
+        val unlockedAtInstant = doc.getTimestamp("unlockedAt")?.toInstant()
+
+        val availability = if (unlocked) Availability.AVAILABLE else Availability.LOCKED
+
+        val title = doc.getString("title")?.takeIf { it.isNotBlank() }
+        val createdAtInstant = doc.getTimestamp("createdAt")?.toInstant()
+        val creationZone = doc.getString("creationZone")
+        val photoPath = doc.getString("photoPath")
+        val hasPhoto = doc.getBoolean("hasPhoto") ?: (!photoPath.isNullOrBlank())
+
+        val senderDisplayName = doc.getString("senderDisplayName")
+        val recipientDisplayName = doc.getString("recipientDisplayName")
+
+        return CapsuleSummary(
+            capsuleId = capsuleId,
+            senderUid = senderId,
+            recipientUid = recipientId,
+            lock = lock,
+            sendStatus = SendStatus.SENT,
+            availability = availability,
+            title = title,
+            createdAt = createdAtInstant,
+            creationZone = creationZone,
+            hasPhoto = hasPhoto,
+            unlockedAt = unlockedAtInstant,
+            senderDisplayName = senderDisplayName,
+            recipientDisplayName = recipientDisplayName
+        )
     }
 
     private fun <T> mapFirestoreUnlockException(e: Exception): OperationResult<T> {

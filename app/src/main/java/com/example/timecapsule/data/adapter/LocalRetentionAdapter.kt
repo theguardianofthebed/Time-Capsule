@@ -1,9 +1,11 @@
 package com.example.timecapsule.data.adapter
 
+import com.example.timecapsule.domain.model.LockMode
 import com.example.timecapsule.domain.model.OriginalPhotoFormat
 import com.example.timecapsule.domain.result.OperationResult
 import com.example.timecapsule.domain.session.SessionSnapshot
 import java.time.Instant
+import com.example.timecapsule.domain.model.LocationTarget
 
 /**
  * Verified retained content record holding text, photo bytes, and server unlock evidence.
@@ -51,11 +53,54 @@ data class RetainedContent(
 }
 
 /**
+ * Lightweight account-scoped retention summary metadata for list enumeration without bulk loading protected bytes.
+ */
+data class RetainedSummary(
+    val uid: String,
+    val capsuleId: String,
+    val verifiedUnlockedAt: Instant,
+    val senderUid: String? = null,
+    val recipientUid: String? = null,
+    val lockMode: LockMode? = null,
+    val unlockAt: Instant? = null,
+    val title: String? = null,
+    val senderDisplayName: String? = null,
+    val recipientDisplayName: String? = null,
+    val createdAt: Instant? = null,
+    val creationZone: String? = null,
+    val hasText: Boolean = false,
+    val hasPhoto: Boolean = false,
+    val isContentAvailable: Boolean = true,
+    val location: LocationTarget? = null
+)
+
+/**
  * Replaceable adapter boundary for UID-scoped local app-private storage and DataStore markers.
  */
 interface LocalRetentionAdapter {
     /**
-     * Persists verified recipient unlocked content with an authoritative server timestamp and session snapshot.
+     * Persists verified recipient unlock marker with server timestamp and metadata independently of content download success.
+     */
+    suspend fun saveVerifiedUnlockMarker(
+        targetSession: SessionSnapshot,
+        capsuleId: String,
+        verifiedUnlockedAt: Instant,
+        title: String? = null,
+        lockMode: LockMode? = null,
+        senderUid: String? = null,
+        recipientUid: String? = null,
+        senderDisplayName: String? = null,
+        recipientDisplayName: String? = null,
+        createdAt: Instant? = null,
+        unlockAt: Instant? = null,
+        creationZone: String? = null,
+        hasText: Boolean = false,
+        hasPhoto: Boolean = false,
+        location: LocationTarget? = null
+    ): OperationResult<Unit> = OperationResult.Unavailable("Save verified unlock marker is not implemented in this adapter.")
+
+    /**
+     * Persists verified recipient unlocked content with server timestamp, metadata, and session snapshot.
      */
     suspend fun saveRetainedContent(
         targetSession: SessionSnapshot,
@@ -63,7 +108,17 @@ interface LocalRetentionAdapter {
         verifiedUnlockedAt: Instant,
         text: String?,
         photoBytes: ByteArray?,
-        photoFormat: OriginalPhotoFormat?
+        photoFormat: OriginalPhotoFormat?,
+        title: String? = null,
+        lockMode: LockMode? = null,
+        senderUid: String? = null,
+        recipientUid: String? = null,
+        senderDisplayName: String? = null,
+        recipientDisplayName: String? = null,
+        createdAt: Instant? = null,
+        unlockAt: Instant? = null,
+        creationZone: String? = null,
+        location: LocationTarget? = null
     ): OperationResult<Unit>
 
     /**
@@ -73,6 +128,15 @@ interface LocalRetentionAdapter {
         targetSession: SessionSnapshot,
         capsuleId: String
     ): OperationResult<RetainedContent>
+
+    /**
+     * Lists lightweight retention metadata for [targetSession] without bulk loading protected text or photo bytes.
+     */
+    suspend fun listVerifiedRecipientEntries(
+        targetSession: SessionSnapshot
+    ): OperationResult<List<RetainedSummary>> {
+        return OperationResult.Unavailable("List verified recipient entries is not implemented in this adapter.")
+    }
 
     /** Clears account-scoped retained content for [uid]. */
     suspend fun clearAccountData(uid: String)

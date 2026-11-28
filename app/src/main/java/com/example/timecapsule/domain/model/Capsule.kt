@@ -30,9 +30,16 @@ data class CapsuleSummary(
     val capsuleId: String,
     val senderUid: String,
     val recipientUid: String,
-    val lock: CapsuleLock,
+    val lock: CapsuleLock?,
     val sendStatus: SendStatus,
     val availability: Availability = Availability.UNKNOWN,
+    val title: String? = null,
+    val createdAt: Instant? = null,
+    val creationZone: String? = null,
+    val hasPhoto: Boolean = false,
+    val unlockedAt: Instant? = null,
+    val senderDisplayName: String? = null,
+    val recipientDisplayName: String? = null,
 )
 
 /** Keep private content in its own access-controlled backend boundary. */

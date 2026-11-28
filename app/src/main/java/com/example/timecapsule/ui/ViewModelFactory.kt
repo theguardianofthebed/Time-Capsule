@@ -10,6 +10,8 @@ import com.example.timecapsule.data.recovery.ForegroundRecoveryCoordinator
 import com.example.timecapsule.ui.draft.CapsuleDraftViewModel
 import com.example.timecapsule.ui.s01.S01SignInViewModel
 import com.example.timecapsule.ui.s02.S02RegisterViewModel
+import com.example.timecapsule.ui.s03.S03CapsuleListViewModel
+import com.example.timecapsule.ui.s07.S07CapsuleDetailViewModel
 import com.example.timecapsule.ui.s08.S08AccountSettingsViewModel
 
 /**
@@ -19,7 +21,8 @@ class ViewModelFactory(
     private val accountSessionManager: AccountSessionManager,
     private val context: Context? = null,
     private val repository: CapsuleRepository? = null,
-    private val recoveryCoordinator: ForegroundRecoveryCoordinator? = null
+    private val recoveryCoordinator: ForegroundRecoveryCoordinator? = null,
+    private val restorePhotoDraft: Boolean = true
 ) : ViewModelProvider.Factory {
 
     @Suppress("UNCHECKED_CAST")
@@ -37,8 +40,24 @@ class ViewModelFactory(
             }
             modelClass.isAssignableFrom(CapsuleDraftViewModel::class.java) -> {
                 CapsuleDraftViewModel(accountSessionManager, repository, recoveryCoordinator).also { model ->
-                    context?.let { model.configurePhotos(AndroidPhotoInput(it)) }
+                    context?.let { model.configurePhotos(AndroidPhotoInput(it), restore = restorePhotoDraft) }
                 } as T
+            }
+            modelClass.isAssignableFrom(S03CapsuleListViewModel::class.java) -> {
+                val repo = repository ?: throw IllegalArgumentException("CapsuleRepository is required for S03CapsuleListViewModel")
+                S03CapsuleListViewModel(
+                    sessionTracker = accountSessionManager.sessionTracker,
+                    repository = repo,
+                    recoveryCoordinator = recoveryCoordinator
+                ) as T
+            }
+            modelClass.isAssignableFrom(S07CapsuleDetailViewModel::class.java) -> {
+                val repo = repository ?: throw IllegalArgumentException("CapsuleRepository is required for S07CapsuleDetailViewModel")
+                S07CapsuleDetailViewModel(
+                    sessionTracker = accountSessionManager.sessionTracker,
+                    repository = repo,
+                    recoveryCoordinator = recoveryCoordinator
+                ) as T
             }
             else -> throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
         }
