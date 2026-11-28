@@ -140,6 +140,11 @@ class S08AccountSettingsFragment : Fragment() {
 
         // Profile update observer: re-enables button and updates header using confirmed submitted name
         viewModel.updateState.observe(viewLifecycleOwner) { result ->
+            val origin = getOriginatingSession()
+            val current = appContainer.accountSessionManager.currentSession()
+            if (origin == null || origin != current || !appContainer.accountSessionManager.isSessionValid(origin)) {
+                return@observe
+            }
             if (result != null) {
                 binding.btnUpdateProfile.isEnabled = true
             }
@@ -216,6 +221,11 @@ class S08AccountSettingsFragment : Fragment() {
 
         // Sign out observer: awaits result and navigates to sign in only on Success
         viewModel.signOutState.observe(viewLifecycleOwner) { result ->
+            val origin = getOriginatingSession()
+            val current = appContainer.accountSessionManager.currentSession()
+            if (origin == null || origin != current || !appContainer.accountSessionManager.isSessionValid(origin)) {
+                return@observe
+            }
             if (result != null) {
                 binding.btnSignOut.isEnabled = true
             }

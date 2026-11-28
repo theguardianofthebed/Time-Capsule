@@ -31,3 +31,12 @@ Published for independent review in [Draft PR #51](https://github.com/theguardia
 - Refined `S07CapsuleDetailViewModel.mapUnlockFailureStatus()` to ensure TIME-only verification failures never generate location-settings actions.
 - Re-evaluated session validity in `MainActivity.replaceFragment()`'s `runOnCommit` callback to prevent asynchronous session transition leakage.
 - Automated verification: 436 JVM unit tests passed (`./gradlew :app:testDebugUnitTest`), debug/test APKs assembled, lint clean (0 errors), readiness valid (`py tools/check_readiness.py --validate-manifest` -> `MANIFEST_VALID`).
+
+## Issue #22 · Fourth Review: Remaining Functional Corrections (28 November 2026)
+
+- Work period: 28 November 2026 (KST). Scope: MVP. Human reviewer: User G.
+- Target PR: [PR #51](https://github.com/theguardianofthebed/Time-Capsule/pull/51). Branch: `feature/22-native-ui-recovery`.
+- Replaced/supplemented regression tests in `AccountSessionManagerTest`, `CapsuleDraftViewModelTest`, and `S07CapsuleDetailViewModelTest` to test actual production adapter/ViewModel boundaries with Red->Green verification.
+- Enforced complete profile verification in `DefaultFirestoreAdapter.getRecipientProfile()` (checks `hasPendingWrites()`/`isFromCache` before document existence, requires matching UID and nonblank display name).
+- Added in-flight submission guard `isSignOutInFlight` in `S08AccountSettingsViewModel` and session validation in S-08 LiveData observers.
+- Automated verification: 442 JVM unit tests passed (`./gradlew :app:testDebugUnitTest`), debug/test APKs assembled, lint clean (0 errors), readiness preflight valid (`py tools/check_readiness.py --issue 22 --evidence docs/agent-tools/readiness-evidence-issue22.json` -> `PREFLIGHT_RECORD_VALID`).

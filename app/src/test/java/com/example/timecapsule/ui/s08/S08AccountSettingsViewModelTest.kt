@@ -247,5 +247,16 @@ class S08AccountSettingsViewModelTest {
         assertEquals("test-uid-123", authAdapter.activeUid())
     }
 
+    @Test
+    fun signOut_preventsDuplicateConcurrentInFlightSubmissions() = runBlockingTest {
+        val currentSession = accountSessionManager.currentSession()
+        viewModel.signOut(currentSession)
+        viewModel.signOut(currentSession)
+
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertNull(authAdapter.activeUid())
+    }
+
     private fun runBlockingTest(block: suspend () -> Unit) = runBlocking { block() }
 }

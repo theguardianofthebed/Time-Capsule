@@ -6,6 +6,7 @@ import com.example.timecapsule.data.AccountSessionManager
 import com.example.timecapsule.data.CapsuleRepository
 import com.example.timecapsule.data.DefaultCapsuleRepository
 import com.example.timecapsule.domain.model.CapsuleDraft
+import com.example.timecapsule.domain.model.CapsuleLock
 import com.example.timecapsule.domain.model.FrozenCapsuleOperation
 import com.example.timecapsule.domain.model.PublicationPhase
 import com.example.timecapsule.domain.model.RecoveredPublication
@@ -33,6 +34,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import androidx.lifecycle.viewModelScope
 import com.example.timecapsule.domain.session.SessionSnapshot
+import com.example.timecapsule.ui.s06.reviewCondition
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
@@ -550,6 +552,49 @@ class CapsuleDraftViewModelTest {
         assertFalse(state.canAbandon)
         assertFalse(state.canRetryUnchanged)
         assertNull(state.publicationPhase)
+    }
+
+    /** Recovering an operation with a different location target through the ViewModel flow clears any stale location label. */
+    @Test fun recoveringDifferentOperationClearsStaleLocationLabelThroughViewModelFlow() {
+        val repository = PublicationRepository()
+        val model = publicationModel(repository)
+
+        // 1. Create a draft with an existing location label "Eiffel Tower"
+        model.updateLocation(LocationTarget(48.8584, 2.2945), "Eiffel Tower")
+
+        // 2. Create another frozen operation with different coordinates (Seoul Plaza) and no location name
+        val olderDraft = CapsuleDraft(
+            capsuleId = "older-capsule-101",
+            recipientUid = "recipient-b",
+            text = "Older location capsule",
+            localPhotoUri = null,
+            lock = CapsuleLock(LockMode.LOCATION, location = LocationTarget(37.5665, 126.9780)),
+            title = null,
+            recipientDisplayName = "recipient-b",
+            isRecipientConfirmed = true,
+            locationName = null,
+            originalPhoto = null,
+            creationZone = "Asia/Seoul"
+        )
+        val olderOperation = FrozenCapsuleOperation.freeze(olderDraft, "sender-uid", "Asia/Seoul", Instant.now())
+        val recoveredRecord = RecoveredPublication(
+            capsuleId = "older-capsule-101",
+            phase = PublicationPhase.FAILED,
+            snapshot = olderOperation,
+            canAbandon = true
+        )
+
+        // 3. Supply recovered operation and invoke real recovery path
+        repository.recovered = OperationResult.Success(listOf(recoveredRecord))
+        model.recoverPublicationState("older-capsule-101")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // 4. Examine resulting ViewModel state and review text from reviewCondition
+        val state = model.uiState.value
+        assertEquals("older-capsule-101", state.capsuleId)
+        val reviewText = reviewCondition(state)
+        assertTrue(reviewText.contains("37.5665"))
+        assertFalse(reviewText.contains("Eiffel Tower"))
     }
 
     /** Reauthentication invalidates even a previously verified target under the same UID. */

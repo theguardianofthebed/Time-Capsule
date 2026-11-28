@@ -32,6 +32,7 @@ class S08AccountSettingsViewModel(
 
     private var activeProfileCheckToken = 0
     private var isUpdateInFlight = false
+    private var isSignOutInFlight = false
 
     /**
      * Verifies recipient profile existence for active [uid].
@@ -80,20 +81,24 @@ class S08AccountSettingsViewModel(
 
     /**
      * Signs out current user asynchronously for originating [origin] session.
-     * Rejects sign out if [origin] is no longer active or valid.
+     * Rejects sign out if [origin] is no longer active or valid, and guards against duplicate in-flight clicks.
      */
     fun signOut(origin: SessionSnapshot? = null) {
         val targetSession = origin ?: accountSessionManager.currentSession()
+        if (isSignOutInFlight) return
         if (!accountSessionManager.isSessionValid(targetSession)) {
             _signOutState.postValue(OperationResult.Denied("Account changed or session expired."))
             return
         }
+        isSignOutInFlight = true
         viewModelScope.launch {
             if (!accountSessionManager.isSessionValid(targetSession)) {
+                isSignOutInFlight = false
                 _signOutState.postValue(OperationResult.Denied("Account changed or session expired."))
                 return@launch
             }
             val result = accountSessionManager.signOut(targetSession)
+            isSignOutInFlight = false
             _signOutState.postValue(result)
         }
     }

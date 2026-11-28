@@ -27,12 +27,16 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
+import com.example.timecapsule.data.recovery.ForegroundRecoveryCoordinator
+import com.example.timecapsule.domain.model.LocationTarget
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class S07CapsuleDetailViewModelTest {
 
     private val testDispatcher = StandardTestDispatcher()
     private lateinit var sessionTracker: DefaultSessionTracker
     private lateinit var fakeRepository: FakeCapsuleRepository
+    private lateinit var fakeRecoveryCoordinator: FakeRecoveryCoordinator
     private lateinit var viewModel: S07CapsuleDetailViewModel
 
     private val userA = "user-a"
@@ -44,7 +48,8 @@ class S07CapsuleDetailViewModelTest {
         sessionTracker = DefaultSessionTracker()
         sessionTracker.startSession(userA)
         fakeRepository = FakeCapsuleRepository(sessionTracker)
-        viewModel = S07CapsuleDetailViewModel(sessionTracker, fakeRepository)
+        fakeRecoveryCoordinator = FakeRecoveryCoordinator(sessionTracker, fakeRepository)
+        viewModel = S07CapsuleDetailViewModel(sessionTracker, fakeRepository, fakeRecoveryCoordinator)
     }
 
     @After
@@ -91,6 +96,7 @@ class S07CapsuleDetailViewModelTest {
             title = "A's Note To B"
         )
         fakeRepository.summaries["cap-2"] = cap
+        fakeRecoveryCoordinator.verifyUnlockResult = OperationResult.Denied("Unlock authorization denied or unlock time not reached.")
 
         viewModel.loadDetail("cap-2")
         testDispatcher.scheduler.advanceUntilIdle()
@@ -99,7 +105,7 @@ class S07CapsuleDetailViewModelTest {
         assertFalse(state.isLoading)
         assertEquals(ParticipantRole.RECIPIENT, state.role)
         assertFalse(state.isUnlocked)
-        assertEquals("Locked by time", state.unlockReason)
+        assertEquals(DetailStatus.LOCKED_WAITING_TIME, state.status)
     }
 
     @Test
@@ -116,14 +122,68 @@ class S07CapsuleDetailViewModelTest {
             title = "A's Note To B"
         )
         fakeRepository.summaries["cap-3"] = cap
+        fakeRecoveryCoordinator.verifyUnlockResult = OperationResult.Denied("User account disabled or not found.")
 
         viewModel.loadDetail("cap-3")
         testDispatcher.scheduler.advanceUntilIdle()
 
         val state = viewModel.uiState.value
         assertFalse(state.isLoading)
-        assertEquals(DetailStatus.LOCKED_WAITING_TIME, state.status)
+        assertEquals(DetailStatus.ACCESS_DENIED, state.status)
         assertFalse(state.status == DetailStatus.LOCKED_LOCATION_DISABLED)
+    }
+
+    @Test
+    fun `locationLock_permissionError_mapsToPermissionRequired`() = runTest(testDispatcher) {
+        sessionTracker.startSession(userB)
+        val cap = CapsuleSummary(
+            capsuleId = "cap-4",
+            senderUid = userA,
+            recipientUid = userB,
+            lock = CapsuleLock(LockMode.LOCATION, location = LocationTarget(37.5, 127.0)),
+            sendStatus = SendStatus.SENT,
+            availability = Availability.LOCKED
+        )
+        fakeRepository.summaries["cap-4"] = cap
+        fakeRecoveryCoordinator.verifyUnlockResult = OperationResult.Denied("Location permission denied.")
+
+        viewModel.loadDetail("cap-4")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(DetailStatus.LOCKED_PERMISSION_REQUIRED, state.status)
+    }
+
+    @Test
+    fun `locationLock_disabledError_mapsToLocationDisabled`() = runTest(testDispatcher) {
+        sessionTracker.startSession(userB)
+        val cap = CapsuleSummary(
+            capsuleId = "cap-5",
+            senderUid = userA,
+            recipientUid = userB,
+            lock = CapsuleLock(LockMode.LOCATION, location = LocationTarget(37.5, 127.0)),
+            sendStatus = SendStatus.SENT,
+            availability = Availability.LOCKED
+        )
+        fakeRepository.summaries["cap-5"] = cap
+        fakeRecoveryCoordinator.verifyUnlockResult = OperationResult.Unavailable("Location services disabled in device settings.")
+
+        viewModel.loadDetail("cap-5")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(DetailStatus.LOCKED_LOCATION_DISABLED, state.status)
+    }
+
+    private class FakeRecoveryCoordinator(
+        sessionTracker: DefaultSessionTracker,
+        repository: CapsuleRepository
+    ) : ForegroundRecoveryCoordinator(repository, sessionTracker) {
+        var verifyUnlockResult: OperationResult<Availability> = OperationResult.Denied("Unlock time not reached.")
+
+        override suspend fun verifyUnlock(capsuleId: String, targetSession: SessionSnapshot): OperationResult<Availability> {
+            return verifyUnlockResult
+        }
     }
 
     private class FakeCapsuleRepository(

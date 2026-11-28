@@ -67,6 +67,7 @@ class AccountSessionManagerTest {
         var uid: String? = null
         var email: String? = null
         var displayName: String? = null
+        var failDisplayNameUpdateInSignUp = false
 
         override fun activeUid(): String? = uid
         override fun activeEmail(): String? = email
@@ -97,7 +98,11 @@ class AccountSessionManagerTest {
             val newUid = "user-123"
             uid = newUid
             this.email = email
-            this.displayName = displayName
+            if (failDisplayNameUpdateInSignUp) {
+                this.displayName = null // Simulates failure during user.updateProfile()
+            } else {
+                this.displayName = displayName
+            }
             return OperationResult.Success(newUid)
         }
 
@@ -183,10 +188,34 @@ class AccountSessionManagerTest {
     }
 
     @Test
-    fun testSignUpAuthSuccessWithProfileWriteFailureActivatesSessionAndEnablesProfileRepair() = runBlocking {
-        fakeFirestoreAdapter.failSaveProfile = true
-        val result = accountSessionManager.signUpAndCreateProfile("new@example.com", "pass123", "New User")
+    fun testSignUpAuthSuccess_displayNameUpdateFails_directorySucceeds_activatesSessionAndCompletes() = runBlocking {
+        fakeAuthAdapter.failDisplayNameUpdateInSignUp = true
+        fakeFirestoreAdapter.failSaveProfile = false
 
+        val result = accountSessionManager.signUpAndCreateProfile("new@example.com", "pass123", "New User")
+        assertTrue(result is OperationResult.Success)
+
+        // Session is activated for user-123
+        assertTrue(sessionTracker.currentSession().isAuthenticated)
+        assertEquals("user-123", sessionTracker.currentSession().uid)
+
+        // Firestore directory profile saved successfully
+        val profileRes = fakeFirestoreAdapter.getRecipientProfile("user-123")
+        assertTrue(profileRes is OperationResult.Success)
+        assertEquals("New User", (profileRes as OperationResult.Success).data.displayName)
+
+        // Auth display name can subsequently be repaired
+        val repairRes = accountSessionManager.repairProfile("New User", sessionTracker.currentSession())
+        assertTrue(repairRes is OperationResult.Success)
+        assertEquals("New User", fakeAuthAdapter.activeDisplayName())
+    }
+
+    @Test
+    fun testSignUpAuthSuccess_displayNameUpdateFails_directoryFails_activatesSessionAndEnablesProfileRepair() = runBlocking {
+        fakeAuthAdapter.failDisplayNameUpdateInSignUp = true
+        fakeFirestoreAdapter.failSaveProfile = true
+
+        val result = accountSessionManager.signUpAndCreateProfile("new@example.com", "pass123", "New User")
         assertTrue(result is OperationResult.Unavailable)
 
         // Auth account created and session activated for user-123

@@ -76,17 +76,17 @@ class DefaultFirestoreAdapter(
                 .get(Source.SERVER)
                 .await()
 
-            if (!doc.exists()) {
-                return OperationResult.Invalid("No recipient found with UID: $cleanUid")
-            }
-
             if (doc.metadata.hasPendingWrites() || doc.metadata.isFromCache) {
                 return OperationResult.Unavailable("Profile snapshot is unconfirmed or cached.")
             }
 
+            if (!doc.exists()) {
+                return OperationResult.Invalid("No recipient found with UID: $cleanUid")
+            }
+
             val docUid = doc.getString("uid")
-            if (docUid != null && docUid != cleanUid) {
-                return OperationResult.Invalid("Profile document UID mismatch.")
+            if (docUid.isNullOrBlank() || docUid != cleanUid) {
+                return OperationResult.Invalid("Profile document UID missing or mismatched.")
             }
 
             val displayName = doc.getString("displayName")
