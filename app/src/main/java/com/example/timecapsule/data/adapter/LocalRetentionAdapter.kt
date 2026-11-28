@@ -58,7 +58,10 @@ data class RetainedSummary(
     val uid: String,
     val capsuleId: String,
     val verifiedUnlockedAt: Instant,
+    val senderUid: String? = null,
+    val recipientUid: String? = null,
     val lockMode: LockMode? = null,
+    val unlockAt: Instant? = null,
     val title: String? = null,
     val senderDisplayName: String? = null,
     val recipientDisplayName: String? = null,
@@ -73,16 +76,22 @@ data class RetainedSummary(
  */
 interface LocalRetentionAdapter {
     /**
-     * Persists verified recipient unlocked content with an authoritative server timestamp and session snapshot.
+     * Persists verified recipient unlock marker with server timestamp and metadata independently of content download success.
      */
-    suspend fun saveRetainedContent(
+    suspend fun saveVerifiedUnlockMarker(
         targetSession: SessionSnapshot,
         capsuleId: String,
         verifiedUnlockedAt: Instant,
-        text: String?,
-        photoBytes: ByteArray?,
-        photoFormat: OriginalPhotoFormat?
-    ): OperationResult<Unit>
+        title: String? = null,
+        lockMode: LockMode? = null,
+        senderUid: String? = null,
+        recipientUid: String? = null,
+        senderDisplayName: String? = null,
+        recipientDisplayName: String? = null,
+        createdAt: Instant? = null,
+        hasText: Boolean = false,
+        hasPhoto: Boolean = false
+    ): OperationResult<Unit> = OperationResult.Unavailable("Save verified unlock marker is not implemented in this adapter.")
 
     /**
      * Persists verified recipient unlocked content with server timestamp, metadata, and session snapshot.
@@ -99,9 +108,7 @@ interface LocalRetentionAdapter {
         senderDisplayName: String? = null,
         recipientDisplayName: String? = null,
         createdAt: Instant? = null
-    ): OperationResult<Unit> = saveRetainedContent(
-        targetSession, capsuleId, verifiedUnlockedAt, text, photoBytes, photoFormat
-    )
+    ): OperationResult<Unit>
 
     /**
      * Reads verified retained content for the active account if marker and content files are complete.

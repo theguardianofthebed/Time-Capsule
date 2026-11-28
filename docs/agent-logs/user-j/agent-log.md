@@ -723,6 +723,35 @@ Implement complete bounded scope for Issue #21: S-03 Capsule Lists (Received and
   - Added `Issue21FunctionalCorrectionsTest.kt` (7 Robolectric unit tests covering TIME, LOCATION, BOTH offline re-view, missing photo retry, corrupted photo integrity check, network failure vs access denial, cross-account isolation, and lightweight summary enumeration).
   - Total **372 JVM unit tests passed** (`./gradlew :app:testDebugUnitTest`).
 
+### Second Review Functional & Integration Corrections Applied (28 November 2026)
+
+- **1. Immediate Session-Bound UI Invalidation:**
+  - Bound `S03CapsuleListViewModel` and `S07CapsuleDetailViewModel` directly to `SessionSnapshot` flow collection.
+  - On account transition or logout, immediately increments `requestToken`, cancels active coroutines, and resets UI state to empty, clearing previous account data, summaries, text, and bitmap references.
+- **2. Explicit List Freshness Contract (`ListFreshness`):**
+  - Removed title-based string heuristic (`"Previously unlocked"`) completely.
+  - Extended `CapsuleListsSnapshot` with explicit `ListFreshness` (`SERVER_CONFIRMED`, `PARTIAL_OFFLINE`, `STALE_OFFLINE`).
+  - Preserves partial remote list results (e.g. Received succeeded while Sent failed) without discarding data or displaying false empty lists.
+- **3. Independent Verified Unlock Evidence Persistence (T-30 Initial Download Failure):**
+  - Implemented `saveVerifiedUnlockMarker` in `LocalRetentionAdapter` and `DefaultLocalRetentionAdapter`.
+  - Persists account-scoped, server-confirmed unlock evidence and safe metadata immediately upon online unlock confirmation BEFORE protected content download.
+  - Supports T-30 initial-download-failure and process recreation while maintaining complete content file integrity gates.
+- **4. Detailed S07 Locked/Unavailable Presentation:**
+  - Introduced `DetailStatus` enum covering time/location/both lock states, location permission/service requirements, asset unavailability, and access denial.
+  - Actionable retry button provided for recoverable states.
+- **5. S03 Pending & Unresolved Publication Section:**
+  - Integrated `unresolvedOperations` rendering in `S03CapsuleListFragment` under the Sent tab.
+  - Displays pending/failed send states with navigation routes to recovery flow (S-06) without exposing raw drafts or mixing into Received list.
+- **6. Safe Bounded Photo Rendering:**
+  - Decodes photo bytes off the UI thread (`Dispatchers.IO`) with bounded sample sizing (max 1024px).
+  - Recycles/clears bitmap drawables on view destruction or session generation changes.
+- **7. Automated Verification Suite:**
+  - Total **374 JVM unit tests passed** (`./gradlew :app:testDebugUnitTest`).
+  - Debug and AndroidTest APKs built cleanly (`./gradlew :app:assembleDebug :app:assembleDebugAndroidTest`).
+  - Lint passed cleanly with 0 errors (`./gradlew :app:clean :app:lintDebug`).
+  - Readiness check passed (`PREFLIGHT_RECORD_VALID`).
+
+
 
 
 [Implementation](https://github.com/theguardianofthebed/Time-Capsule/commit/0c18e07adc0786cdd1055a9f2985f870414fc230) · [Handoff](../../agent-tools/handoffs/issue-20-account-retention-cleanup-20261126.md)

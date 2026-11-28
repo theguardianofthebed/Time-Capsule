@@ -70,43 +70,43 @@
    - Added `Issue21FunctionalCorrectionsTest.kt` (7 Robolectric unit tests covering TIME, LOCATION, BOTH offline re-view, missing photo retry, corrupted photo integrity check, network failure vs access denial, cross-account isolation, and lightweight summary enumeration).
    - Total **372 JVM unit tests passed** (`./gradlew :app:testDebugUnitTest`).
 
+## 3. Second Review Functional & Integration Corrections (28 November 2026)
+
+1. **Immediate Session-Bound UI Invalidation:**
+   - Bound ViewModels (`S03CapsuleListViewModel`, `S07CapsuleDetailViewModel`) directly to `SessionSnapshot` emission.
+   - On account transition or logout, immediately increments `requestToken`, cancels active coroutines, and resets UI state to empty, clearing previous account data, summaries, text, and bitmap references.
+
+2. **Explicit List Freshness Contract (`ListFreshness`):**
+   - Removed title-based string heuristic (`"Previously unlocked"`) completely.
+   - Extended `CapsuleListsSnapshot` with explicit `ListFreshness` (`SERVER_CONFIRMED`, `PARTIAL_OFFLINE`, `STALE_OFFLINE`).
+   - Preserves partial remote list results (e.g. Received succeeded while Sent failed) without discarding data or displaying false empty lists.
+
+3. **Independent Verified Unlock Evidence Persistence (T-30 Initial Download Failure):**
+   - Implemented `saveVerifiedUnlockMarker` in `LocalRetentionAdapter` and `DefaultLocalRetentionAdapter`.
+   - Persists account-scoped, server-confirmed unlock evidence and safe metadata immediately upon online unlock confirmation BEFORE protected content download.
+   - Supports T-30 initial-download-failure and process recreation while maintaining complete content file integrity gates.
+
+4. **Detailed S07 Locked/Unavailable Presentation:**
+   - Introduced `DetailStatus` enum covering time/location/both lock states, location permission/service requirements, asset unavailability, and access denial.
+   - Actionable retry button provided for recoverable states.
+
+5. **S03 Pending & Unresolved Publication Section:**
+   - Integrated `unresolvedOperations` rendering in `S03CapsuleListFragment` under the Sent tab.
+   - Displays pending/failed send states with navigation routes to recovery flow (S-06) without exposing raw drafts or mixing into Received list.
+
+6. **Safe Bounded Photo Rendering:**
+   - Decodes photo bytes off the UI thread (`Dispatchers.IO`) with bounded sample sizing (max 1024px).
+   - Recycles/clears bitmap drawables on view destruction or session generation changes.
+
 ---
 
-## 3. Verification and Checks Summary
+## 4. Verification and Checks Summary
 
-- `./gradlew :app:testDebugUnitTest`: **PASS (372 passed, 0 failed)**
+- `./gradlew :app:testDebugUnitTest`: **PASS (374 passed, 0 failed)**
 - `./gradlew :app:assembleDebug :app:assembleDebugAndroidTest`: **PASS (`BUILD SUCCESSFUL`)**
 - `./gradlew :app:clean :app:lintDebug`: **PASS (`BUILD SUCCESSFUL`, 0 lint errors)**
 - `py tools/check_readiness.py --issue 21 --evidence docs/agent-tools/readiness-evidence-issue21.json`: **PASS (`PREFLIGHT_RECORD_VALID`)**
-
----
-
-## 4. Key Files Created/Modified
-
-- `app/src/main/java/com/example/timecapsule/domain/model/Capsule.kt`
-- `app/src/main/java/com/example/timecapsule/data/adapter/FirestoreAdapter.kt`
-- `app/src/main/java/com/example/timecapsule/data/adapter/DefaultFirestoreAdapter.kt`
-- `app/src/main/java/com/example/timecapsule/data/adapter/LocalRetentionAdapter.kt`
-- `app/src/main/java/com/example/timecapsule/data/adapter/DefaultLocalRetentionAdapter.kt`
-- `app/src/main/java/com/example/timecapsule/data/CapsuleRepository.kt`
-- `app/src/main/java/com/example/timecapsule/data/DefaultCapsuleRepository.kt`
-- `app/src/main/java/com/example/timecapsule/data/AccountSessionManager.kt`
-- `app/src/main/java/com/example/timecapsule/ui/ViewModelFactory.kt`
-- `app/src/main/java/com/example/timecapsule/ui/s03/CapsuleListUiState.kt`
-- `app/src/main/java/com/example/timecapsule/ui/s03/S03CapsuleListViewModel.kt`
-- `app/src/main/java/com/example/timecapsule/ui/s03/S03CapsuleListFragment.kt`
-- `app/src/main/java/com/example/timecapsule/ui/s07/CapsuleDetailUiState.kt`
-- `app/src/main/java/com/example/timecapsule/ui/s07/S07CapsuleDetailViewModel.kt`
-- `app/src/main/java/com/example/timecapsule/ui/s07/S07CapsuleDetailFragment.kt`
-- `app/src/main/java/com/example/timecapsule/MainActivity.kt`
-- `app/src/main/res/layout/fragment_s03_capsule_list.xml`
-- `app/src/main/res/layout/item_capsule_summary.xml`
-- `app/src/main/res/layout/fragment_s07_capsule_detail.xml`
-- `app/src/main/res/values/strings.xml`
-- `app/src/test/java/com/example/timecapsule/data/CapsuleListsAndDetailRepositoryTest.kt`
-- `app/src/test/java/com/example/timecapsule/data/Issue21FunctionalCorrectionsTest.kt`
-- `app/src/test/java/com/example/timecapsule/ui/s03/S03CapsuleListViewModelTest.kt`
-- `app/src/test/java/com/example/timecapsule/ui/s07/S07CapsuleDetailViewModelTest.kt`
+- `git diff --check`: **PASS (0 whitespace errors)**
 
 ---
 
@@ -115,4 +115,5 @@
 1. User G code review of branch `feature/21-capsule-lists-detail`.
 2. Manual end-to-end verification on Android device/emulator (S-03 list tabs, S-07 detail unlock, Author copy view, notification tap, and offline process relaunch re-view).
 3. Merge PR #47 after teammate approval.
+
 

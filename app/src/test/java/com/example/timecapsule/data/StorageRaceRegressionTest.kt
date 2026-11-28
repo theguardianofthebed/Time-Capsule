@@ -93,10 +93,18 @@ class StorageRaceRegressionTest {
                 verifiedUnlockedAt: Instant,
                 text: String?,
                 photoBytes: ByteArray?,
-                photoFormat: OriginalPhotoFormat?
+                photoFormat: OriginalPhotoFormat?,
+                title: String?,
+                lockMode: LockMode?,
+                senderDisplayName: String?,
+                recipientDisplayName: String?,
+                createdAt: Instant?
             ): OperationResult<Unit> {
                 gate.await()
-                return retentionAdapter.saveRetainedContent(targetSession, capsuleId, verifiedUnlockedAt, text, photoBytes, photoFormat)
+                return retentionAdapter.saveRetainedContent(
+                    targetSession, capsuleId, verifiedUnlockedAt, text, photoBytes, photoFormat,
+                    title, lockMode, senderDisplayName, recipientDisplayName, createdAt
+                )
             }
         }
 

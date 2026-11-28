@@ -5,8 +5,9 @@ import androidx.lifecycle.viewModelScope
 import com.example.timecapsule.data.CapsuleRepository
 import com.example.timecapsule.data.recovery.ForegroundRecoveryCoordinator
 import com.example.timecapsule.data.session.SessionTracker
+import com.example.timecapsule.domain.model.Availability
+import com.example.timecapsule.domain.model.ListFreshness
 import com.example.timecapsule.domain.model.PublicationPhase
-import com.example.timecapsule.domain.model.SendStatus
 import com.example.timecapsule.domain.result.OperationResult
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,9 +34,18 @@ class S03CapsuleListViewModel(
     init {
         viewModelScope.launch {
             sessionTracker.observeSession().collect { session ->
+                activeJob?.cancel()
+                requestToken++
                 if (!session.isAuthenticated) {
-                    _uiState.value = CapsuleListUiState(isLoading = false)
+                    _uiState.value = CapsuleListUiState(
+                        isLoading = false,
+                        sessionSnapshot = session
+                    )
                 } else {
+                    _uiState.value = CapsuleListUiState(
+                        isLoading = true,
+                        sessionSnapshot = session
+                    )
                     loadLists()
                 }
             }
@@ -50,13 +60,17 @@ class S03CapsuleListViewModel(
         val capturedSession = sessionTracker.currentSession()
         val uid = capturedSession.uid
         if (!capturedSession.isAuthenticated || uid.isNullOrBlank()) {
-            _uiState.value = CapsuleListUiState(isLoading = false)
+            _uiState.value = CapsuleListUiState(isLoading = false, sessionSnapshot = capturedSession)
             return
         }
 
         val token = ++requestToken
         activeJob?.cancel()
-        _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
+        _uiState.value = _uiState.value.copy(
+            isLoading = true,
+            errorMessage = null,
+            sessionSnapshot = capturedSession
+        )
 
         activeJob = viewModelScope.launch {
             // 1. Fetch remote/retained lists
@@ -76,45 +90,74 @@ class S03CapsuleListViewModel(
             when (listsRes) {
                 is OperationResult.Success -> {
                     val snapshot = listsRes.data
-                    val isStale = snapshot.received.any { it.title?.contains("Previously unlocked") == true }
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         receivedList = snapshot.received,
                         sentList = snapshot.sent,
                         unresolvedOperations = unresolved,
                         errorMessage = null,
-                        isStale = isStale
+                        freshness = snapshot.freshness,
+                        sessionSnapshot = capturedSession
                     )
 
-                    // Check foreground for known recipient items to trigger background unlock checks
-                    val knownRecipientIds = snapshot.received.map { it.capsuleId }
+                    // Check foreground for known recipient items to trigger background unlock checks and update list
+                    val knownRecipientIds = snapshot.received.filter { it.availability != Availability.AVAILABLE }.map { it.capsuleId }
                     if (knownRecipientIds.isNotEmpty() && recoveryCoordinator != null) {
-                        recoveryCoordinator.checkForeground(knownRecipientIds, capturedSession)
+                        val foregroundSummary = recoveryCoordinator.checkForeground(knownRecipientIds, capturedSession)
+                        if (!sessionTracker.isSessionValid(capturedSession) || token != requestToken) return@launch
+
+                        if (foregroundSummary.unlockResults.isNotEmpty()) {
+                            val updatedReceived = _uiState.value.receivedList.map { item ->
+                                val unlockRes = foregroundSummary.unlockResults[item.capsuleId]
+                                if (unlockRes is OperationResult.Success && unlockRes.data == Availability.AVAILABLE) {
+                                    item.copy(availability = Availability.AVAILABLE)
+                                } else {
+                                    item
+                                }
+                            }
+                            _uiState.value = _uiState.value.copy(receivedList = updatedReceived)
+                        }
                     }
                 }
                 is OperationResult.Denied -> {
-                    _uiState.value = _uiState.value.copy(
+                    _uiState.value = CapsuleListUiState(
                         isLoading = false,
-                        errorMessage = listsRes.message
+                        receivedList = emptyList(),
+                        sentList = emptyList(),
+                        unresolvedOperations = emptyList(),
+                        errorMessage = listsRes.message,
+                        sessionSnapshot = capturedSession
                     )
                 }
                 is OperationResult.Invalid -> {
-                    _uiState.value = _uiState.value.copy(
+                    _uiState.value = CapsuleListUiState(
                         isLoading = false,
-                        errorMessage = listsRes.message
+                        receivedList = emptyList(),
+                        sentList = emptyList(),
+                        unresolvedOperations = emptyList(),
+                        errorMessage = listsRes.message,
+                        sessionSnapshot = capturedSession
                     )
                 }
                 is OperationResult.Unavailable -> {
-                    _uiState.value = _uiState.value.copy(
+                    _uiState.value = CapsuleListUiState(
                         isLoading = false,
+                        receivedList = emptyList(),
+                        sentList = emptyList(),
+                        unresolvedOperations = emptyList(),
                         errorMessage = listsRes.message,
-                        isStale = true
+                        freshness = ListFreshness.STALE_OFFLINE,
+                        sessionSnapshot = capturedSession
                     )
                 }
                 is OperationResult.OutcomeUnknown -> {
-                    _uiState.value = _uiState.value.copy(
+                    _uiState.value = CapsuleListUiState(
                         isLoading = false,
-                        errorMessage = listsRes.message
+                        receivedList = emptyList(),
+                        sentList = emptyList(),
+                        unresolvedOperations = emptyList(),
+                        errorMessage = listsRes.message,
+                        sessionSnapshot = capturedSession
                     )
                 }
             }

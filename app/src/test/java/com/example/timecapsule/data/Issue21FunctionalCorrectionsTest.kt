@@ -15,6 +15,8 @@ import com.example.timecapsule.domain.model.RecipientUnlockRequirements
 import com.example.timecapsule.domain.model.SendStatus
 import com.example.timecapsule.domain.result.OperationResult
 import com.example.timecapsule.domain.session.SessionSnapshot
+import com.example.timecapsule.ui.s03.S03CapsuleListViewModel
+import com.example.timecapsule.ui.s07.S07CapsuleDetailViewModel
 import com.google.firebase.firestore.FirebaseFirestore
 import java.io.File
 import java.time.Instant
@@ -346,6 +348,55 @@ class Issue21FunctionalCorrectionsTest {
         val retainedRes = retentionAdapter.readRetainedContent(sessionA, "cap-retry")
         assertTrue(retainedRes is OperationResult.Success)
         assertEquals(now, (retainedRes as OperationResult.Success).data.verifiedUnlockedAt)
+    }
+
+    @Test
+    fun initialPhotoDownloadFailureAfterConfirmedUnlockThenOfflineProcessRecreation() = runBlocking {
+        val sessionA = sessionTracker.currentSession()
+        val now = Instant.now()
+
+        // 1. Persist verified unlock marker when online unlock is confirmed, even if photo download fails
+        val markerRes = retentionAdapter.saveVerifiedUnlockMarker(
+            targetSession = sessionA,
+            capsuleId = "cap-initial-fail",
+            verifiedUnlockedAt = now,
+            title = "Photo Pending Title",
+            lockMode = LockMode.TIME,
+            senderUid = userB,
+            recipientUid = userA,
+            hasPhoto = true
+        )
+        assertTrue(markerRes is OperationResult.Success)
+
+        // 2. Simulate process restart / offline execution
+        fakeFirestoreAdapter.isNetworkDown = true
+
+        val summaryRes = repository.getSummary("cap-initial-fail", sessionA)
+        assertTrue(summaryRes is OperationResult.Success)
+        val summary = (summaryRes as OperationResult.Success).data
+        assertEquals("Photo Pending Title", summary.title)
+        assertEquals(Availability.AVAILABLE, summary.availability)
+
+        // Content is unavailable locally since photo wasn't downloaded yet
+        val contentRes = repository.readContent("cap-initial-fail", sessionA)
+        assertTrue(contentRes is OperationResult.Unavailable)
+    }
+
+    @Test
+    fun accountTransitionWhileViewModelsActiveClearsPreviousAccountStateImmediately() = runBlocking {
+        val listViewModel = S03CapsuleListViewModel(sessionTracker, repository)
+        val detailViewModel = S07CapsuleDetailViewModel(sessionTracker, repository)
+
+        // Transition to User B
+        sessionTracker.startSession(userB)
+
+        val listState = listViewModel.uiState.value
+        val detailState = detailViewModel.uiState.value
+
+        assertEquals(userB, listState.sessionSnapshot?.uid)
+        assertEquals(userB, detailState.sessionSnapshot?.uid)
+        assertTrue(listState.receivedList.isEmpty())
+        assertTrue(detailState.content == null)
     }
 
     private fun sha256(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256")

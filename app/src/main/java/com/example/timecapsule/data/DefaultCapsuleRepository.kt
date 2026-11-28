@@ -13,6 +13,7 @@ import com.example.timecapsule.domain.model.CapsuleDraft
 import com.example.timecapsule.domain.model.CapsuleListsSnapshot
 import com.example.timecapsule.domain.model.CapsuleLock
 import com.example.timecapsule.domain.model.CapsuleSummary
+import com.example.timecapsule.domain.model.ListFreshness
 import com.example.timecapsule.domain.model.ForegroundLocationSample
 import com.example.timecapsule.domain.model.LocationSampleStatus
 import com.example.timecapsule.domain.model.LockMode
@@ -137,31 +138,37 @@ class DefaultCapsuleRepository(
             return OperationResult.Success(
                 CapsuleListsSnapshot(
                     sent = sentRes.data,
-                    received = receivedRes.data
+                    received = receivedRes.data,
+                    freshness = ListFreshness.SERVER_CONFIRMED
                 )
             )
         }
 
         // Authoritative Denied / Invalid -> Return immediately without offline fallback
-        if (sentRes is OperationResult.Denied) return sentRes
-        if (receivedRes is OperationResult.Denied) return receivedRes
-        if (sentRes is OperationResult.Invalid) return sentRes
-        if (receivedRes is OperationResult.Invalid) return receivedRes
+        @Suppress("UNCHECKED_CAST")
+        if (sentRes is OperationResult.Denied) return sentRes as OperationResult<CapsuleListsSnapshot>
+        @Suppress("UNCHECKED_CAST")
+        if (receivedRes is OperationResult.Denied) return receivedRes as OperationResult<CapsuleListsSnapshot>
+        @Suppress("UNCHECKED_CAST")
+        if (sentRes is OperationResult.Invalid) return sentRes as OperationResult<CapsuleListsSnapshot>
+        @Suppress("UNCHECKED_CAST")
+        if (receivedRes is OperationResult.Invalid) return receivedRes as OperationResult<CapsuleListsSnapshot>
 
-        // Attempt offline fallback ONLY when network/service is Unavailable
         val retention = retentionAdapter
-        if (retention != null && (sentRes is OperationResult.Unavailable || receivedRes is OperationResult.Unavailable)) {
-            val offlineEntries = retention.listVerifiedRecipientEntries(targetSession)
+
+        // Partial remote success: If one query succeeded and the other failed due to Unavailable
+        if (sentRes is OperationResult.Success && receivedRes is OperationResult.Unavailable) {
+            val offlineEntries = retention?.listVerifiedRecipientEntries(targetSession)
             if (!sessionTracker.isSessionValid(targetSession)) {
                 return OperationResult.Denied("Account session changed during offline lists fallback.")
             }
-            if (offlineEntries is OperationResult.Success && offlineEntries.data.isNotEmpty()) {
-                val offlineSummaries = offlineEntries.data.map { retained ->
+            val offlineReceived = if (offlineEntries is OperationResult.Success) {
+                offlineEntries.data.map { retained ->
                     CapsuleSummary(
                         capsuleId = retained.capsuleId,
-                        senderUid = "",
-                        recipientUid = cleanUid,
-                        lock = CapsuleLock(mode = retained.lockMode ?: LockMode.TIME),
+                        senderUid = retained.senderUid ?: "",
+                        recipientUid = retained.recipientUid ?: cleanUid,
+                        lock = CapsuleLock(mode = retained.lockMode ?: LockMode.TIME, unlockAt = retained.unlockAt),
                         sendStatus = SendStatus.SENT,
                         availability = Availability.AVAILABLE,
                         title = retained.title,
@@ -172,11 +179,54 @@ class DefaultCapsuleRepository(
                         recipientDisplayName = retained.recipientDisplayName
                     )
                 }
-                val sentList = if (sentRes is OperationResult.Success) sentRes.data else emptyList()
+            } else emptyList()
+            return OperationResult.Success(
+                CapsuleListsSnapshot(
+                    sent = sentRes.data,
+                    received = offlineReceived,
+                    freshness = ListFreshness.PARTIAL_OFFLINE
+                )
+            )
+        }
+
+        if (receivedRes is OperationResult.Success && sentRes is OperationResult.Unavailable) {
+            return OperationResult.Success(
+                CapsuleListsSnapshot(
+                    sent = emptyList(),
+                    received = receivedRes.data,
+                    freshness = ListFreshness.PARTIAL_OFFLINE
+                )
+            )
+        }
+
+        // Both remote queries failed due to Unavailable -> Stale offline fallback
+        if (retention != null) {
+            val offlineEntries = retention.listVerifiedRecipientEntries(targetSession)
+            if (!sessionTracker.isSessionValid(targetSession)) {
+                return OperationResult.Denied("Account session changed during offline lists fallback.")
+            }
+            if (offlineEntries is OperationResult.Success && offlineEntries.data.isNotEmpty()) {
+                val offlineSummaries = offlineEntries.data.map { retained ->
+                    CapsuleSummary(
+                        capsuleId = retained.capsuleId,
+                        senderUid = retained.senderUid ?: "",
+                        recipientUid = retained.recipientUid ?: cleanUid,
+                        lock = CapsuleLock(mode = retained.lockMode ?: LockMode.TIME, unlockAt = retained.unlockAt),
+                        sendStatus = SendStatus.SENT,
+                        availability = Availability.AVAILABLE,
+                        title = retained.title,
+                        createdAt = retained.createdAt,
+                        hasPhoto = retained.hasPhoto,
+                        unlockedAt = retained.verifiedUnlockedAt,
+                        senderDisplayName = retained.senderDisplayName,
+                        recipientDisplayName = retained.recipientDisplayName
+                    )
+                }
                 return OperationResult.Success(
                     CapsuleListsSnapshot(
-                        sent = sentList,
-                        received = offlineSummaries
+                        sent = emptyList(),
+                        received = offlineSummaries,
+                        freshness = ListFreshness.STALE_OFFLINE
                     )
                 )
             }
@@ -233,9 +283,9 @@ class DefaultCapsuleRepository(
                     return OperationResult.Success(
                         CapsuleSummary(
                             capsuleId = cleanCapsuleId,
-                            senderUid = "",
-                            recipientUid = activeUid,
-                            lock = CapsuleLock(mode = matching.lockMode ?: LockMode.TIME),
+                            senderUid = matching.senderUid ?: "",
+                            recipientUid = matching.recipientUid ?: activeUid,
+                            lock = CapsuleLock(mode = matching.lockMode ?: LockMode.TIME, unlockAt = matching.unlockAt),
                             sendStatus = SendStatus.SENT,
                             availability = Availability.AVAILABLE,
                             title = matching.title,
@@ -391,6 +441,15 @@ class DefaultCapsuleRepository(
         val result = firestoreAdapter.verifyRecipientUnlockDetailed(cleanId, activeUid, sample, clockNanosSupplier)
         if (!sessionTracker.isSessionValid(targetSession)) {
             return OperationResult.Denied("Account session changed during unlock verification.")
+        }
+        if (result is OperationResult.Success && result.data.availability == Availability.AVAILABLE) {
+            retentionAdapter?.saveVerifiedUnlockMarker(
+                targetSession = targetSession,
+                capsuleId = cleanId,
+                verifiedUnlockedAt = Instant.now(),
+                lockMode = mode,
+                recipientUid = activeUid
+            )
         }
         return result
     }

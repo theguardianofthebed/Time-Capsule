@@ -45,18 +45,91 @@ class DefaultLocalRetentionAdapter(
         private const val PHOTO_FILE_NAME = "content.photo"
     }
 
-    override suspend fun saveRetainedContent(
+    override suspend fun saveVerifiedUnlockMarker(
         targetSession: SessionSnapshot,
         capsuleId: String,
         verifiedUnlockedAt: Instant,
-        text: String?,
-        photoBytes: ByteArray?,
-        photoFormat: OriginalPhotoFormat?
-    ): OperationResult<Unit> {
-        return saveRetainedContent(
-            targetSession, capsuleId, verifiedUnlockedAt, text, photoBytes, photoFormat,
-            null, null, null, null, null
-        )
+        title: String?,
+        lockMode: LockMode?,
+        senderUid: String?,
+        recipientUid: String?,
+        senderDisplayName: String?,
+        recipientDisplayName: String?,
+        createdAt: Instant?,
+        hasText: Boolean,
+        hasPhoto: Boolean
+    ): OperationResult<Unit> = withContext(Dispatchers.IO) {
+        val cleanUid = (targetSession.uid ?: "").trim()
+        val cleanCapsuleId = capsuleId.trim()
+        if (cleanUid.isBlank() || cleanCapsuleId.isBlank()) {
+            return@withContext OperationResult.Invalid("UID and capsule ID must not be blank for unlock marker.")
+        }
+        if (!cleanCapsuleId.matches(Regex("[A-Za-z0-9_-]+"))) {
+            return@withContext OperationResult.Invalid("Invalid capsule ID format for storage.")
+        }
+
+        synchronized(lock) {
+            if (!targetSession.isAuthenticated || session() != targetSession) {
+                return@synchronized OperationResult.Denied("Unlock marker save denied for stale or unauthenticated session generation.")
+            }
+            try {
+                val directory = targetCapsuleDirectory(cleanUid, cleanCapsuleId)
+                if (!directory.isDirectory && !directory.mkdirs()) {
+                    return@synchronized OperationResult.Unavailable("Cannot create retained content directory.")
+                }
+
+                val markerFile = File(directory, MARKER_FILE_NAME)
+                val existingProperties = Properties()
+                if (markerFile.exists()) {
+                    try { markerFile.inputStream().use { existingProperties.load(it) } } catch (_: Exception) {}
+                }
+
+                val properties = Properties().apply {
+                    setProperty("version", MARKER_VERSION)
+                    setProperty("uid", cleanUid)
+                    setProperty("capsuleId", cleanCapsuleId)
+                    setProperty("verifiedUnlockedAt", verifiedUnlockedAt.toString())
+                    setProperty("hasText", (hasText || existingProperties.getProperty("hasText") == "true").toString())
+                    setProperty("hasPhoto", (hasPhoto || existingProperties.getProperty("hasPhoto") == "true").toString())
+                    existingProperties.getProperty("photoSha256")?.let { setProperty("photoSha256", it) }
+                    existingProperties.getProperty("photoFormat")?.let { setProperty("photoFormat", it) }
+                    lockMode?.let { setProperty("lockMode", it.name) }
+                        ?: existingProperties.getProperty("lockMode")?.let { setProperty("lockMode", it) }
+                    title?.takeIf { it.isNotBlank() }?.let { setProperty("title", it) }
+                        ?: existingProperties.getProperty("title")?.let { setProperty("title", it) }
+                    senderUid?.takeIf { it.isNotBlank() }?.let { setProperty("senderUid", it) }
+                        ?: existingProperties.getProperty("senderUid")?.let { setProperty("senderUid", it) }
+                    recipientUid?.takeIf { it.isNotBlank() }?.let { setProperty("recipientUid", it) }
+                        ?: existingProperties.getProperty("recipientUid")?.let { setProperty("recipientUid", it) }
+                    senderDisplayName?.takeIf { it.isNotBlank() }?.let { setProperty("senderDisplayName", it) }
+                        ?: existingProperties.getProperty("senderDisplayName")?.let { setProperty("senderDisplayName", it) }
+                    recipientDisplayName?.takeIf { it.isNotBlank() }?.let { setProperty("recipientDisplayName", it) }
+                        ?: existingProperties.getProperty("recipientDisplayName")?.let { setProperty("recipientDisplayName", it) }
+                    createdAt?.let { setProperty("createdAt", it.toString()) }
+                        ?: existingProperties.getProperty("createdAt")?.let { setProperty("createdAt", it) }
+                }
+
+                val tempMarker = File.createTempFile("marker-", ".partial", directory)
+                try {
+                    tempMarker.outputStream().use { output ->
+                        properties.store(output, null)
+                        output.fd.sync()
+                    }
+                    Files.move(
+                        tempMarker.toPath(),
+                        markerFile.toPath(),
+                        StandardCopyOption.ATOMIC_MOVE,
+                        StandardCopyOption.REPLACE_EXISTING
+                    )
+                } finally {
+                    tempMarker.delete()
+                }
+
+                OperationResult.Success(Unit)
+            } catch (error: Exception) {
+                OperationResult.Unavailable("Failed to persist unlock marker: ${error.message}")
+            }
+        }
     }
 
     override suspend fun saveRetainedContent(
@@ -101,7 +174,11 @@ class DefaultLocalRetentionAdapter(
 
                 // A failed replacement must never authorize a mixture of old and new files.
                 val markerFile = File(directory, MARKER_FILE_NAME)
-                Files.deleteIfExists(markerFile.toPath())
+                val existingProperties = Properties()
+                if (markerFile.exists()) {
+                    try { markerFile.inputStream().use { existingProperties.load(it) } } catch (_: Exception) {}
+                }
+
                 val textFile = File(directory, TEXT_FILE_NAME)
                 if (retainedText == null) Files.deleteIfExists(textFile.toPath())
                 else writeAtomic(textFile, retainedText.toByteArray(Charsets.UTF_8))
@@ -119,10 +196,15 @@ class DefaultLocalRetentionAdapter(
                     photoBytes?.let { setProperty("photoSha256", sha256(it)) }
                     photoFormat?.let { setProperty("photoFormat", it.name) }
                     lockMode?.let { setProperty("lockMode", it.name) }
+                        ?: existingProperties.getProperty("lockMode")?.let { setProperty("lockMode", it) }
                     title?.takeIf { it.isNotBlank() }?.let { setProperty("title", it) }
+                        ?: existingProperties.getProperty("title")?.let { setProperty("title", it) }
                     senderDisplayName?.takeIf { it.isNotBlank() }?.let { setProperty("senderDisplayName", it) }
+                        ?: existingProperties.getProperty("senderDisplayName")?.let { setProperty("senderDisplayName", it) }
                     recipientDisplayName?.takeIf { it.isNotBlank() }?.let { setProperty("recipientDisplayName", it) }
+                        ?: existingProperties.getProperty("recipientDisplayName")?.let { setProperty("recipientDisplayName", it) }
                     createdAt?.let { setProperty("createdAt", it.toString()) }
+                        ?: existingProperties.getProperty("createdAt")?.let { setProperty("createdAt", it) }
                 }
 
                 val tempMarker = File.createTempFile("marker-", ".partial", directory)
@@ -334,6 +416,9 @@ class DefaultLocalRetentionAdapter(
             val hasText = properties.getProperty("hasText")?.toBooleanStrictOrNull() ?: false
             val hasPhoto = properties.getProperty("hasPhoto")?.toBooleanStrictOrNull() ?: false
 
+            val senderUid = properties.getProperty("senderUid")?.takeIf { it.isNotBlank() }
+            val recipientUid = properties.getProperty("recipientUid")?.takeIf { it.isNotBlank() }
+
             val lockModeStr = properties.getProperty("lockMode")
             val lockMode = lockModeStr?.let {
                 try { LockMode.valueOf(it) } catch (_: Exception) { null }
@@ -358,6 +443,8 @@ class DefaultLocalRetentionAdapter(
                     uid = cleanUid,
                     capsuleId = cleanCapsuleId,
                     verifiedUnlockedAt = verifiedUnlockedAt,
+                    senderUid = senderUid,
+                    recipientUid = recipientUid,
                     lockMode = lockMode,
                     title = title,
                     senderDisplayName = senderDisplayName,

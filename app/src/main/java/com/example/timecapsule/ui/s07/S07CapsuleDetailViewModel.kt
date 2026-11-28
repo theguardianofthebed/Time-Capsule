@@ -31,23 +31,54 @@ class S07CapsuleDetailViewModel(
     private var activeJob: Job? = null
     private var requestToken: Long = 0L
 
+    init {
+        viewModelScope.launch {
+            sessionTracker.observeSession().collect { session ->
+                activeJob?.cancel()
+                requestToken++
+                if (!session.isAuthenticated) {
+                    _uiState.value = CapsuleDetailUiState(isLoading = false, sessionSnapshot = session)
+                } else {
+                    val currentId = _uiState.value.capsuleId
+                    _uiState.value = CapsuleDetailUiState(isLoading = false, sessionSnapshot = session)
+                    if (currentId.isNotBlank()) {
+                        loadDetail(currentId)
+                    }
+                }
+            }
+        }
+    }
+
     fun loadDetail(capsuleId: String) {
         val cleanId = capsuleId.trim()
         if (cleanId.isBlank()) {
-            _uiState.value = CapsuleDetailUiState(isLoading = false, errorMessage = "Capsule ID is required.")
+            _uiState.value = CapsuleDetailUiState(
+                isLoading = false,
+                status = DetailStatus.ERROR,
+                errorMessage = "Capsule ID is required."
+            )
             return
         }
 
         val capturedSession = sessionTracker.currentSession()
         val activeUid = capturedSession.uid
         if (!capturedSession.isAuthenticated || activeUid.isNullOrBlank()) {
-            _uiState.value = CapsuleDetailUiState(isLoading = false, errorMessage = "Authentication required.")
+            _uiState.value = CapsuleDetailUiState(
+                isLoading = false,
+                status = DetailStatus.ACCESS_DENIED,
+                errorMessage = "Authentication required."
+            )
             return
         }
 
         val token = ++requestToken
         activeJob?.cancel()
-        _uiState.value = CapsuleDetailUiState(isLoading = true, capsuleId = cleanId)
+        _uiState.value = CapsuleDetailUiState(
+            isLoading = true,
+            capsuleId = cleanId,
+            status = DetailStatus.LOADING,
+            sessionSnapshot = capturedSession
+        )
 
         activeJob = viewModelScope.launch {
             // 1. Fetch metadata summary
@@ -55,17 +86,13 @@ class S07CapsuleDetailViewModel(
             if (!sessionTracker.isSessionValid(capturedSession) || token != requestToken) return@launch
 
             if (summaryRes !is OperationResult.Success) {
-                val msg = when (summaryRes) {
-                    is OperationResult.Invalid -> summaryRes.message
-                    is OperationResult.Denied -> summaryRes.message
-                    is OperationResult.Unavailable -> summaryRes.message
-                    is OperationResult.OutcomeUnknown -> summaryRes.message
-                    is OperationResult.Success -> ""
-                }
+                val msg = resultErrorMessage(summaryRes)
                 _uiState.value = CapsuleDetailUiState(
                     isLoading = false,
                     capsuleId = cleanId,
-                    errorMessage = msg
+                    status = DetailStatus.ERROR,
+                    errorMessage = msg,
+                    sessionSnapshot = capturedSession
                 )
                 return@launch
             }
@@ -83,7 +110,9 @@ class S07CapsuleDetailViewModel(
                     capsuleId = cleanId,
                     summary = summary,
                     role = ParticipantRole.NONE,
-                    errorMessage = "Access denied. User is not a participant of this capsule."
+                    status = DetailStatus.ACCESS_DENIED,
+                    errorMessage = "Access denied. User is not a participant of this capsule.",
+                    sessionSnapshot = capturedSession
                 )
                 return@launch
             }
@@ -102,7 +131,9 @@ class S07CapsuleDetailViewModel(
                             role = ParticipantRole.AUTHOR_COPY,
                             content = contentRes.data,
                             isUnlocked = false,
-                            unlockReason = "Sender Copy"
+                            status = DetailStatus.AUTHOR_COPY_READY,
+                            unlockReason = "Sender Copy",
+                            sessionSnapshot = capturedSession
                         )
                     }
                     else -> {
@@ -111,8 +142,10 @@ class S07CapsuleDetailViewModel(
                             capsuleId = cleanId,
                             summary = summary,
                             role = ParticipantRole.AUTHOR_COPY,
+                            status = DetailStatus.AUTHOR_COPY_ASSET_UNAVAILABLE,
                             errorMessage = resultErrorMessage(contentRes),
-                            isAssetUnavailable = true
+                            isAssetUnavailable = true,
+                            sessionSnapshot = capturedSession
                         )
                     }
                 }
@@ -131,13 +164,20 @@ class S07CapsuleDetailViewModel(
             }
 
             if (!isUnlocked) {
+                val lockedStatus = when (summary.lock.mode) {
+                    LockMode.TIME -> DetailStatus.LOCKED_WAITING_TIME
+                    LockMode.LOCATION -> DetailStatus.LOCKED_WAITING_LOCATION
+                    LockMode.TIME_AND_LOCATION -> DetailStatus.LOCKED_WAITING_BOTH
+                }
                 _uiState.value = CapsuleDetailUiState(
                     isLoading = false,
                     capsuleId = cleanId,
                     summary = summary,
                     role = ParticipantRole.RECIPIENT,
                     isUnlocked = false,
-                    unlockReason = formatLockReason(summary)
+                    status = lockedStatus,
+                    unlockReason = formatLockReason(summary),
+                    sessionSnapshot = capturedSession
                 )
                 return@launch
             }
@@ -155,7 +195,9 @@ class S07CapsuleDetailViewModel(
                         role = ParticipantRole.RECIPIENT,
                         content = contentRes.data,
                         isUnlocked = true,
-                        unlockReason = "Capsule unlocked"
+                        status = DetailStatus.UNLOCKED_CONTENT_READY,
+                        unlockReason = "Capsule unlocked",
+                        sessionSnapshot = capturedSession
                     )
                 }
                 else -> {
@@ -165,8 +207,10 @@ class S07CapsuleDetailViewModel(
                         summary = summary,
                         role = ParticipantRole.RECIPIENT,
                         isUnlocked = true,
+                        status = DetailStatus.UNLOCKED_ASSET_UNAVAILABLE,
                         errorMessage = resultErrorMessage(contentRes),
-                        isAssetUnavailable = true
+                        isAssetUnavailable = true,
+                        sessionSnapshot = capturedSession
                     )
                 }
             }

@@ -256,7 +256,12 @@ class CapsuleListsAndDetailRepositoryTest {
             verifiedUnlockedAt: Instant,
             text: String?,
             photoBytes: ByteArray?,
-            photoFormat: OriginalPhotoFormat?
+            photoFormat: OriginalPhotoFormat?,
+            title: String?,
+            lockMode: LockMode?,
+            senderDisplayName: String?,
+            recipientDisplayName: String?,
+            createdAt: Instant?
         ): OperationResult<Unit> {
             retainedEntries.add(
                 RetainedContent(

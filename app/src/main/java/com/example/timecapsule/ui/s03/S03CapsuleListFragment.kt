@@ -4,6 +4,9 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Button
+import android.widget.LinearLayout
+import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
@@ -17,6 +20,8 @@ import com.example.timecapsule.databinding.ItemCapsuleSummaryBinding
 import com.example.timecapsule.domain.model.Availability
 import com.example.timecapsule.domain.model.CapsuleSummary
 import com.example.timecapsule.domain.model.LockMode
+import com.example.timecapsule.domain.model.PublicationPhase
+import com.example.timecapsule.domain.model.RecoveredPublication
 import com.example.timecapsule.ui.ViewModelFactory
 import kotlinx.coroutines.launch
 import java.time.ZoneId
@@ -105,7 +110,12 @@ class S03CapsuleListFragment : Fragment() {
         val container = binding.llCapsuleListContainer
         container.removeAllViews()
 
-        if (currentList.isEmpty() && !state.isLoading) {
+        // Render unresolved operations if on SENT tab
+        if (state.selectedTab == CapsuleTab.SENT && state.unresolvedOperations.isNotEmpty()) {
+            renderUnresolvedOperations(container, state.unresolvedOperations)
+        }
+
+        if (currentList.isEmpty() && state.unresolvedOperations.isEmpty() && !state.isLoading) {
             binding.tvEmptyList.text = if (state.selectedTab == CapsuleTab.RECEIVED)
                 getString(R.string.s03_empty_received)
             else
@@ -120,6 +130,66 @@ class S03CapsuleListFragment : Fragment() {
                 bindCapsuleItem(itemBinding, summary, state.selectedTab)
                 container.addView(itemBinding.root)
             }
+        }
+    }
+
+    private fun renderUnresolvedOperations(
+        container: LinearLayout,
+        unresolved: List<RecoveredPublication>
+    ) {
+        val context = requireContext()
+        val sectionHeader = TextView(context).apply {
+            text = "Pending & Unresolved Publications"
+            setTextColor(ContextCompat.getColor(context, R.color.capsule_primary))
+            textSize = 13f
+            setPadding(0, 16, 0, 8)
+        }
+        container.addView(sectionHeader)
+
+        for (pub in unresolved) {
+            val card = LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(16, 16, 16, 16)
+                setBackgroundResource(R.drawable.bg_card_surface)
+                val params = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { setMargins(0, 0, 0, 16) }
+                layoutParams = params
+            }
+
+            val titleView = TextView(context).apply {
+                text = "Capsule ID: ${pub.capsuleId}"
+                setTextColor(ContextCompat.getColor(context, R.color.capsule_text_dark))
+                textSize = 14f
+            }
+            card.addView(titleView)
+
+            val statusText = when (pub.phase) {
+                PublicationPhase.PREPARED, PublicationPhase.UPLOADING, PublicationPhase.PUBLISHING -> "Sending in progress..."
+                PublicationPhase.OUTCOME_UNKNOWN -> "Result unconfirmed — check result or retry"
+                PublicationPhase.FAILED -> "Send failed — action required"
+                PublicationPhase.ABANDONED -> "Send abandoned"
+                PublicationPhase.SENT -> "Sent"
+            }
+
+            val statusView = TextView(context).apply {
+                text = statusText
+                setTextColor(ContextCompat.getColor(context, R.color.capsule_text_muted))
+                textSize = 12f
+                setPadding(0, 4, 0, 8)
+            }
+            card.addView(statusView)
+
+            val btnAction = Button(context).apply {
+                text = if (pub.phase == PublicationPhase.OUTCOME_UNKNOWN) "Check / Retry" else "Open Confirm Send (S-06)"
+                setOnClickListener {
+                    (requireActivity() as MainActivity).navigateToConfirmSend()
+                }
+            }
+            card.addView(btnAction)
+
+            container.addView(card)
         }
     }
 

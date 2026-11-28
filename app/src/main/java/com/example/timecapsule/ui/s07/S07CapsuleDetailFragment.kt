@@ -1,5 +1,6 @@
 package com.example.timecapsule.ui.s07
 
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -15,7 +16,9 @@ import com.example.timecapsule.MainActivity
 import com.example.timecapsule.R
 import com.example.timecapsule.databinding.FragmentS07CapsuleDetailBinding
 import com.example.timecapsule.ui.ViewModelFactory
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
@@ -106,6 +109,10 @@ class S07CapsuleDetailFragment : Fragment() {
 
             val unlockAtStr = summary.lock.unlockAt?.let { formatter.format(it) } ?: "Not specified"
             binding.tvS07LockCondition.text = "Unlock time: $unlockAtStr\nLock mode: ${summary.lock.mode.name}"
+        } else {
+            binding.tvS07Headline.text = ""
+            binding.tvS07Meta.text = ""
+            binding.tvS07LockCondition.text = ""
         }
 
         when (state.role) {
@@ -132,16 +139,19 @@ class S07CapsuleDetailFragment : Fragment() {
             binding.llS07ContentCard.visibility = View.VISIBLE
             binding.tvS07BodyText.text = state.content.text ?: ""
 
-            if (state.content.photoBytes != null && state.content.photoBytes!!.isNotEmpty()) {
-                val bitmap = BitmapFactory.decodeByteArray(
-                    state.content.photoBytes, 0, state.content.photoBytes!!.size
-                )
-                if (bitmap != null) {
-                    binding.ivS07Photo.setImageBitmap(bitmap)
-                    binding.ivS07Photo.visibility = View.VISIBLE
-                } else {
-                    binding.ivS07Photo.setImageDrawable(null)
-                    binding.ivS07Photo.visibility = View.GONE
+            val photoBytes = state.content.photoBytes
+            if (photoBytes != null && photoBytes.isNotEmpty()) {
+                viewLifecycleOwner.lifecycleScope.launch {
+                    val bitmap = decodeSampledBitmap(photoBytes, 1024)
+                    _binding?.let { b ->
+                        if (bitmap != null) {
+                            b.ivS07Photo.setImageBitmap(bitmap)
+                            b.ivS07Photo.visibility = View.VISIBLE
+                        } else {
+                            b.ivS07Photo.setImageDrawable(null)
+                            b.ivS07Photo.visibility = View.GONE
+                        }
+                    }
                 }
             } else {
                 binding.ivS07Photo.setImageDrawable(null)
@@ -152,6 +162,8 @@ class S07CapsuleDetailFragment : Fragment() {
             binding.tvS07SignOff.text = "With care,\n$senderName"
         } else {
             binding.llS07ContentCard.visibility = View.GONE
+            binding.tvS07BodyText.text = ""
+            binding.tvS07SignOff.text = ""
             binding.ivS07Photo.setImageDrawable(null)
         }
 
@@ -167,7 +179,27 @@ class S07CapsuleDetailFragment : Fragment() {
             Toast.makeText(requireContext(), state.errorMessage, Toast.LENGTH_SHORT).show()
         }
 
-        binding.btnS07Retry.visibility = if (state.isAssetUnavailable) View.VISIBLE else View.GONE
+        binding.btnS07Retry.visibility = if (state.isAssetUnavailable || !state.isUnlocked) View.VISIBLE else View.GONE
+    }
+
+    private suspend fun decodeSampledBitmap(photoBytes: ByteArray, maxDim: Int = 1024): Bitmap? = withContext(Dispatchers.IO) {
+        try {
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeByteArray(photoBytes, 0, photoBytes.size, bounds)
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return@withContext null
+
+            var inSampleSize = 1
+            while (bounds.outWidth / inSampleSize > maxDim || bounds.outHeight / inSampleSize > maxDim) {
+                inSampleSize *= 2
+            }
+
+            val options = BitmapFactory.Options().apply {
+                this.inSampleSize = inSampleSize
+            }
+            BitmapFactory.decodeByteArray(photoBytes, 0, photoBytes.size, options)
+        } catch (_: Exception) {
+            null
+        }
     }
 
     override fun onDestroyView() {
