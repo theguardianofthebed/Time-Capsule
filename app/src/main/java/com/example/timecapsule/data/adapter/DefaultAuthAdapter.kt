@@ -102,6 +102,7 @@ class DefaultAuthAdapter(
 
     private fun <T> mapAuthException(e: Exception): OperationResult<T> {
         return when (e) {
+            is kotlinx.coroutines.CancellationException -> throw e
             is FirebaseNetworkException -> {
                 OperationResult.Unavailable("Network unavailable. Please check your connection.")
             }
@@ -112,13 +113,13 @@ class DefaultAuthAdapter(
                 OperationResult.Invalid("User email is already registered.")
             }
             is FirebaseAuthInvalidCredentialsException -> {
-                OperationResult.Invalid("Invalid credentials provided.")
+                OperationResult.Invalid("Email or password is incorrect. Check both and retry.")
             }
             is FirebaseAuthInvalidUserException -> {
                 OperationResult.Denied("User account disabled or not found.")
             }
             else -> {
-                OperationResult.Denied("Authentication operation failed: ${e.localizedMessage ?: e.message}")
+                OperationResult.Unavailable("Account service unavailable. Check your connection and retry.")
             }
         }
     }

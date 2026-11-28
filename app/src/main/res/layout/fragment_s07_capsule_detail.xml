@@ -18,11 +18,11 @@
 
         <ImageButton
             android:id="@+id/btnS07Back"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
             android:background="?selectableItemBackgroundBorderless"
-            android:contentDescription="@string/s07_nav_title"
-            android:src="@drawable/ic_arrow_right" />
+            android:contentDescription="@string/nav_back"
+            android:src="@drawable/ic_back" />
 
         <TextView
             android:layout_width="0dp"
@@ -79,7 +79,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
-                android:textColor="@color/capsule_text_muted"
+                android:textColor="@color/capsule_text_body"
                 android:textSize="12sp" />
 
             <!-- Lock Condition Card ("MEANT TO OPEN") -->
@@ -137,6 +137,7 @@
 
                 <ImageView
                     android:id="@+id/ivS07Photo"
+                    android:contentDescription="@string/capsule_photo_description"
                     android:layout_width="match_parent"
                     android:layout_height="220dp"
                     android:layout_marginTop="12dp"
@@ -162,7 +163,7 @@
                 android:layout_marginTop="16dp"
                 android:background="@drawable/bg_banner_info"
                 android:padding="12dp"
-                android:textColor="@color/capsule_banner_text"
+                android:textColor="@color/capsule_text_body"
                 android:textSize="12sp"
                 android:visibility="gone" />
 
@@ -212,7 +213,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="@string/nav_create"
-            android:textColor="@color/capsule_text_muted" />
+            android:textColor="@color/capsule_text_body" />
 
         <Button
             android:id="@+id/btnS07NavAccount"
@@ -221,7 +222,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="@string/nav_account"
-            android:textColor="@color/capsule_text_muted" />
+            android:textColor="@color/capsule_text_body" />
     </LinearLayout>
 
 </LinearLayout>

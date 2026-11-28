@@ -28,6 +28,7 @@ import com.example.timecapsule.ui.ViewModelFactory
 import kotlinx.coroutines.launch
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import android.graphics.Typeface
 
 /**
  * Fragment for S-03 Capsule List screen.
@@ -66,11 +67,20 @@ class S03CapsuleListFragment : Fragment() {
         return binding.root
     }
 
+    /** Restore list direction and subscribe to this view's account-scoped rows. */
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        binding.btnTabReceived.setOnClickListener { viewModel.selectTab(CapsuleTab.RECEIVED) }
-        binding.btnTabSent.setOnClickListener { viewModel.selectTab(CapsuleTab.SENT) }
+        val host = requireActivity() as MainActivity
+        binding.btnTabReceived.setOnClickListener {
+            host.rememberTab(CapsuleTab.RECEIVED)
+            viewModel.selectTab(CapsuleTab.RECEIVED)
+        }
+        if ((savedInstanceState ?: arguments)?.getBoolean("showSent") == true) viewModel.selectTab(CapsuleTab.SENT)
+        binding.btnTabSent.setOnClickListener {
+            host.rememberTab(CapsuleTab.SENT)
+            viewModel.selectTab(CapsuleTab.SENT)
+        }
         binding.btnHeaderRefresh.setOnClickListener { viewModel.loadLists(explicitRefresh = true) }
         binding.btnHeaderAccount.setOnClickListener { onAccountSettingsListener?.invoke() }
 
@@ -91,12 +101,16 @@ class S03CapsuleListFragment : Fragment() {
     private fun renderUiState(state: CapsuleListUiState) {
         binding.pbLoading.visibility = if (state.isLoading) View.VISIBLE else View.GONE
 
+        binding.btnTabReceived.isSelected = state.selectedTab == CapsuleTab.RECEIVED
+        binding.btnTabSent.isSelected = state.selectedTab == CapsuleTab.SENT
+        binding.btnTabReceived.setTypeface(null, if (binding.btnTabReceived.isSelected) Typeface.BOLD else Typeface.NORMAL)
+        binding.btnTabSent.setTypeface(null, if (binding.btnTabSent.isSelected) Typeface.BOLD else Typeface.NORMAL)
         // Tab selection styling
         if (state.selectedTab == CapsuleTab.RECEIVED) {
             binding.btnTabReceived.setTextColor(ContextCompat.getColor(requireContext(), R.color.capsule_primary))
-            binding.btnTabSent.setTextColor(ContextCompat.getColor(requireContext(), R.color.capsule_text_muted))
+            binding.btnTabSent.setTextColor(ContextCompat.getColor(requireContext(), R.color.capsule_text_body))
         } else {
-            binding.btnTabReceived.setTextColor(ContextCompat.getColor(requireContext(), R.color.capsule_text_muted))
+            binding.btnTabReceived.setTextColor(ContextCompat.getColor(requireContext(), R.color.capsule_text_body))
             binding.btnTabSent.setTextColor(ContextCompat.getColor(requireContext(), R.color.capsule_primary))
         }
 
@@ -182,7 +196,7 @@ class S03CapsuleListFragment : Fragment() {
 
             val statusText = when (pub.phase) {
                 PublicationPhase.PREPARED, PublicationPhase.UPLOADING, PublicationPhase.PUBLISHING -> "Sending in progress..."
-                PublicationPhase.OUTCOME_UNKNOWN -> "Result unconfirmed — check result or retry"
+                PublicationPhase.OUTCOME_UNKNOWN -> "Result unconfirmed — check original send"
                 PublicationPhase.FAILED -> "Send failed — action required"
                 PublicationPhase.ABANDONED -> "Send abandoned"
                 PublicationPhase.SENT -> "Sent"
@@ -190,14 +204,14 @@ class S03CapsuleListFragment : Fragment() {
 
             val statusView = TextView(context).apply {
                 text = statusText
-                setTextColor(ContextCompat.getColor(context, R.color.capsule_text_muted))
+                setTextColor(ContextCompat.getColor(context, R.color.capsule_text_body))
                 textSize = 12f
                 setPadding(0, 4, 0, 8)
             }
             card.addView(statusView)
 
             val btnAction = Button(context).apply {
-                text = if (pub.phase == PublicationPhase.OUTCOME_UNKNOWN) "Check / Retry" else "Open Confirm Send (S-06)"
+                text = if (pub.phase == PublicationPhase.OUTCOME_UNKNOWN) "Check result" else "Open Confirm Send (S-06)"
                 setOnClickListener {
                     (requireActivity() as MainActivity).navigateToConfirmSend(pub.capsuleId, origin)
                 }
@@ -234,7 +248,12 @@ class S03CapsuleListFragment : Fragment() {
         val dateStr = summary.createdAt?.let { formatter.format(it) } ?: "A moment, kept"
         itemBinding.tvItemSubtitle.text = dateStr
 
-        itemBinding.tvItemStatusBadge.text = if (isOpened) getString(R.string.s03_status_opened) else getString(R.string.s03_status_sealed)
+        itemBinding.tvItemStatusBadge.text = when {
+            tab == CapsuleTab.SENT && summary.senderUid != summary.recipientUid -> "Sender copy"
+            isOpened -> getString(R.string.s03_status_opened)
+            summary.availability == Availability.UNKNOWN -> "Verification required"
+            else -> "Locked · Check conditions"
+        }
         itemBinding.tvItemStatusBadge.setBackgroundResource(
             if (isOpened) R.color.capsule_success_bg else R.color.capsule_badge_bg
         )
@@ -250,6 +269,12 @@ class S03CapsuleListFragment : Fragment() {
         itemBinding.itemCapsuleRoot.setOnClickListener {
             onOpenCapsuleDetailListener?.invoke(summary.capsuleId)
         }
+    }
+
+    /** Rotation preserves the user's latest tab, even when the original entry requested another tab. */
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putBoolean("showSent", viewModel.uiState.value.selectedTab == CapsuleTab.SENT)
     }
 
     override fun onDestroyView() {

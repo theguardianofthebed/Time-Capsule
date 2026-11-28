@@ -14,12 +14,10 @@ import com.example.timecapsule.MainActivity
 import com.example.timecapsule.R
 import com.example.timecapsule.domain.model.PublicationPhase
 import com.example.timecapsule.databinding.FragmentS06ConfirmSendBinding
-import com.example.timecapsule.domain.model.LockMode
-import com.example.timecapsule.domain.time.TimeConversionHelper
 import com.example.timecapsule.ui.ViewModelFactory
 import com.example.timecapsule.ui.draft.CapsuleDraftViewModel
-import java.time.ZoneId
 import kotlinx.coroutines.launch
+import com.example.timecapsule.ui.s03.CapsuleTab
 
 /**
  * S-06 Confirm Send / Review ScreenFragment using native Views and ViewBinding.
@@ -110,6 +108,9 @@ class S06ConfirmSendFragment : Fragment() {
             arguments?.getString("originUid"), arguments?.getLong("originGeneration", -1L) ?: -1L))
     }
 
+    /** Only an editable draft can return to recipient and lock editing. */
+    fun canEditDraft() = ::viewModel.isInitialized && activeTargetCapsuleId == null && viewModel.uiState.value.editable
+
     /** Routes user actions through guarded ViewModel operations instead of Firebase calls. */
     private fun setupClickListeners() {
         binding.btnBack.setOnClickListener {
@@ -123,16 +124,20 @@ class S06ConfirmSendFragment : Fragment() {
         binding.btnSendCapsule.setOnClickListener {
             when (viewModel.uiState.value.publicationPhase) {
                 PublicationPhase.SENT -> {
-                    viewModel.startNewAfterSent(activeTargetCapsuleId)
-                    if (viewModel.uiState.value.editable) {
-                        (requireActivity() as MainActivity).navigateToContentDraft()
-                    }
+                    val activity = requireActivity() as MainActivity
+                    activity.rememberTab(CapsuleTab.SENT)
+                    activity.navigateToCapsuleList()
                 }
                 null -> if (activeTargetCapsuleId == null) viewModel.sendCapsule() else Unit
                 else -> viewModel.retryPublication(activeTargetCapsuleId)
             }
         }
-        binding.btnCheckPublication.setOnClickListener { checkPublication() }
+        binding.btnCheckPublication.setOnClickListener {
+            if (viewModel.uiState.value.publicationPhase == PublicationPhase.SENT) {
+                viewModel.startNewAfterSent(activeTargetCapsuleId)
+                if (viewModel.uiState.value.editable) (requireActivity() as MainActivity).navigateToContentDraft()
+            } else checkPublication()
+        }
         binding.btnReplacePublication.setOnClickListener { viewModel.replaceFailedPublication(activeTargetCapsuleId) }
 
         binding.btnNavMoments.setOnClickListener {
@@ -158,22 +163,29 @@ class S06ConfirmSendFragment : Fragment() {
                     val sent = state.publicationPhase == PublicationPhase.SENT
                     binding.layoutSummaryCard.visibility =
                         if (state.statusOnly || sent || state.recoveryBusy || state.recoveryBlocked) View.GONE else View.VISIBLE
-                    binding.btnSendCapsule.isEnabled = !busy && !state.recoveryBlocked
-                    binding.btnSendCapsule.setText(when {
-                        sent -> R.string.publication_new
-                        state.publicationPhase != null -> R.string.publication_retry
-                        else -> R.string.s06_btn_send
-                    })
+                    val canSend = activeTargetCapsuleId == null && state.editable
+                    val primary = when {
+                        state.recoveryBlocked -> null
+                        sent -> R.string.view_sent
+                        state.canRetryUnchanged && !busy -> R.string.publication_retry
+                        canSend -> R.string.s06_btn_send
+                        else -> null
+                    }
+                    binding.btnSendCapsule.visibility = if (primary == null) View.GONE else View.VISIBLE
+                    primary?.let(binding.btnSendCapsule::setText)
+                    binding.btnSendCapsule.isEnabled = primary != null && !busy
                     binding.btnCheckPublication.visibility =
                         if (state.publicationPhase != null || state.recoveryBlocked) View.VISIBLE else View.GONE
                     binding.btnCheckPublication.isEnabled = !busy
-                    binding.btnCheckPublication.setText(if (state.recoveryBlocked)
-                        R.string.publication_recover else R.string.publication_check)
-                    binding.btnReplacePublication.visibility =
-                        if (state.canAbandon) View.VISIBLE else View.GONE
-                    binding.btnReplacePublication.isEnabled = !busy && !state.recoveryBlocked
-                    binding.btnEditDraft.isEnabled = state.editable && !busy
-                    binding.btnBack.isEnabled = state.editable && !busy
+                    binding.btnCheckPublication.setText(when {
+                        state.recoveryBlocked -> R.string.publication_recover
+                        sent -> R.string.publication_new
+                        else -> R.string.publication_check
+                    })
+                    binding.btnReplacePublication.visibility = if (state.canAbandon && !state.recoveryBlocked) View.VISIBLE else View.GONE
+                    binding.btnReplacePublication.isEnabled = !busy
+                    binding.btnEditDraft.isEnabled = canSend && !busy
+                    binding.btnBack.isEnabled = true
                     // Title
                     if (state.title.isNotBlank()) {
                         binding.tvReviewTitle.text = state.title
@@ -182,10 +194,10 @@ class S06ConfirmSendFragment : Fragment() {
                     }
 
                     // Recipient
-                    val recipientName = state.resolvedProfile?.displayName ?: "Me"
+                    val recipientName = state.resolvedProfile?.takeIf { state.isRecipientConfirmed }?.displayName?.takeIf(String::isNotBlank) ?: getString(R.string.recipient_unconfirmed)
                     val recipientUid = state.resolvedProfile?.uid ?: state.recipientUidInput
                     binding.tvReviewRecipientName.text = recipientName
-                    binding.tvReviewRecipientUid.text = "UID: $recipientUid"
+                    binding.tvReviewRecipientUid.text = recipientUid.takeIf(String::isNotBlank)?.let { "UID: $it" } ?: "UID unavailable"
 
                     // Message Text & Photo Content
                     if (state.text.isNotBlank()) {
@@ -202,47 +214,13 @@ class S06ConfirmSendFragment : Fragment() {
                         binding.tvReviewPhotoInfo.visibility = View.GONE
                     }
 
-                    // Unlock Condition Presentation
-                    val timeFormatted = if (state.unlockAt != null) {
-                        val zoneId = try { ZoneId.of(state.creationZone) } catch (_: Exception) { ZoneId.systemDefault() }
-                        TimeConversionHelper.formatZonedDateTime(state.unlockAt, zoneId)
-                    } else null
-
-                    val placeFormatted = if (state.lockMode == LockMode.LOCATION || state.lockMode == LockMode.TIME_AND_LOCATION) {
-                        val placeName = state.locationName ?: "Selected location"
-                        val radius = state.locationTarget?.radiusMeters?.toInt() ?: 150
-                        "$placeName ($radius m radius)"
-                    } else null
-
-                    when (state.lockMode) {
-                        LockMode.TIME -> {
-                            binding.tvReviewUnlockAt.text = if (timeFormatted != null) {
-                                "Meant to open: $timeFormatted"
-                            } else {
-                                "Meant to open: Specified future time"
-                            }
-                            binding.tvReviewLocation.visibility = View.GONE
-                        }
-                        LockMode.LOCATION -> {
-                            binding.tvReviewUnlockAt.text = if (placeFormatted != null) {
-                                "Meant to open: At $placeFormatted"
-                            } else {
-                                "Meant to open: At target location"
-                            }
-                            binding.tvReviewLocation.visibility = View.GONE
-                        }
-                        LockMode.TIME_AND_LOCATION -> {
-                            val timeText = timeFormatted ?: "Specified future time"
-                            val placeText = placeFormatted ?: "Target location"
-                            binding.tvReviewUnlockAt.text = "Meant to open: $timeText AND at $placeText"
-                            binding.tvReviewLocation.visibility = View.GONE
-                        }
-                    }
+                    binding.tvReviewUnlockAt.text = reviewCondition(state)
+                    binding.tvReviewLocation.visibility = View.GONE
 
                     val notice = if (state.recoveryBusy) R.string.publication_recovering
                         else state.publicationMessage
                     if (notice != null) {
-                        binding.tvSendNoticeBanner.setText(notice)
+                        binding.tvSendNoticeBanner.text = state.publicationFailure?.guidance ?: getString(notice)
                         binding.tvSendNoticeBanner.visibility = View.VISIBLE
                     } else {
                         binding.tvSendNoticeBanner.visibility = View.GONE

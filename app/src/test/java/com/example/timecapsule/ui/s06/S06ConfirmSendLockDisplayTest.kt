@@ -2,91 +2,43 @@ package com.example.timecapsule.ui.s06
 
 import com.example.timecapsule.domain.model.LocationTarget
 import com.example.timecapsule.domain.model.LockMode
-import com.example.timecapsule.domain.time.TimeConversionHelper
 import com.example.timecapsule.ui.draft.CapsuleDraftUiState
 import java.time.Instant
-import java.time.ZoneId
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * Pure JVM unit tests verifying truthful unlock condition formatting for S-06 Confirm Send.
- * Validates that LOCATION-only, TIME-only, and BOTH lock modes yield accurate, non-misleading review text.
- */
+/** Assert the text passed to the actual review label, including incomplete recovered drafts. */
 class S06ConfirmSendLockDisplayTest {
+    private val draft = CapsuleDraftUiState(
+        unlockAt = Instant.parse("2026-12-01T10:00:00Z"), creationZone = "Asia/Seoul",
+        locationName = "Garden", locationTarget = LocationTarget(37.5, 127.0)
+    )
+    private val time = "2026-12-01 19:00 (Asia/Seoul, UTC+09:00)"
 
-    @Test
-    fun locationOnlyCapsuleFormatsLocationWithoutInstantUnlockFallback() {
-        val state = CapsuleDraftUiState(
-            lockMode = LockMode.LOCATION,
-            unlockAt = null,
-            locationTarget = LocationTarget(37.5665, 126.9780, 150.0),
-            locationName = "University Garden"
-        )
+    /** Stale target fields do not appear on time-only drafts. */
+    @Test fun timeOnlyUsesCreationZone() =
+        assertEquals("Meant to open: $time", reviewCondition(draft))
 
-        val timeFormatted = if (state.unlockAt != null) {
-            val zoneId = try { ZoneId.of(state.creationZone) } catch (_: Exception) { ZoneId.systemDefault() }
-            TimeConversionHelper.formatZonedDateTime(state.unlockAt, zoneId)
-        } else null
+    /** Location mode ignores a stale time. */
+    @Test fun locationOnlyUsesValidTarget() =
+        assertEquals("Meant to open: At Garden (150 m radius)", reviewCondition(draft.copy(lockMode = LockMode.LOCATION)))
 
-        val placeFormatted = if (state.lockMode == LockMode.LOCATION || state.lockMode == LockMode.TIME_AND_LOCATION) {
-            val placeName = state.locationName ?: "Selected location"
-            val radius = state.locationTarget?.radiusMeters?.toInt() ?: 150
-            "$placeName ($radius m radius)"
-        } else null
+    /** Both conditions must be satisfied at verification. */
+    @Test fun bothExplicitlyRequiresTimeAndPlace() =
+        assertEquals("Meant to open: $time AND at Garden (150 m radius)", reviewCondition(draft.copy(lockMode = LockMode.TIME_AND_LOCATION)))
 
-        assertNull(timeFormatted)
-        assertEquals("University Garden (150 m radius)", placeFormatted)
-        assertEquals(LockMode.LOCATION, state.lockMode)
-    }
+    /** Missing evidence cannot establish a future time or a selected location. */
+    @Test fun missingConditions() =
+        assertEquals("Unlock time unavailable AND location unavailable", reviewCondition(
+            draft.copy(lockMode = LockMode.TIME_AND_LOCATION, unlockAt = null, locationTarget = null)))
 
-    @Test
-    fun timeAndLocationBothLockModeCombinesTimeAndPlaceRequirements() {
-        val now = Instant.parse("2026-12-01T10:00:00Z")
-        val state = CapsuleDraftUiState(
-            lockMode = LockMode.TIME_AND_LOCATION,
-            unlockAt = now,
-            creationZone = "UTC",
-            locationTarget = LocationTarget(37.5665, 126.9780, 150.0),
-            locationName = "Seoul Plaza"
-        )
+    /** A stale name cannot make an invalid coordinate valid. */
+    @Test fun invalidCoordinates() =
+        assertEquals("Location unavailable", reviewCondition(draft.copy(lockMode = LockMode.LOCATION,
+            locationTarget = LocationTarget(Double.NaN, 127.0))))
 
-        val timeFormatted = if (state.unlockAt != null) {
-            val zoneId = try { ZoneId.of(state.creationZone) } catch (_: Exception) { ZoneId.systemDefault() }
-            TimeConversionHelper.formatZonedDateTime(state.unlockAt, zoneId)
-        } else null
-
-        val placeFormatted = if (state.lockMode == LockMode.LOCATION || state.lockMode == LockMode.TIME_AND_LOCATION) {
-            val placeName = state.locationName ?: "Selected location"
-            val radius = state.locationTarget?.radiusMeters?.toInt() ?: 150
-            "$placeName ($radius m radius)"
-        } else null
-
-        assertTrue(timeFormatted!!.contains("2026"))
-        assertEquals("Seoul Plaza (150 m radius)", placeFormatted)
-        assertEquals(LockMode.TIME_AND_LOCATION, state.lockMode)
-    }
-
-    @Test
-    fun timeOnlyLockModeDisplaysFormattedTime() {
-        val now = Instant.parse("2027-01-01T00:00:00Z")
-        val state = CapsuleDraftUiState(
-            lockMode = LockMode.TIME,
-            unlockAt = now,
-            creationZone = "UTC",
-            locationTarget = null,
-            locationName = null
-        )
-
-        val timeFormatted = if (state.unlockAt != null) {
-            val zoneId = try { ZoneId.of(state.creationZone) } catch (_: Exception) { ZoneId.systemDefault() }
-            TimeConversionHelper.formatZonedDateTime(state.unlockAt, zoneId)
-        } else null
-
-        assertTrue(timeFormatted!!.contains("2027"))
-        assertEquals(LockMode.TIME, state.lockMode)
-        assertNull(state.locationTarget)
-    }
+    /** An unknown creation zone must be identified, independent of the reviewing device. */
+    @Test fun unknownZoneUsesExplicitUtc() =
+        assertEquals("Meant to open: 2026-12-01 10:00 (UTC, UTC+00:00) · Creation timezone unavailable",
+            reviewCondition(draft.copy(creationZone = "broken")))
 }

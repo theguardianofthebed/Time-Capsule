@@ -73,7 +73,7 @@ class DefaultFirestoreAdapter(
         return try {
             val doc = instance.collection("recipientDirectory")
                 .document(cleanUid)
-                .get()
+                .get(Source.SERVER)
                 .await()
 
             if (doc.exists()) {
@@ -591,7 +591,7 @@ class DefaultFirestoreAdapter(
                 when (e.code) {
                     FirebaseFirestoreException.Code.UNAVAILABLE,
                     FirebaseFirestoreException.Code.DEADLINE_EXCEEDED -> {
-                        OperationResult.Unavailable("Firestore service unavailable: ${e.message}")
+                        OperationResult.Unavailable("Service unavailable. Check your connection and retry.")
                     }
                     FirebaseFirestoreException.Code.PERMISSION_DENIED -> {
                         OperationResult.Denied("Unlock authorization denied or unlock time not reached.")
@@ -617,18 +617,18 @@ class DefaultFirestoreAdapter(
                 when (e.code) {
                     FirebaseFirestoreException.Code.UNAVAILABLE,
                     FirebaseFirestoreException.Code.DEADLINE_EXCEEDED -> {
-                        OperationResult.Unavailable("Firestore service unavailable: ${e.message}")
+                        OperationResult.Unavailable("Service unavailable. Check your connection and retry.")
                     }
                     FirebaseFirestoreException.Code.PERMISSION_DENIED -> {
-                        OperationResult.Denied("Firestore permission denied: ${e.message}")
+                        OperationResult.Denied("Access denied. Check the signed-in account.")
                     }
                     else -> {
-                        OperationResult.Denied("Firestore request failed: ${e.message}")
+                        OperationResult.Denied("The service rejected this request. Check your account access.")
                     }
                 }
             }
             else -> {
-                OperationResult.Denied("Firestore request failed: ${e.localizedMessage ?: e.message}")
+                OperationResult.Denied("The request could not be completed. Check your account and retry.")
             }
         }
     }

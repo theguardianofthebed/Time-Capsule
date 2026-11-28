@@ -265,12 +265,7 @@ class S07CapsuleDetailViewModel(
             msg.contains("disabled", ignoreCase = true) -> DetailStatus.LOCKED_LOCATION_DISABLED
             msg.contains("radius", ignoreCase = true) || msg.contains("accuracy", ignoreCase = true) || msg.contains("stale", ignoreCase = true) -> DetailStatus.LOCKED_WAITING_LOCATION
             res is OperationResult.Denied -> DetailStatus.ACCESS_DENIED
-            else -> when (lockMode) {
-                null -> DetailStatus.LOCKED_VERIFICATION_FAILED
-                LockMode.TIME -> DetailStatus.LOCKED_WAITING_TIME
-                LockMode.LOCATION -> DetailStatus.LOCKED_WAITING_LOCATION
-                LockMode.TIME_AND_LOCATION -> DetailStatus.LOCKED_WAITING_BOTH
-            }
+            else -> DetailStatus.LOCKED_VERIFICATION_FAILED
         }
     }
 

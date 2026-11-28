@@ -153,5 +153,6 @@ data class RecoveredPublication(
     val phase: PublicationPhase,
     val snapshot: FrozenCapsuleOperation?,
     val canAbandon: Boolean,
-    val clearedEditableDraft: Boolean = false
+    val clearedEditableDraft: Boolean = false,
+    val canRetryUnchanged: Boolean = phase == PublicationPhase.OUTCOME_UNKNOWN || phase == PublicationPhase.FAILED
 )

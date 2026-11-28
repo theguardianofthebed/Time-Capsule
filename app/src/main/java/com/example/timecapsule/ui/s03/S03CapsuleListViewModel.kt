@@ -42,6 +42,7 @@ class S03CapsuleListViewModel(
                     )
                 } else {
                     _uiState.value = CapsuleListUiState(
+                        selectedTab = if (_uiState.value.sessionSnapshot == null) _uiState.value.selectedTab else CapsuleTab.RECEIVED,
                         isLoading = true,
                         sessionSnapshot = session
                     )

@@ -10,6 +10,14 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
+    <ProgressBar
+        android:id="@+id/accountCheckProgress"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_gravity="center"
+        android:contentDescription="@string/profile_check_progress"
+        android:visibility="gone" />
+
     <!-- Error message text displayed only if Firebase initialization fails -->
     <TextView
         android:id="@+id/tvInitError"

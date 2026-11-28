@@ -305,6 +305,298 @@ class Issue21FunctionalCorrectionsTest {
         override suspend fun readContent(capsuleId: String, targetSession: SessionSnapshot) = body
     }
 
+    /** Register and repair share a single claim, even if both methods are called in the same event loop. */
+    @Test fun duplicateRegisterOrRepairDoesNotWriteProfileTwice() {
+        fakeAuthAdapter.signOut()
+        sessionTracker.clearSession()
+        val activity = openScreen(repository)
+        val model = com.example.timecapsule.ui.s02.S02RegisterViewModel(activity.container.accountSessionManager)
+        model.registerAndCreateProfile("reader@example.com", "example", "Reader")
+        model.registerAndCreateProfile("reader@example.com", "example", "Reader")
+        settleScreen()
+        assertEquals(1, fakeAuthAdapter.signUpCalls)
+        assertEquals(1, fakeFirestoreAdapter.profileWrites)
+        model.repairProfile("Reader")
+        model.repairProfile("Reader")
+        settleScreen()
+        assertEquals(2, fakeFirestoreAdapter.profileWrites)
+    }
+
+    /** Partial registration repairs the existing UID and never sends a second sign-up request. */
+    @Test fun registrationFailureRepairsSameAccount() {
+        fakeAuthAdapter.signOut()
+        sessionTracker.clearSession()
+        fakeFirestoreAdapter.profileResult = OperationResult.Invalid("Missing")
+        fakeFirestoreAdapter.failProfileWrite = true
+        val activity = openScreen(repository)
+        activity.findViewById<View>(R.id.btnGoToRegister).performClick()
+        settleScreen()
+        activity.findViewById<TextView>(R.id.etEmail).text = "reader@example.com"
+        activity.findViewById<TextView>(R.id.etPassword).text = "example"
+        activity.findViewById<TextView>(R.id.etConfirmPassword).text = "example"
+        activity.findViewById<TextView>(R.id.etDisplayName).text = "Reader"
+        activity.findViewById<Button>(R.id.btnRegister).performClick()
+        settleScreen()
+        assertEquals(activity.getString(R.string.s02_headline_repair), activity.findViewById<TextView>(R.id.tvS02Title).text)
+        fakeFirestoreAdapter.failProfileWrite = false
+        activity.findViewById<Button>(R.id.btnRegister).performClick()
+        settleScreen()
+        assertNotNull(activity.findViewById<View>(R.id.btnTabReceived))
+        assertEquals(1, fakeAuthAdapter.signUpCalls)
+        assertEquals("new-reader", sessionTracker.currentSession().uid)
+    }
+
+    /** While a sign-in request is suspended, recreation restores progress and suppresses a second submission. */
+    @Test fun signInRotationKeepsOperation() {
+        fakeAuthAdapter.signOut()
+        sessionTracker.clearSession()
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        fakeAuthAdapter.signInGate = gate
+        openScreen(repository)
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        settleScreen()
+        val activity = controller.get()
+        activity.findViewById<TextView>(R.id.etEmail).text = "reader@example.com"
+        activity.findViewById<TextView>(R.id.etPassword).text = "example"
+        activity.findViewById<Button>(R.id.btnSignIn).performClick()
+        settleScreen()
+        controller.recreate()
+        settleScreen()
+        val rotated = controller.get()
+        assertEquals(View.VISIBLE, rotated.findViewById<View>(R.id.pbLoading).visibility)
+        assertFalse(rotated.findViewById<Button>(R.id.btnSignIn).isEnabled)
+        assertFalse(rotated.findViewById<View>(R.id.btnGoToRegister).isEnabled)
+        assertEquals("", rotated.findViewById<TextView>(R.id.etPassword).text.toString())
+        gate.complete(Unit)
+        settleScreen()
+        assertEquals(1, fakeAuthAdapter.signInCalls)
+        assertNotNull(rotated.findViewById<View>(R.id.btnTabReceived))
+    }
+
+    /** A restored Firebase account still needs a directory profile to enter the list. */
+    @Test fun missingProfileOpensRepairOnStartup() {
+        fakeFirestoreAdapter.profileResult = OperationResult.Invalid("Recipient not found")
+        val activity = openScreen(repository)
+        assertEquals(activity.getString(R.string.s02_headline_repair),
+            activity.findViewById<TextView>(R.id.tvS02Title)?.text)
+    }
+
+    /** An old repair form cannot write a display name into a later session of the same UID. */
+    @Test fun staleRepairScreenCannotWriteProfile() {
+        fakeFirestoreAdapter.profileResult = OperationResult.Invalid("Missing")
+        val activity = openScreen(repository)
+        val submit = activity.findViewById<Button>(R.id.btnRegister)
+        activity.findViewById<TextView>(R.id.etDisplayName).text = "Old form"
+        sessionTracker.startSession(userA)
+        submit.performClick()
+        settleScreen()
+        assertEquals(0, fakeFirestoreAdapter.profileWrites)
+    }
+
+    /** A successful Auth callback from an earlier generation cannot start a new directory write. */
+    @Test fun interruptedRepairCannotStartDirectoryWrite() {
+        fakeFirestoreAdapter.profileResult = OperationResult.Invalid("Missing")
+        val activity = openScreen(repository)
+        fakeAuthAdapter.afterNameUpdate = { sessionTracker.startSession(userA) }
+        activity.findViewById<Button>(R.id.btnRegister).performClick()
+        settleScreen()
+        assertEquals(0, fakeFirestoreAdapter.profileWrites)
+    }
+
+    /** Failed verification offers a read retry without creating another account or overwriting a profile. */
+    @Test fun unavailableProfileOffersReadRetry() {
+        fakeFirestoreAdapter.profileResult = OperationResult.Unavailable("offline")
+        val activity = openScreen(repository)
+        val action = activity.findViewById<Button>(R.id.btnRegister)
+        assertEquals("Check profile again", action?.text)
+        fakeFirestoreAdapter.profileResult = null
+        action.performClick()
+        settleScreen()
+        assertNotNull(activity.findViewById<View>(R.id.btnTabReceived))
+    }
+
+    /** System Back follows the same draft steps as the visible controls. */
+    @Test fun systemBackReturnsFromLockToDraft() {
+        val activity = openScreen(withEmptyJournal())
+        activity.navigateToContentDraft()
+        settleScreen()
+        activity.findViewById<TextView>(R.id.etCapsuleTitle).text = "Draft title"
+        activity.navigateToRecipientLock()
+        settleScreen()
+        activity.onBackPressedDispatcher.onBackPressed()
+        settleScreen()
+        assertEquals("Draft title", activity.findViewById<TextView>(R.id.etCapsuleTitle)?.text?.toString())
+    }
+
+    /** Accessibility selection survives a trip from Sent to detail and back. */
+    @Test fun detailBackRestoresSelectedSentTab() {
+        val activity = openScreen(repository)
+        activity.findViewById<Button>(R.id.btnTabSent).performClick()
+        settleScreen()
+        activity.navigateToCapsuleDetail("detail-id")
+        settleScreen()
+        activity.findViewById<View>(R.id.btnS07Back).performClick()
+        settleScreen()
+        assertTrue(activity.findViewById<Button>(R.id.btnTabSent).isSelected)
+    }
+
+    /** Unknown availability must never be announced as a confirmed lock. */
+    @Test fun unknownReceivedAvailabilityRequiresVerification() {
+        fakeFirestoreAdapter.receivedList[userA] = listOf(CapsuleSummary("id", userB, userA, null,
+            SendStatus.SENT, Availability.UNKNOWN))
+        val activity = openScreen(repository)
+        assertEquals("Verification required", activity.findViewById<TextView>(R.id.tvItemStatusBadge)?.text)
+    }
+
+    /** The first permission request may open a dialog. A suppressed repeat opens notification settings. */
+    @Test fun notificationDenialHasSettingsRoute() {
+        val activity = openScreen(repository)
+        activity.navigateToAccountSettings()
+        settleScreen()
+        val action = activity.findViewById<View>(R.id.btnOpenNotificationSettings)
+        action.performClick()
+        settleScreen()
+        action.performClick()
+        assertEquals(Settings.ACTION_APP_NOTIFICATION_SETTINGS, shadowOf(activity).nextStartedActivity?.action)
+    }
+
+    /** Test back-to-back programmatic submissions before the first coroutine can run. */
+    @Test fun duplicateAuthSubmission() {
+        fakeAuthAdapter.signOut()
+        sessionTracker.clearSession()
+        val activity = openScreen(repository)
+        val model = com.example.timecapsule.ui.s01.S01SignInViewModel(activity.container.accountSessionManager)
+        model.signIn("reader@example.com", "secret")
+        model.signIn("reader@example.com", "secret")
+        settleScreen()
+        assertEquals(1, fakeAuthAdapter.signInCalls)
+    }
+
+    /** A queued render for the same capsule from an expired generation must clear its body immediately. */
+    @Test fun staleDetailRenderClearsBody() {
+        val activity = openDetail(detailBackend(true, body = OperationResult.Success(
+            ProtectedCapsuleContent("detail-id", "old caption", null, null))))
+        val frag = activity.supportFragmentManager.findFragmentById(R.id.fragmentContainer)!!
+        val model = androidx.lifecycle.ViewModelProvider(frag)[S07CapsuleDetailViewModel::class.java]
+        val oldState = model.uiState.value
+        val body = activity.findViewById<TextView>(R.id.tvS07BodyText)
+        assertEquals("old caption", body.text.toString())
+        sessionTracker.startSession(userA)
+        frag.javaClass.getDeclaredMethod("renderUiState", oldState.javaClass).apply {
+            isAccessible = true
+            invoke(frag, oldState)
+        }
+        assertEquals("", body.text.toString())
+    }
+
+    /** The actual confirmation fragment renders operation evidence independently of its draft fields. */
+    @Test fun publicationControlsFollowEvidence() {
+        val activity = openScreen(withEmptyJournal())
+        activity.navigateToConfirmSend()
+        settleScreen()
+        val model = androidx.lifecycle.ViewModelProvider(activity)[com.example.timecapsule.ui.draft.CapsuleDraftViewModel::class.java]
+        @Suppress("UNCHECKED_CAST")
+        val updates = model.javaClass.getDeclaredField("_uiState").apply { isAccessible = true }.get(model)
+            as kotlinx.coroutines.flow.MutableStateFlow<com.example.timecapsule.ui.draft.CapsuleDraftUiState>
+        updates.value = updates.value.copy(resolvedProfile = null, recipientUidInput = "unknown-recipient")
+        settleScreen()
+        assertEquals("Recipient unconfirmed", activity.findViewById<TextView>(R.id.tvReviewRecipientName).text)
+        updates.value = updates.value.copy(publicationPhase = PublicationPhase.UPLOADING, publicationBusy = true)
+        settleScreen()
+        val primary = activity.findViewById<Button>(R.id.btnSendCapsule)
+        assertFalse(primary.isEnabled)
+        assertFalse(primary.isShown && primary.text == activity.getString(R.string.publication_retry))
+        updates.value = updates.value.copy(publicationPhase = PublicationPhase.SENT, publicationBusy = false)
+        settleScreen()
+        assertEquals("View Sent", primary.text)
+        primary.performClick()
+        settleScreen()
+        assertTrue(activity.findViewById<Button>(R.id.btnTabSent).isSelected)
+    }
+
+    /** System bars and IME share one inset consumer and repeated dispatch must not accumulate padding. */
+    @Test fun rootAppliesInsetsOnce() {
+        val root = openScreen(repository).findViewById<View>(R.id.mainRootView)
+        val insets = android.view.WindowInsets.Builder()
+            .setInsets(android.view.WindowInsets.Type.systemBars(), android.graphics.Insets.of(0, 27, 0, 18))
+            .setInsets(android.view.WindowInsets.Type.ime(), android.graphics.Insets.of(0, 0, 0, 120))
+            .build()
+        repeat(2) { root.dispatchApplyWindowInsets(insets) }
+        assertEquals(27, root.paddingTop)
+        assertEquals(120, root.paddingBottom)
+    }
+
+    /** Compose tests need a confirmed empty journal before the shared ViewModel can enable editing. */
+    private fun withEmptyJournal(): CapsuleRepository = object : CapsuleRepository by repository {
+        override suspend fun recoverPublications(targetSession: SessionSnapshot) =
+            OperationResult.Success(emptyList<RecoveredPublication>())
+    }
+
+    /** A network failure during first verification cannot determine which condition is pending. */
+    @Test fun offlineFirstVerificationKeepsContentHidden() {
+        val activity = openDetail(detailBackend(verification = OperationResult.Unavailable("Network unavailable")))
+        val frag = activity.supportFragmentManager.findFragmentById(R.id.fragmentContainer)!!
+        val model = androidx.lifecycle.ViewModelProvider(frag)[S07CapsuleDetailViewModel::class.java]
+        assertEquals(DetailStatus.LOCKED_VERIFICATION_FAILED, model.uiState.value.status)
+        assertFalse(activity.findViewById<View>(R.id.llS07ContentCard).isShown)
+    }
+
+    /** Offline directory lookup must still lead to the account-scoped retained list. */
+    @Test fun offlineProfileCanOpenRetainedListWithoutCreating() {
+        fakeFirestoreAdapter.profileResult = OperationResult.Unavailable("offline")
+        val activity = openScreen(repository)
+        assertTrue(activity.findViewById<View>(R.id.tvGoToSignIn).isShown)
+        activity.findViewById<View>(R.id.tvGoToSignIn).performClick()
+        settleScreen()
+        assertNotNull(activity.findViewById<View>(R.id.btnTabReceived))
+        activity.findViewById<View>(R.id.btnNavCreate).performClick()
+        settleScreen()
+        assertEquals("Check profile again", activity.findViewById<Button>(R.id.btnRegister)?.text)
+    }
+
+    /** SDK exception diagnostics must not reach an account-screen error label. */
+    @Test fun unknownAuthErrorHasActionableCopy() {
+        val adapter = com.example.timecapsule.data.adapter.DefaultAuthAdapter()
+        val method = adapter.javaClass.getDeclaredMethod("mapAuthException", Exception::class.java)
+        method.isAccessible = true
+        val result = method.invoke(adapter, IllegalStateException("private provider diagnostic"))
+        assertEquals(OperationResult.Unavailable("Account service unavailable. Check your connection and retry."), result)
+    }
+
+    /** Even a non-cancellable decoder must not repaint after authorization has been revoked. */
+    @Test fun delayedPhotoCannotRepaintAfterRevocation() {
+        var revoked = false
+        val readable = detailBackend(true)
+        val backend = object : CapsuleRepository by readable {
+            override suspend fun readContent(capsuleId: String, targetSession: SessionSnapshot): OperationResult<ProtectedCapsuleContent> =
+                if (revoked) OperationResult.Denied("Access revoked")
+                else OperationResult.Success(ProtectedCapsuleContent(capsuleId, "caption", "original", byteArrayOf(1)))
+        }
+        val activity = openDetail(backend)
+        val screen = activity.supportFragmentManager.findFragmentById(R.id.fragmentContainer)
+            as com.example.timecapsule.ui.s07.S07CapsuleDetailFragment
+        val started = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val release = kotlinx.coroutines.CompletableDeferred<Unit>()
+        screen.decodePhoto = {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                started.complete(Unit)
+                release.await()
+                android.graphics.Bitmap.createBitmap(2, 2, android.graphics.Bitmap.Config.ARGB_8888)
+            }
+        }
+        screen.refreshScreen()
+        settleScreen()
+        assertTrue(started.isCompleted)
+        revoked = true
+        screen.refreshScreen()
+        settleScreen()
+        release.complete(Unit)
+        settleScreen()
+        assertFalse(activity.findViewById<View>(R.id.llS07ContentCard).isShown)
+        assertNull(activity.findViewById<android.widget.ImageView>(R.id.ivS07Photo).drawable)
+        assertEquals("", activity.findViewById<TextView>(R.id.tvS07BodyText).text.toString())
+    }
+
     /** Show a capsule through the production activity navigation and fragment lifecycle. */
     private fun openDetail(backend: CapsuleRepository): MainActivity = openScreen(backend).also {
         it.navigateToCapsuleDetail("detail-id")
@@ -334,12 +626,14 @@ class Issue21FunctionalCorrectionsTest {
         val bytes = byteArrayOf(1, 2, 3)
         val activity = openDetail(detailBackend(true, body = OperationResult.Success(
             ProtectedCapsuleContent("detail-id", "caption", "original", bytes))))
-        val notice = activity.findViewById<TextView>(R.id.tvS07LockCondition)
+        val notice = activity.findViewById<TextView>(R.id.tvS07Banner)
         val deadline = System.nanoTime() + 2_000_000_000L
         while (!notice.text.contains("photo", ignoreCase = true) && System.nanoTime() < deadline) {
             settleScreen()
             Thread.sleep(10)
         }
+        assertTrue(notice.text.contains("photo", ignoreCase = true))
+        assertTrue(activity.findViewById<Button>(R.id.btnS07Retry).isShown)
         assertEquals(activity.getString(R.string.s07_badge_opened),
             activity.findViewById<TextView>(R.id.tvS07StatusBadge).text)
         assertEquals("caption", activity.findViewById<TextView>(R.id.tvS07BodyText).text.toString())
@@ -754,7 +1048,17 @@ class Issue21FunctionalCorrectionsTest {
         )
         fakeFirestoreAdapter.unlockVerificationResponse = OperationResult.Denied("Unlock authorization denied or unlock time not reached.")
 
-        val fakeRepo = object : CapsuleRepository by repository {
+        // A qualifying current fix lets the server actually decide the time condition.
+        val location = object : com.example.timecapsule.data.adapter.LocationAdapter {
+            override fun isFineLocationGranted() = true
+            override fun isLocationAvailable() = true
+            override suspend fun getCurrentLocation() = com.example.timecapsule.domain.model.LocationSampleResult(
+                com.example.timecapsule.domain.model.LocationSampleStatus.SUCCESS,
+                ForegroundLocationSample(locTarget.latitude, locTarget.longitude, 1000L, 5f))
+        }
+        val locationRepository = DefaultCapsuleRepository(sessionTracker, fakeAuthAdapter, fakeFirestoreAdapter,
+            locationAdapter = location, clockNanosSupplier = { 1000L })
+        val fakeRepo = object : CapsuleRepository by locationRepository {
             override suspend fun getSummary(capsuleId: String, targetSession: SessionSnapshot): OperationResult<CapsuleSummary> {
                 val sum = fakeFirestoreAdapter.summaries[capsuleId] ?: return OperationResult.Invalid("Not found")
                 return OperationResult.Success(sum)
@@ -1240,9 +1544,25 @@ class Issue21FunctionalCorrectionsTest {
         override fun activeUid(): String? = activeUid
         override fun activeEmail(): String = "test@example.com"
         override fun activeDisplayName(): String = "Test User"
-        override suspend fun signIn(email: String, password: String) = OperationResult.Success(activeUid ?: "")
-        override suspend fun signUp(email: String, password: String, displayName: String) = OperationResult.Success(activeUid ?: "")
-        override suspend fun updateDisplayName(displayName: String) = OperationResult.Success(Unit)
+        var signInGate: kotlinx.coroutines.CompletableDeferred<Unit>? = null
+        var signUpCalls = 0
+        var signInCalls = 0
+        override suspend fun signIn(email: String, password: String): OperationResult<String> {
+            signInCalls++
+            signInGate?.await()
+            activeUid = "reader"
+            return OperationResult.Success("reader")
+        }
+        override suspend fun signUp(email: String, password: String, displayName: String): OperationResult<String> {
+            signUpCalls++
+            activeUid = "new-reader"
+            return OperationResult.Success("new-reader")
+        }
+        var afterNameUpdate: (() -> Unit)? = null
+        override suspend fun updateDisplayName(displayName: String): OperationResult<Unit> {
+            afterNameUpdate?.invoke()
+            return OperationResult.Success(Unit)
+        }
         override fun signOut() { activeUid = null }
     }
 
@@ -1261,8 +1581,16 @@ class Issue21FunctionalCorrectionsTest {
 
         override fun isAvailable(): Boolean = !isNetworkDown
         override fun firestoreInstance(): FirebaseFirestore? = null
-        override suspend fun getRecipientProfile(uid: String) = OperationResult.Invalid("Not needed")
-        override suspend fun saveRecipientProfile(profile: RecipientProfile) = OperationResult.Success(Unit)
+        var profileWrites = 0
+        var failProfileWrite = false
+        var profileResult: OperationResult<RecipientProfile>? = null
+        override suspend fun getRecipientProfile(uid: String) = profileResult ?: OperationResult.Success(RecipientProfile(uid, "Test User"))
+        override suspend fun saveRecipientProfile(profile: RecipientProfile): OperationResult<Unit> {
+            profileWrites++
+            if (failProfileWrite) return OperationResult.Unavailable("Directory unavailable")
+            profileResult = OperationResult.Success(profile)
+            return OperationResult.Success(Unit)
+        }
 
         override suspend fun verifyRecipientUnlockDetailed(
             capsuleId: String,

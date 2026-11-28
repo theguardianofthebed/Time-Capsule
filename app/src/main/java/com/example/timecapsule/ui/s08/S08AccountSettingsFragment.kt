@@ -27,7 +27,10 @@ import com.example.timecapsule.data.notification.DefaultNotificationAdapter
 import com.example.timecapsule.databinding.FragmentS08AccountSettingsBinding
 import com.example.timecapsule.domain.result.OperationResult
 import com.example.timecapsule.ui.ViewModelFactory
+import com.example.timecapsule.ui.requestOrOpenSettings
 import java.util.Locale
+import android.location.LocationManager
+import androidx.core.location.LocationManagerCompat
 
 /**
  * Fragment implementation for S-08 Account & Settings screen matching the Stitch UI design.
@@ -178,14 +181,17 @@ class S08AccountSettingsFragment : Fragment() {
 
         // Open System Settings listeners
         binding.btnOpenLocationSettings.setOnClickListener {
-            openSystemAppSettings()
+            if (!locationServicesEnabled()) startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+            else openSystemAppSettings()
         }
 
         binding.btnOpenNotificationSettings.setOnClickListener {
             val ctx = context ?: return@setOnClickListener
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
                 ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                requestNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                requestOrOpenSettings(Manifest.permission.POST_NOTIFICATIONS, ::openSystemNotificationSettings) {
+                    requestNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
             } else {
                 openSystemNotificationSettings()
             }
@@ -251,7 +257,7 @@ class S08AccountSettingsFragment : Fragment() {
     /**
      * Inspects current Android OS permission and notification status truthfully.
      * Uses [NotificationManagerCompat.areNotificationsEnabled] for notification grants across API levels,
-     * and displays a neutral non-configured state for location permissions not yet declared in manifest.
+     * and reports system location, precise/approximate access, and the reminder channel independently.
      */
     private fun checkAndroidPermissionsStatus() {
         val context = context ?: return
@@ -267,18 +273,21 @@ class S08AccountSettingsFragment : Fragment() {
             Manifest.permission.ACCESS_COARSE_LOCATION
         ) == PackageManager.PERMISSION_GRANTED
 
-        if (fineGranted) {
+        if (!locationServicesEnabled()) {
+            binding.tvLocationStatusBadge.text = "Location services off"
+            binding.tvLocationStatusBadge.setBackgroundResource(R.drawable.bg_badge_neutral)
+        } else if (fineGranted) {
             binding.tvLocationStatusBadge.text = getString(R.string.s08_badge_allowed)
             binding.tvLocationStatusBadge.setBackgroundResource(R.drawable.bg_badge_success)
             binding.tvLocationStatusBadge.setTextColor(ContextCompat.getColor(context, R.color.capsule_success_text))
         } else if (coarseGranted) {
             binding.tvLocationStatusBadge.text = getString(R.string.s08_badge_approximate)
             binding.tvLocationStatusBadge.setBackgroundResource(R.drawable.bg_badge_neutral)
-            binding.tvLocationStatusBadge.setTextColor(ContextCompat.getColor(context, R.color.capsule_text_muted))
+            binding.tvLocationStatusBadge.setTextColor(ContextCompat.getColor(context, R.color.capsule_text_body))
         } else {
-            binding.tvLocationStatusBadge.text = getString(R.string.s08_badge_not_configured)
+            binding.tvLocationStatusBadge.text = "Permission required"
             binding.tvLocationStatusBadge.setBackgroundResource(R.drawable.bg_badge_neutral)
-            binding.tvLocationStatusBadge.setTextColor(ContextCompat.getColor(context, R.color.capsule_text_muted))
+            binding.tvLocationStatusBadge.setTextColor(ContextCompat.getColor(context, R.color.capsule_text_body))
         }
 
         // Notification permission & system settings check across all Android versions
@@ -289,23 +298,32 @@ class S08AccountSettingsFragment : Fragment() {
             true
         }
 
-        val channelEnabled = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        val channel = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
-            val channel = manager?.getNotificationChannel(DefaultNotificationAdapter.CHANNEL_ID)
-            channel == null || channel.importance != NotificationManager.IMPORTANCE_NONE
-        } else {
-            true
-        }
+            manager?.getNotificationChannel(DefaultNotificationAdapter.CHANNEL_ID)
+        } else null
+        val channelEnabled = channel != null && channel.importance != NotificationManager.IMPORTANCE_NONE
 
         if (notificationsEnabled && postPermissionGranted && channelEnabled) {
             binding.tvNotificationStatusBadge.text = getString(R.string.s08_badge_allowed)
             binding.tvNotificationStatusBadge.setBackgroundResource(R.drawable.bg_badge_success)
             binding.tvNotificationStatusBadge.setTextColor(ContextCompat.getColor(context, R.color.capsule_success_text))
         } else {
-            binding.tvNotificationStatusBadge.text = getString(R.string.s08_badge_denied)
+            binding.tvNotificationStatusBadge.text = when {
+                !postPermissionGranted -> "Permission required"
+                !notificationsEnabled -> "App notifications off"
+                channel == null -> "Channel not created yet"
+                else -> "Reminder channel off"
+            }
             binding.tvNotificationStatusBadge.setBackgroundResource(R.drawable.bg_badge_neutral)
-            binding.tvNotificationStatusBadge.setTextColor(ContextCompat.getColor(context, R.color.capsule_text_muted))
+            binding.tvNotificationStatusBadge.setTextColor(ContextCompat.getColor(context, R.color.capsule_text_body))
         }
+    }
+
+    /** Check the system location switch independently of precise/approximate permission. */
+    private fun locationServicesEnabled(): Boolean {
+        val manager = requireContext().getSystemService(LocationManager::class.java) ?: return false
+        return LocationManagerCompat.isLocationEnabled(manager)
     }
 
     /** Launches system application notification or details settings page for permission management. */
@@ -313,7 +331,11 @@ class S08AccountSettingsFragment : Fragment() {
         val context = context ?: return
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                val manager = context.getSystemService(NotificationManager::class.java)
+                val blocked = NotificationManagerCompat.from(context).areNotificationsEnabled() &&
+                    manager?.getNotificationChannel(DefaultNotificationAdapter.CHANNEL_ID)?.importance == NotificationManager.IMPORTANCE_NONE
+                val intent = Intent(if (blocked) Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS else Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                    if (blocked) putExtra(Settings.EXTRA_CHANNEL_ID, DefaultNotificationAdapter.CHANNEL_ID)
                     putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
                 }
                 startActivity(intent)

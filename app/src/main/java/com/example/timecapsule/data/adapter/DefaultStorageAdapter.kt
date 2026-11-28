@@ -40,7 +40,7 @@ class DefaultStorageAdapter(
                 StorageException.ERROR_NOT_AUTHORIZED, StorageException.ERROR_NOT_AUTHENTICATED
             )) -> OperationResult.Denied("Access to this photo was denied.")
             e is IllegalArgumentException -> OperationResult.Invalid("Invalid photo download request.")
-            else -> OperationResult.Unavailable("Photo download failed: ${e.message}")
+            else -> OperationResult.Unavailable("Photo download failed. Check your connection and retry.")
         }
     }
 

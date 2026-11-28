@@ -81,6 +81,7 @@ class S04ContentDraftFragment : Fragment() {
         viewModel.syncSessionState(mainActivity.container.repository, mainActivity.container.recoveryCoordinator)
 
         setupTextWatchers()
+        binding.btnBack.setOnClickListener { (requireActivity() as MainActivity).navigateBack() }
         setupClickListeners()
         observeViewModelState()
     }

@@ -43,6 +43,7 @@ class S01SignInFragment : Fragment() {
         return binding.root
     }
 
+    /** Bind validation, progress and navigation to the retained sign-in operation. */
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
@@ -70,7 +71,10 @@ class S01SignInFragment : Fragment() {
         val textWatcher = object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                binding.tvStatusMessage.text = ""
+                if (isResumed && viewModel.busy.value != true) {
+                    viewModel.clearState()
+                    binding.tvStatusMessage.text = ""
+                }
             }
             override fun afterTextChanged(s: Editable?) {}
         }
@@ -78,19 +82,25 @@ class S01SignInFragment : Fragment() {
         binding.etPassword.addTextChangedListener(textWatcher)
 
         // Observe ViewModel sign-in state mutations
-        viewModel.signInState.observe(viewLifecycleOwner) { result ->
-            binding.btnSignIn.isEnabled = true
-            binding.pbLoading.visibility = View.GONE
+        viewModel.busy.observe(viewLifecycleOwner) { busy ->
+            binding.btnSignIn.isEnabled = !busy
+            binding.btnGoToRegister.isEnabled = !busy
+            binding.pbLoading.visibility = if (busy) View.VISIBLE else View.GONE
+            if (busy) binding.tvStatusMessage.setText(R.string.msg_signing_in)
+        }
+        viewModel.result.observe(viewLifecycleOwner) { result ->
             when (result) {
                 is OperationResult.Success -> {
                     binding.tvStatusMessage.text = getString(R.string.msg_sign_in_success)
-                    onSignInSuccessListener?.invoke(result.data)
+                    if (mainActivity.container.accountSessionManager.currentSession().uid == result.data) {
+                        onSignInSuccessListener?.invoke(result.data)
+                    }
                     viewModel.clearState()
                 }
                 is OperationResult.Invalid -> binding.tvStatusMessage.text = result.message
                 is OperationResult.Denied -> binding.tvStatusMessage.text = result.message
                 is OperationResult.Unavailable -> binding.tvStatusMessage.text = result.message
-                is OperationResult.OutcomeUnknown -> binding.tvStatusMessage.text = result.message
+                is OperationResult.OutcomeUnknown -> binding.tvStatusMessage.setText(R.string.profile_check_unavailable)
                 null -> {}
             }
         }
@@ -101,18 +111,17 @@ class S01SignInFragment : Fragment() {
             val password = binding.etPassword.text.toString()
 
             if (email.isBlank() || password.isBlank()) {
+                (if (email.isBlank()) binding.etEmail else binding.etPassword).error = getString(R.string.err_required_field)
                 binding.tvStatusMessage.text = getString(R.string.err_email_password_required)
                 return@setOnClickListener
             }
 
             if (!Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+                binding.etEmail.error = getString(R.string.err_invalid_email)
                 binding.tvStatusMessage.text = getString(R.string.err_invalid_email)
                 return@setOnClickListener
             }
 
-            binding.btnSignIn.isEnabled = false
-            binding.pbLoading.visibility = View.VISIBLE
-            binding.tvStatusMessage.text = getString(R.string.msg_signing_in)
             viewModel.signIn(email, password)
         }
 
@@ -121,6 +130,9 @@ class S01SignInFragment : Fragment() {
             onGoToRegisterListener?.invoke()
         }
     }
+
+    /** The host can leave the form once its account transition has finished. */
+    fun submitting() = ::viewModel.isInitialized && viewModel.busy.value == true
 
     override fun onDestroyView() {
         super.onDestroyView()

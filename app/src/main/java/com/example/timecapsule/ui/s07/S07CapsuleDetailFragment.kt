@@ -6,6 +6,9 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import com.example.timecapsule.ui.needsPermissionSettings
+import com.example.timecapsule.ui.requestOrOpenSettings
+import com.example.timecapsule.ui.openAppPermissions
 import android.Manifest
 import android.content.Intent
 import android.net.Uri
@@ -29,6 +32,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import com.example.timecapsule.domain.session.SessionSnapshot
 
 /**
  * Fragment for S-07 Capsule Detail screen.
@@ -66,7 +70,7 @@ class S07CapsuleDetailFragment : Fragment() {
     }
 
     /** Android may suppress repeated prompts. Keep a path to the app permission settings. */
-    private fun needsAppSettings(): Boolean = permissionRequested &&
+    private fun needsAppSettings(): Boolean = (permissionRequested || needsPermissionSettings(Manifest.permission.ACCESS_FINE_LOCATION)) &&
         ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION) !=
             PackageManager.PERMISSION_GRANTED && !shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_FINE_LOCATION)
 
@@ -76,9 +80,12 @@ class S07CapsuleDetailFragment : Fragment() {
         outState.putBoolean("locationPermissionRequested", permissionRequested)
     }
 
+    /** A decoder may finish after the account or authorization changes. Results are validated on return. */
+    internal var decodePhoto: suspend (ByteArray) -> Bitmap? = { decodeSampledBitmap(it) }
     private var imageRenderJob: Job? = null
     private var imageRenderToken: Long = 0L
     private var activeRenderCapsuleId: String? = null
+    private var activeRenderSession: SessionSnapshot? = null
 
     private val viewModel: S07CapsuleDetailViewModel by viewModels {
         val activity = requireActivity() as MainActivity
@@ -125,8 +132,10 @@ class S07CapsuleDetailFragment : Fragment() {
                         Uri.fromParts("package", requireContext().packageName, null)))
                 } else {
                     permissionRequested = true
-                    locationPermission.launch(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION,
-                        Manifest.permission.ACCESS_FINE_LOCATION))
+                    requestOrOpenSettings(Manifest.permission.ACCESS_FINE_LOCATION, ::openAppPermissions) {
+                        locationPermission.launch(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION,
+                            Manifest.permission.ACCESS_FINE_LOCATION))
+                    }
                 }
                 DetailStatus.LOCKED_LOCATION_DISABLED -> startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
                 else -> refreshScreen()
@@ -146,9 +155,12 @@ class S07CapsuleDetailFragment : Fragment() {
     private fun renderUiState(state: CapsuleDetailUiState) {
         binding.pbS07Loading.visibility = if (state.isLoading) View.VISIBLE else View.GONE
 
-        // Cancel previous image render and clear previous text state if capsule ID changed
+        // Validate old emissions even if the new session opened the same capsule ID.
         imageRenderToken++
-        if (state.capsuleId != activeRenderCapsuleId) {
+        val tracker = (requireActivity() as MainActivity).container.sessionTracker
+        val live = tracker.currentSession()
+        val stale = state.sessionSnapshot != live || !live.isAuthenticated
+        if (stale || state.capsuleId != activeRenderCapsuleId || state.sessionSnapshot != activeRenderSession) {
             imageRenderJob?.cancel()
             binding.ivS07Photo.setImageDrawable(null)
             binding.ivS07Photo.visibility = View.GONE
@@ -159,6 +171,11 @@ class S07CapsuleDetailFragment : Fragment() {
             binding.tvS07SignOff.text = ""
             binding.tvS07Banner.text = ""
             activeRenderCapsuleId = state.capsuleId
+            activeRenderSession = state.sessionSnapshot
+            binding.llS07ContentCard.visibility = View.GONE
+            binding.tvS07StatusBadge.visibility = View.GONE
+            binding.btnS07Retry.visibility = View.GONE
+            if (stale) return
         }
 
         if (state.summary != null) {
@@ -217,20 +234,24 @@ class S07CapsuleDetailFragment : Fragment() {
         }
 
         // Content card
-        if (state.content != null) {
+        val authorized = state.role == ParticipantRole.AUTHOR_COPY ||
+            (state.role == ParticipantRole.RECIPIENT && state.isUnlocked)
+        if (authorized && state.content != null && state.status != DetailStatus.ACCESS_DENIED) {
             binding.llS07ContentCard.visibility = View.VISIBLE
             binding.tvS07BodyText.text = state.content.text ?: ""
 
             val photoBytes = state.content.photoBytes
             if (photoBytes != null) {
                 imageRenderJob?.cancel()
+                binding.ivS07Photo.setImageDrawable(null)
+                binding.ivS07Photo.visibility = View.GONE
                 val token = ++imageRenderToken
                 val expectedCapsuleId = state.capsuleId
                 val expectedSession = state.sessionSnapshot
                 val sessionTracker = (requireActivity() as MainActivity).container.sessionTracker
 
                 imageRenderJob = viewLifecycleOwner.lifecycleScope.launch {
-                    val bitmap = decodeSampledBitmap(photoBytes, 1024)
+                    val bitmap = decodePhoto(photoBytes)
                     val currentSession = sessionTracker.currentSession()
                     val currentState = viewModel.uiState.value
 

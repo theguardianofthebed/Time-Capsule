@@ -42,6 +42,7 @@ class S02RegisterFragment : Fragment() {
         return binding.root
     }
 
+    /** Render registration, same-account repair, or a read-only retry after profile verification. */
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
@@ -50,11 +51,12 @@ class S02RegisterFragment : Fragment() {
         val factory = ViewModelFactory(appContainer.accountSessionManager)
         viewModel = ViewModelProvider(this, factory)[S02RegisterViewModel::class.java]
 
-        val activeUid = appContainer.authAdapter.activeUid()
-        val isProfileRepairMode = !activeUid.isNullOrBlank()
+        val mode = arguments?.getString("profileMode")
+        val isProfileRepairMode = mode == "missing"
+        val verificationRequired = mode == "unavailable" || mode == "denied"
 
         // Configure layout and field visibility depending on whether profile repair mode is active
-        if (isProfileRepairMode) {
+        if (isProfileRepairMode || verificationRequired) {
             binding.tvS02Title.text = getString(R.string.s02_headline_repair)
             binding.tvS02Subtitle.text = getString(R.string.s02_subtitle_repair)
             binding.btnRegister.text = getString(R.string.btn_repair_profile)
@@ -64,6 +66,18 @@ class S02RegisterFragment : Fragment() {
             binding.layoutSignInLink.visibility = View.GONE
             val activeName = appContainer.authAdapter.activeDisplayName() ?: ""
             binding.etDisplayName.setText(activeName)
+            if (verificationRequired) {
+                binding.tvS02Title.setText(R.string.profile_check_title)
+                binding.tvS02Subtitle.setText(if (mode == "denied") R.string.profile_check_denied else R.string.profile_check_unavailable)
+                binding.btnRegister.setText(R.string.profile_check_retry)
+                if (mode == "unavailable") {
+                    binding.layoutSignInLink.visibility = View.VISIBLE
+                    binding.existingAccountLabel.visibility = View.GONE
+                    binding.tvGoToSignIn.text = "View saved capsules"
+                }
+                binding.nameLabel.visibility = View.GONE
+                binding.layoutNameContainer.visibility = View.GONE
+            }
         } else {
             binding.tvS02Title.text = getString(R.string.s02_headline)
             binding.tvS02Subtitle.text = getString(R.string.s02_subtitle)
@@ -72,6 +86,12 @@ class S02RegisterFragment : Fragment() {
             binding.layoutPasswordContainer.visibility = View.VISIBLE
             binding.layoutConfirmPasswordContainer.visibility = View.VISIBLE
             binding.layoutSignInLink.visibility = View.VISIBLE
+        }
+
+        binding.btnExitRecovery.visibility = if (mode == null) View.GONE else View.VISIBLE
+        binding.btnExitRecovery.setOnClickListener {
+            val origin = mainActivity.recoverySession(this)
+            if (origin != null) viewModel.signOut(origin) else mainActivity.resolveAccountScreen()
         }
 
         // Initialize password visibility accessibility content description
@@ -94,7 +114,10 @@ class S02RegisterFragment : Fragment() {
         val textWatcher = object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                binding.tvStatusMessage.text = ""
+                if (isResumed && viewModel.busy.value != true) {
+                    viewModel.clearState()
+                    binding.tvStatusMessage.text = ""
+                }
             }
             override fun afterTextChanged(s: Editable?) {}
         }
@@ -104,73 +127,96 @@ class S02RegisterFragment : Fragment() {
         binding.etConfirmPassword.addTextChangedListener(textWatcher)
 
         // Observe registration and profile repair ViewModel state
-        viewModel.registerState.observe(viewLifecycleOwner) { result ->
-            binding.btnRegister.isEnabled = true
-            binding.pbLoading.visibility = View.GONE
+        viewModel.busy.observe(viewLifecycleOwner) { busy ->
+            binding.btnExitRecovery.isEnabled = !busy
+            binding.btnRegister.isEnabled = !busy
+            binding.tvGoToSignIn.isEnabled = !busy
+            binding.pbLoading.visibility = if (busy) View.VISIBLE else View.GONE
+            if (busy) binding.tvStatusMessage.setText(if (mode != null) R.string.account_operation_progress else R.string.msg_creating_account)
+        }
+        viewModel.result.observe(viewLifecycleOwner) { result ->
             when (result) {
                 is OperationResult.Success -> {
                     binding.tvStatusMessage.text = getString(R.string.msg_account_created)
-                    onRegisterSuccessListener?.invoke(result.data)
+                    if (result.data.isEmpty() && !appContainer.accountSessionManager.currentSession().isAuthenticated) {
+                        mainActivity.navigateToSignIn()
+                    } else if (appContainer.accountSessionManager.currentSession().uid == result.data) {
+                        onRegisterSuccessListener?.invoke(result.data)
+                    }
                     viewModel.clearState()
                 }
                 is OperationResult.Invalid -> binding.tvStatusMessage.text = result.message
                 is OperationResult.Denied -> binding.tvStatusMessage.text = result.message
-                is OperationResult.Unavailable -> binding.tvStatusMessage.text = result.message
-                is OperationResult.OutcomeUnknown -> binding.tvStatusMessage.text = result.message
+                is OperationResult.Unavailable -> {
+                    binding.tvStatusMessage.setText(R.string.profile_check_unavailable)
+                    if (mode == null && appContainer.accountSessionManager.currentSession().isAuthenticated) {
+                        viewModel.clearState()
+                        mainActivity.resolveAccountScreen()
+                    }
+                }
+                is OperationResult.OutcomeUnknown -> binding.tvStatusMessage.setText(R.string.profile_check_unavailable)
                 null -> {}
             }
         }
 
         // Submit button action (Registration or Profile Repair) with field-specific validation
         binding.btnRegister.setOnClickListener {
+            val origin = if (mode == null) null else mainActivity.recoverySession(this)
+            if (verificationRequired || (mode != null && origin == null)) {
+                mainActivity.resolveAccountScreen()
+                return@setOnClickListener
+            }
             val displayName = binding.etDisplayName.text.toString().trim()
 
-            if (isProfileRepairMode) {
+            if (isProfileRepairMode && origin != null) {
                 if (displayName.isBlank()) {
+                    binding.etDisplayName.error = getString(R.string.err_name_required)
                     binding.tvStatusMessage.text = getString(R.string.err_name_required)
                     return@setOnClickListener
                 }
-                binding.btnRegister.isEnabled = false
-                binding.pbLoading.visibility = View.VISIBLE
-                binding.tvStatusMessage.text = getString(R.string.msg_creating_account)
-                viewModel.repairProfile(displayName)
+                viewModel.repairProfile(displayName, origin)
             } else {
                 val email = binding.etEmail.text.toString().trim()
                 val password = binding.etPassword.text.toString()
                 val confirmPassword = binding.etConfirmPassword.text.toString()
 
                 if (email.isBlank() || password.isBlank() || displayName.isBlank()) {
+                    listOf(binding.etEmail, binding.etPassword, binding.etDisplayName)
+                        .first { it.text.isNullOrBlank() }.error = getString(R.string.err_required_field)
                     binding.tvStatusMessage.text = getString(R.string.err_required_field)
                     return@setOnClickListener
                 }
 
                 if (!Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+                    binding.etEmail.error = getString(R.string.err_invalid_email)
                     binding.tvStatusMessage.text = getString(R.string.err_invalid_email)
                     return@setOnClickListener
                 }
 
                 if (password.length < 6) {
+                    binding.etPassword.error = getString(R.string.err_password_too_short)
                     binding.tvStatusMessage.text = getString(R.string.err_password_too_short)
                     return@setOnClickListener
                 }
 
                 if (password != confirmPassword) {
+                    binding.etConfirmPassword.error = getString(R.string.err_password_mismatch)
                     binding.tvStatusMessage.text = getString(R.string.err_password_mismatch)
                     return@setOnClickListener
                 }
 
-                binding.btnRegister.isEnabled = false
-                binding.pbLoading.visibility = View.VISIBLE
-                binding.tvStatusMessage.text = getString(R.string.msg_creating_account)
                 viewModel.registerAndCreateProfile(email, password, displayName)
             }
         }
 
         // Navigation back to S-01 Sign in
         binding.tvGoToSignIn.setOnClickListener {
-            onGoToSignInListener?.invoke()
+            if (mode == "unavailable") mainActivity.openCapsulesWhileOffline() else onGoToSignInListener?.invoke()
         }
     }
+
+    /** The host can leave the form once its account transition has finished. */
+    fun submitting() = ::viewModel.isInitialized && viewModel.busy.value == true
 
     override fun onDestroyView() {
         super.onDestroyView()
