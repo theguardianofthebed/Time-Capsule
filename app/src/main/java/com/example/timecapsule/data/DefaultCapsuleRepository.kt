@@ -155,7 +155,10 @@ class DefaultCapsuleRepository(
 
         val offlineReceived = retained.orEmpty().map { it.toSummary(cleanUid) }
         val offlineSelfSends = retained.orEmpty()
-            .filter { (it.senderUid.isNullOrBlank() || it.senderUid == cleanUid) && (it.recipientUid.isNullOrBlank() || it.recipientUid == cleanUid) }
+            .filter {
+                it.senderUid == cleanUid &&
+                it.recipientUid == cleanUid
+            }
             .map { it.toSummary(cleanUid) }
 
         val finalReceived = receivedRemote ?: offlineReceived
@@ -574,6 +577,8 @@ class DefaultCapsuleRepository(
                     photoFormat = content.photoFormat,
                     title = summaryTitle,
                     lockMode = summaryLockMode ?: requirements.lockMode,
+                    senderUid = (summaryRes as? OperationResult.Success)?.data?.senderUid,
+                    recipientUid = activeUid,
                     senderDisplayName = summarySenderName,
                     recipientDisplayName = summaryRecipientName,
                     createdAt = summaryCreatedAt,

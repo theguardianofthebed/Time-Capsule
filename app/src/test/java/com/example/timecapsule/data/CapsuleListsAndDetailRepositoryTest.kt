@@ -9,6 +9,7 @@ import com.example.timecapsule.data.session.DefaultSessionTracker
 import com.example.timecapsule.domain.model.Availability
 import com.example.timecapsule.domain.model.CapsuleLock
 import com.example.timecapsule.domain.model.CapsuleSummary
+import com.example.timecapsule.domain.model.LocationTarget
 import com.example.timecapsule.domain.model.LockMode
 import com.example.timecapsule.domain.model.OriginalPhotoFormat
 import com.example.timecapsule.domain.model.ProtectedCapsuleContent
@@ -259,11 +260,14 @@ class CapsuleListsAndDetailRepositoryTest {
             photoFormat: OriginalPhotoFormat?,
             title: String?,
             lockMode: LockMode?,
+            senderUid: String?,
+            recipientUid: String?,
             senderDisplayName: String?,
             recipientDisplayName: String?,
             createdAt: Instant?,
             unlockAt: Instant?,
-            creationZone: String?
+            creationZone: String?,
+            location: LocationTarget?
         ): OperationResult<Unit> {
             retainedEntries.add(
                 RetainedContent(

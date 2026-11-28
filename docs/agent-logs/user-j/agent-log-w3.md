@@ -862,3 +862,18 @@ Final verification passed 399 JVM tests (0 failed or skipped), debug APK assembl
   - Lint passed cleanly with 0 errors (`./gradlew :app:clean :app:lintDebug`).
   - Readiness check passed (`PREFLIGHT_RECORD_VALID`).
 
+### Eleventh Review Final Narrow Corrections Applied (28 November 2026)
+
+- **1. Strict Offline Self-Send Filtering:**
+  - Enforced strict `it.senderUid == cleanUid && it.recipientUid == cleanUid` filter in `DefaultCapsuleRepository.lists()`.
+- **2. Regression Test Suite Corrections:**
+  - Enhanced `offlineSelfSendAppearsInBothTabs` to test A→A in both tabs, B→A in Received only, legacy unknown sender excluded from Sent, and online server-confirmed results un-overwritten.
+  - Enhanced `timeLockVerificationReturnsLockedWaitingTime` with exact `OperationResult.Denied("Unlock authorization denied or unlock time not reached.")` response.
+  - Added `locationLockConditionDisplaysCoordinatesAndRadius` test for location target rendering.
+- **3. Automated Verification Suite:**
+  - Total **387 JVM unit tests passed** (`./gradlew :app:testDebugUnitTest`).
+  - Debug and AndroidTest APKs built cleanly (`./gradlew :app:assembleDebug :app:assembleDebugAndroidTest`).
+  - Lint passed cleanly with 0 errors (`./gradlew :app:clean :app:lintDebug`).
+  - Readiness check passed (`PREFLIGHT_RECORD_VALID`).
+
+

@@ -111,11 +111,14 @@ interface LocalRetentionAdapter {
         photoFormat: OriginalPhotoFormat?,
         title: String? = null,
         lockMode: LockMode? = null,
+        senderUid: String? = null,
+        recipientUid: String? = null,
         senderDisplayName: String? = null,
         recipientDisplayName: String? = null,
         createdAt: Instant? = null,
         unlockAt: Instant? = null,
-        creationZone: String? = null
+        creationZone: String? = null,
+        location: LocationTarget? = null
     ): OperationResult<Unit>
 
     /**

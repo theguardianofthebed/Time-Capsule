@@ -156,11 +156,14 @@ class DefaultLocalRetentionAdapter(
         photoFormat: OriginalPhotoFormat?,
         title: String?,
         lockMode: LockMode?,
+        senderUid: String?,
+        recipientUid: String?,
         senderDisplayName: String?,
         recipientDisplayName: String?,
         createdAt: Instant?,
         unlockAt: Instant?,
-        creationZone: String?
+        creationZone: String?,
+        location: LocationTarget?
     ): OperationResult<Unit> = withContext(Dispatchers.IO) {
         val cleanUid = (targetSession.uid ?: "").trim()
         val cleanCapsuleId = capsuleId.trim()
@@ -241,8 +244,18 @@ class DefaultLocalRetentionAdapter(
                     setProperty("hasPhoto", (photoBytes != null).toString())
                     photoBytes?.let { setProperty("photoSha256", sha256(it)) }
                     photoFormat?.let { setProperty("photoFormat", it.name) }
-                    for (key in listOf("senderUid", "recipientUid", "latitude", "longitude", "radiusMeters")) {
-                        existingProperties.getProperty(key)?.let { setProperty(key, it) }
+                    senderUid?.takeIf { it.isNotBlank() }?.let { setProperty("senderUid", it) }
+                        ?: existingProperties.getProperty("senderUid")?.let { setProperty("senderUid", it) }
+                    recipientUid?.takeIf { it.isNotBlank() }?.let { setProperty("recipientUid", it) }
+                        ?: existingProperties.getProperty("recipientUid")?.let { setProperty("recipientUid", it) }
+                    location?.let {
+                        setProperty("latitude", it.latitude.toString())
+                        setProperty("longitude", it.longitude.toString())
+                        setProperty("radiusMeters", it.radiusMeters.toString())
+                    } ?: run {
+                        for (key in listOf("latitude", "longitude", "radiusMeters")) {
+                            existingProperties.getProperty(key)?.let { setProperty(key, it) }
+                        }
                     }
                     lockMode?.let { setProperty("lockMode", it.name) }
                         ?: existingProperties.getProperty("lockMode")?.let { setProperty("lockMode", it) }

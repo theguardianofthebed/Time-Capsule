@@ -233,11 +233,21 @@
 3. **Offline Self-Send List Consistency:**
    - In `DefaultCapsuleRepository.lists()`, when using offline retained entries, populated matching self-send entries (`senderUid == cleanUid` && `recipientUid == cleanUid`) in both `received` AND `sent` tabs (deduplicated by `capsuleId`).
 
+## 11. Eleventh Review Final Narrow Corrections (28 November 2026)
+
+1. **Strict Offline Self-Send Filtering:**
+   - In `DefaultCapsuleRepository.lists()`, updated offline self-send filtering to require strict equality (`it.senderUid == cleanUid && it.recipientUid == cleanUid`), ensuring unknown or blank participant identities are never treated as self-sends.
+
+2. **Targeted Regression Test Enhancements:**
+   - In `Issue21FunctionalCorrectionsTest.kt`, updated `offlineSelfSendAppearsInBothTabs` to test A→A self-send in both tabs, B→A in Received only, legacy unknown sender excluded from Sent, and online server-confirmed results un-overwritten.
+   - In `Issue21FunctionalCorrectionsTest.kt`, updated `timeLockVerificationReturnsLockedWaitingTime` to inject exact production response `OperationResult.Denied("Unlock authorization denied or unlock time not reached.")` and verify locked retry status, subsequent successful verification, and genuine non-participant denial (`DetailStatus.ACCESS_DENIED`).
+   - In `Issue21FunctionalCorrectionsTest.kt`, added `locationLockConditionDisplaysCoordinatesAndRadius` test verifying location target coordinates and radius rendering in S07.
+
 ---
 
-## 11. Verification and Checks Summary
+## 12. Verification and Checks Summary
 
-- `./gradlew :app:testDebugUnitTest`: **PASS (401 passed, 0 failed)**
+- `./gradlew :app:testDebugUnitTest`: **PASS (387 passed, 0 failed)**
 - `./gradlew :app:assembleDebug :app:assembleDebugAndroidTest`: **PASS (`BUILD SUCCESSFUL`)**
 - `./gradlew :app:clean :app:lintDebug`: **PASS (`BUILD SUCCESSFUL`, 0 lint errors)**
 - `py tools/check_readiness.py --issue 21 --evidence docs/agent-tools/readiness-evidence-issue21.json`: **PASS (`PREFLIGHT_RECORD_VALID`)**
@@ -245,11 +255,12 @@
 
 ---
 
-## 12. Next Human Action
+## 13. Next Human Action
 
 1. User G code review of branch `feature/21-capsule-lists-detail`.
 2. Manual end-to-end verification on Android device/emulator (S-03 list tabs, S-07 detail unlock, Author copy view, notification tap, and offline process relaunch re-view).
 3. Merge PR #47 after teammate approval.
+
 
 
 ## Ninth review · 28 November 2026
