@@ -1,47 +1,71 @@
-# Agent Log – Week 4 (MM/DD – MM/DD)
+# Week 4 · User J
 
-- Name / Student ID:
-- Model(s) used:
-- My changes to the team's Agent Tools this week:
+## Issue #22 · Native navigation and recovery
 
-The planned submission date is **4 December 2026**; follow any later professor announcement. Add one feature/task section for each piece of work. Describe your own contribution and use real prompts, results, and examples. If you did not use an agent this week, say so honestly.
+- Project development environment specification: Android Studio Agent Mode.
+- Work period: 28 November 2026 (KST). Scope: MVP. Human reviewer: User G.
+- Contract: AC-10, DD-01, DD-02, NFR-02, NFR-03, NFR-05, T-38 and T-45.
+- Branch: `feature/22-native-ui-recovery`. [Issue #22](https://github.com/theguardianofthebed/Time-Capsule/issues/22).
 
-Follow [the shared workflow](../../agent-tools/WORKFLOW.md) and [AGENTS.md](../../../AGENTS.md). Remove credentials and private data from any quoted material.
+The first implementation at `bb6bb09` added authentication progress views, live regions, lock wording, and clearing on capsule ID changes. Its log reported 406 passing JVM tests. Its three new tests repeated the formatter and did not verify the screen text. The initial report also attributed existing list and recipient-confirmation behavior to that commit.
 
-## Feature or task
+The correction binds authentication progress to each form’s ViewModel, checks the current account and profile before entering protected screens, and offers repair, verification retry, or offline re-view according to the result. System Back and visible Back use the same route and preserve the editable draft or original frozen publication. The review screen presents the actual lock evidence, sends confirmed publications to the Sent tab, and offers only the recovery actions supported by the journal.
 
-- **Task and purpose:** [What you worked on and why.]
-- **Session date(s):** [Actual dates.]
-- **Issue and PR:** [Real links, or the publication blocker.]
-- **Requirement/design references:** [Relevant IDs or paths, if applicable.]
-- **Agent environment:** [Actual environment; project coding must use Android Studio Agent Mode.]
-- **Model used:** [Exact displayed model name, including any switch during the task.]
+Several failures were reproduced through the Android activity. A duplicate sign-in reached the adapter twice. A missing profile opened the list. A stale emission for the same capsule retained the old session’s caption. Reinstalling the previous production lock formatter made three assertions fail. The final test names, environment, results, and outstanding device checks are recorded in the [technical handoff](../../agent-tools/handoffs/issue-22-native-ui-recovery.md).
 
-**Goal**
+User J’s personal review, explanations, manual fixes, and course submission remain pending student input. User G’s independent review is pending.
 
-[What help did you need? What did you decide or do yourself?]
+See the [dated correction to the ongoing log](issue-22-correction.md).
 
-**Requests and prompts**
+Published for independent review in [Draft PR #51](https://github.com/theguardianofthebed/Time-Capsule/pull/51).
 
-| # | Request summary | Actual prompt (key part) | Why it worked (or didn't) |
-|---|-----------------|--------------------------|---------------------------|
-| 1 | | | |
-| 2 | | | |
+## Issue #22 · Third Implementation: Targeted Functional Corrections (28 November 2026)
 
-[Include the important prompts and corrections. Mark redacted or paraphrased text.]
+- Work period: 28 November 2026 (KST). Scope: MVP. Human reviewer: User G.
+- Target PR: [PR #51](https://github.com/theguardianofthebed/Time-Capsule/pull/51). Branch: `feature/22-native-ui-recovery`.
+- Corrected registration failure boundary in `DefaultAuthAdapter.signUp()` when Auth creation succeeds but profile update fails, keeping session active for same-account profile repair.
+- Applied originating session protection (`SessionSnapshot`) across `S08AccountSettingsFragment.kt` and `S08AccountSettingsViewModel.kt` (`repairProfile`, `signOut`, `checkProfile`, `btnCopyUid`).
+- Enforced authoritative server profile reads in `DefaultFirestoreAdapter.getRecipientProfile()` (`doc.metadata.hasPendingWrites() || doc.metadata.isFromCache` rejection, required UID and nonblank display name validation).
+- Updated `MainActivity.resolveAccountScreen()` with a 5s profile-check timeout and preserved offline viewing of previously authorized retained content.
+- Cleared stale location labels on recovered operations in `CapsuleDraftViewModel.applyRecovered()` and represented missing recovery records truthfully without false `PublicationPhase.FAILED` states.
+- Refined `S07CapsuleDetailViewModel.mapUnlockFailureStatus()` to ensure TIME-only verification failures never generate location-settings actions.
+- Re-evaluated session validity in `MainActivity.replaceFragment()`'s `runOnCommit` callback to prevent asynchronous session transition leakage.
+- Automated verification: 436 JVM unit tests passed (`./gradlew :app:testDebugUnitTest`), debug/test APKs assembled, lint clean (0 errors), readiness valid (`py tools/check_readiness.py --validate-manifest` -> `MANIFEST_VALID`).
 
-### What the agent changed and verified
+## Issue #22 · Fourth Review: Remaining Functional Corrections (28 November 2026)
 
-- **Changes:** [Relevant files or behavior.]
-- **Checks and results:** [Actual commands or actions, environment, observed result, and evidence.]
-- **Remaining checks:** [Anything not run, failed, or blocked, and why.]
+- Work period: 28 November 2026 (KST). Scope: MVP. Human reviewer: User G.
+- Target PR: [PR #51](https://github.com/theguardianofthebed/Time-Capsule/pull/51). Branch: `feature/22-native-ui-recovery`.
+- Replaced/supplemented regression tests in `AccountSessionManagerTest`, `CapsuleDraftViewModelTest`, and `S07CapsuleDetailViewModelTest` to test actual production adapter/ViewModel boundaries with Red->Green verification.
+- Enforced complete profile verification in `DefaultFirestoreAdapter.getRecipientProfile()` (checks `hasPendingWrites()`/`isFromCache` before document existence, requires matching UID and nonblank display name).
+- Added in-flight submission guard `isSignOutInFlight` in `S08AccountSettingsViewModel` and session validation in S-08 LiveData observers.
+- Automated verification: 442 JVM unit tests passed (`./gradlew :app:testDebugUnitTest`), debug/test APKs assembled, lint clean (0 errors), readiness preflight valid (`py tools/check_readiness.py --issue 22 --evidence docs/agent-tools/readiness-evidence-issue22.json` -> `PREFLIGHT_RECORD_VALID`).
 
-### Errors and manual fixes
+## Issue #22 · Fifth Review: Outstanding Corrections (29 November 2026)
 
-[Describe any error and how it was corrected. Separate the agent's correction from your own manual work. Say that no fix was needed only if that is true.]
+- Work period: 29 November 2026 (KST). Scope: MVP. Human reviewer: User G.
+- Target PR: [PR #51](https://github.com/theguardianofthebed/Time-Capsule/pull/51). Branch: `feature/22-native-ui-recovery`.
+- Committed previously pending changes to `MainActivity.kt` and `S07CapsuleDetailViewModel.kt`.
+- Strengthened `MainActivity.replaceFragment().runOnCommit` with `belongsToCurrentSession(fragment)` check and `accountCheck?.isActive` guard.
+- Refined `S07CapsuleDetailViewModel.mapUnlockFailureStatus()` so specific location failures (`"location service"`, `"permission"`, `"null fix"`) produce correct location guidance while account/denial errors map to `ACCESS_DENIED`.
+- Strengthened `CapsuleDraftViewModel.applyRecovered()` location-label logic to require matching coordinates before preserving a custom location label.
+- Added tests exercising real `DefaultAuthAdapter` and `DefaultFirestoreAdapter` production adapter validation in `AuthAndRecipientTest.kt`.
+- Automated verification: 448 JVM unit tests passed (`./gradlew :app:testDebugUnitTest`), debug/test APKs assembled, lint clean (0 errors), readiness preflight valid (`py tools/check_readiness.py --issue 22 --evidence docs/agent-tools/readiness-evidence-issue22.json` -> `PREFLIGHT_RECORD_VALID`).
 
-### My review and understanding
+## Issue #22 · Sixth Review: Final Outstanding Corrections (29 November 2026)
 
-- **What I reviewed:** [The changes you inspected before accepting them.]
-- **What I can explain:** [A mechanism, data flow, or failure case you understand.]
-- **Feedback and next step:** [Reviewer feedback, unresolved questions, and the next owner/action.]
+- Work period: 29 November 2026 (KST). Scope: MVP. Human reviewer: User G.
+- Target PR: [PR #51](https://github.com/theguardianofthebed/Time-Capsule/pull/51). Branch: `feature/22-native-ui-recovery`.
+- Refined `S07CapsuleDetailViewModel.mapUnlockFailureStatus()` so ambiguous backend denials and explicit location guidance are strictly distinguished.
+- Distinguished malformed recipient profiles from absent recipients in `CapsuleDraftViewModel.kt` (`RecipientLookupStatus.NONEXISTENT` vs `RecipientLookupStatus.ERROR`).
+- Added unit tests for production `DefaultAuthAdapter` and `DefaultFirestoreAdapter` in `DefaultAuthAdapterTest.kt` and `DefaultFirestoreAdapterTest.kt`.
+- Added Robolectric navigation transaction session-change test `navigationTransactionSessionChangeDuringRunOnCommitKeepsContainerInvisible` in `Issue21FunctionalCorrectionsTest.kt`.
+- Automated verification: 455 JVM unit tests passed (`./gradlew :app:testDebugUnitTest`), debug/test APKs assembled, lint clean (0 errors), readiness preflight valid (`py tools/check_readiness.py --issue 22 --evidence docs/agent-tools/readiness-evidence-issue22.json` -> `PREFLIGHT_RECORD_VALID`).
+
+## Issue #22 · Seventh Review: Complete Remaining Functional and Verification Gaps (29 November 2026)
+
+- Work period: 29 November 2026 (KST). Scope: MVP. Human reviewer: User G.
+- Target PR: [PR #51](https://github.com/theguardianofthebed/Time-Capsule/pull/51). Branch: `feature/22-native-ui-recovery`.
+- Refined `S07CapsuleDetailViewModel.mapUnlockFailureStatus()` to ensure exact production unlock denial string `"Unlock authorization denied or unlock time not reached."` maps to `DetailStatus.ACCESS_DENIED`.
+- Verified production adapter exception-handling branches in `DefaultAuthAdapterTest.kt` and `DefaultFirestoreAdapterTest.kt`.
+- Automated verification: 463 JVM unit tests passed (`./gradlew :app:testDebugUnitTest`), debug/test APKs assembled, lint clean (0 errors), readiness preflight valid (`py tools/check_readiness.py --issue 22 --evidence docs/agent-tools/readiness-evidence-issue22.json` -> `PREFLIGHT_RECORD_VALID`).

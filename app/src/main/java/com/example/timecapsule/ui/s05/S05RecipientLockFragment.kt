@@ -290,10 +290,10 @@ class S05RecipientLockFragment : Fragment() {
                     // Recipient Mode toggle formatting
                     if (state.recipientMode == RecipientMode.FUTURE_ME) {
                         binding.btnModeFutureMe.setTextColor(requireContext().getColor(android.R.color.black))
-                        binding.btnModeSomeoneElse.setTextColor(requireContext().getColor(android.R.color.darker_gray))
+                        binding.btnModeSomeoneElse.setTextColor(requireContext().getColor(R.color.capsule_text_body))
                         binding.layoutUidInputSection.visibility = View.GONE
                     } else {
-                        binding.btnModeFutureMe.setTextColor(requireContext().getColor(android.R.color.darker_gray))
+                        binding.btnModeFutureMe.setTextColor(requireContext().getColor(R.color.capsule_text_body))
                         binding.btnModeSomeoneElse.setTextColor(requireContext().getColor(android.R.color.black))
                         binding.layoutUidInputSection.visibility = View.VISIBLE
                     }
@@ -370,6 +370,11 @@ class S05RecipientLockFragment : Fragment() {
                         }
                     }
 
+                    binding.btnModeFutureMe.isSelected = state.recipientMode == RecipientMode.FUTURE_ME
+                    binding.btnModeSomeoneElse.isSelected = state.recipientMode == RecipientMode.SOMEONE_ELSE
+                    binding.btnLockTime.isSelected = state.lockMode == LockMode.TIME
+                    binding.btnLockPlace.isSelected = state.lockMode == LockMode.LOCATION
+                    binding.btnLockBoth.isSelected = state.lockMode == LockMode.TIME_AND_LOCATION
                     // Lock mode formatting
                     when (state.lockMode) {
                         LockMode.TIME -> {

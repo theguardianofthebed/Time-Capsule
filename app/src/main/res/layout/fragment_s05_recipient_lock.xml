@@ -19,11 +19,11 @@
 
         <ImageButton
             android:id="@+id/btnBack"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="Go back"
-            android:src="@android:drawable/ic_menu_revert"
+            android:contentDescription="@string/nav_back"
+            android:src="@drawable/ic_back"
             app:tint="#3D3933" />
 
         <TextView
@@ -56,7 +56,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/s04_step_01"
-            android:textColor="#9C9488"
+            android:textColor="@color/capsule_text_body"
             android:textSize="13sp" />
 
         <TextView
@@ -64,7 +64,7 @@
             android:layout_height="wrap_content"
             android:layout_marginHorizontal="16dp"
             android:text="·"
-            android:textColor="#C4BDB2" />
+            android:textColor="@color/capsule_text_body" />
 
         <TextView
             android:id="@+id/tvStep2"
@@ -80,14 +80,14 @@
             android:layout_height="wrap_content"
             android:layout_marginHorizontal="16dp"
             android:text="·"
-            android:textColor="#C4BDB2" />
+            android:textColor="@color/capsule_text_body" />
 
         <TextView
             android:id="@+id/tvStep3"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/s04_step_03"
-            android:textColor="#9C9488"
+            android:textColor="@color/capsule_text_body"
             android:textSize="13sp" />
     </LinearLayout>
 
@@ -125,7 +125,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
                 android:text="@string/s05_subtitle"
-                android:textColor="#8C857B"
+                android:textColor="@color/capsule_text_body"
                 android:textSize="14sp" />
 
             <!-- Recipient Section -->
@@ -165,7 +165,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="@string/s05_mode_someone_else"
-                    android:textColor="#8C857B"
+                    android:textColor="@color/capsule_text_body"
                     android:textSize="13sp" />
             </LinearLayout>
 
@@ -180,6 +180,7 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:labelFor="@id/etRecipientUid"
                     android:text="@string/s05_label_exact_uid"
                     android:textColor="#3D3933"
                     android:textSize="12sp"
@@ -254,7 +255,7 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="2dp"
                             android:text="UID: TC-JAMIE1ff"
-                            android:textColor="#8C857B"
+                            android:textColor="@color/capsule_text_body"
                             android:textSize="12sp" />
                     </LinearLayout>
 
@@ -311,7 +312,7 @@
                     android:layout_marginTop="8dp"
                     android:gravity="center"
                     android:text="@string/s05_note_confirm"
-                    android:textColor="#8C857B"
+                    android:textColor="@color/capsule_text_body"
                     android:textSize="12sp" />
             </LinearLayout>
 
@@ -349,7 +350,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="@string/s05_lock_place"
-                    android:textColor="#8C857B"
+                    android:textColor="@color/capsule_text_body"
                     android:textSize="12sp" />
 
                 <Button
@@ -359,7 +360,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="@string/s05_lock_both"
-                    android:textColor="#8C857B"
+                    android:textColor="@color/capsule_text_body"
                     android:textSize="12sp" />
             </LinearLayout>
 
@@ -430,7 +431,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
                     android:text="@string/s05_location_notice"
-                    android:textColor="#8C857B"
+                    android:textColor="@color/capsule_text_body"
                     android:textSize="12sp" />
             </LinearLayout>
 
@@ -450,6 +451,7 @@
             <!-- Error Notice -->
             <TextView
                 android:id="@+id/tvS05Error"
+                android:accessibilityLiveRegion="polite"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
@@ -489,6 +491,7 @@
 
         <LinearLayout
             android:id="@+id/btnNavMoments"
+            android:minHeight="48dp"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
@@ -501,12 +504,13 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/nav_moments"
-                android:textColor="#9C9488"
+                android:textColor="@color/capsule_text_body"
                 android:textSize="12sp" />
         </LinearLayout>
 
         <LinearLayout
             android:id="@+id/btnNavCreate"
+            android:minHeight="48dp"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
@@ -526,6 +530,7 @@
 
         <LinearLayout
             android:id="@+id/btnNavAccount"
+            android:minHeight="48dp"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
@@ -538,7 +543,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/nav_account"
-                android:textColor="#9C9488"
+                android:textColor="@color/capsule_text_body"
                 android:textSize="12sp" />
         </LinearLayout>
     </LinearLayout>

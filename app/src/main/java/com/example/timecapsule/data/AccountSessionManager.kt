@@ -147,7 +147,7 @@ class AccountSessionManager(
             authMutex.withLock {
                 if (authAdapter.activeUid() != null) {
                     val activeUid = restoreLocked() ?: return cleanupFailure()
-                    val repair = repairProfileInternal(activeUid, trimmedName)
+                    val repair = repairProfileInternal(activeUid, trimmedName, currentSession())
                     return if (repair is OperationResult.Success) OperationResult.Success(activeUid)
                     else OperationResult.Unavailable("Recipient profile setup failed.")
                 }
@@ -170,11 +170,10 @@ class AccountSessionManager(
      * Performs Profile Repair for an authenticated user session.
      * Requires an active, authenticated session and updates the user's `recipientDirectory/{uid}` profile.
      */
-    suspend fun repairProfile(displayName: String): OperationResult<Unit> {
-        val session = sessionTracker.currentSession()
+    suspend fun repairProfile(displayName: String, session: SessionSnapshot = currentSession()): OperationResult<Unit> {
         val activeUid = authAdapter.activeUid()
 
-        if (!session.isAuthenticated || activeUid.isNullOrBlank() || session.uid != activeUid) {
+        if (!isSessionValid(session) || !session.isAuthenticated || activeUid.isNullOrBlank() || session.uid != activeUid) {
             return OperationResult.Denied("Profile repair requires an active, authenticated user session.")
         }
 
@@ -184,7 +183,7 @@ class AccountSessionManager(
         }
 
         return sessionGuard.runGuarded(session) {
-            repairProfileInternal(activeUid, trimmedName)
+            repairProfileInternal(activeUid, trimmedName, session)
         }
     }
 
@@ -207,10 +206,13 @@ class AccountSessionManager(
         }
     }
 
-    private suspend fun repairProfileInternal(activeUid: String, trimmedName: String): OperationResult<Unit> {
+    private suspend fun repairProfileInternal(activeUid: String, trimmedName: String, origin: SessionSnapshot): OperationResult<Unit> {
         val authUpdateRes = authAdapter.updateDisplayName(trimmedName)
         if (authUpdateRes !is OperationResult.Success) {
             return authUpdateRes
+        }
+        if (!isSessionValid(origin) || authAdapter.activeUid() != activeUid) {
+            return OperationResult.Denied("Account changed.")
         }
         val profile = RecipientProfile(uid = activeUid, displayName = trimmedName)
         return firestoreAdapter.saveRecipientProfile(profile)
@@ -252,7 +254,10 @@ class AccountSessionManager(
      * 3. Execute store cleanups and Auth sign-out.
      * 4. Confirm successful cleanup before removing pending obligation.
      */
-    suspend fun signOut(): OperationResult<Unit> = authMutex.withLock {
+    suspend fun signOut(origin: SessionSnapshot? = null): OperationResult<Unit> = authMutex.withLock {
+        if (origin != null && (!isSessionValid(origin) || authAdapter.activeUid() != origin.uid)) {
+            return@withLock OperationResult.Denied("Account changed.")
+        }
         retire(currentSession().uid ?: authAdapter.activeUid(), signOutSdk = true)
     }
 

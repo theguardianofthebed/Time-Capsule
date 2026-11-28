@@ -1,0 +1,147 @@
+{
+  "issue": 22,
+  "checked_at": "2026-11-28T13:53:53Z",
+  "selected_base": "a344980a56eae0078567cbbf421188c88ec49a5a",
+  "owner": "User J",
+  "owner_confirmation": "Second implementation request identifies User J",
+  "branch": "feature/22-native-ui-recovery",
+  "period": "28 November 2026 KST",
+  "scope": "MVP",
+  "reviewer": "User G",
+  "components": [
+    "S-01 through S-08 Views, MainActivity, authentication presentation, permission recovery, UI tests"
+  ],
+  "deliverable": "Correct native navigation, accessibility and truthful status and recovery",
+  "contract_approval": "Issue #22, Atlas r55, DESIGN.md, DD-01/02, NFR-02/03/05, AC-10, T-38/T-45",
+  "blocking_failures": [],
+  "inventory": {
+    "issues": "Reviewed Issue #22 and its five direct implementation dependencies",
+    "branches": "Existing feature/22-native-ui-recovery matches reviewed bb6bb09, main matches selected base",
+    "prs": "Open PRs #5 and #24 concern documentation. PR #50 is a separate reminder foundation.",
+    "handoffs": "Reviewed predecessor handoffs and merged PR verification. First implementation did not supply an Issue #22 handoff.",
+    "compatible": true,
+    "compatibility_evidence": "PR #50 excludes screen/settings wiring. Log updates are appended to preserve parallel records.",
+    "active_claims": [
+      {
+        "issue": 22,
+        "owner": "User J",
+        "branch": "feature/22-native-ui-recovery",
+        "overlaps": false,
+        "agreement": "Explicit continuation of the existing branch"
+      },
+      {
+        "issue": 48,
+        "owner": "User G",
+        "branch": "feature/48-push-reminder-foundation",
+        "overlaps": false
+      }
+    ]
+  },
+  "dependencies": [
+    {
+      "issue": 10,
+      "pr": "https://github.com/theguardianofthebed/Time-Capsule/pull/33",
+      "merged": true,
+      "merge_commit": "74aa763076801944a33897b2f67c36d3afb27aa9",
+      "implementation_inspection": "Serializes authentication and checks account profiles",
+      "paths": [
+        "app/src/main/java/com/example/timecapsule/data/AccountSessionManager.kt"
+      ],
+      "checks": [
+        {
+          "result": "PASS",
+          "procedure": "Predecessor verification from its merged PR and handoff",
+          "expected_actual": "47 JVM tests and 9 instrumentation tests reported passing",
+          "commit": "16c8038615500b96ae9590611b1e32973f58b574",
+          "environment": "Predecessor development environment as described in linked PR. Historical evidence.",
+          "evidence": "https://github.com/theguardianofthebed/Time-Capsule/pull/33"
+        }
+      ],
+      "blocking_failures": []
+    },
+    {
+      "issue": 12,
+      "pr": "https://github.com/theguardianofthebed/Time-Capsule/pull/36",
+      "merged": true,
+      "merge_commit": "26d78cc897ec2bd6853288be9c66838dd3bf63d2",
+      "implementation_inspection": "Activity-scoped draft contains the recipient confirmation and review flow",
+      "paths": [
+        "app/src/main/java/com/example/timecapsule/ui/draft/CapsuleDraftViewModel.kt"
+      ],
+      "checks": [
+        {
+          "result": "PASS",
+          "procedure": "Predecessor verification from its merged PR and handoff",
+          "expected_actual": "69 JVM tests, assembly and lint reported passing",
+          "commit": "7ff68c2a6ed0980ae85bc4c15ebd41fe9154d6ab",
+          "environment": "Predecessor development environment as described in linked PR. Historical evidence.",
+          "evidence": "https://github.com/theguardianofthebed/Time-Capsule/pull/36"
+        }
+      ],
+      "blocking_failures": []
+    },
+    {
+      "issue": 16,
+      "pr": "https://github.com/theguardianofthebed/Time-Capsule/pull/42",
+      "merged": true,
+      "merge_commit": "93b7409e871f215ea2cfc08642c1c934ddf5ec27",
+      "implementation_inspection": "Checks target validity, freshness, accuracy and distance",
+      "paths": [
+        "app/src/main/java/com/example/timecapsule/domain/location/LocationQualifier.kt"
+      ],
+      "checks": [
+        {
+          "result": "PASS",
+          "procedure": "Predecessor verification from its merged PR and handoff",
+          "expected_actual": "245 JVM tests, assembly and lint reported passing",
+          "commit": "399fd4c67d024a639a66cb6a832d9c8ddb6de30f",
+          "environment": "Predecessor development environment as described in linked PR. Historical evidence.",
+          "evidence": "https://github.com/theguardianofthebed/Time-Capsule/pull/42"
+        }
+      ],
+      "blocking_failures": []
+    },
+    {
+      "issue": 19,
+      "pr": "https://github.com/theguardianofthebed/Time-Capsule/pull/45",
+      "merged": true,
+      "merge_commit": "ff24346b8a83f802a4e6ef7eaa41a774057d8aee",
+      "implementation_inspection": "Revalidates content-free entry against the live account",
+      "paths": [
+        "app/src/main/java/com/example/timecapsule/data/notification/NotificationEntryValidator.kt"
+      ],
+      "checks": [
+        {
+          "result": "PASS",
+          "procedure": "Predecessor verification from its merged PR and handoff",
+          "expected_actual": "313 JVM tests, assembly and lint reported passing",
+          "commit": "a14ec13f717b51ff7e71a5a64ed1964bfec6d297",
+          "environment": "Predecessor development environment as described in linked PR. Historical evidence.",
+          "evidence": "https://github.com/theguardianofthebed/Time-Capsule/pull/45"
+        }
+      ],
+      "blocking_failures": []
+    },
+    {
+      "issue": 21,
+      "pr": "https://github.com/theguardianofthebed/Time-Capsule/pull/47",
+      "merged": true,
+      "merge_commit": "a344980a56eae0078567cbbf421188c88ec49a5a",
+      "implementation_inspection": "Detail verification and retained-content recovery are present",
+      "paths": [
+        "app/src/main/java/com/example/timecapsule/ui/s07/S07CapsuleDetailViewModel.kt"
+      ],
+      "checks": [
+        {
+          "result": "PASS",
+          "procedure": "Predecessor verification from its merged PR and handoff",
+          "expected_actual": "403 JVM tests, both debug assemblies and lint reported passing",
+          "commit": "4834ebb4c19fe483760c5cb10793c500d0f25dd7",
+          "environment": "Predecessor development environment as described in linked PR. Historical evidence.",
+          "evidence": "https://github.com/theguardianofthebed/Time-Capsule/pull/47"
+        }
+      ],
+      "blocking_failures": []
+    }
+  ]
+}

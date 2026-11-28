@@ -49,7 +49,9 @@ private sealed interface TransactionUnlockResult {
  */
 class DefaultFirestoreAdapter(
     private val contextSupplier: () -> Context? = { null },
-    private val storageAdapter: StorageAdapter? = null
+    private val storageAdapter: StorageAdapter? = null,
+    private val firestoreSupplier: (() -> FirebaseFirestore?)? = null,
+    private val recipientFetcher: (suspend (String) -> OperationResult<RecipientProfile>)? = null
 ) : FirestoreAdapter {
 
     override fun isAvailable(): Boolean {
@@ -58,7 +60,7 @@ class DefaultFirestoreAdapter(
     }
 
     override fun firestoreInstance(): FirebaseFirestore? {
-        return FirebaseConfig.getMemoryOnlyFirestore(contextSupplier())
+        return firestoreSupplier?.invoke() ?: FirebaseConfig.getMemoryOnlyFirestore(contextSupplier())
     }
 
     override suspend fun getRecipientProfile(uid: String): OperationResult<RecipientProfile> {
@@ -67,22 +69,40 @@ class DefaultFirestoreAdapter(
             return OperationResult.Invalid("UID must not be blank for recipient lookup.")
         }
 
+        if (recipientFetcher != null) {
+            return recipientFetcher.invoke(cleanUid)
+        }
+
         val instance = firestoreInstance()
             ?: return OperationResult.Unavailable("Firestore service is unavailable.")
 
         return try {
             val doc = instance.collection("recipientDirectory")
                 .document(cleanUid)
-                .get()
+                .get(Source.SERVER)
                 .await()
 
-            if (doc.exists()) {
-                val displayName = doc.getString("displayName") ?: ""
-                OperationResult.Success(RecipientProfile(uid = cleanUid, displayName = displayName))
-            } else {
-                OperationResult.Invalid("No recipient found with UID: $cleanUid")
+            if (doc.metadata.hasPendingWrites() || doc.metadata.isFromCache) {
+                return OperationResult.Unavailable("Profile snapshot is unconfirmed or cached.")
             }
+
+            if (!doc.exists()) {
+                return OperationResult.Invalid("No recipient found with UID: $cleanUid")
+            }
+
+            val docUid = doc.getString("uid")
+            if (docUid.isNullOrBlank() || docUid != cleanUid) {
+                return OperationResult.Invalid("Profile document UID missing or mismatched.")
+            }
+
+            val displayName = doc.getString("displayName")
+            if (displayName.isNullOrBlank()) {
+                return OperationResult.Invalid("Profile display name is missing or blank.")
+            }
+
+            OperationResult.Success(RecipientProfile(uid = cleanUid, displayName = displayName))
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             mapFirestoreException(e)
         }
     }
@@ -591,7 +611,7 @@ class DefaultFirestoreAdapter(
                 when (e.code) {
                     FirebaseFirestoreException.Code.UNAVAILABLE,
                     FirebaseFirestoreException.Code.DEADLINE_EXCEEDED -> {
-                        OperationResult.Unavailable("Firestore service unavailable: ${e.message}")
+                        OperationResult.Unavailable("Service unavailable. Check your connection and retry.")
                     }
                     FirebaseFirestoreException.Code.PERMISSION_DENIED -> {
                         OperationResult.Denied("Unlock authorization denied or unlock time not reached.")
@@ -617,18 +637,18 @@ class DefaultFirestoreAdapter(
                 when (e.code) {
                     FirebaseFirestoreException.Code.UNAVAILABLE,
                     FirebaseFirestoreException.Code.DEADLINE_EXCEEDED -> {
-                        OperationResult.Unavailable("Firestore service unavailable: ${e.message}")
+                        OperationResult.Unavailable("Service unavailable. Check your connection and retry.")
                     }
                     FirebaseFirestoreException.Code.PERMISSION_DENIED -> {
-                        OperationResult.Denied("Firestore permission denied: ${e.message}")
+                        OperationResult.Denied("Access denied. Check the signed-in account.")
                     }
                     else -> {
-                        OperationResult.Denied("Firestore request failed: ${e.message}")
+                        OperationResult.Denied("The service rejected this request. Check your account access.")
                     }
                 }
             }
             else -> {
-                OperationResult.Denied("Firestore request failed: ${e.localizedMessage ?: e.message}")
+                OperationResult.Denied("The request could not be completed. Check your account and retry.")
             }
         }
     }

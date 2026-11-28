@@ -26,8 +26,12 @@ import com.example.timecapsule.R
 import com.example.timecapsule.data.notification.DefaultNotificationAdapter
 import com.example.timecapsule.databinding.FragmentS08AccountSettingsBinding
 import com.example.timecapsule.domain.result.OperationResult
+import com.example.timecapsule.domain.session.SessionSnapshot
 import com.example.timecapsule.ui.ViewModelFactory
+import com.example.timecapsule.ui.requestOrOpenSettings
 import java.util.Locale
+import android.location.LocationManager
+import androidx.core.location.LocationManagerCompat
 
 /**
  * Fragment implementation for S-08 Account & Settings screen matching the Stitch UI design.
@@ -35,6 +39,14 @@ import java.util.Locale
  * system permissions status (Location, Notifications), profile updates, and session sign-out.
  */
 class S08AccountSettingsFragment : Fragment() {
+
+    private fun getOriginatingSession(): SessionSnapshot? {
+        val args = arguments ?: return null
+        val uid = args.getString("screenUid") ?: return null
+        val gen = args.getLong("screenGeneration", -1L)
+        if (gen == -1L) return null
+        return SessionSnapshot(uid, gen)
+    }
 
     private var _binding: FragmentS08AccountSettingsBinding? = null
     private val binding get() = _binding!!
@@ -93,12 +105,18 @@ class S08AccountSettingsFragment : Fragment() {
             }
         }
 
-        if (!activeUid.isNullOrBlank()) {
-            viewModel.checkProfile(activeUid)
+        val origin = getOriginatingSession()
+        if (!activeUid.isNullOrBlank() && origin != null) {
+            viewModel.checkProfile(activeUid, origin)
         }
 
         // Profile check observer: updates header and populates field if user is not actively editing
         viewModel.profileCheckState.observe(viewLifecycleOwner) { result ->
+            val screenOrigin = getOriginatingSession()
+            val currentSession = appContainer.accountSessionManager.currentSession()
+            if (screenOrigin == null || screenOrigin != currentSession || !appContainer.accountSessionManager.isSessionValid(screenOrigin)) {
+                return@observe
+            }
             when (result) {
                 is OperationResult.Success -> {
                     val name = result.data.displayName
@@ -127,6 +145,11 @@ class S08AccountSettingsFragment : Fragment() {
 
         // Profile update observer: re-enables button and updates header using confirmed submitted name
         viewModel.updateState.observe(viewLifecycleOwner) { result ->
+            val origin = getOriginatingSession()
+            val current = appContainer.accountSessionManager.currentSession()
+            if (origin == null || origin != current || !appContainer.accountSessionManager.isSessionValid(origin)) {
+                return@observe
+            }
             if (result != null) {
                 binding.btnUpdateProfile.isEnabled = true
             }
@@ -151,6 +174,12 @@ class S08AccountSettingsFragment : Fragment() {
 
         // Copy UID button handler
         binding.btnCopyUid.setOnClickListener {
+            val currentOrigin = getOriginatingSession()
+            val currentSession = appContainer.accountSessionManager.currentSession()
+            if (currentOrigin == null || currentOrigin != currentSession || !appContainer.accountSessionManager.isSessionValid(currentOrigin)) {
+                Toast.makeText(requireContext(), getString(R.string.err_session_unavailable), Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
             val uid = binding.tvUserUid.text.toString()
             if (uid.isNotBlank() && uid != "Unauthenticated") {
                 val clipboard = requireContext().getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -162,30 +191,34 @@ class S08AccountSettingsFragment : Fragment() {
 
         // Update profile display name handler with field-specific validation and duplicate submission prevention
         binding.btnUpdateProfile.setOnClickListener {
-            val newName = binding.etDisplayName.text.toString().trim()
-            if (activeUid.isNullOrBlank()) {
+            val currentOrigin = getOriginatingSession()
+            if (currentOrigin == null || !appContainer.accountSessionManager.isSessionValid(currentOrigin)) {
                 binding.tvStatusMessage.text = getString(R.string.err_session_unavailable)
                 return@setOnClickListener
             }
+            val newName = binding.etDisplayName.text.toString().trim()
             if (newName.isBlank()) {
                 binding.tvStatusMessage.text = getString(R.string.err_name_required)
                 return@setOnClickListener
             }
             isUserEditingName = false
             binding.btnUpdateProfile.isEnabled = false
-            viewModel.repairProfile(newName)
+            viewModel.repairProfile(newName, currentOrigin)
         }
 
         // Open System Settings listeners
         binding.btnOpenLocationSettings.setOnClickListener {
-            openSystemAppSettings()
+            if (!locationServicesEnabled()) startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+            else openSystemAppSettings()
         }
 
         binding.btnOpenNotificationSettings.setOnClickListener {
             val ctx = context ?: return@setOnClickListener
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
                 ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                requestNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                requestOrOpenSettings(Manifest.permission.POST_NOTIFICATIONS, ::openSystemNotificationSettings) {
+                    requestNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
             } else {
                 openSystemNotificationSettings()
             }
@@ -193,6 +226,11 @@ class S08AccountSettingsFragment : Fragment() {
 
         // Sign out observer: awaits result and navigates to sign in only on Success
         viewModel.signOutState.observe(viewLifecycleOwner) { result ->
+            val origin = getOriginatingSession()
+            val current = appContainer.accountSessionManager.currentSession()
+            if (origin == null || origin != current || !appContainer.accountSessionManager.isSessionValid(origin)) {
+                return@observe
+            }
             if (result != null) {
                 binding.btnSignOut.isEnabled = true
             }
@@ -221,8 +259,13 @@ class S08AccountSettingsFragment : Fragment() {
 
         // Sign out handler
         binding.btnSignOut.setOnClickListener {
+            val currentOrigin = getOriginatingSession()
+            if (currentOrigin == null || !appContainer.accountSessionManager.isSessionValid(currentOrigin)) {
+                binding.tvStatusMessage.text = getString(R.string.err_session_unavailable)
+                return@setOnClickListener
+            }
             binding.btnSignOut.isEnabled = false
-            viewModel.signOut()
+            viewModel.signOut(currentOrigin)
         }
     }
 
@@ -251,7 +294,7 @@ class S08AccountSettingsFragment : Fragment() {
     /**
      * Inspects current Android OS permission and notification status truthfully.
      * Uses [NotificationManagerCompat.areNotificationsEnabled] for notification grants across API levels,
-     * and displays a neutral non-configured state for location permissions not yet declared in manifest.
+     * and reports system location, precise/approximate access, and the reminder channel independently.
      */
     private fun checkAndroidPermissionsStatus() {
         val context = context ?: return
@@ -267,18 +310,21 @@ class S08AccountSettingsFragment : Fragment() {
             Manifest.permission.ACCESS_COARSE_LOCATION
         ) == PackageManager.PERMISSION_GRANTED
 
-        if (fineGranted) {
+        if (!locationServicesEnabled()) {
+            binding.tvLocationStatusBadge.text = "Location services off"
+            binding.tvLocationStatusBadge.setBackgroundResource(R.drawable.bg_badge_neutral)
+        } else if (fineGranted) {
             binding.tvLocationStatusBadge.text = getString(R.string.s08_badge_allowed)
             binding.tvLocationStatusBadge.setBackgroundResource(R.drawable.bg_badge_success)
             binding.tvLocationStatusBadge.setTextColor(ContextCompat.getColor(context, R.color.capsule_success_text))
         } else if (coarseGranted) {
             binding.tvLocationStatusBadge.text = getString(R.string.s08_badge_approximate)
             binding.tvLocationStatusBadge.setBackgroundResource(R.drawable.bg_badge_neutral)
-            binding.tvLocationStatusBadge.setTextColor(ContextCompat.getColor(context, R.color.capsule_text_muted))
+            binding.tvLocationStatusBadge.setTextColor(ContextCompat.getColor(context, R.color.capsule_text_body))
         } else {
-            binding.tvLocationStatusBadge.text = getString(R.string.s08_badge_not_configured)
+            binding.tvLocationStatusBadge.text = "Permission required"
             binding.tvLocationStatusBadge.setBackgroundResource(R.drawable.bg_badge_neutral)
-            binding.tvLocationStatusBadge.setTextColor(ContextCompat.getColor(context, R.color.capsule_text_muted))
+            binding.tvLocationStatusBadge.setTextColor(ContextCompat.getColor(context, R.color.capsule_text_body))
         }
 
         // Notification permission & system settings check across all Android versions
@@ -289,23 +335,32 @@ class S08AccountSettingsFragment : Fragment() {
             true
         }
 
-        val channelEnabled = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        val channel = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
-            val channel = manager?.getNotificationChannel(DefaultNotificationAdapter.CHANNEL_ID)
-            channel == null || channel.importance != NotificationManager.IMPORTANCE_NONE
-        } else {
-            true
-        }
+            manager?.getNotificationChannel(DefaultNotificationAdapter.CHANNEL_ID)
+        } else null
+        val channelEnabled = channel != null && channel.importance != NotificationManager.IMPORTANCE_NONE
 
         if (notificationsEnabled && postPermissionGranted && channelEnabled) {
             binding.tvNotificationStatusBadge.text = getString(R.string.s08_badge_allowed)
             binding.tvNotificationStatusBadge.setBackgroundResource(R.drawable.bg_badge_success)
             binding.tvNotificationStatusBadge.setTextColor(ContextCompat.getColor(context, R.color.capsule_success_text))
         } else {
-            binding.tvNotificationStatusBadge.text = getString(R.string.s08_badge_denied)
+            binding.tvNotificationStatusBadge.text = when {
+                !postPermissionGranted -> "Permission required"
+                !notificationsEnabled -> "App notifications off"
+                channel == null -> "Channel not created yet"
+                else -> "Reminder channel off"
+            }
             binding.tvNotificationStatusBadge.setBackgroundResource(R.drawable.bg_badge_neutral)
-            binding.tvNotificationStatusBadge.setTextColor(ContextCompat.getColor(context, R.color.capsule_text_muted))
+            binding.tvNotificationStatusBadge.setTextColor(ContextCompat.getColor(context, R.color.capsule_text_body))
         }
+    }
+
+    /** Check the system location switch independently of precise/approximate permission. */
+    private fun locationServicesEnabled(): Boolean {
+        val manager = requireContext().getSystemService(LocationManager::class.java) ?: return false
+        return LocationManagerCompat.isLocationEnabled(manager)
     }
 
     /** Launches system application notification or details settings page for permission management. */
@@ -313,7 +368,11 @@ class S08AccountSettingsFragment : Fragment() {
         val context = context ?: return
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                val manager = context.getSystemService(NotificationManager::class.java)
+                val blocked = NotificationManagerCompat.from(context).areNotificationsEnabled() &&
+                    manager?.getNotificationChannel(DefaultNotificationAdapter.CHANNEL_ID)?.importance == NotificationManager.IMPORTANCE_NONE
+                val intent = Intent(if (blocked) Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS else Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                    if (blocked) putExtra(Settings.EXTRA_CHANNEL_ID, DefaultNotificationAdapter.CHANNEL_ID)
                     putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
                 }
                 startActivity(intent)

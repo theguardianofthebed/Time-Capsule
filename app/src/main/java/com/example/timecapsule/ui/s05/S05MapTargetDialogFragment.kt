@@ -1,5 +1,8 @@
 package com.example.timecapsule.ui.s05
 
+import com.example.timecapsule.ui.needsPermissionSettings
+import com.example.timecapsule.ui.requestOrOpenSettings
+import com.example.timecapsule.ui.openAppPermissions
 import android.Manifest
 import android.os.Bundle
 import android.os.SystemClock
@@ -28,6 +31,8 @@ import com.google.android.gms.maps.model.Marker
 import com.google.android.gms.maps.model.MarkerOptions
 import kotlinx.coroutines.launch
 import java.util.Locale
+import android.content.Intent
+import android.provider.Settings
 
 /**
  * DialogFragment embedding Google Maps SDK for selecting a WGS84 target coordinate
@@ -173,6 +178,7 @@ class S05MapTargetDialogFragment : DialogFragment(), OnMapReadyCallback {
         setupClickListeners()
     }
 
+    /** Offer settings or a foreground fix without restricting manual pin selection. */
     private fun setupClickListeners() {
         binding.btnCloseMap.setOnClickListener {
             dismiss()
@@ -181,14 +187,13 @@ class S05MapTargetDialogFragment : DialogFragment(), OnMapReadyCallback {
         binding.btnUseCurrentLocation.setOnClickListener {
             if (locationAdapter.isFineLocationGranted()) {
                 binding.tvMapStatus.visibility = View.GONE
-                fetchAndMoveToCurrentLocation()
+                if (locationAdapter.isLocationAvailable()) fetchAndMoveToCurrentLocation()
+                else startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
             } else {
-                requestPermissionLauncher.launch(
-                    arrayOf(
-                        Manifest.permission.ACCESS_FINE_LOCATION,
-                        Manifest.permission.ACCESS_COARSE_LOCATION
-                    )
-                )
+                requestOrOpenSettings(Manifest.permission.ACCESS_FINE_LOCATION, ::openAppPermissions) {
+                    requestPermissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION,
+                        Manifest.permission.ACCESS_COARSE_LOCATION))
+                }
             }
         }
 
@@ -298,8 +303,9 @@ class S05MapTargetDialogFragment : DialogFragment(), OnMapReadyCallback {
                     } else {
                         val errorMsg = when (quality) {
                             QualificationFailureReason.POOR_ACCURACY -> {
-                                val acc = sample?.horizontalAccuracyMeters?.toInt() ?: 0
-                                "Location accuracy too low (${acc} m > 100 m required). Select manually on the map."
+                                val accuracy = sample?.horizontalAccuracyMeters
+                                if (accuracy == null || !accuracy.isFinite()) "Location accuracy unavailable. Retry or select a pin."
+                                else "Location accuracy is ${accuracy.toInt()} m. Retry or select a pin."
                             }
                             QualificationFailureReason.STALE_SAMPLE -> "Location fix is stale. Select manually on the map."
                             else -> getString(R.string.s05_map_acquisition_failed)
@@ -317,7 +323,7 @@ class S05MapTargetDialogFragment : DialogFragment(), OnMapReadyCallback {
                     binding.tvMapStatus.visibility = View.VISIBLE
                 }
                 else -> {
-                    binding.tvMapStatus.text = result.errorMessage ?: getString(R.string.s05_map_acquisition_failed)
+                    binding.tvMapStatus.text = getString(R.string.s05_map_acquisition_failed)
                     binding.tvMapStatus.visibility = View.VISIBLE
                 }
             }
@@ -329,9 +335,15 @@ class S05MapTargetDialogFragment : DialogFragment(), OnMapReadyCallback {
         binding.mapView.onStart()
     }
 
+    /** Refresh the location action after returning from Settings. */
     override fun onResume() {
         super.onResume()
         binding.mapView.onResume()
+        binding.btnUseCurrentLocation.text = when {
+            !locationAdapter.isFineLocationGranted() && needsPermissionSettings(Manifest.permission.ACCESS_FINE_LOCATION) -> "Open permission settings"
+            locationAdapter.isFineLocationGranted() && !locationAdapter.isLocationAvailable() -> "Open location settings"
+            else -> getString(R.string.s05_map_btn_current_location)
+        }
     }
 
     override fun onPause() {

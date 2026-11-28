@@ -37,6 +37,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import java.time.ZoneId
+import com.example.timecapsule.domain.result.PublicationFailure
 
 /** Recipient target mode selection for S-05 recipient step. */
 enum class RecipientMode {
@@ -84,6 +85,8 @@ data class CapsuleDraftUiState(
     val recoveryBlocked: Boolean = false,
     val statusOnly: Boolean = false,
     val canAbandon: Boolean = false,
+    val publicationFailure: PublicationFailure? = null,
+    val canRetryUnchanged: Boolean = false,
     val publicationMessage: Int? = null
 ) {
     /** Frozen, completed and unresolved submissions never become editable through Back navigation. */
@@ -562,9 +565,11 @@ class CapsuleDraftViewModel(
                     }
                 }
                 is OperationResult.Invalid -> {
+                    val isAbsent = result.message.contains("No recipient found", ignoreCase = true) ||
+                            result.message.contains("not found", ignoreCase = true)
                     _uiState.update {
                         it.copy(
-                            lookupStatus = RecipientLookupStatus.NONEXISTENT,
+                            lookupStatus = if (isAbsent) RecipientLookupStatus.NONEXISTENT else RecipientLookupStatus.ERROR,
                             resolvedProfile = null,
                             isRecipientConfirmed = false,
                             lookupErrorMessage = result.message
@@ -779,7 +784,9 @@ class CapsuleDraftViewModel(
                             recoveryBusy = false,
                             recoveryBlocked = true,
                             statusOnly = true,
-                            publicationPhase = PublicationPhase.FAILED,
+                            publicationPhase = null,
+                            canAbandon = false,
+                            canRetryUnchanged = false,
                             publicationMessage = R.string.publication_recovery_failure
                         ) }
                     } else {
@@ -823,14 +830,24 @@ class CapsuleDraftViewModel(
                     photoName = null,
                     photoSizeBytes = null,
                     photoBusy = false,
+                    locationName = null,
                     publicationPhase = recovered.phase,
                     canAbandon = recovered.canAbandon,
+                    canRetryUnchanged = recovered.canRetryUnchanged,
+                    publicationFailure = state.publicationFailure.takeIf { state.capsuleId == recovered.capsuleId && recovered.phase == PublicationPhase.FAILED },
                     publicationBusy = false,
                     recoveryBusy = false,
                     recoveryBlocked = false,
                     publicationMessage = messageRes
                 )
             } else {
+                val restoredLocationName = if (state.capsuleId == operation.capsuleId &&
+                    state.locationTarget?.latitude == operation.lock.location?.latitude &&
+                    state.locationTarget?.longitude == operation.lock.location?.longitude) {
+                    state.locationName
+                } else {
+                    operation.lock.location?.let { "${"%.4f".format(it.latitude)}, ${"%.4f".format(it.longitude)}" }
+                }
                 state.copy(
                     statusOnly = false,
                     capsuleId = operation.capsuleId,
@@ -848,8 +865,11 @@ class CapsuleDraftViewModel(
                     unlockAt = operation.lock.unlockAt,
                     creationZone = operation.creationZone,
                     locationTarget = operation.lock.location,
+                    locationName = restoredLocationName,
                     publicationPhase = recovered.phase,
                     canAbandon = recovered.canAbandon,
+                    canRetryUnchanged = recovered.canRetryUnchanged,
+                    publicationFailure = state.publicationFailure.takeIf { state.capsuleId == recovered.capsuleId && recovered.phase == PublicationPhase.FAILED },
                     publicationBusy = false,
                     recoveryBusy = false,
                     recoveryBlocked = false,
@@ -882,7 +902,7 @@ class CapsuleDraftViewModel(
         val backend = repository ?: return
         val state = _uiState.value
         val uid = state.activeSessionUid ?: return
-        if (state.publicationPhase == null || state.publicationPhase == PublicationPhase.SENT ||
+        if (!state.canRetryUnchanged || state.publicationPhase == null || state.publicationPhase == PublicationPhase.SENT ||
             state.publicationBusy || state.recoveryBusy || state.recoveryBlocked) return
         val capturedSession = observedSession
         startPublicationAction(uid, capturedSession) { session -> backend.retryPublication(state.capsuleId, session) }
@@ -903,7 +923,7 @@ class CapsuleDraftViewModel(
             val review = if (hideContent) state.copy(statusOnly = true, title = "", text = "",
                 originalPhoto = null, localPhotoUri = null, photoName = null, photoSizeBytes = null) else state
             review.copy(publicationBusy = true, publicationPhase = PublicationPhase.PREPARED,
-                canAbandon = false, publicationMessage = R.string.publication_sending)
+                canAbandon = false, canRetryUnchanged = false, publicationFailure = null, publicationMessage = R.string.publication_sending)
         }
         viewModelScope.launch {
             try {
@@ -924,6 +944,7 @@ class CapsuleDraftViewModel(
                 } else {
                     _uiState.update { it.copy(
                         publicationPhase = PublicationPhase.OUTCOME_UNKNOWN,
+                        canRetryUnchanged = result is OperationResult.OutcomeUnknown && result.capsuleId == before.capsuleId,
                         publicationMessage = R.string.publication_unknown) }
                 }
                 // Even a rejected request can have an older pending write; only saved evidence
@@ -932,8 +953,12 @@ class CapsuleDraftViewModel(
                 if (!isCurrentPublication(uid, token, capturedSession)) return@launch
                 if (recovered is OperationResult.Success) {
                     val record = recovered.data.firstOrNull { it.capsuleId == _uiState.value.capsuleId }
-                    if (record != null) applyRecovered(record)
-                    else if (result is OperationResult.Invalid && before.editable) _uiState.update {
+                    if (record != null) {
+                        applyRecovered(record)
+                        if (record.phase == PublicationPhase.FAILED && result.publicationFailure != null) {
+                            _uiState.update { it.copy(publicationFailure = result.publicationFailure) }
+                        }
+                    } else if (result is OperationResult.Invalid && before.editable) _uiState.update {
                         before.copy(publicationBusy = false, publicationPhase = null,
                             publicationMessage = R.string.publication_invalid)
                     }

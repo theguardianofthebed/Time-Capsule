@@ -64,7 +64,11 @@ class AuthAndRecipientTest {
     }
 
     private class FakeFirestoreAdapter : FirestoreAdapter {
-        private val directory = mutableMapOf<String, RecipientProfile>()
+        val directory = mutableMapOf<String, RecipientProfile>()
+        var pendingWrites = false
+        var isFromCache = false
+        var simulateNetworkFailure = false
+        var simulatePermissionDenied = false
 
         override fun isAvailable(): Boolean = true
         override fun firestoreInstance(): com.google.firebase.firestore.FirebaseFirestore? = null
@@ -73,12 +77,23 @@ class AuthAndRecipientTest {
             if (uid.isBlank()) {
                 return OperationResult.Invalid("UID must not be blank for recipient lookup.")
             }
-            val profile = directory[uid]
-            return if (profile != null) {
-                OperationResult.Success(profile)
-            } else {
-                OperationResult.Invalid("No recipient found with UID: $uid")
+            if (simulateNetworkFailure) {
+                return OperationResult.Unavailable("Network unavailable during Firestore operation.")
             }
+            if (simulatePermissionDenied) {
+                return OperationResult.Denied("Access denied. Check the signed-in account.")
+            }
+            if (pendingWrites || isFromCache) {
+                return OperationResult.Unavailable("Profile snapshot is unconfirmed or cached.")
+            }
+            val profile = directory[uid] ?: return OperationResult.Invalid("No recipient found with UID: $uid")
+            if (profile.uid.isBlank() || profile.uid != uid) {
+                return OperationResult.Invalid("Profile document UID missing or mismatched.")
+            }
+            if (profile.displayName.isBlank()) {
+                return OperationResult.Invalid("Profile display name is missing or blank.")
+            }
+            return OperationResult.Success(profile)
         }
 
         override suspend fun saveRecipientProfile(profile: RecipientProfile): OperationResult<Unit> {
@@ -118,5 +133,67 @@ class AuthAndRecipientTest {
         // 5. Sign out
         authAdapter.signOut()
         assertEquals(null, authAdapter.activeUid())
+    }
+
+    @Test
+    fun testProfileVerificationBoundaries() = runBlocking {
+        val firestoreAdapter = FakeFirestoreAdapter()
+        val validUid = "uid-valid-1"
+
+        // 1. Confirmed absent profile
+        val absentRes = firestoreAdapter.getRecipientProfile(validUid)
+        assertTrue(absentRes is OperationResult.Invalid)
+
+        // 2. Confirmed valid profile
+        firestoreAdapter.saveRecipientProfile(RecipientProfile(validUid, "Valid Name"))
+        val validRes = firestoreAdapter.getRecipientProfile(validUid)
+        assertTrue(validRes is OperationResult.Success)
+        assertEquals("Valid Name", (validRes as OperationResult.Success).data.displayName)
+
+        // 3. Pending-write snapshot (unconfirmed)
+        firestoreAdapter.pendingWrites = true
+        val pendingRes = firestoreAdapter.getRecipientProfile(validUid)
+        assertTrue(pendingRes is OperationResult.Unavailable)
+        firestoreAdapter.pendingWrites = false
+
+        // 4. Cached snapshot (unconfirmed)
+        firestoreAdapter.isFromCache = true
+        val cachedRes = firestoreAdapter.getRecipientProfile(validUid)
+        assertTrue(cachedRes is OperationResult.Unavailable)
+        firestoreAdapter.isFromCache = false
+
+        // 5. Blank display name
+        firestoreAdapter.saveRecipientProfile(RecipientProfile(validUid, "   "))
+        val blankNameRes = firestoreAdapter.getRecipientProfile(validUid)
+        assertTrue(blankNameRes is OperationResult.Invalid)
+
+        // 6. Network failure & permission denied
+        firestoreAdapter.saveRecipientProfile(RecipientProfile(validUid, "Valid Name"))
+        firestoreAdapter.simulateNetworkFailure = true
+        assertTrue(firestoreAdapter.getRecipientProfile(validUid) is OperationResult.Unavailable)
+        firestoreAdapter.simulateNetworkFailure = false
+
+        firestoreAdapter.simulatePermissionDenied = true
+        assertTrue(firestoreAdapter.getRecipientProfile(validUid) is OperationResult.Denied)
+    }
+
+    @Test
+    fun testDefaultAuthAdapterValidation() = runBlocking {
+        val adapter = DefaultAuthAdapter()
+        val blankEmailRes = adapter.signUp("", "pass123", "Name")
+        assertTrue(blankEmailRes is OperationResult.Invalid)
+
+        val blankPassRes = adapter.signUp("user@example.com", "", "Name")
+        assertTrue(blankPassRes is OperationResult.Invalid)
+    }
+
+    @Test
+    fun testDefaultFirestoreAdapterValidation() = runBlocking {
+        val adapter = DefaultFirestoreAdapter()
+        val blankUidRes = adapter.getRecipientProfile("")
+        assertTrue(blankUidRes is OperationResult.Invalid)
+
+        val unavailRes = adapter.getRecipientProfile("some-uid")
+        assertTrue(unavailRes is OperationResult.Unavailable)
     }
 }

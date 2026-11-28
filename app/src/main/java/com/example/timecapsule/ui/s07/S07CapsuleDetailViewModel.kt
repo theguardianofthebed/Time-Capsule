@@ -250,6 +250,41 @@ class S07CapsuleDetailViewModel(
     /** Distinguish device location guidance from an authoritative participant denial. */
     private fun mapUnlockFailureStatus(res: OperationResult<*>, lockMode: LockMode?): DetailStatus {
         val msg = resultErrorMessage(res)
+        val isLocationRequired = lockMode == LockMode.LOCATION || lockMode == LockMode.TIME_AND_LOCATION
+
+        // 1. Check precise location guidance for location-required locks
+        if (isLocationRequired) {
+            if (msg.contains("location permission", ignoreCase = true) ||
+                (msg.contains("location", ignoreCase = true) && msg.contains("permission", ignoreCase = true))) {
+                return DetailStatus.LOCKED_PERMISSION_REQUIRED
+            }
+            if (msg.contains("location service disabled", ignoreCase = true) ||
+                msg.contains("location services disabled", ignoreCase = true) ||
+                msg.contains("location provider disabled", ignoreCase = true) ||
+                msg.contains("gps disabled", ignoreCase = true) ||
+                (msg.contains("location", ignoreCase = true) && msg.contains("disabled", ignoreCase = true) && !msg.contains("account", ignoreCase = true))) {
+                return DetailStatus.LOCKED_LOCATION_DISABLED
+            }
+            if (msg.contains("null fix", ignoreCase = true) ||
+                msg.contains("accuracy", ignoreCase = true) ||
+                msg.contains("stale", ignoreCase = true) ||
+                msg.contains("outside target radius", ignoreCase = true) ||
+                msg.contains("sample is missing", ignoreCase = true)) {
+                return DetailStatus.LOCKED_WAITING_LOCATION
+            }
+        }
+
+        // 2. Participant or account denial takes precedence over ambiguous messages
+        if (res is OperationResult.Denied) {
+            val isExplicitTimePending = msg.equals("Unlock time not reached.", ignoreCase = true) ||
+                    msg.equals("Unlock time not reached", ignoreCase = true) ||
+                    msg.equals("Time condition pending", ignoreCase = true)
+            if (!isExplicitTimePending) {
+                return DetailStatus.ACCESS_DENIED
+            }
+        }
+
+        // 3. Explicit time condition pending
         val isTimeConditionPending = msg.contains("unlock time not reached", ignoreCase = true) ||
                 msg.contains("time not reached", ignoreCase = true) ||
                 msg.contains("time condition", ignoreCase = true)
@@ -260,17 +295,21 @@ class S07CapsuleDetailViewModel(
                 LockMode.TIME, null -> DetailStatus.LOCKED_WAITING_TIME
             }
         }
-        return when {
-            (msg.contains("location", true) && msg.contains("permission", true)) -> DetailStatus.LOCKED_PERMISSION_REQUIRED
-            msg.contains("disabled", ignoreCase = true) -> DetailStatus.LOCKED_LOCATION_DISABLED
-            msg.contains("radius", ignoreCase = true) || msg.contains("accuracy", ignoreCase = true) || msg.contains("stale", ignoreCase = true) -> DetailStatus.LOCKED_WAITING_LOCATION
-            res is OperationResult.Denied -> DetailStatus.ACCESS_DENIED
-            else -> when (lockMode) {
-                null -> DetailStatus.LOCKED_VERIFICATION_FAILED
-                LockMode.TIME -> DetailStatus.LOCKED_WAITING_TIME
-                LockMode.LOCATION -> DetailStatus.LOCKED_WAITING_LOCATION
-                LockMode.TIME_AND_LOCATION -> DetailStatus.LOCKED_WAITING_BOTH
-            }
+
+        // 4. Verification service / network unavailable
+        if (res is OperationResult.Unavailable) {
+            return DetailStatus.LOCKED_VERIFICATION_FAILED
+        }
+
+        if (res is OperationResult.Denied) {
+            return DetailStatus.ACCESS_DENIED
+        }
+
+        return when (lockMode) {
+            LockMode.TIME -> DetailStatus.LOCKED_WAITING_TIME
+            LockMode.LOCATION -> DetailStatus.LOCKED_WAITING_LOCATION
+            LockMode.TIME_AND_LOCATION -> DetailStatus.LOCKED_WAITING_BOTH
+            null -> DetailStatus.LOCKED_VERIFICATION_FAILED
         }
     }
 

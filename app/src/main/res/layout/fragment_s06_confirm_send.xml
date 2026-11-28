@@ -19,11 +19,11 @@
 
         <ImageButton
             android:id="@+id/btnBack"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="Go back"
-            android:src="@android:drawable/ic_menu_revert"
+            android:contentDescription="@string/nav_back"
+            android:src="@drawable/ic_back"
             app:tint="#3D3933" />
 
         <TextView
@@ -66,7 +66,7 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_horizontal"
                 android:text="@string/s06_eyebrow"
-                android:textColor="#9E6E4D"
+                android:textColor="@color/capsule_primary"
                 android:textSize="11sp"
                 android:textStyle="bold" />
 
@@ -88,12 +88,13 @@
                 android:layout_gravity="center_horizontal"
                 android:layout_marginTop="4dp"
                 android:text="@string/s06_subtitle"
-                android:textColor="#8C857B"
+                android:textColor="@color/capsule_text_body"
                 android:textSize="13sp" />
 
             <!-- Send Notice / Downstream Status Banner -->
             <TextView
                 android:id="@+id/tvSendNoticeBanner"
+                android:accessibilityLiveRegion="polite"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
@@ -118,7 +119,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Capsule title (Visible while locked)"
-                    android:textColor="#A67C59"
+                    android:textColor="@color/capsule_primary"
                     android:textSize="11sp"
                     android:textStyle="bold" />
 
@@ -143,7 +144,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="A little something for"
-                    android:textColor="#A67C59"
+                    android:textColor="@color/capsule_primary"
                     android:textSize="11sp"
                     android:textStyle="bold" />
 
@@ -169,7 +170,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="TC-JAMIE1ff"
-                        android:textColor="#8C857B"
+                        android:textColor="@color/capsule_text_body"
                         android:textSize="12sp" />
                 </LinearLayout>
 
@@ -184,7 +185,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Message Content (Protected until unlock)"
-                    android:textColor="#A67C59"
+                    android:textColor="@color/capsule_primary"
                     android:textSize="11sp"
                     android:textStyle="bold" />
 
@@ -203,7 +204,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
                     android:text="Attached photo: None"
-                    android:textColor="#8C857B"
+                    android:textColor="@color/capsule_text_body"
                     android:textSize="12sp"
                     android:visibility="gone" />
 
@@ -242,7 +243,7 @@
                     android:background="#FAF9F5"
                     android:padding="10dp"
                     android:text="@string/s06_unlock_rule_notice"
-                    android:textColor="#8C857B"
+                    android:textColor="@color/capsule_text_body"
                     android:textSize="11sp" />
             </LinearLayout>
 
@@ -280,7 +281,7 @@
                 android:layout_gravity="center_horizontal"
                 android:layout_marginTop="6dp"
                 android:text="@string/s06_disclaimer"
-                android:textColor="#8C857B"
+                android:textColor="@color/capsule_text_body"
                 android:textSize="12sp" />
 
             <!-- Edit Draft Button -->
@@ -313,6 +314,7 @@
 
         <LinearLayout
             android:id="@+id/btnNavMoments"
+            android:minHeight="48dp"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
@@ -325,12 +327,13 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/nav_moments"
-                android:textColor="#9C9488"
+                android:textColor="@color/capsule_text_body"
                 android:textSize="12sp" />
         </LinearLayout>
 
         <LinearLayout
             android:id="@+id/btnNavCreate"
+            android:minHeight="48dp"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
@@ -350,6 +353,7 @@
 
         <LinearLayout
             android:id="@+id/btnNavAccount"
+            android:minHeight="48dp"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
@@ -362,7 +366,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/nav_account"
-                android:textColor="#9C9488"
+                android:textColor="@color/capsule_text_body"
                 android:textSize="12sp" />
         </LinearLayout>
     </LinearLayout>

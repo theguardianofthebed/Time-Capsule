@@ -44,7 +44,7 @@
                 android:fontFamily="sans-serif-medium"
                 android:letterSpacing="0.15"
                 android:text="@string/s01_tagline"
-                android:textColor="@color/capsule_text_muted"
+                android:textColor="@color/capsule_text_body"
                 android:textSize="10sp" />
         </LinearLayout>
 
@@ -78,7 +78,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
                 android:text="@string/s01_subtitle"
-                android:textColor="@color/capsule_text_muted"
+                android:textColor="@color/capsule_text_body"
                 android:textSize="14sp" />
         </LinearLayout>
 
@@ -95,13 +95,15 @@
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="6dp"
                 android:fontFamily="sans-serif-medium"
+                android:labelFor="@id/etEmail"
                 android:text="@string/s01_label_email"
                 android:textColor="@color/capsule_text_dark"
                 android:textSize="12sp" />
 
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="48dp"
+                android:minHeight="48dp"
+                android:layout_height="wrap_content"
                 android:background="@drawable/bg_button_outlined"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
@@ -116,13 +118,14 @@
                 <EditText
                     android:id="@+id/etEmail"
                     android:layout_width="match_parent"
-                    android:layout_height="match_parent"
+                    android:minHeight="48dp"
+                    android:layout_height="wrap_content"
                     android:layout_marginStart="10dp"
                     android:background="@null"
                     android:hint="@string/hint_email"
                     android:inputType="textEmailAddress"
                     android:textColor="@color/capsule_text_dark"
-                    android:textColorHint="@color/capsule_text_subtle"
+                    android:textColorHint="@color/capsule_text_body"
                     android:textSize="14sp" />
             </LinearLayout>
 
@@ -133,13 +136,15 @@
                 android:layout_marginTop="16dp"
                 android:layout_marginBottom="6dp"
                 android:fontFamily="sans-serif-medium"
+                android:labelFor="@id/etPassword"
                 android:text="@string/s01_label_password"
                 android:textColor="@color/capsule_text_dark"
                 android:textSize="12sp" />
 
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="48dp"
+                android:minHeight="48dp"
+                android:layout_height="wrap_content"
                 android:background="@drawable/bg_button_outlined"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
@@ -154,14 +159,16 @@
                 <EditText
                     android:id="@+id/etPassword"
                     android:layout_width="0dp"
-                    android:layout_height="match_parent"
+                    android:minHeight="48dp"
+                    android:layout_height="wrap_content"
                     android:layout_marginStart="10dp"
                     android:layout_weight="1"
                     android:background="@null"
                     android:hint="@string/s01_hint_password"
+                    android:saveEnabled="false"
                     android:inputType="textPassword"
                     android:textColor="@color/capsule_text_dark"
-                    android:textColorHint="@color/capsule_text_subtle"
+                    android:textColorHint="@color/capsule_text_body"
                     android:textSize="14sp" />
 
                 <ImageButton
@@ -178,7 +185,8 @@
             <Button
                 android:id="@+id/btnSignIn"
                 android:layout_width="match_parent"
-                android:layout_height="52dp"
+                android:minHeight="48dp"
+                android:layout_height="wrap_content"
                 android:layout_marginTop="24dp"
                 android:background="@drawable/bg_button_primary"
                 android:drawableEnd="@drawable/ic_arrow_right"
@@ -190,9 +198,19 @@
                 android:textSize="15sp"
                 app:backgroundTint="@null" />
 
+            <!-- Progress Indicator -->
+            <ProgressBar
+                android:id="@+id/pbLoading"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="16dp"
+                android:visibility="gone" />
+
             <!-- Status Message -->
             <TextView
                 android:id="@+id/tvStatusMessage"
+                android:accessibilityLiveRegion="polite"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
@@ -218,7 +236,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/s01_new_here"
-                android:textColor="@color/capsule_text_muted"
+                android:textColor="@color/capsule_text_body"
                 android:textSize="13sp" />
 
             <TextView

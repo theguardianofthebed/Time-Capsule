@@ -43,6 +43,8 @@
     <string name="err_adapter_unavailable">Required service adapters unavailable.</string>
     <string name="err_session_unavailable">Session unauthenticated or service unavailable.</string>
     <string name="err_password_mismatch">Passwords do not match.</string>
+    <string name="err_password_too_short">Password must be at least 6 characters.</string>
+    <string name="err_invalid_email">Please enter a valid email address.</string>
     <string name="err_email_password_required">Please enter both email address and password.</string>
     <string name="err_required_field">Please fill in all required fields.</string>
     <string name="err_name_required">Please enter a valid display name.</string>
@@ -154,7 +156,7 @@
     <string name="s06_disclaimer">Sending freezes this capsule. An uncertain result can be checked or retried.</string>
     <string name="publication_sending">Sending capsule. Keep this submission unchanged.</string>
     <string name="publication_sent">Capsule sent. Its protected content stays hidden until unlock.</string>
-    <string name="publication_unknown">The result is not confirmed. Check the result or retry this same capsule.</string>
+    <string name="publication_unknown">The result is not confirmed. Check the original send result.</string>
     <string name="publication_failed">Sending failed before publication. Retry unchanged or create an editable copy.</string>
     <string name="publication_invalid">Check the content, recipient confirmation and future unlock conditions.</string>
     <string name="publication_recovery_failure">Cannot recover the saved send now. Check your connection and try recovery again.</string>
@@ -183,6 +185,7 @@
     <string name="s05_map_service_disabled">Location services (GPS/Network) are disabled in device settings.</string>
     <string name="s05_map_acquisition_failed">Could not acquire current location fix. Check location settings and retry.</string>
 
+    <string name="capsule_photo_description">Attached capsule photo</string>
     <string name="photo_preview_description">Selected photo preview</string>
     <string name="photo_restore_failure">Saved photo is missing or changed. Choose it again.</string>
     <string name="photo_save_failure">Cannot save draft. Free some storage and try again.</string>
@@ -220,4 +223,14 @@
     <string name="s07_precise_permission">Allow precise location permission</string>
     <string name="s07_app_settings">Open app permission settings</string>
     <string name="s07_location_settings">Open location settings</string>
+    <string name="nav_back">Go back</string>
+    <string name="nav_refresh">Refresh capsules</string>
+    <string name="view_sent">View Sent</string>
+    <string name="recipient_unconfirmed">Recipient unconfirmed</string>
+    <string name="account_operation_progress">Updating your account…</string>
+    <string name="profile_check_title">Check your account profile</string>
+    <string name="profile_check_retry">Check profile again</string>
+    <string name="profile_check_denied">Profile access was denied. Check your account access and try again.</string>
+    <string name="profile_check_unavailable">Your profile could not be verified. Check your connection and try again.</string>
+    <string name="profile_check_progress">Checking your account…</string>
 </resources>

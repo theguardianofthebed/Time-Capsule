@@ -52,7 +52,7 @@ data class ForegroundRecoverySummary(
  *    Validates session state before starting, during suspension points, and before dispatch.
  * 6. Non-Blocking Lifecycle: Does not hold strong references to Activity or Fragment instances.
  */
-class ForegroundRecoveryCoordinator(
+open class ForegroundRecoveryCoordinator(
     private val repository: CapsuleRepository,
     private val sessionTracker: SessionTracker,
     private val unlockNotificationCoordinator: UnlockNotificationCoordinator? = null,
@@ -159,7 +159,7 @@ class ForegroundRecoveryCoordinator(
      * @param targetSession Optional explicitly bound session. Defaults to current session.
      * @return Typed availability result.
      */
-    suspend fun verifyUnlock(
+    open suspend fun verifyUnlock(
         capsuleId: String,
         targetSession: SessionSnapshot = sessionTracker.currentSession()
     ): OperationResult<Availability> = withContext(ioDispatcher) {

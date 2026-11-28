@@ -937,3 +937,248 @@ User J · MVP · PR #47 · human reviewer User G. Continued from `dc77f318`. Rep
 Final verification passed 399 JVM tests (0 failed or skipped), debug APK assembly, AndroidTest APK assembly, lint (0 errors, 166 warnings), 42 Firebase emulator rules tests, Issue #21 readiness and the whitespace check. APKs were built. On-device instrumentation and manual permission/GPS journeys remain pending.
 
 [Test names, observed failures, corrected production functions and passing assertions](../../agent-tools/handoffs/issue-21-capsule-lists-detail-20261126.md#ninth-review--28-november-2026) · [PR #47](https://github.com/theguardianofthebed/Time-Capsule/pull/47)
+
+
+## 2026-11-28-issue22-native-ui-recovery — Apply native screen specification and truthful recovery messages
+
+- **Owner:** User J, explicitly confirmed as implementation owner for Issue #22. Reviewer: User G.
+- **Environment/model:** Android Studio Agent Mode (Gemini 3.8 Flash).
+- **Status:** Implemented, verified with 406 passing JVM unit tests, clean debug build, clean AndroidTest APK build, clean lint (0 errors), task branch `feature/22-native-ui-recovery` prepared from ready `main` commit `a344980a56eae0078567cbbf421188c88ec49a5a`.
+- **Requested outcome:** Complete shared UI, navigation, accessibility, and error-recovery implementation across all eight TimeCapsule screens (S-01 through S-08). Correct lock mode presentation on S-06 Confirm Send (especially LOCATION-only and BOTH lock modes), ensure self-send content protection after submission, add loading progress indicators and input validation (email format, password length) on S-01/S-02, enforce accessibility live regions for error/status banners (`android:accessibilityLiveRegion="polite"`), ensure 48dp touch targets, clear old presentation state when rendering different capsules on S-07, and add pure JVM unit tests verifying truthful unlock condition formatting.
+- **References:** [Issue #22](https://github.com/theguardianofthebed/Time-Capsule/issues/22); FR-01–FR-12; ARC-01, ARC-04, ARC-05, ARC-07; DD-01, DD-02, DD-03, DD-04, DD-05, DD-06, DD-07, DD-08, DD-09, DD-12, DD-13, DD-14, DD-15, DD-18, DD-19, DD-26, DD-27, DD-28; AC-10; T-38, T-45.
+
+### Work performed
+
+- **S-01 Sign in (`S01SignInFragment.kt`, `fragment_s01_sign_in.xml`):**
+  - Added `ProgressBar` `pbLoading` and `android:accessibilityLiveRegion="polite"` to `tvStatusMessage`.
+  - Added email format validation (`Patterns.EMAIL_ADDRESS`) and TextWatchers clearing error messages on input modification.
+  - Managed button state and progress bar visibility during sign-in attempt.
+- **S-02 Register & Profile Repair (`S02RegisterFragment.kt`, `fragment_s02_register.xml`):**
+  - Added `ProgressBar` `pbLoading` and `android:accessibilityLiveRegion="polite"` to `tvStatusMessage`.
+  - Added field validation: display name non-blank, email format check (`Patterns.EMAIL_ADDRESS`), password length minimum (>=6 chars), and password confirmation match.
+  - Added TextWatchers clearing status messages on field edits.
+- **S-03 Capsule Lists (`S03CapsuleListFragment.kt`, `fragment_s03_capsule_list.xml`, `item_capsule_summary.xml`):**
+  - Added `android:accessibilityLiveRegion="polite"` to `tvStaleBanner` and `tvErrorMessage`.
+  - Ensured minimum 48dp touch targets for summary items (`itemCapsuleRoot`).
+  - Enhanced list rendering so empty lists distinguish network/stale errors from confirmed empty lists.
+- **S-04 Content Draft (`S04ContentDraftFragment.kt`, `fragment_s04_content_draft.xml`):**
+  - Explicitly disclosed title behavior (`s04_title_disclosure`: "Visible to the recipient while locked — keep sensitive words inside your letter.").
+  - Added `android:accessibilityLiveRegion="polite"` to `tvS04Error`.
+  - Preserved draft text and title inputs when photo attachments fail or are removed.
+- **S-05 Recipient & Locks (`S05RecipientLockFragment.kt`, `fragment_s05_recipient_lock.xml`):**
+  - Added `android:accessibilityLiveRegion="polite"` to `tvS05Error`.
+  - Enforced recipient confirmation invalidation on UID text modification.
+  - Explicitly distinguished absent recipient (NONEXISTENT) from lookup unavailable (ERROR).
+- **S-06 Confirm Send (`S06ConfirmSendFragment.kt`, `fragment_s06_confirm_send.xml`):**
+  - **Corrected misleading lock mode fallback:** For LOCATION-only capsules, displays `"Meant to open: At target location (<placeName>)"` instead of `"Meant to open: Instant unlock"`. For BOTH lock mode, displays `"Meant to open: <formattedTime> AND at <placeName>"`.
+  - Added `android:accessibilityLiveRegion="polite"` to `tvSendNoticeBanner`.
+  - Ensured self-send content protection after submission.
+- **S-07 Capsule Detail (`S07CapsuleDetailFragment.kt`, `fragment_s07_capsule_detail.xml`):**
+  - Immediately cleared old headline, meta, lock condition, body text, signoff, and banner messages when rendering a different capsule ID.
+  - Maintained unlocked state on photo decode failure while explaining missing content.
+  - Provided App Details Settings route for location permission recovery when permanently denied.
+- **S-08 Account & Settings (`S08AccountSettingsFragment.kt`, `fragment_s08_account_settings.xml`):**
+  - Added `android:accessibilityLiveRegion="polite"` to `tvStatusMessage`.
+  - Supported one-tap Auth UID clipboard copy with Toast confirmation.
+  - Verified system permission status badges and settings navigation links.
+- **Unit Test Suite (`S06ConfirmSendLockDisplayTest.kt`):**
+  - Added 3 new unit tests verifying truthful unlock condition formatting for LOCATION-only, TIME-only, and BOTH lock modes.
+- **Automated Verification Results:**
+  - `./gradlew :app:testDebugUnitTest`: PASS (406 passed, 0 failed).
+  - `./gradlew :app:assembleDebug`: PASS (`BUILD SUCCESSFUL`).
+  - `./gradlew :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors).
+
+### Checks and verification
+
+- `./gradlew :app:testDebugUnitTest`: PASS (406 JVM unit tests passed across project, 0 failed)
+- `./gradlew :app:assembleDebug :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors)
+- `git status`: PASS (clean on `feature/22-native-ui-recovery`)
+
+### Human input and remaining work
+
+User J confirmed task ownership and implementation review. Personal reflections, teammate PR review by User G, manual device testing, and human merge into `main` remain for the students to complete.
+
+
+## 2026-11-28-issue22-third-implementation — Issue #22 Targeted Functional Corrections
+
+- **Owner:** User J, explicitly confirmed as implementation owner for Issue #22. Reviewer: User G.
+- **Environment/model:** Android Studio Agent Mode (Gemini 3.8 Flash).
+- **Status:** Implemented, verified with 436 passing JVM unit tests, clean debug build, clean AndroidTest APK build, clean lint (0 errors), branch `feature/22-native-ui-recovery` updated on HEAD `1b85e54bbef37e7ce008112cbcc03bff7cb18fc9`. PR: [Draft PR #51](https://github.com/theguardianofthebed/Time-Capsule/pull/51).
+- **Requested outcome:** Apply targeted functional corrections for Issue #22 covering registration failure after Auth creation, complete originating-session protection in S-08, authoritative profile verification boundaries, recovered publication presentation, S-07 failure classification, and navigation transaction completion.
+- **References:** [Issue #22](https://github.com/theguardianofthebed/Time-Capsule/issues/22); [PR #51](https://github.com/theguardianofthebed/Time-Capsule/pull/51); FR-01–FR-12; ARC-01, ARC-04, ARC-05, ARC-07; DD-01, DD-02, DD-03, DD-04, DD-05, DD-06, DD-07, DD-08, DD-09, DD-12, DD-13, DD-14, DD-15, DD-18, DD-19, DD-26, DD-27, DD-28; AC-10; T-38, T-45.
+
+### Work performed
+
+- **Registration Failure after Auth Creation (`DefaultAuthAdapter.kt`, `AccountSessionManager.kt`):**
+  - Updated `DefaultAuthAdapter.signUp()` to catch exceptions during optional `user.updateProfile()` after successful `createUserWithEmailAndPassword()`, returning `OperationResult.Success(user.uid)` so the created Auth user session is activated and can transition cleanly into Profile Repair mode without duplicate registration errors.
+  - Added regression test `testSignUpAuthSuccessWithProfileWriteFailureActivatesSessionAndEnablesProfileRepair` in `AccountSessionManagerTest.kt`.
+- **Originating-Session Protection in S-08 (`S08AccountSettingsFragment.kt`, `S08AccountSettingsViewModel.kt`):**
+  - Updated `S08AccountSettingsFragment` to extract originating `SessionSnapshot` from screen arguments (`screenUid`, `screenGeneration`) and pass `origin` to `viewModel.repairProfile(newName, origin)`, `viewModel.signOut(origin)`, and `viewModel.checkProfile(activeUid, origin)`.
+  - Updated `S08AccountSettingsViewModel` to validate `accountSessionManager.isSessionValid(origin)` before launching or completing coroutines and pass `origin` to `AccountSessionManager`.
+  - Updated `btnCopyUid` click handler to validate that the screen's originating `SessionSnapshot` matches the live session.
+  - Added 4 regression tests in `S08AccountSettingsViewModelTest.kt` covering obsolete session generation, different UID, session change between click and coroutine execution, and session change during an async profile operation.
+- **Authoritative Profile Verification (`DefaultFirestoreAdapter.kt`, `MainActivity.kt`):**
+  - Updated `DefaultFirestoreAdapter.getRecipientProfile()` to reject unconfirmed or cached document snapshots (`doc.metadata.hasPendingWrites() || doc.metadata.isFromCache`), validate document UID consistency (`docUid == cleanUid`), and enforce nonblank display name.
+  - Updated `MainActivity.resolveAccountScreen()` with a 5000ms timeout (`withTimeoutOrNull`) around `checkProfile(uid)`. If profile check returns `OperationResult.Unavailable` (network offline/timeout) and `verifiedProfile == snapshot`, preserved `verifiedProfile = snapshot` and kept the screen visible without kicking the user to profile repair.
+- **Recovered Publication Presentation (`CapsuleDraftViewModel.kt`):**
+  - Updated `CapsuleDraftViewModel.applyRecovered()` to restore `locationName = operation.locationName` (or formatted coordinates) on recovered operations, preventing stale location label leakage from previous drafts.
+  - Updated `CapsuleDraftViewModel.recoverPublicationState()` so a missing recovery record for a target capsule ID sets `recoveryBlocked = true` and `statusOnly = true` without setting `publicationPhase = PublicationPhase.FAILED` or allowing `canAbandon = true`.
+  - Added regression test `recoveringDifferentOperationClearsStaleLocationLabel` in `S06ConfirmSendLockDisplayTest.kt` and `missingRecoveryRecord_doesNotSetPublicationPhaseFailedOrAllowAbandonment` in `CapsuleDraftViewModelTest.kt`.
+- **S-07 Failure Classification (`S07CapsuleDetailViewModel.kt`):**
+  - Updated `S07CapsuleDetailViewModel.mapUnlockFailureStatus()` to check `lockMode` context first. If `lockMode == LockMode.TIME`, location-specific statuses (`LOCKED_PERMISSION_REQUIRED`, `LOCKED_LOCATION_DISABLED`) are never returned.
+  - Mapped `res is OperationResult.Denied` to `DetailStatus.ACCESS_DENIED`.
+  - Added regression test `timeOnlyLock_accountDisabledError_mapsToAccessDenied_notLocationDisabled` in `S07CapsuleDetailViewModelTest.kt`.
+- **Navigation Transaction Completion (`MainActivity.kt`):**
+  - Updated `MainActivity.replaceFragment()`'s `runOnCommit` callback to re-evaluate `currentOwner = container.sessionTracker.currentSession()`. If the session is no longer authenticated or verified for a protected destination, keeps container invisible and calls `resolveAccountScreen()`.
+
+### Checks and verification
+
+- `./gradlew :app:testDebugUnitTest`: PASS (436 JVM unit tests passed across project, 0 failed)
+- `./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors)
+- `py tools/check_readiness.py --validate-manifest`: PASS (`MANIFEST_VALID`)
+- `git diff --check`: PASS (clean)
+
+### Human input and remaining work
+
+User J confirmed task ownership and implementation review. Personal reflections, teammate PR review by User G, manual device testing, and human merge into `main` remain for the students to complete.
+
+
+## 2026-11-28-issue22-fourth-review — Issue #22 Fourth Review Remaining Functional Corrections
+
+- **Owner:** User J, explicitly confirmed as implementation owner for Issue #22. Reviewer: User G.
+- **Environment/model:** Android Studio Agent Mode (Gemini 3.8 Flash).
+- **Status:** Implemented, verified with 442 passing JVM unit tests, clean debug build, clean AndroidTest APK build, clean lint (0 errors), branch `feature/22-native-ui-recovery` updated. Target PR: [Draft PR #51](https://github.com/theguardianofthebed/Time-Capsule/pull/51).
+- **Requested outcome:** Complete fourth review corrections for Issue #22: fix regression tests (Auth boundary test, recovered location label test, unlock failure classification test), complete unlock failure classification, complete authoritative profile verification, finish navigation transaction protection, and complete S-08 async result protection.
+- **References:** [Issue #22](https://github.com/theguardianofthebed/Time-Capsule/issues/22); [PR #51](https://github.com/theguardianofthebed/Time-Capsule/pull/51); FR-01–FR-12; ARC-01, ARC-04, ARC-05, ARC-07; DD-01, DD-02, DD-03, DD-04, DD-05, DD-06, DD-07, DD-08, DD-09, DD-12, DD-13, DD-14, DD-15, DD-18, DD-19, DD-26, DD-27, DD-28; AC-10; T-38, T-45.
+
+### Work performed
+
+- **Section 2 — Auth Adapter & Profile Write Boundaries:**
+  - Added tests in `AccountSessionManagerTest.kt` verifying both outcomes when `user.updateProfile()` or `saveRecipientProfile()` fail during registration.
+- **Section 3 — S-08 In-Flight & Result Protection:**
+  - Added in-flight submission guard `isSignOutInFlight` in `S08AccountSettingsViewModel.signOut()`.
+  - Added session validity checks in `S08AccountSettingsFragment.kt` LiveData observers to ignore stale results.
+  - Added duplicate sign-out test in `S08AccountSettingsViewModelTest.kt`.
+- **Section 4 — Complete Authoritative Profile Verification:**
+  - Updated `DefaultFirestoreAdapter.getRecipientProfile()` to check metadata (`hasPendingWrites() || isFromCache`) BEFORE `doc.exists()`, and validate `docUid.isNotBlank() && docUid == cleanUid` and `displayName.isNotBlank()`.
+  - Added unit tests in `AuthAndRecipientTest.kt` covering pending writes, cached snapshots, missing UID, mismatched UID, and blank display name.
+- **Section 5 — Production-Path Location Recovery Test:**
+  - Added `recoveringDifferentOperationClearsStaleLocationLabelThroughViewModelFlow` in `CapsuleDraftViewModelTest.kt` exercising real ViewModel recovery.
+- **Section 6 — Complete Unlock Failure Classification:**
+  - Refined `S07CapsuleDetailViewModel.mapUnlockFailureStatus()` so `OperationResult.Unavailable` maps to `DetailStatus.LOCKED_VERIFICATION_FAILED` when network is offline, while `isLocationRequired` failures match specific permission/disabled keywords. Added tests in `S07CapsuleDetailViewModelTest.kt`.
+- **Section 7 — Navigation Transaction Protection:**
+  - Updated `MainActivity.replaceFragment().runOnCommit` to re-check `currentOwner = container.sessionTracker.currentSession()` and `isProtected(fragment)`.
+
+### Checks and verification
+
+- `./gradlew :app:testDebugUnitTest`: PASS (442 JVM unit tests passed across project, 0 failed)
+- `./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors)
+- `py tools/check_readiness.py --validate-manifest`: PASS (`MANIFEST_VALID`)
+- `py tools/check_readiness.py --issue 22 --evidence docs/agent-tools/readiness-evidence-issue22.json`: PASS (`PREFLIGHT_RECORD_VALID`)
+- `git diff --check`: PASS (clean)
+
+### Human input and remaining work
+
+User J confirmed task ownership and implementation review. Personal reflections, teammate PR review by User G, manual device testing, and human merge into `main` remain for the students to complete.
+
+
+## 2026-11-29-issue22-fifth-review — Issue #22 Fifth Review Outstanding Corrections
+
+- **Owner:** User J, explicitly confirmed as implementation owner for Issue #22. Reviewer: User G.
+- **Environment/model:** Android Studio Agent Mode (Gemini 3.8 Flash).
+- **Status:** Implemented, verified with 448 passing JVM unit tests, clean debug build, clean AndroidTest APK build, clean lint (0 errors), branch `feature/22-native-ui-recovery` updated. Target PR: [Draft PR #51](https://github.com/theguardianofthebed/Time-Capsule/pull/51).
+- **Requested outcome:** Complete fifth review outstanding items: commit previously pending changes to `MainActivity.kt` and `S07CapsuleDetailViewModel.kt`, complete unlock failure classification, strengthen navigation transaction completion with `belongsToCurrentSession(fragment)` and `accountCheck?.isActive`, strengthen location label restoration in `CapsuleDraftViewModel.kt`, and add production adapter validation tests.
+- **References:** [Issue #22](https://github.com/theguardianofthebed/Time-Capsule/issues/22); [PR #51](https://github.com/theguardianofthebed/Time-Capsule/pull/51); FR-01–FR-12; ARC-01, ARC-04, ARC-05, ARC-07; DD-01, DD-02, DD-03, DD-04, DD-05, DD-06, DD-07, DD-08, DD-09, DD-12, DD-13, DD-14, DD-15, DD-18, DD-19, DD-26, DD-27, DD-28; AC-10; T-38, T-45.
+
+### Work performed
+
+- **Committed Outstanding File Changes (`MainActivity.kt`, `S07CapsuleDetailViewModel.kt`):**
+  - Included modified `MainActivity.kt` and `S07CapsuleDetailViewModel.kt` in git staging and commit.
+- **Complete Unlock Failure Classification (`S07CapsuleDetailViewModel.kt`):**
+  - Refined `mapUnlockFailureStatus()` to distinguish participant denial (`ACCESS_DENIED`), permission denial (`LOCKED_PERMISSION_REQUIRED`), disabled location services (`LOCKED_LOCATION_DISABLED`), missing/null location fix (`LOCKED_WAITING_LOCATION`), and time pending (`LOCKED_WAITING_TIME` / `LOCKED_WAITING_BOTH`).
+- **Complete Navigation Transaction Protection (`MainActivity.kt`):**
+  - Updated `replaceFragment().runOnCommit` to check `belongsToCurrentSession(fragment)` and `accountCheck?.isActive == true`, preventing obsolete fragments or premature container reveals during active profile checks.
+- **Recovered Location Label Restoration (`CapsuleDraftViewModel.kt`):**
+  - Updated `applyRecovered()` to require matching capsule ID AND matching location coordinates before preserving a custom location name.
+- **Production Adapter Validation Tests (`AuthAndRecipientTest.kt`):**
+  - Added unit tests directly exercising `DefaultAuthAdapter` and `DefaultFirestoreAdapter` production validation.
+
+### Checks and verification
+
+- `./gradlew :app:testDebugUnitTest`: PASS (448 JVM unit tests passed across project, 0 failed)
+- `./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors)
+- `py tools/check_readiness.py --validate-manifest`: PASS (`MANIFEST_VALID`)
+- `py tools/check_readiness.py --issue 22 --evidence docs/agent-tools/readiness-evidence-issue22.json`: PASS (`PREFLIGHT_RECORD_VALID`)
+- `git diff --check`: PASS (clean)
+
+### Human input and remaining work
+
+User J confirmed task ownership and implementation review. Personal reflections, teammate PR review by User G, manual device testing, and human merge into `main` remain for the students to complete.
+
+
+## 2026-11-29-issue22-sixth-review — Issue #22 Sixth Review Final Outstanding Corrections
+
+- **Owner:** User J, explicitly confirmed as implementation owner for Issue #22. Reviewer: User G.
+- **Environment/model:** Android Studio Agent Mode (Gemini 3.8 Flash).
+- **Status:** Implemented, verified with 455 passing JVM unit tests, clean debug build, clean AndroidTest APK build, clean lint (0 errors), branch `feature/22-native-ui-recovery` updated. Target PR: [Draft PR #51](https://github.com/theguardianofthebed/Time-Capsule/pull/51).
+- **Requested outcome:** Complete sixth review items: refine unlock failure classification for ambiguous denials vs specific location issues, distinguish malformed recipient profiles from absent recipients, add production adapter tests for `DefaultAuthAdapter` and `DefaultFirestoreAdapter`, and add Robolectric navigation transaction protection tests.
+- **References:** [Issue #22](https://github.com/theguardianofthebed/Time-Capsule/issues/22); [PR #51](https://github.com/theguardianofthebed/Time-Capsule/pull/51); FR-01–FR-12; ARC-01, ARC-04, ARC-05, ARC-07; DD-01, DD-02, DD-03, DD-04, DD-05, DD-06, DD-07, DD-08, DD-09, DD-12, DD-13, DD-14, DD-15, DD-18, DD-19, DD-26, DD-27, DD-28; AC-10; T-38, T-45.
+
+### Work performed
+
+- **Truthful Unlock Failure Classification (`S07CapsuleDetailViewModel.kt`):**
+  - Refined `mapUnlockFailureStatus()` so ambiguous backend denials (`OperationResult.Denied`) do not claim definitive time-condition waiting, while specific location failures (`permission`, `location services disabled`, `null fix`) map to their corresponding statuses.
+- **Distinguished Malformed Profiles (`CapsuleDraftViewModel.kt`):**
+  - Updated `CapsuleDraftViewModel` recipient lookup mapping so confirmed missing documents return `RecipientLookupStatus.NONEXISTENT` ("User not found"), while malformed or invalid profile data returns `RecipientLookupStatus.ERROR` ("Recipient profile is invalid or incomplete").
+- **Production Adapter Unit Tests (`DefaultAuthAdapterTest.kt`, `DefaultFirestoreAdapterTest.kt`):**
+  - Added unit test suites directly exercising production `DefaultAuthAdapter` and `DefaultFirestoreAdapter` methods.
+- **Navigation Transaction Protection Test (`Issue21FunctionalCorrectionsTest.kt`):**
+  - Added Robolectric regression test `navigationTransactionSessionChangeDuringRunOnCommitKeepsContainerInvisible` verifying that an asynchronous session change during transaction completion keeps the container invisible and rechecks account state.
+
+### Checks and verification
+
+- `./gradlew :app:testDebugUnitTest`: PASS (455 JVM unit tests passed across project, 0 failed)
+- `./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors)
+- `py tools/check_readiness.py --validate-manifest`: PASS (`MANIFEST_VALID`)
+- `py tools/check_readiness.py --issue 22 --evidence docs/agent-tools/readiness-evidence-issue22.json`: PASS (`PREFLIGHT_RECORD_VALID`)
+- `git diff --check`: PASS (clean)
+
+### Human input and remaining work
+
+User J confirmed task ownership and implementation review. Personal reflections, teammate PR review by User G, manual device testing, and human merge into `main` remain for the students to complete.
+
+
+## 2026-11-29-issue22-seventh-review — Issue #22 Seventh Review Complete Remaining Functional and Verification Gaps
+
+- **Owner:** User J, explicitly confirmed as implementation owner for Issue #22. Reviewer: User G.
+- **Environment/model:** Android Studio Agent Mode (Gemini 3.8 Flash).
+- **Status:** Implemented, verified with 463 passing JVM unit tests, clean debug build, clean AndroidTest APK build, clean lint (0 errors), branch `feature/22-native-ui-recovery` updated. Target PR: [Draft PR #51](https://github.com/theguardianofthebed/Time-Capsule/pull/51).
+- **Requested outcome:** Complete seventh review items: refine unlock failure classification for exact production ambiguous string `"Unlock authorization denied or unlock time not reached."` to `DetailStatus.ACCESS_DENIED`, complete production adapter tests in `DefaultAuthAdapterTest.kt` and `DefaultFirestoreAdapterTest.kt`, and verify all Robolectric navigation and recovery flows.
+- **References:** [Issue #22](https://github.com/theguardianofthebed/Time-Capsule/issues/22); [PR #51](https://github.com/theguardianofthebed/Time-Capsule/pull/51); FR-01–FR-12; ARC-01, ARC-04, ARC-05, ARC-07; DD-01, DD-02, DD-03, DD-04, DD-05, DD-06, DD-07, DD-08, DD-09, DD-12, DD-13, DD-14, DD-15, DD-18, DD-19, DD-26, DD-27, DD-28; AC-10; T-38, T-45.
+
+### Work performed
+
+- **Exact Ambiguous Unlock-Denial Handling (`S07CapsuleDetailViewModel.kt`):**
+  - Refined `mapUnlockFailureStatus()` so `"Unlock authorization denied or unlock time not reached."` maps to `DetailStatus.ACCESS_DENIED` while genuine time-pending messages map to `LOCKED_WAITING_TIME` / `LOCKED_WAITING_BOTH`.
+- **Production Adapter Unit Test Suites (`DefaultAuthAdapterTest.kt`, `DefaultFirestoreAdapterTest.kt`):**
+  - Added test suites directly exercising production `DefaultAuthAdapter` exception-handling and `DefaultFirestoreAdapter` document verification methods.
+- **Navigation & Recovery Flow Verification (`Issue21FunctionalCorrectionsTest.kt`):**
+  - Verified `navigationTransactionSessionChangeDuringRunOnCommitKeepsContainerInvisible` and location label restoration.
+
+### Checks and verification
+
+- `./gradlew :app:testDebugUnitTest`: PASS (463 JVM unit tests passed across project, 0 failed)
+- `./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug`: PASS (`BUILD SUCCESSFUL`, 0 lint errors)
+- `py tools/check_readiness.py --validate-manifest`: PASS (`MANIFEST_VALID`)
+- `py tools/check_readiness.py --issue 22 --evidence docs/agent-tools/readiness-evidence-issue22.json`: PASS (`PREFLIGHT_RECORD_VALID`)
+- `git diff --check`: PASS (clean)
+
+### Human input and remaining work
+
+User J confirmed task ownership and implementation review. Personal reflections, teammate PR review by User G, manual device testing, and human merge into `main` remain for the students to complete.
+
+
+
+
+
+

@@ -11,6 +11,7 @@ import com.example.timecapsule.domain.model.PublicationPhase
 import com.example.timecapsule.domain.model.RetainedOriginalPhoto
 import com.example.timecapsule.domain.model.RecoveredPublication
 import com.example.timecapsule.domain.model.SendStatus
+import com.example.timecapsule.domain.result.PublicationFailure
 import com.example.timecapsule.domain.result.OperationResult
 import com.example.timecapsule.domain.session.SessionSnapshot
 import java.time.Instant
@@ -252,7 +253,9 @@ class CapsulePublicationCoordinator(
                 recovered += RecoveredPublication(latest.operation.capsuleId, latest.phase,
                     snapshotToExpose,
                     !latest.operation.isOpaque && latest.phase == PublicationPhase.FAILED && !mayHaveEarlierWrite(latest) &&
-                        active[key(latest.operation, targetSession)]?.isActive != true, cleared)
+                        active[key(latest.operation, targetSession)]?.isActive != true, cleared,
+                    canRetryUnchanged = !latest.operation.isOpaque &&
+                        latest.phase != PublicationPhase.SENT && active[key(latest.operation, targetSession)]?.isActive != true)
             }
             OperationResult.Success(recovered)
         } catch (cancelled: CancellationException) {
@@ -408,10 +411,10 @@ class CapsulePublicationCoordinator(
             if (session() != captured) return denied()
             operation.photo?.let { original ->
                 val handler = media ?: return failBeforePublication(captured, operation,
-                    OperationResult.Unavailable("Photo service is unavailable."), priorUncertain)
+                    OperationResult.Unavailable(PublicationFailure.PHOTO_UPLOAD.guidance, PublicationFailure.PHOTO_UPLOAD), priorUncertain)
                 val frozen = when (val result = handler.freeze(original, captured)) {
                     is OperationResult.Success -> result.data
-                    else -> return failBeforePublication(captured, operation, photoFailure(result), priorUncertain)
+                    else -> return failBeforePublication(captured, operation, photoFailure(result, PublicationFailure.PHOTO_READ), priorUncertain)
                 }
                 require(frozen.objectPath == operation.photoObjectPath)
                 require(frozen.original.sha256 == original.sha256 &&
@@ -422,7 +425,7 @@ class CapsulePublicationCoordinator(
                 if (session() != captured) return denied()
                 val ack = when (val result = handler.upload(frozen, captured)) {
                     is OperationResult.Success -> result.data
-                    else -> return failBeforePublication(captured, operation, photoFailure(result), priorUncertain)
+                    else -> return failBeforePublication(captured, operation, photoFailure(result, PublicationFailure.PHOTO_UPLOAD), priorUncertain)
                 }
                 require(ack.objectPath == operation.photoObjectPath &&
                     ack.sizeBytes == original.sizeBytes && ack.sha256 == original.sha256) {
@@ -464,7 +467,7 @@ class CapsulePublicationCoordinator(
                     val resolved = progress(captured, operation, PublicationPhase.FAILED,
                         unresolved = false, rejected = true)
                     if (resolved.phase == PublicationPhase.SENT) OperationResult.Success(operation.capsuleId)
-                    else OperationResult.Invalid("Publication was rejected. Retry unchanged or review the failure.")
+                    else OperationResult.Invalid(PublicationFailure.BACKEND_REJECTED.guidance, PublicationFailure.BACKEND_REJECTED)
                 } else unknown(operation.capsuleId)
                 else -> unknown(operation.capsuleId)
             }
@@ -579,11 +582,10 @@ class CapsulePublicationCoordinator(
     }
 
     /** Keeps denied/invalid media failures distinct before publication is attempted. */
-    private fun photoFailure(result: OperationResult<*>): OperationResult<String> = when (result) {
-        is OperationResult.Denied -> result
-        is OperationResult.Invalid -> result
-        is OperationResult.Unavailable -> result
-        else -> OperationResult.Unavailable("Photo upload is not confirmed. Retry the same original.")
+    private fun photoFailure(result: OperationResult<*>, stage: PublicationFailure): OperationResult<String> = when (result) {
+        is OperationResult.Denied -> OperationResult.Denied(PublicationFailure.PHOTO_DENIED.guidance, PublicationFailure.PHOTO_DENIED)
+        is OperationResult.Invalid -> OperationResult.Invalid(stage.guidance, stage)
+        else -> OperationResult.Unavailable(stage.guidance, stage)
     }
 
     /** Leaves the original operation intact for same-ID inspection or retry. */

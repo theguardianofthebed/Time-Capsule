@@ -18,11 +18,11 @@
 
         <ImageButton
             android:id="@+id/btnHeaderAccount"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
             android:background="?selectableItemBackgroundBorderless"
             android:contentDescription="@string/nav_account"
-            android:src="@drawable/ic_logout" />
+            android:src="@drawable/ic_account" />
 
         <TextView
             android:layout_width="0dp"
@@ -36,11 +36,11 @@
 
         <ImageButton
             android:id="@+id/btnHeaderRefresh"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
             android:background="?selectableItemBackgroundBorderless"
-            android:contentDescription="@string/s08_btn_create_capsule"
-            android:src="@drawable/ic_edit" />
+            android:contentDescription="@string/nav_refresh"
+            android:src="@drawable/ic_refresh" />
     </LinearLayout>
 
     <!-- Intro Section -->
@@ -74,7 +74,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
             android:text="@string/s03_subtitle"
-            android:textColor="@color/capsule_text_muted"
+            android:textColor="@color/capsule_text_body"
             android:textSize="13sp" />
     </LinearLayout>
 
@@ -103,25 +103,27 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="@string/s03_tab_sent"
-            android:textColor="@color/capsule_text_muted" />
+            android:textColor="@color/capsule_text_body" />
     </LinearLayout>
 
     <!-- Stale / Offline Banner -->
     <TextView
         android:id="@+id/tvStaleBanner"
+        android:accessibilityLiveRegion="polite"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@color/capsule_banner_bg"
         android:padding="8dp"
         android:text="@string/s03_stale_banner"
         android:textAlignment="center"
-        android:textColor="@color/capsule_banner_text"
+        android:textColor="@color/capsule_text_body"
         android:textSize="12sp"
         android:visibility="gone" />
 
     <!-- Error Banner -->
     <TextView
         android:id="@+id/tvErrorMessage"
+        android:accessibilityLiveRegion="polite"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@color/capsule_error_bg"
@@ -162,7 +164,7 @@
                 android:layout_marginTop="32dp"
                 android:gravity="center"
                 android:text="@string/s03_empty_received"
-                android:textColor="@color/capsule_text_muted"
+                android:textColor="@color/capsule_text_body"
                 android:textSize="14sp"
                 android:visibility="gone" />
 
@@ -195,7 +197,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="@string/nav_create"
-            android:textColor="@color/capsule_text_muted" />
+            android:textColor="@color/capsule_text_body" />
 
         <Button
             android:id="@+id/btnNavAccount"
@@ -204,7 +206,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="@string/nav_account"
-            android:textColor="@color/capsule_text_muted" />
+            android:textColor="@color/capsule_text_body" />
     </LinearLayout>
 
 </LinearLayout>

@@ -7,14 +7,17 @@ import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
 import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import com.google.firebase.auth.FirebaseAuthWeakPasswordException
+import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.UserProfileChangeRequest
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.tasks.await
 
 /**
  * Production implementation of [AuthAdapter] using Firebase Authentication.
  */
 class DefaultAuthAdapter(
-    private val authSupplier: () -> FirebaseAuth = { FirebaseAuth.getInstance() }
+    private val authSupplier: () -> FirebaseAuth = { FirebaseAuth.getInstance() },
+    private val profileUpdater: (suspend (FirebaseUser, String) -> Unit)? = null
 ) : AuthAdapter {
 
     override fun activeUid(): String? = authSupplier().currentUser?.uid
@@ -58,10 +61,19 @@ class DefaultAuthAdapter(
             val user = result.user
             if (user != null) {
                 if (trimmedName.isNotBlank()) {
-                    val profileUpdates = UserProfileChangeRequest.Builder()
-                        .setDisplayName(trimmedName)
-                        .build()
-                    user.updateProfile(profileUpdates).await()
+                    try {
+                        if (profileUpdater != null) {
+                            profileUpdater.invoke(user, trimmedName)
+                        } else {
+                            val profileUpdates = UserProfileChangeRequest.Builder()
+                                .setDisplayName(trimmedName)
+                                .build()
+                            user.updateProfile(profileUpdates).await()
+                        }
+                    } catch (e: Exception) {
+                        if (e is CancellationException) throw e
+                        // Account creation in Auth succeeded; profile display name update can be completed during profile repair
+                    }
                 }
                 OperationResult.Success(user.uid)
             } else {
@@ -102,6 +114,7 @@ class DefaultAuthAdapter(
 
     private fun <T> mapAuthException(e: Exception): OperationResult<T> {
         return when (e) {
+            is CancellationException -> throw e
             is FirebaseNetworkException -> {
                 OperationResult.Unavailable("Network unavailable. Please check your connection.")
             }
@@ -112,13 +125,13 @@ class DefaultAuthAdapter(
                 OperationResult.Invalid("User email is already registered.")
             }
             is FirebaseAuthInvalidCredentialsException -> {
-                OperationResult.Invalid("Invalid credentials provided.")
+                OperationResult.Invalid("Email or password is incorrect. Check both and retry.")
             }
             is FirebaseAuthInvalidUserException -> {
                 OperationResult.Denied("User account disabled or not found.")
             }
             else -> {
-                OperationResult.Denied("Authentication operation failed: ${e.localizedMessage ?: e.message}")
+                OperationResult.Unavailable("Account service unavailable. Check your connection and retry.")
             }
         }
     }

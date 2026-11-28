@@ -101,6 +101,8 @@ class CapsulePublicationCoordinatorTest {
         val result = coordinator(CapsulePublicationBackend { calls.incrementAndGet(); Unit }, media)
             .publish(draft(true))
         assertTrue(result is OperationResult.Unavailable)
+        assertEquals("Photo upload unavailable. Check your connection and retry the same capsule.",
+            (result as OperationResult.Unavailable).message)
         assertEquals(0, calls.get())
         assertEquals(PublicationPhase.FAILED, journal.load("sender", "one")?.phase)
     }
