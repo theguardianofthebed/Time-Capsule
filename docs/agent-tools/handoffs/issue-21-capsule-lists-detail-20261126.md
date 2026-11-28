@@ -221,11 +221,23 @@
    - In `DefaultLocalRetentionAdapter.kt`, recognizes legacy v1/v2 complete markers while enforcing `contentCommitted == "true"` for version 3.
    - Preserves `contentCommitted = "true"`, `hasText`, and `hasPhoto` when refreshing unlock evidence for an already committed capsule.
 
+## 10. Tenth Review Bounded Functional Corrections (28 November 2026)
+
+1. **Recoverable Time-Lock Verification:**
+   - In `S07CapsuleDetailViewModel.mapUnlockFailureStatus()`, distinguished time-lock pending status ("unlock time not reached") from non-participant access denial.
+   - Maps pending time locks to `DetailStatus.LOCKED_WAITING_TIME` (or `LOCKED_WAITING_BOTH`), preserving locked status badge and enabling verification retry action.
+
+2. **Display Known Location-Lock Conditions in S07:**
+   - In `S07CapsuleDetailFragment.renderUiState()`, formatted and rendered location target coordinates and radius (e.g., `Target location: (37.5665, 126.9780) · 150 m radius`) for `LOCATION` and `TIME_AND_LOCATION` lock modes.
+
+3. **Offline Self-Send List Consistency:**
+   - In `DefaultCapsuleRepository.lists()`, when using offline retained entries, populated matching self-send entries (`senderUid == cleanUid` && `recipientUid == cleanUid`) in both `received` AND `sent` tabs (deduplicated by `capsuleId`).
+
 ---
 
-## 10. Verification and Checks Summary
+## 11. Verification and Checks Summary
 
-- `./gradlew :app:testDebugUnitTest`: **PASS (376 passed, 0 failed)**
+- `./gradlew :app:testDebugUnitTest`: **PASS (401 passed, 0 failed)**
 - `./gradlew :app:assembleDebug :app:assembleDebugAndroidTest`: **PASS (`BUILD SUCCESSFUL`)**
 - `./gradlew :app:clean :app:lintDebug`: **PASS (`BUILD SUCCESSFUL`, 0 lint errors)**
 - `py tools/check_readiness.py --issue 21 --evidence docs/agent-tools/readiness-evidence-issue21.json`: **PASS (`PREFLIGHT_RECORD_VALID`)**
@@ -233,11 +245,12 @@
 
 ---
 
-## 11. Next Human Action
+## 12. Next Human Action
 
 1. User G code review of branch `feature/21-capsule-lists-detail`.
 2. Manual end-to-end verification on Android device/emulator (S-03 list tabs, S-07 detail unlock, Author copy view, notification tap, and offline process relaunch re-view).
 3. Merge PR #47 after teammate approval.
+
 
 ## Ninth review · 28 November 2026
 

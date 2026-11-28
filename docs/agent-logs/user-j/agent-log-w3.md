@@ -846,3 +846,19 @@ User J · MVP · PR #47 · human reviewer User G. Continued from `dc77f318`. Rep
 Final verification passed 399 JVM tests (0 failed or skipped), debug APK assembly, AndroidTest APK assembly, lint (0 errors, 166 warnings), 42 Firebase emulator rules tests, Issue #21 readiness and the whitespace check. APKs were built. On-device instrumentation and manual permission/GPS journeys remain pending.
 
 [Test names, observed failures, corrected production functions and passing assertions](../../agent-tools/handoffs/issue-21-capsule-lists-detail-20261126.md#ninth-review--28-november-2026) · [PR #47](https://github.com/theguardianofthebed/Time-Capsule/pull/47)
+
+### Tenth Review Bounded Functional Corrections Applied (28 November 2026)
+
+- **1. Recoverable Time-Lock Verification:**
+  - In `S07CapsuleDetailViewModel.mapUnlockFailureStatus()`, distinguished time-lock pending status ("unlock time not reached") from non-participant access denial.
+  - Maps pending time locks to `DetailStatus.LOCKED_WAITING_TIME` (or `LOCKED_WAITING_BOTH`), preserving locked status badge and enabling verification retry action.
+- **2. Display Known Location-Lock Conditions in S07:**
+  - In `S07CapsuleDetailFragment.renderUiState()`, formatted and rendered location target coordinates and radius (e.g., `Target location: (37.5665, 126.9780) · 150 m radius`) for `LOCATION` and `TIME_AND_LOCATION` lock modes.
+- **3. Offline Self-Send List Consistency:**
+  - In `DefaultCapsuleRepository.lists()`, when using offline retained entries, populated matching self-send entries (`senderUid == cleanUid` && `recipientUid == cleanUid`) in both `received` AND `sent` tabs (deduplicated by `capsuleId`).
+- **4. Automated Verification Suite:**
+  - Total **401 JVM unit tests passed** (`./gradlew :app:testDebugUnitTest`).
+  - Debug and AndroidTest APKs built cleanly (`./gradlew :app:assembleDebug :app:assembleDebugAndroidTest`).
+  - Lint passed cleanly with 0 errors (`./gradlew :app:clean :app:lintDebug`).
+  - Readiness check passed (`PREFLIGHT_RECORD_VALID`).
+

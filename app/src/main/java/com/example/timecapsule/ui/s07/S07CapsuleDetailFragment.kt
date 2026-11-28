@@ -21,6 +21,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.example.timecapsule.MainActivity
 import com.example.timecapsule.R
 import com.example.timecapsule.databinding.FragmentS07CapsuleDetailBinding
+import com.example.timecapsule.domain.model.LockMode
 import com.example.timecapsule.ui.ViewModelFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -165,7 +166,23 @@ class S07CapsuleDetailFragment : Fragment() {
             binding.tvS07Meta.text = "Sent $dateStr by $senderName"
 
             val unlockAtStr = summary.lock?.unlockAt?.let { formatter.format(it) } ?: "Not specified"
-            binding.tvS07LockCondition.text = "Unlock time: $unlockAtStr\nLock mode: ${summary.lock?.mode?.name ?: "Unknown"}"
+            val lockModeStr = summary.lock?.mode?.name ?: "Unknown"
+
+            val locationText = if (summary.lock?.mode == LockMode.LOCATION || summary.lock?.mode == LockMode.TIME_AND_LOCATION) {
+                val loc = summary.lock.location
+                if (loc != null) {
+                    val radius = loc.radiusMeters.toInt()
+                    val latFormatted = "%.4f".format(loc.latitude)
+                    val lngFormatted = "%.4f".format(loc.longitude)
+                    "\nTarget location: ($latFormatted, $lngFormatted) · $radius m radius"
+                } else {
+                    "\nTarget location: Unavailable"
+                }
+            } else {
+                ""
+            }
+
+            binding.tvS07LockCondition.text = "Unlock time: $unlockAtStr\nLock mode: $lockModeStr$locationText"
         } else {
             binding.tvS07Headline.text = ""
             binding.tvS07Meta.text = ""

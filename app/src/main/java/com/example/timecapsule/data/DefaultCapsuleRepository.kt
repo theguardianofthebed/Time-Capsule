@@ -143,24 +143,44 @@ class DefaultCapsuleRepository(
         if (sentRes is OperationResult.Invalid) return sentRes
         if (receivedRes is OperationResult.Invalid) return receivedRes
 
-        val local = if (receivedRes is OperationResult.Unavailable) {
+        val local = if (receivedRes is OperationResult.Unavailable || sentRes is OperationResult.Unavailable) {
             retentionAdapter?.listVerifiedRecipientEntries(targetSession)
         } else null
         if (!sessionTracker.isSessionValid(targetSession)) {
             return OperationResult.Denied("Account session changed during offline lists fallback.")
         }
-        val sent = (sentRes as? OperationResult.Success)?.data
-        val received = (receivedRes as? OperationResult.Success)?.data
+        val sentRemote = (sentRes as? OperationResult.Success)?.data
+        val receivedRemote = (receivedRes as? OperationResult.Success)?.data
         val retained = (local as? OperationResult.Success)?.data
+
+        val offlineReceived = retained.orEmpty().map { it.toSummary(cleanUid) }
+        val offlineSelfSends = retained.orEmpty()
+            .filter { (it.senderUid.isNullOrBlank() || it.senderUid == cleanUid) && (it.recipientUid.isNullOrBlank() || it.recipientUid == cleanUid) }
+            .map { it.toSummary(cleanUid) }
+
+        val finalReceived = receivedRemote ?: offlineReceived
+        val finalSent = if (sentRemote != null) {
+            sentRemote
+        } else {
+            offlineSelfSends.distinctBy { it.capsuleId }
+        }
+
+        val sentProv = when {
+            sentRemote != null -> ListProvenance.SERVER_CONFIRMED
+            offlineSelfSends.isNotEmpty() -> ListProvenance.OFFLINE_RETAINED
+            else -> ListProvenance.UNAVAILABLE
+        }
+        val receivedProv = when {
+            receivedRemote != null -> ListProvenance.SERVER_CONFIRMED
+            retained != null -> ListProvenance.OFFLINE_RETAINED
+            else -> ListProvenance.UNAVAILABLE
+        }
+
         return OperationResult.Success(CapsuleListsSnapshot(
-            sent = sent.orEmpty(),
-            received = received ?: retained.orEmpty().map { it.toSummary(cleanUid) },
-            sentProvenance = if (sent != null) ListProvenance.SERVER_CONFIRMED else ListProvenance.UNAVAILABLE,
-            receivedProvenance = when {
-                received != null -> ListProvenance.SERVER_CONFIRMED
-                retained != null -> ListProvenance.OFFLINE_RETAINED
-                else -> ListProvenance.UNAVAILABLE
-            }
+            sent = finalSent,
+            received = finalReceived,
+            sentProvenance = sentProv,
+            receivedProvenance = receivedProv
         ))
     }
 

@@ -380,7 +380,8 @@ class Issue21FunctionalCorrectionsTest {
     /** A confirmed empty Received query remains distinguishable from an unavailable Sent query. */
     @Test fun tabsEmptyReceivedAndUnavailableSent() {
         fakeFirestoreAdapter.sentUnavailable = true
-        val model = S03CapsuleListViewModel(sessionTracker, repository)
+        val remoteOnly = DefaultCapsuleRepository(sessionTracker, fakeAuthAdapter, fakeFirestoreAdapter)
+        val model = S03CapsuleListViewModel(sessionTracker, remoteOnly)
         testDispatcher.scheduler.advanceUntilIdle()
         assertFalse(model.uiState.value.isReceivedUnavailable)
         assertTrue(model.uiState.value.isSentUnavailable)
@@ -656,6 +657,66 @@ class Issue21FunctionalCorrectionsTest {
             assertTrue(summary.isContentAvailable)
             assertNotNull(summary.title)
         }
+    }
+
+    @Test
+    fun timeLockVerificationReturnsLockedWaitingTime() = runBlocking {
+        val now = Instant.now()
+        fakeFirestoreAdapter.summaries["cap-time-locked"] = CapsuleSummary(
+            "cap-time-locked", userB, userA, CapsuleLock(LockMode.TIME, now.plusSeconds(3600)),
+            SendStatus.SENT, availability = Availability.LOCKED, title = "Time Locked"
+        )
+        fakeFirestoreAdapter.requirements["cap-time-locked"] = RecipientUnlockRequirements(
+            "cap-time-locked", userA, unlocked = false, lockMode = LockMode.TIME, unlockAt = now.plusSeconds(3600)
+        )
+
+        val fakeCoordinator = ForegroundRecoveryCoordinator(
+            repository, sessionTracker, ioDispatcher = testDispatcher
+        )
+        val viewModel = S07CapsuleDetailViewModel(sessionTracker, repository, fakeCoordinator)
+        viewModel.loadDetail("cap-time-locked")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertFalse(state.isUnlocked)
+        assertEquals(DetailStatus.LOCKED_WAITING_TIME, state.status)
+    }
+
+    @Test
+    fun offlineSelfSendAppearsInBothTabs() = runBlocking {
+        val sessionA = sessionTracker.currentSession()
+        val now = Instant.now()
+
+        val saveRes = retentionAdapter.saveRetainedContent(
+            targetSession = sessionA,
+            capsuleId = "cap-self-send-offline",
+            verifiedUnlockedAt = now,
+            text = "Self Send Note",
+            photoBytes = null,
+            photoFormat = null,
+            title = "Self Send Title",
+            lockMode = LockMode.TIME,
+            senderDisplayName = "Me",
+            recipientDisplayName = "Me"
+        )
+        assertTrue(saveRes is OperationResult.Success)
+
+        // Force network offline
+        fakeFirestoreAdapter.isNetworkDown = true
+
+        val listsRes = repository.lists(userA, sessionA)
+        assertTrue(listsRes is OperationResult.Success)
+        val snapshot = (listsRes as OperationResult.Success).data
+
+        // Must appear in Received tab
+        val receivedMatch = snapshot.received.firstOrNull { it.capsuleId == "cap-self-send-offline" }
+        assertNotNull(receivedMatch)
+        assertEquals("Self Send Title", receivedMatch?.title)
+
+        // Must ALSO appear in Sent tab
+        val sentMatch = snapshot.sent.firstOrNull { it.capsuleId == "cap-self-send-offline" }
+        assertNotNull(sentMatch)
+        assertEquals("Self Send Title", sentMatch?.title)
     }
 
     @Test

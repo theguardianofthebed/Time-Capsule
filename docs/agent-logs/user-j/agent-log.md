@@ -834,6 +834,22 @@ Implement complete bounded scope for Issue #21: S-03 Capsule Lists (Received and
   - Lint passed cleanly with 0 errors (`./gradlew :app:clean :app:lintDebug`).
   - Readiness check passed (`PREFLIGHT_RECORD_VALID`).
 
+### Tenth Review Bounded Functional Corrections Applied (28 November 2026)
+
+- **1. Recoverable Time-Lock Verification:**
+  - In `S07CapsuleDetailViewModel.mapUnlockFailureStatus()`, distinguished time-lock pending status ("unlock time not reached") from non-participant access denial.
+  - Maps pending time locks to `DetailStatus.LOCKED_WAITING_TIME` (or `LOCKED_WAITING_BOTH`), preserving locked status badge and enabling verification retry action.
+- **2. Display Known Location-Lock Conditions in S07:**
+  - In `S07CapsuleDetailFragment.renderUiState()`, formatted and rendered location target coordinates and radius (e.g., `Target location: (37.5665, 126.9780) · 150 m radius`) for `LOCATION` and `TIME_AND_LOCATION` lock modes.
+- **3. Offline Self-Send List Consistency:**
+  - In `DefaultCapsuleRepository.lists()`, when using offline retained entries, populated matching self-send entries (`senderUid == cleanUid` && `recipientUid == cleanUid`) in both `received` AND `sent` tabs (deduplicated by `capsuleId`).
+- **4. Automated Verification Suite:**
+  - Total **401 JVM unit tests passed** (`./gradlew :app:testDebugUnitTest`).
+  - Debug and AndroidTest APKs built cleanly (`./gradlew :app:assembleDebug :app:assembleDebugAndroidTest`).
+  - Lint passed cleanly with 0 errors (`./gradlew :app:clean :app:lintDebug`).
+  - Readiness check passed (`PREFLIGHT_RECORD_VALID`).
+
+
 
 ### Seventh Review Functional Corrections Applied (28 November 2026)
 

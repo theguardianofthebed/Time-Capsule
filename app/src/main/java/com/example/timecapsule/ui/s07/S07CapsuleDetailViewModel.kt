@@ -250,6 +250,16 @@ class S07CapsuleDetailViewModel(
     /** Distinguish device location guidance from an authoritative participant denial. */
     private fun mapUnlockFailureStatus(res: OperationResult<*>, lockMode: LockMode?): DetailStatus {
         val msg = resultErrorMessage(res)
+        val isTimeConditionPending = msg.contains("unlock time not reached", ignoreCase = true) ||
+                msg.contains("time not reached", ignoreCase = true) ||
+                msg.contains("time condition", ignoreCase = true)
+        if (isTimeConditionPending) {
+            return when (lockMode) {
+                LockMode.LOCATION -> DetailStatus.LOCKED_WAITING_LOCATION
+                LockMode.TIME_AND_LOCATION -> DetailStatus.LOCKED_WAITING_BOTH
+                LockMode.TIME, null -> DetailStatus.LOCKED_WAITING_TIME
+            }
+        }
         return when {
             (msg.contains("location", true) && msg.contains("permission", true)) -> DetailStatus.LOCKED_PERMISSION_REQUIRED
             msg.contains("disabled", ignoreCase = true) -> DetailStatus.LOCKED_LOCATION_DISABLED
