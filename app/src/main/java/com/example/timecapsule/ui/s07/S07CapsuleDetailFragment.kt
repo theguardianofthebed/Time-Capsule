@@ -44,6 +44,15 @@ class S07CapsuleDetailFragment : Fragment() {
     private var _binding: FragmentS07CapsuleDetailBinding? = null
     private val binding get() = _binding!!
 
+    fun refreshScreen() {
+        if (_binding != null) {
+            val capsuleId = arguments?.getString(ARG_CAPSULE_ID) ?: ""
+            if (capsuleId.isNotBlank()) {
+                viewModel.loadDetail(capsuleId)
+            }
+        }
+    }
+
     private var imageRenderJob: Job? = null
     private var imageRenderToken: Long = 0L
     private var activeRenderCapsuleId: String? = null

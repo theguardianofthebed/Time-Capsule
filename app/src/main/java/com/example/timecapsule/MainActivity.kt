@@ -141,6 +141,11 @@ class MainActivity : AppCompatActivity() {
                 val activeUid = container.accountSessionManager.restoreSessionIfAuthenticated()
                 if (!activeUid.isNullOrBlank()) {
                     container.recoveryCoordinator?.triggerForegroundRecovery()
+                    val currentFrag = supportFragmentManager.findFragmentById(R.id.fragmentContainer)
+                    when (currentFrag) {
+                        is S03CapsuleListFragment -> currentFrag.refreshScreen()
+                        is S07CapsuleDetailFragment -> currentFrag.refreshScreen()
+                    }
                 }
             }
         }

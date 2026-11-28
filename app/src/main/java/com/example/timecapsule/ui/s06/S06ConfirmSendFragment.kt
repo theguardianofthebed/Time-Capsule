@@ -58,6 +58,8 @@ class S06ConfirmSendFragment : Fragment() {
         return binding.root
     }
 
+    private var activeTargetCapsuleId: String? = null
+
     /** Obtains the activity-scoped draft so rotations do not restart publication. */
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
@@ -70,9 +72,9 @@ class S06ConfirmSendFragment : Fragment() {
                 mainActivity.container.recoveryCoordinator)
         )[CapsuleDraftViewModel::class.java]
 
-        val targetCapsuleId = arguments?.getString(ARG_CAPSULE_ID)
-        if (!targetCapsuleId.isNullOrBlank()) {
-            viewModel.recoverPublicationState(targetCapsuleId = targetCapsuleId)
+        activeTargetCapsuleId = arguments?.getString(ARG_CAPSULE_ID)
+        if (!activeTargetCapsuleId.isNullOrBlank()) {
+            viewModel.recoverPublicationState(targetCapsuleId = activeTargetCapsuleId)
         } else {
             viewModel.syncSessionState(mainActivity.container.repository, mainActivity.container.recoveryCoordinator)
         }
@@ -85,7 +87,9 @@ class S06ConfirmSendFragment : Fragment() {
     override fun onResume() {
         super.onResume()
         val mainActivity = activity as? MainActivity
-        if (mainActivity != null) {
+        if (!activeTargetCapsuleId.isNullOrBlank()) {
+            viewModel.recoverPublicationState(targetCapsuleId = activeTargetCapsuleId)
+        } else if (mainActivity != null) {
             viewModel.syncSessionState(mainActivity.container.repository, mainActivity.container.recoveryCoordinator)
         } else {
             viewModel.syncSessionState()
@@ -114,7 +118,7 @@ class S06ConfirmSendFragment : Fragment() {
                 else -> viewModel.retryPublication()
             }
         }
-        binding.btnCheckPublication.setOnClickListener { viewModel.recoverPublicationState() }
+        binding.btnCheckPublication.setOnClickListener { viewModel.recoverPublicationState(targetCapsuleId = activeTargetCapsuleId) }
         binding.btnReplacePublication.setOnClickListener { viewModel.replaceFailedPublication() }
 
         binding.btnNavMoments.setOnClickListener {

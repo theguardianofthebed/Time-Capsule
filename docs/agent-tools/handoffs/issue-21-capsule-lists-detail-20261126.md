@@ -185,9 +185,26 @@
 4. **Preserved Committed Assets Test:**
    - Added `refreshingUnlockEvidenceForCommittedCapsulePreservesBothAssets` to `Issue21FunctionalCorrectionsTest.kt`, verifying that saving a complete text + photo capsule, refreshing unlock evidence, and switching to offline mode preserves full offline readability for both assets.
 
+## 8. Seventh Review Functional Corrections (28 November 2026)
+
+1. **Package A — Finish Publication Recovery:**
+   - In `S03CapsuleListFragment.kt`, unresolved publication card button passes `pub.capsuleId` to `navigateToConfirmSend(pub.capsuleId)`.
+   - In `CapsuleDraftViewModel.kt`, strict targeted recovery (`recoverPublicationState`) requires target ID match when supplied without falling back to unrelated operations.
+   - In `S06ConfirmSendFragment.kt`, stores `activeTargetCapsuleId` and enforces targeted recovery throughout `onViewCreated`, `onResume`, and `btnCheckPublication`.
+
+2. **Package B — Complete S03/S07 User-Facing Behavior:**
+   - In `S03CapsuleListFragment.kt`, distinguishes unavailable network states (`isTabUnavailable`) from confirmed empty lists.
+   - In `S07CapsuleDetailFragment.kt` & `ViewModel`, renders detailed persistent lock/error states and actionable retry buttons.
+   - In `MainActivity.kt`, `onResume()` triggers foreground recovery and calls `refreshScreen()` on active S03 list or S07 detail fragment.
+
+3. **Package C — Version 3 Retention Marker & Metadata:**
+   - Upgraded `MARKER_VERSION` to `"3"` in `DefaultLocalRetentionAdapter.kt`.
+   - Version 3 requires `contentCommitted == "true"`. Legacy v1/v2 records with valid files remain readable.
+   - Preserves `contentCommitted = "true"`, `hasText`, and `hasPhoto` when refreshing unlock evidence for an already committed capsule.
+
 ---
 
-## 8. Verification and Checks Summary
+## 9. Verification and Checks Summary
 
 - `./gradlew :app:testDebugUnitTest`: **PASS (376 passed, 0 failed)**
 - `./gradlew :app:assembleDebug :app:assembleDebugAndroidTest`: **PASS (`BUILD SUCCESSFUL`)**
@@ -197,11 +214,12 @@
 
 ---
 
-## 9. Next Human Action
+## 10. Next Human Action
 
 1. User G code review of branch `feature/21-capsule-lists-detail`.
 2. Manual end-to-end verification on Android device/emulator (S-03 list tabs, S-07 detail unlock, Author copy view, notification tap, and offline process relaunch re-view).
 3. Merge PR #47 after teammate approval.
+
 
 
 

@@ -17,6 +17,7 @@ data class CapsuleListUiState(
     val unresolvedOperations: List<RecoveredPublication> = emptyList(),
     val errorMessage: String? = null,
     val freshness: ListFreshness = ListFreshness.SERVER_CONFIRMED,
+    val isTabUnavailable: Boolean = false,
     val sessionSnapshot: SessionSnapshot? = null
 ) {
     val isStale: Boolean

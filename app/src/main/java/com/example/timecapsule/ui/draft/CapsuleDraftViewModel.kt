@@ -732,15 +732,28 @@ class CapsuleDraftViewModel(
                 val result = recoverSaved(backend, capturedSession)
                 if (!isCurrentPublication(uid, token, capturedSession)) return@launch
                 if (result is OperationResult.Success) {
-                    val targeted = targetCapsuleId?.let { id -> result.data.firstOrNull { it.capsuleId == id } }
-                    val pending = result.data.firstOrNull { it.phase != PublicationPhase.SENT }
-                    val completed = result.data.firstOrNull {
-                        it.capsuleId == _uiState.value.capsuleId || it.clearedEditableDraft
+                    val recovered = if (!targetCapsuleId.isNullOrBlank()) {
+                        result.data.firstOrNull { it.capsuleId == targetCapsuleId }
+                    } else {
+                        val pending = result.data.firstOrNull { it.phase != PublicationPhase.SENT }
+                        val completed = result.data.firstOrNull {
+                            it.capsuleId == _uiState.value.capsuleId || it.clearedEditableDraft
+                        }
+                        pending ?: completed
                     }
-                    val recovered = targeted ?: pending ?: completed
-                    if (recovered != null) applyRecovered(recovered)
-                    else _uiState.update { it.copy(recoveryBusy = false, recoveryBlocked = false) }
-                    if (recovered == null && restoreEditable && _uiState.value.editable) restorePhotoDraft()
+                    if (recovered != null) {
+                        applyRecovered(recovered)
+                    } else if (!targetCapsuleId.isNullOrBlank()) {
+                        _uiState.update { it.copy(
+                            recoveryBusy = false,
+                            recoveryBlocked = true,
+                            statusOnly = true,
+                            publicationMessage = R.string.publication_recovery_failure
+                        ) }
+                    } else {
+                        _uiState.update { it.copy(recoveryBusy = false, recoveryBlocked = false) }
+                        if (restoreEditable && _uiState.value.editable) restorePhotoDraft()
+                    }
                 } else {
                     _uiState.update { it.copy(recoveryBusy = false, recoveryBlocked = !it.statusOnly,
                         publicationMessage = R.string.publication_recovery_failure) }

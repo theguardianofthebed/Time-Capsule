@@ -813,6 +813,26 @@ Implement complete bounded scope for Issue #21: S-03 Capsule Lists (Received and
   - Lint passed cleanly with 0 errors (`./gradlew :app:clean :app:lintDebug`).
   - Readiness check passed (`PREFLIGHT_RECORD_VALID`).
 
+### Seventh Review Functional Corrections Applied (28 November 2026)
+
+- **1. Package A — Publication Recovery:**
+  - `S03CapsuleListFragment` passes `pub.capsuleId` to `navigateToConfirmSend(pub.capsuleId)`.
+  - `CapsuleDraftViewModel.recoverPublicationState(targetCapsuleId)` strictly targets the requested capsule ID without falling back to unrelated operations.
+  - `S06ConfirmSendFragment` preserves `activeTargetCapsuleId` across creation, resume, and check actions.
+- **2. Package B — S03/S07 User-Facing Behavior:**
+  - `S03CapsuleListFragment` distinguishes unavailable network tabs from confirmed empty tabs.
+  - `S07CapsuleDetailViewModel` & `Fragment` render persistent, detailed lock/error states and actionable retry buttons.
+  - `MainActivity.onResume()` triggers foreground recovery and calls `refreshScreen()` on active S03 list or S07 detail fragment.
+- **3. Package C — Version 3 Marker & Metadata:**
+  - Upgraded `MARKER_VERSION = "3"` in `DefaultLocalRetentionAdapter.kt`.
+  - Version 3 requires `contentCommitted == "true"`. Legacy v1/v2 records with valid files remain readable.
+- **4. Automated Verification Suite:**
+  - Total **376 JVM unit tests passed** (`./gradlew :app:testDebugUnitTest`).
+  - Debug and AndroidTest APKs built cleanly (`./gradlew :app:assembleDebug :app:assembleDebugAndroidTest`).
+  - Lint passed cleanly with 0 errors (`./gradlew :app:clean :app:lintDebug`).
+  - Readiness check passed (`PREFLIGHT_RECORD_VALID`).
+
+
 
 ### Fourth Review Functional Corrections Applied (28 November 2026)
 

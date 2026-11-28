@@ -45,6 +45,12 @@ class S03CapsuleListFragment : Fragment() {
         )
     }
 
+    fun refreshScreen() {
+        if (_binding != null) {
+            viewModel.loadLists(explicitRefresh = false)
+        }
+    }
+
     var onOpenCapsuleDetailListener: ((String) -> Unit)? = null
     var onCreateCapsuleListener: (() -> Unit)? = null
     var onAccountSettingsListener: (() -> Unit)? = null
@@ -116,10 +122,13 @@ class S03CapsuleListFragment : Fragment() {
         }
 
         if (currentList.isEmpty() && state.unresolvedOperations.isEmpty() && !state.isLoading) {
-            binding.tvEmptyList.text = if (state.selectedTab == CapsuleTab.RECEIVED)
+            binding.tvEmptyList.text = if (state.isTabUnavailable) {
+                state.errorMessage ?: "Unable to connect to network. Tap refresh to try again."
+            } else if (state.selectedTab == CapsuleTab.RECEIVED) {
                 getString(R.string.s03_empty_received)
-            else
+            } else {
                 getString(R.string.s03_empty_sent)
+            }
             binding.tvEmptyList.visibility = View.VISIBLE
             container.addView(binding.tvEmptyList)
         } else {
@@ -184,7 +193,7 @@ class S03CapsuleListFragment : Fragment() {
             val btnAction = Button(context).apply {
                 text = if (pub.phase == PublicationPhase.OUTCOME_UNKNOWN) "Check / Retry" else "Open Confirm Send (S-06)"
                 setOnClickListener {
-                    (requireActivity() as MainActivity).navigateToConfirmSend()
+                    (requireActivity() as MainActivity).navigateToConfirmSend(pub.capsuleId)
                 }
             }
             card.addView(btnAction)

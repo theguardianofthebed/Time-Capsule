@@ -31,7 +31,7 @@ class DefaultLocalRetentionAdapter(
 
     companion object {
         private val lock = StorageSession.lock
-        private const val MARKER_VERSION = "2"
+        private const val MARKER_VERSION = "3"
         private const val MARKER_FILE_NAME = "verified-marker.properties"
         private const val TEXT_FILE_NAME = "content.text"
         private const val PHOTO_FILE_NAME = "content.photo"
@@ -359,7 +359,7 @@ class DefaultLocalRetentionAdapter(
             val markerCapsuleId = properties.getProperty("capsuleId")
             val unlockTimeStr = properties.getProperty("verifiedUnlockedAt")
 
-            if ((version != MARKER_VERSION && version != "1") || markerUid != cleanUid || markerCapsuleId != cleanCapsuleId || unlockTimeStr == null) {
+            if ((version != "3" && version != "2" && version != "1") || markerUid != cleanUid || markerCapsuleId != cleanCapsuleId || unlockTimeStr == null) {
                 return OperationResult.Denied("Retained marker is invalid or belongs to another account.")
             }
 
@@ -461,7 +461,7 @@ class DefaultLocalRetentionAdapter(
             val markerCapsuleId = properties.getProperty("capsuleId")
             val unlockTimeStr = properties.getProperty("verifiedUnlockedAt")
 
-            if ((version != MARKER_VERSION && version != "1") || markerUid != cleanUid || markerCapsuleId != cleanCapsuleId || unlockTimeStr == null) {
+            if ((version != "3" && version != "2" && version != "1") || markerUid != cleanUid || markerCapsuleId != cleanCapsuleId || unlockTimeStr == null) {
                 return OperationResult.Denied("Retained marker is invalid or belongs to another account.")
             }
 
